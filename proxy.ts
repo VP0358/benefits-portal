@@ -85,6 +85,7 @@ export const config = {
     "/",
     "/login",
     "/dashboard/:path*",
+    "/profile/:path*",
     "/admin/:path*",
     "/points/:path*",
     "/orders/:path*",

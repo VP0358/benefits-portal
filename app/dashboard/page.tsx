@@ -109,7 +109,7 @@ export default async function DashboardPage() {
         {/* 今月の直紹介 携帯契約件数ボタン */}
         <ReferralContractsButton />
 
-        {/* 履歴・お知らせ */}
+        {/* 履歴・お知らせ・登録情報変更 */}
         <div className="grid grid-cols-2 gap-3">
           <Link href="/orders/history"
             className="rounded-2xl bg-white p-4 shadow-sm text-center hover:bg-slate-50 transition-colors">
@@ -124,6 +124,19 @@ export default async function DashboardPage() {
             <div className="text-xs text-slate-400 mt-0.5">獲得・利用の記録</div>
           </Link>
         </div>
+
+        {/* 登録情報変更ボタン */}
+        <Link href="/profile"
+          className="flex items-center justify-between rounded-2xl bg-white p-4 shadow-sm hover:shadow-md transition-shadow active:scale-[0.98]">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-xl">👤</div>
+            <div className="text-left">
+              <div className="text-sm font-semibold text-slate-800">登録情報の変更</div>
+              <div className="text-xs text-slate-400 mt-0.5">名前・住所・メール・パスワード</div>
+            </div>
+          </div>
+          <div className="text-slate-400 text-lg">›</div>
+        </Link>
 
         {/* お知らせエリア */}
         <div className="rounded-3xl bg-white p-5 shadow-sm">

@@ -22,6 +22,7 @@ const navItems = [
   { href: "/admin/audit",            label: "🔍 監査ログ" },
   { href: "/admin/export",           label: "📥 CSV エクスポート" },
   { href: "/admin/site-settings",    label: "⚙️ サイト設定" },
+  { href: "/admin/account",          label: "🔐 ログイン情報変更" },
 ];
 
 // 相談窓口は特別扱い（未読バッジを付ける）
