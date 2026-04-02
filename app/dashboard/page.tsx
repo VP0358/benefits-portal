@@ -4,6 +4,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import SignOutButton from "@/app/components/sign-out-button";
 import ViolaLogo from "@/app/components/viola-logo";
+import MenuCard from "./ui/menu-card";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -31,11 +32,6 @@ export default async function DashboardPage() {
   const btnPointsImage = siteSettings.btnPointsImageUrl ?? null;
   const btnReferralImage = siteSettings.btnReferralImageUrl ?? null;
 
-  const iconMap: Record<string, string> = {
-    smartphone: "📱", plane: "✈️", smile: "😊", cart: "🛒",
-    message: "💬", jar: "🫙", star: "⭐", heart: "❤️",
-  };
-
   return (
     <main className="min-h-screen bg-[#e6f2dc]">
       <div className="mx-auto max-w-md px-4 py-6 space-y-5">
@@ -43,7 +39,6 @@ export default async function DashboardPage() {
         {/* ヘッダー */}
         <div className="flex items-center justify-between">
           <div>
-            {/* ロゴ */}
             <div className="mb-1">
               <ViolaLogo size="md" />
             </div>
@@ -146,15 +141,19 @@ export default async function DashboardPage() {
             <h2 className="text-sm font-bold text-slate-600 mb-3 px-1">福利厚生サービス</h2>
             <div className="grid grid-cols-3 gap-3">
               {menus.map(menu => (
-                <a key={menu.id.toString()} href={menu.linkUrl}
-                  target="_blank" rel="noopener noreferrer"
-                  className="rounded-2xl bg-white p-4 shadow-sm text-center hover:shadow-md transition-shadow">
-                  <div className="text-2xl mb-2">{iconMap[menu.iconType || "star"] || "⭐"}</div>
-                  <div className="text-xs font-semibold text-slate-800">{menu.title}</div>
-                  {menu.subtitle && (
-                    <div className="text-xs text-slate-400 mt-0.5">{menu.subtitle}</div>
-                  )}
-                </a>
+                <MenuCard
+                  key={menu.id.toString()}
+                  id={menu.id.toString()}
+                  title={menu.title}
+                  subtitle={menu.subtitle}
+                  iconType={menu.iconType}
+                  menuType={menu.menuType}
+                  linkUrl={menu.linkUrl}
+                  contentData={menu.contentData}
+                  userName={user.name}
+                  userPhone={user.phone ?? ""}
+                  userEmail={user.email}
+                />
               ))}
             </div>
           </div>

@@ -119,7 +119,9 @@ model Menu {
   subtitle    String?  @db.VarChar(255)
   iconType    String?  @db.VarChar(50)
   imageUrl    String?  @db.VarChar(500)
-  linkUrl     String   @db.VarChar(500)
+  linkUrl     String   @default("") @db.VarChar(500)
+  menuType    String   @default("url") @db.VarChar(50)
+  contentData String?  @db.Text
   isActive    Boolean  @default(true)
   isHighlight Boolean  @default(false)
   sortOrder   Int      @default(0)

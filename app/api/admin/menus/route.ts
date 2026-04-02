@@ -8,7 +8,9 @@ const menuSchema = z.object({
   subtitle: z.string().max(255).optional().nullable(),
   iconType: z.string().max(50).optional().nullable(),
   imageUrl: z.string().url().max(500).optional().nullable().or(z.literal("")),
-  linkUrl: z.string().url().max(500),
+  linkUrl: z.string().max(500).optional().nullable().default(""),
+  menuType: z.string().max(50).default("url"),
+  contentData: z.string().optional().nullable(),
   isActive: z.boolean().default(true),
   isHighlight: z.boolean().default(false),
   sortOrder: z.number().int().min(0).default(0),
@@ -19,7 +21,7 @@ export async function GET() {
   if (guard.error) return guard.error;
 
   const menus = await prisma.menu.findMany({ orderBy: { sortOrder: "asc" } });
-  return NextResponse.json(menus.map(m => ({...m, id: m.id.toString()})));
+  return NextResponse.json(menus.map(m => ({ ...m, id: m.id.toString() })));
 }
 
 export async function POST(req: NextRequest) {
@@ -32,7 +34,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const data = {...parsed.data, imageUrl: parsed.data.imageUrl || null};
+  const data = {
+    ...parsed.data,
+    imageUrl: parsed.data.imageUrl || null,
+    linkUrl: parsed.data.linkUrl || "",
+  };
   const menu = await prisma.menu.create({ data });
-  return NextResponse.json({...menu, id: menu.id.toString()}, { status: 201 });
+  return NextResponse.json({ ...menu, id: menu.id.toString() }, { status: 201 });
 }
