@@ -1,0 +1,309 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  active
+  suspended
+  invited
+}
+
+enum AdminRole {
+  super_admin
+  admin
+  operator
+}
+
+enum PointSourceType {
+  auto
+  manual
+  external
+}
+
+enum PointTransactionType {
+  grant
+  adjust
+  external_import
+  use
+  expire
+  reversal
+}
+
+enum ContractStatus {
+  pending
+  active
+  canceled
+  suspended
+}
+
+enum RewardStatus {
+  scheduled
+  granted
+  canceled
+  reversed
+}
+
+model User {
+  id            BigInt     @id @default(autoincrement())
+  memberCode    String     @unique @db.VarChar(50)
+  name          String     @db.VarChar(255)
+  email         String     @unique @db.VarChar(255)
+  passwordHash  String     @db.VarChar(255)
+  status        UserStatus @default(active)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  lastLoginAt   DateTime?
+
+  referrals     UserReferral[]   @relation("ReferralsOfUser")
+  referredBy    UserReferral[]   @relation("ReferrerOfUser")
+  contracts     MobileContract[]
+  pointWallet   PointWallet?
+  pointLogs     PointTransaction[]
+  pointUsages   PointUsage[]
+  orders        Order[]
+}
+
+model Admin {
+  id           BigInt    @id @default(autoincrement())
+  name         String    @db.VarChar(255)
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @db.VarChar(255)
+  role         AdminRole @default(admin)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model UserReferral {
+  id             BigInt    @id @default(autoincrement())
+  userId         BigInt
+  referrerUserId BigInt
+  relationType   String    @default("direct") @db.VarChar(20)
+  isActive       Boolean   @default(true)
+  validFrom      DateTime
+  validTo        DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user     User @relation("ReferralsOfUser", fields: [userId], references: [id], onDelete: Cascade)
+  referrer User @relation("ReferrerOfUser", fields: [referrerUserId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([referrerUserId])
+}
+
+model ReferralHistory {
+  id                BigInt    @id @default(autoincrement())
+  userId            BigInt
+  referrerUserId    BigInt
+  actionType        String    @db.VarChar(50)
+  validFrom         DateTime?
+  validTo           DateTime?
+  operatedByAdminId BigInt?
+  note              String?   @db.VarChar(255)
+  createdAt         DateTime  @default(now())
+}
+
+model Menu {
+  id          BigInt   @id @default(autoincrement())
+  title       String   @unique @db.VarChar(255)
+  subtitle    String?  @db.VarChar(255)
+  iconType    String?  @db.VarChar(50)
+  imageUrl    String?  @db.VarChar(500)
+  linkUrl     String   @db.VarChar(500)
+  isActive    Boolean  @default(true)
+  isHighlight Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MediaFile {
+  id               BigInt   @id @default(autoincrement())
+  fileName         String   @db.VarChar(255)
+  originalFileName String   @db.VarChar(255)
+  contentType      String   @db.VarChar(100)
+  fileSize         BigInt
+  storageDisk      String   @db.VarChar(100)
+  storagePath      String   @db.VarChar(500)
+  publicUrl        String   @db.VarChar(500)
+  uploadedByType   String   @db.VarChar(20)
+  uploadedById     BigInt?
+  createdAt        DateTime @default(now())
+}
+
+model MobileContract {
+  id             BigInt         @id @default(autoincrement())
+  userId         BigInt
+  contractNumber String         @unique @db.VarChar(100)
+  planName       String         @db.VarChar(255)
+  monthlyFee     Decimal        @db.Decimal(10, 2)
+  status         ContractStatus @default(pending)
+  startedAt      DateTime?
+  confirmedAt    DateTime?
+  canceledAt     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  user    User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rewards ContractReferralReward[]
+}
+
+model ContractReferralReward {
+  id                    BigInt       @id @default(autoincrement())
+  contractId            BigInt
+  contractedUserId      BigInt
+  referrerUserId        BigInt
+  referralRelationId    BigInt
+  rewardMonth           String       @db.Char(7)
+  baseMonthlyFee        Decimal      @db.Decimal(10, 2)
+  rewardRate            Decimal      @db.Decimal(5, 4)
+  rewardPoints          Int
+  calculationTargetDate DateTime
+  status                RewardStatus @default(scheduled)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  contract MobileContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@unique([contractId, referrerUserId, rewardMonth])
+  @@index([contractedUserId])
+  @@index([referrerUserId])
+}
+
+model MonthlyRewardRun {
+  id                BigInt   @id @default(autoincrement())
+  rewardMonth       String   @db.Char(7)
+  closingDate       DateTime
+  mode              String   @db.VarChar(20)
+  totalContracts    Int      @default(0)
+  totalReferrers    Int      @default(0)
+  totalRewardPoints Int      @default(0)
+  executedByAdminId BigInt?
+  createdAt         DateTime @default(now())
+}
+
+model PointWallet {
+  id                     BigInt   @id @default(autoincrement())
+  userId                 BigInt   @unique
+  autoPointsBalance      Int      @default(0)
+  manualPointsBalance    Int      @default(0)
+  externalPointsBalance  Int      @default(0)
+  availablePointsBalance Int      @default(0)
+  usedPointsBalance      Int      @default(0)
+  expiredPointsBalance   Int      @default(0)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PointTransaction {
+  id              BigInt               @id @default(autoincrement())
+  userId          BigInt
+  transactionType PointTransactionType
+  pointSourceType PointSourceType
+  points          Int
+  balanceAfter    Int
+  relatedUserId   BigInt?
+  relatedContractId BigInt?
+  description     String?              @db.VarChar(255)
+  occurredAt      DateTime
+  createdByType   String               @db.VarChar(20)
+  createdById     BigInt?
+  createdAt       DateTime             @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([relatedContractId])
+}
+
+model PointUsage {
+  id                  BigInt   @id @default(autoincrement())
+  userId              BigInt
+  orderId             BigInt?
+  usedAutoPoints      Int      @default(0)
+  usedManualPoints    Int      @default(0)
+  usedExternalPoints  Int      @default(0)
+  totalUsedPoints     Int
+  usedAt              DateTime
+  createdAt           DateTime @default(now())
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([orderId])
+}
+
+model Product {
+  id          BigInt   @id @default(autoincrement())
+  name        String   @unique @db.VarChar(255)
+  description String?  @db.VarChar(500)
+  price       Int
+  imageUrl    String?  @db.VarChar(500)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orderItems OrderItem[]
+}
+
+model Order {
+  id             BigInt   @id @default(autoincrement())
+  userId         BigInt
+  orderNumber    String   @unique @db.VarChar(100)
+  status         String   @db.VarChar(30)
+  subtotalAmount Int
+  usedPoints     Int      @default(0)
+  totalAmount    Int
+  orderedAt      DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items      OrderItem[]
+  pointUsages PointUsage[]
+
+  @@index([userId])
+}
+
+model OrderItem {
+  id          BigInt   @id @default(autoincrement())
+  orderId     BigInt
+  productId   BigInt
+  productName String   @db.VarChar(255)
+  unitPrice   Int
+  quantity    Int
+  lineAmount  Int
+  createdAt   DateTime @default(now())
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model AdminAuditLog {
+  id          BigInt   @id @default(autoincrement())
+  adminId     BigInt?
+  actionType  String   @db.VarChar(100)
+  targetTable String   @db.VarChar(100)
+  targetId    String?  @db.VarChar(100)
+  beforeJson  Json?
+  afterJson   Json?
+  createdAt   DateTime @default(now())
+}
+
+model SiteSetting {
+  id           BigInt   @id @default(autoincrement())
+  settingKey   String   @unique @db.VarChar(100)
+  settingValue String?  @db.VarChar(1000)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

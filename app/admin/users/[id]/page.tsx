@@ -1,0 +1,116 @@
+import { prisma } from "@/lib/prisma";
+import { notFound } from "next/navigation";
+import ReferralManager from "./ui/referral-manager";
+import ContractForm from "./ui/contract-form";
+import ManualPointAdjuster from "./ui/manual-point-adjuster";
+
+export default async function AdminUserDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  let userId: bigint;
+  try { userId = BigInt(id); } catch { notFound(); return; }
+
+  const [user, referrerOptions] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        pointWallet: true,
+        referrals: { where: { isActive: true }, include: { referrer: true } },
+        contracts: true,
+        pointLogs: { orderBy: { occurredAt: "desc" }, take: 20 },
+      },
+    }),
+    prisma.user.findMany({
+      where: { id: { not: userId } },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, email: true },
+      take: 200,
+    }),
+  ]);
+
+  if (!user) notFound();
+
+  const initialReferrals = user!.referrals.map(ref => ({
+    id: ref.id.toString(),
+    referrerName: ref.referrer.name,
+    referrerEmail: ref.referrer.email,
+    isActive: ref.isActive,
+  }));
+
+  const referrerItems = referrerOptions.map(item => ({ id: item.id.toString(), name: item.name, email: item.email }));
+
+  return (
+    <main className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-slate-800">会員詳細</h1>
+        <p className="mt-2 text-slate-600">{user!.memberCode} / {user!.name}</p>
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-slate-800">基本情報</h2>
+          <div className="mt-4 space-y-2 text-sm text-slate-700">
+            <div>会員番号: <span className="font-medium">{user!.memberCode}</span></div>
+            <div>氏名: <span className="font-medium">{user!.name}</span></div>
+            <div>メール: {user!.email}</div>
+            <div>状態: <span className={`rounded-full px-2 py-0.5 text-xs ${user!.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{user!.status}</span></div>
+          </div>
+        </section>
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-slate-800">ポイント残高</h2>
+          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+            {[
+              { label: "自動", value: user!.pointWallet?.autoPointsBalance ?? 0 },
+              { label: "手動", value: user!.pointWallet?.manualPointsBalance ?? 0 },
+              { label: "外部", value: user!.pointWallet?.externalPointsBalance ?? 0 },
+              { label: "利用可能", value: user!.pointWallet?.availablePointsBalance ?? 0 },
+            ].map(item => (
+              <div key={item.label} className="rounded-2xl bg-slate-50 p-3">
+                <div className="text-xs text-slate-500">{item.label}ポイント</div>
+                <div className="mt-1 text-lg font-bold text-slate-800">{item.value.toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-slate-800">紹介者管理</h2>
+          <div className="mt-4">
+            <ReferralManager userId={user!.id.toString()} initialReferrals={initialReferrals} referrerOptions={referrerItems} />
+          </div>
+        </section>
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-slate-800">契約登録</h2>
+          <div className="mt-4"><ContractForm userId={user!.id.toString()} /></div>
+        </section>
+      </div>
+      <section className="rounded-3xl bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-bold text-slate-800">契約一覧</h2>
+        <div className="mt-4 space-y-3 text-sm">
+          {user!.contracts.length === 0 ? <div className="text-slate-500">契約はありません。</div> : user!.contracts.map(contract => (
+            <div key={contract.id.toString()} className="rounded-2xl border p-3">
+              <div className="font-semibold text-slate-800">{contract.planName}</div>
+              <div className="text-slate-500">契約番号: {contract.contractNumber}</div>
+              <div className="text-slate-500">月額: {Number(contract.monthlyFee).toLocaleString()}円</div>
+              <div><span className={`rounded-full px-2 py-0.5 text-xs ${contract.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{contract.status}</span></div>
+            </div>
+          ))}
+        </div>
+      </section>
+      <section className="rounded-3xl bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-bold text-slate-800">手動ポイント加算 / 減算</h2>
+        <div className="mt-4"><ManualPointAdjuster userId={user!.id.toString()} /></div>
+      </section>
+      <section className="rounded-3xl bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-bold text-slate-800">最新ポイント履歴</h2>
+        <div className="mt-4 space-y-2 text-sm">
+          {user!.pointLogs.length === 0 ? <div className="text-slate-500">履歴はありません。</div> : user!.pointLogs.map(log => (
+            <div key={log.id.toString()} className="grid grid-cols-[160px_120px_100px_1fr] gap-4 rounded-2xl border p-3">
+              <div className="text-slate-500">{new Date(log.occurredAt).toLocaleString("ja-JP")}</div>
+              <div>{log.transactionType}</div>
+              <div className={log.points > 0 ? "text-emerald-600 font-medium" : "text-red-600 font-medium"}>{log.points > 0 ? "+" : ""}{log.points.toLocaleString()}</div>
+              <div className="text-slate-600">{log.description}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}
