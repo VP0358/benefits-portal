@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ViolaLogo from "@/app/components/viola-logo";
 
 export default function ReferralPage() {
   const [referralCode, setReferralCode] = useState("");
@@ -49,6 +50,7 @@ export default function ReferralPage() {
           <Link href="/dashboard" className="text-slate-500 hover:text-slate-700">
             ← 戻る
           </Link>
+          <ViolaLogo size="sm" />
           <h1 className="text-xl font-bold text-slate-800">友達・知人を紹介する</h1>
         </div>
 

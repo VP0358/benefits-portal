@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import ViolaLogo from "@/app/components/viola-logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -60,8 +61,11 @@ export default function LoginPage() {
     <main className="min-h-screen bg-[#e6f2dc] flex items-center justify-center p-4">
       <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-slate-800">福利厚生ポータル</h1>
-          <p className="mt-2 text-slate-500">ログインしてください</p>
+          {/* ロゴ */}
+          <div className="flex justify-center mb-4">
+            <ViolaLogo size="lg" />
+          </div>
+          <p className="mt-2 text-slate-500 text-sm">ログインしてください</p>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4">

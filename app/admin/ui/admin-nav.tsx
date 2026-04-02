@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import SignOutButton from "@/app/components/sign-out-button";
+import ViolaLogo from "@/app/components/viola-logo";
 
 const navItems = [
   { href: "/admin", label: "🏠 ダッシュボード" },
@@ -43,8 +44,11 @@ export default function AdminNav() {
   return (
     <aside className="rounded-3xl bg-white p-5 shadow-sm lg:sticky lg:top-6 lg:h-fit">
       <div className="mb-6">
-        <div className="text-xs text-slate-500">管理画面</div>
-        <div className="text-lg font-bold text-slate-800">福利厚生ポータル</div>
+        {/* ロゴ */}
+        <div className="flex items-center gap-2 mb-3">
+          <ViolaLogo size="md" />
+        </div>
+        <div className="text-xs text-slate-500 border-t border-slate-100 pt-2">管理画面</div>
       </div>
 
       {isPending && (

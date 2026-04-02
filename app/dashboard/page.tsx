@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import SignOutButton from "@/app/components/sign-out-button";
+import ViolaLogo from "@/app/components/viola-logo";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -42,8 +43,12 @@ export default async function DashboardPage() {
         {/* ヘッダー */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-lg font-bold text-slate-800">こんにちは、{user.name}さん</div>
-            <div className="text-sm text-slate-500">会員番号: {user.memberCode}</div>
+            {/* ロゴ */}
+            <div className="mb-1">
+              <ViolaLogo size="md" />
+            </div>
+            <div className="text-sm font-bold text-slate-800">こんにちは、{user.name}さん</div>
+            <div className="text-xs text-slate-500">会員番号: {user.memberCode}</div>
           </div>
           <SignOutButton className="text-sm text-slate-500 rounded-xl border px-3 py-1.5 hover:bg-white transition-colors" />
         </div>

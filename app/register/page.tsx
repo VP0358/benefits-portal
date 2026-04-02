@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, FormEvent, Suspense } from "react";
+import ViolaLogo from "@/app/components/viola-logo";
 
 type Referrer = { id: string; name: string; memberCode: string } | null;
 
@@ -125,8 +126,11 @@ function RegisterForm() {
 
         {/* ヘッダー */}
         <div className="text-center">
-          <div className="text-3xl font-bold text-slate-800">会員登録</div>
-          <div className="mt-2 text-sm text-slate-500">福利厚生ポータル</div>
+          <div className="flex justify-center mb-3">
+            <ViolaLogo size="lg" />
+          </div>
+          <div className="text-xl font-bold text-slate-800">会員登録</div>
+          <div className="mt-1 text-sm text-slate-500">福利厚生ポータル</div>
         </div>
 
         {/* 紹介者バナー */}
