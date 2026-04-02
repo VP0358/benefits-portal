@@ -2,7 +2,6 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
 import ViolaLogo from "@/app/components/viola-logo";
 
 export default function LoginPage() {
@@ -17,29 +16,43 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const result = await signIn("credentials", {
-        email: form.email,
-        password: form.password,
-        redirect: false,
+      // CSRFトークン取得
+      const csrfRes = await fetch("/api/auth/csrf");
+      const csrfData = await csrfRes.json();
+      const csrfToken = csrfData.csrfToken ?? "";
+
+      // credentials でログイン（フォームエンコード）
+      const res = await fetch("/api/auth/callback/credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          email:       form.email,
+          password:    form.password,
+          csrfToken,
+          callbackUrl: "/",
+          json:        "true",
+        }).toString(),
+        redirect: "manual",
       });
 
-      if (!result || result.error) {
+      // レスポンスのステータスに関わらずセッションを確認
+      const sessionRes = await fetch("/api/auth/session", { cache: "no-store" });
+      const session = await sessionRes.json();
+
+      if (!session?.user) {
         setError("メールアドレスまたはパスワードが正しくありません。");
         setLoading(false);
         return;
       }
 
-      // セッション確認してロールに応じてリダイレクト
-      const sessionRes = await fetch("/api/auth/session");
-      const session = await sessionRes.json();
-
-      if (session?.user?.role === "admin") {
-        router.push("/admin");
+      // ロールに応じてリダイレクト
+      if (session.user.role === "admin") {
+        window.location.href = "/admin";
       } else {
-        router.push("/dashboard");
+        window.location.href = "/dashboard";
       }
-      router.refresh();
-    } catch {
+    } catch (err) {
+      console.error("Login error:", err);
       setError("ログインに失敗しました。もう一度お試しください。");
       setLoading(false);
     }
@@ -49,7 +62,6 @@ export default function LoginPage() {
     <main className="min-h-screen bg-[#e6f2dc] flex items-center justify-center p-4">
       <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-sm">
         <div className="mb-8 text-center">
-          {/* ロゴ */}
           <div className="flex justify-center mb-4">
             <ViolaLogo size="lg" />
           </div>
@@ -64,6 +76,7 @@ export default function LoginPage() {
             <input
               type="email"
               required
+              autoComplete="email"
               className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:border-slate-600 focus:outline-none"
               placeholder="example@email.com"
               value={form.email}
@@ -78,6 +91,7 @@ export default function LoginPage() {
             <input
               type="password"
               required
+              autoComplete="current-password"
               className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:border-slate-600 focus:outline-none"
               placeholder="パスワードを入力"
               value={form.password}
@@ -85,16 +99,16 @@ export default function LoginPage() {
             />
           </div>
 
-          {error ? (
+          {error && (
             <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
               {error}
             </div>
-          ) : null}
+          )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+            className="w-full rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
           >
             {loading ? "ログイン中..." : "ログイン"}
           </button>
