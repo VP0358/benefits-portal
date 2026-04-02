@@ -112,6 +112,19 @@ export default function LoginPage() {
             {loading ? "ログイン中..." : "ログイン"}
           </button>
         </form>
+
+        {/* 新規登録リンク */}
+        <div className="mt-6 text-center">
+          <p className="text-sm text-slate-500">
+            アカウントをお持ちでない方は
+          </p>
+          <a
+            href="/register"
+            className="mt-2 block w-full rounded-xl border-2 border-slate-900 px-4 py-3 text-center font-semibold text-slate-900 hover:bg-slate-50 transition-colors"
+          >
+            新規会員登録
+          </a>
+        </div>
       </div>
     </main>
   );

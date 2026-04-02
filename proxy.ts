@@ -5,7 +5,7 @@ const MEMBER_DOMAIN = "viola-pure.net";
 const ADMIN_DOMAIN  = "viola-pure.xyz";
 
 // 認証不要なパス
-const PUBLIC_PATHS = ["/login", "/register", "/api/auth", "/_next", "/favicon"];
+const PUBLIC_PATHS = ["/login", "/register", "/api/auth", "/api/register", "/_next", "/favicon"];
 
 export default auth(function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -84,6 +84,7 @@ export const config = {
   matcher: [
     "/",
     "/login",
+    "/register",
     "/dashboard/:path*",
     "/profile/:path*",
     "/admin/:path*",
