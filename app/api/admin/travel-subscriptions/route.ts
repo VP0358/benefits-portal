@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/app/api/admin/route-guard";
+import { getTravelFee, getTravelPlanName } from "@/lib/travel-pricing";
 
 // 一覧取得
 export async function GET(req: NextRequest) {
@@ -46,6 +47,8 @@ export async function GET(req: NextRequest) {
   const data = subs.map(s => ({
     id: s.id.toString(),
     planName: s.planName,
+    level: s.level,
+    pricingTier: s.pricingTier,
     monthlyFee: Number(s.monthlyFee),
     status: s.status,
     startedAt: s.startedAt?.toISOString() ?? null,
@@ -74,8 +77,8 @@ export async function GET(req: NextRequest) {
 // 新規登録
 const createSchema = z.object({
   userId: z.string().min(1),
-  planName: z.string().min(1).max(255),
-  monthlyFee: z.number().nonnegative(),
+  level: z.number().int().min(1).max(5).default(1),
+  pricingTier: z.enum(["early", "standard"]).default("early"),
   status: z.enum(["pending", "active", "canceled", "suspended"]).default("pending"),
   startedAt: z.string().optional().nullable(),
   confirmedAt: z.string().optional().nullable(),
@@ -98,11 +101,17 @@ export async function POST(req: NextRequest) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return NextResponse.json({ error: "user not found" }, { status: 404 });
 
+  const { level, pricingTier } = parsed.data;
+  const monthlyFee = getTravelFee(pricingTier, level);
+  const planName = getTravelPlanName(pricingTier, level);
+
   const sub = await prisma.travelSubscription.create({
     data: {
       userId,
-      planName: parsed.data.planName,
-      monthlyFee: parsed.data.monthlyFee,
+      planName,
+      level,
+      pricingTier,
+      monthlyFee,
       status: parsed.data.status,
       startedAt: parsed.data.startedAt ? new Date(parsed.data.startedAt) : null,
       confirmedAt: parsed.data.confirmedAt ? new Date(parsed.data.confirmedAt) : null,
@@ -117,7 +126,7 @@ export async function POST(req: NextRequest) {
       actionType: "create",
       targetTable: "travelSubscription",
       targetId: sub.id.toString(),
-      afterJson: { planName: sub.planName, userId: userId.toString() },
+      afterJson: { planName: sub.planName, level, pricingTier, monthlyFee, userId: userId.toString() },
     },
   }).catch(() => {});
 
@@ -125,6 +134,8 @@ export async function POST(req: NextRequest) {
     id: sub.id.toString(),
     userId: sub.userId.toString(),
     planName: sub.planName,
+    level: sub.level,
+    pricingTier: sub.pricingTier,
     monthlyFee: Number(sub.monthlyFee),
     status: sub.status,
   }, { status: 201 });

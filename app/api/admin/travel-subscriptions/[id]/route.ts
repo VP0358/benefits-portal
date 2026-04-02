@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/app/api/admin/route-guard";
+import { getTravelFee, getTravelPlanName } from "@/lib/travel-pricing";
 
 const updateSchema = z.object({
-  planName: z.string().min(1).max(255).optional(),
-  monthlyFee: z.number().nonnegative().optional(),
+  level: z.number().int().min(1).max(5).optional(),
+  pricingTier: z.enum(["early", "standard"]).optional(),
   status: z.enum(["pending", "active", "canceled", "suspended"]).optional(),
   startedAt: z.string().optional().nullable(),
   confirmedAt: z.string().optional().nullable(),
@@ -35,11 +36,18 @@ export async function PATCH(
   if (!sub) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const data = parsed.data;
+
+  // level か pricingTier が変わった場合は月額・プラン名を自動更新
+  const newLevel = data.level ?? sub.level;
+  const newTier = (data.pricingTier ?? sub.pricingTier) as "early" | "standard";
+  const levelOrTierChanged = data.level !== undefined || data.pricingTier !== undefined;
+  const newMonthlyFee = levelOrTierChanged ? getTravelFee(newTier, newLevel) : Number(sub.monthlyFee);
+  const newPlanName = levelOrTierChanged ? getTravelPlanName(newTier, newLevel) : sub.planName;
+
   const updated = await prisma.travelSubscription.update({
     where: { id: subId },
     data: {
-      ...(data.planName !== undefined ? { planName: data.planName } : {}),
-      ...(data.monthlyFee !== undefined ? { monthlyFee: data.monthlyFee } : {}),
+      ...(levelOrTierChanged ? { level: newLevel, pricingTier: newTier, monthlyFee: newMonthlyFee, planName: newPlanName } : {}),
       ...(data.status !== undefined ? { status: data.status } : {}),
       ...(data.startedAt !== undefined ? { startedAt: data.startedAt ? new Date(data.startedAt) : null } : {}),
       ...(data.confirmedAt !== undefined ? { confirmedAt: data.confirmedAt ? new Date(data.confirmedAt) : null } : {}),
@@ -54,16 +62,22 @@ export async function PATCH(
       actionType: "update",
       targetTable: "travelSubscription",
       targetId: subId.toString(),
-      beforeJson: { status: sub.status, planName: sub.planName },
-      afterJson: { status: updated.status, planName: updated.planName },
+      beforeJson: { status: sub.status, level: sub.level, pricingTier: sub.pricingTier, monthlyFee: Number(sub.monthlyFee) },
+      afterJson: { status: updated.status, level: updated.level, pricingTier: updated.pricingTier, monthlyFee: Number(updated.monthlyFee) },
     },
   }).catch(() => {});
 
   return NextResponse.json({
-    ...updated,
     id: updated.id.toString(),
     userId: updated.userId.toString(),
+    planName: updated.planName,
+    level: updated.level,
+    pricingTier: updated.pricingTier,
     monthlyFee: Number(updated.monthlyFee),
+    status: updated.status,
+    startedAt: updated.startedAt?.toISOString() ?? null,
+    confirmedAt: updated.confirmedAt?.toISOString() ?? null,
+    note: updated.note ?? null,
   });
 }
 
