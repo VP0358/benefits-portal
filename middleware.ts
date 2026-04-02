@@ -1,21 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { auth } from "@/auth";
 
 // ドメイン設定
-const MEMBER_DOMAIN  = "viola-pure.net";   // 会員サイト
-const ADMIN_DOMAIN   = "viola-pure.xyz";   // 管理サイト
+const MEMBER_DOMAIN = "viola-pure.net"; // 会員サイト
+const ADMIN_DOMAIN = "viola-pure.xyz"; // 管理サイト
 
-export async function middleware(req: NextRequest) {
-  const secret = process.env.NEXTAUTH_SECRET;
+export default auth(function middleware(req) {
   const { pathname } = req.nextUrl;
   const hostname = req.headers.get("host") ?? "";
+  const session = req.auth;
+
+  const isMemberDomain =
+    hostname === MEMBER_DOMAIN || hostname === `www.${MEMBER_DOMAIN}`;
+  const isAdminDomain =
+    hostname === ADMIN_DOMAIN || hostname === `www.${ADMIN_DOMAIN}`;
 
   // ─────────────────────────────────────────────
-  // ① ドメインによるアクセス制限
+  // ① 認証チェック
   // ─────────────────────────────────────────────
 
-  const isMemberDomain = hostname === MEMBER_DOMAIN || hostname === `www.${MEMBER_DOMAIN}`;
-  const isAdminDomain  = hostname === ADMIN_DOMAIN  || hostname === `www.${ADMIN_DOMAIN}`;
+  // 未ログインなら /login へ
+  if (!session?.user) {
+    const loginUrl = req.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // ─────────────────────────────────────────────
+  // ② ドメインによるアクセス制限
+  // ─────────────────────────────────────────────
 
   // 【会員ドメイン (viola-pure.net)】から /admin にアクセスしようとした場合
   // → /dashboard にリダイレクト
@@ -25,15 +38,16 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // 【管理ドメイン (viola-pure.xyz)】から /dashboard など会員ページにアクセスしようとした場合
+  // 【管理ドメイン (viola-pure.xyz)】から会員ページにアクセスしようとした場合
   // → /admin にリダイレクト
-  if (isAdminDomain && (
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/points") ||
-    pathname.startsWith("/orders") ||
-    pathname === "/referral" ||
-    pathname.startsWith("/referral")
-  )) {
+  if (
+    isAdminDomain &&
+    (pathname.startsWith("/dashboard") ||
+      pathname.startsWith("/points") ||
+      pathname.startsWith("/orders") ||
+      pathname === "/referral" ||
+      pathname.startsWith("/referral/"))
+  ) {
     const url = req.nextUrl.clone();
     url.pathname = "/admin";
     return NextResponse.redirect(url);
@@ -54,40 +68,18 @@ export async function middleware(req: NextRequest) {
   }
 
   // ─────────────────────────────────────────────
-  // ② 認証チェック（既存ロジック）
+  // ③ ロールチェック
   // ─────────────────────────────────────────────
 
-  // 両方のクッキー名を試す（環境によって異なるため）
-  let token = await getToken({
-    req,
-    secret,
-    cookieName: "__Secure-authjs.session-token",
-  });
-
-  if (!token) {
-    token = await getToken({
-      req,
-      secret,
-      cookieName: "authjs.session-token",
-    });
-  }
-
-  // 未ログインなら /login へ
-  if (!token) {
-    const loginUrl = req.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    return NextResponse.redirect(loginUrl);
-  }
-
   // 管理者ルート：admin ロールのみ許可
-  if (pathname.startsWith("/admin") && token.role !== "admin") {
+  if (pathname.startsWith("/admin") && session.user.role !== "admin") {
     const url = req.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: [
