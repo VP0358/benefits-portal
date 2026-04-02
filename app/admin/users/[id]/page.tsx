@@ -2,7 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import ReferralManager from "./ui/referral-manager";
 import ContractForm from "./ui/contract-form";
+import ContractList from "./ui/contract-list";
 import ManualPointAdjuster from "./ui/manual-point-adjuster";
+import Link from "next/link";
 
 export default async function AdminUserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -83,15 +85,17 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
       </div>
       <section className="rounded-3xl bg-white p-6 shadow-sm">
         <h2 className="text-xl font-bold text-slate-800">契約一覧</h2>
-        <div className="mt-4 space-y-3 text-sm">
-          {user!.contracts.length === 0 ? <div className="text-slate-500">契約はありません。</div> : user!.contracts.map(contract => (
-            <div key={contract.id.toString()} className="rounded-2xl border p-3">
-              <div className="font-semibold text-slate-800">{contract.planName}</div>
-              <div className="text-slate-500">契約番号: {contract.contractNumber}</div>
-              <div className="text-slate-500">月額: {Number(contract.monthlyFee).toLocaleString()}円</div>
-              <div><span className={`rounded-full px-2 py-0.5 text-xs ${contract.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{contract.status}</span></div>
-            </div>
-          ))}
+        <div className="mt-4">
+          <ContractList contracts={user!.contracts.map(c => ({
+            id: c.id.toString(),
+            contractNumber: c.contractNumber,
+            planName: c.planName,
+            monthlyFee: Number(c.monthlyFee),
+            status: c.status,
+            startedAt: c.startedAt?.toISOString() ?? null,
+            confirmedAt: c.confirmedAt?.toISOString() ?? null,
+            canceledAt: c.canceledAt?.toISOString() ?? null,
+          }))} />
         </div>
       </section>
       <section className="rounded-3xl bg-white p-6 shadow-sm">

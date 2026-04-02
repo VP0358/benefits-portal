@@ -13,8 +13,11 @@ const navItems = [
   { href: "/admin/products", label: "📦 商品管理" },
   { href: "/admin/orders", label: "🛒 注文管理" },
   { href: "/admin/points/monthly", label: "💰 月次ポイント計算" },
+  { href: "/admin/points/expire", label: "⏰ ポイント失効処理" },
   { href: "/admin/monthly-runs", label: "📅 月次実行履歴" },
+  { href: "/admin/referral-history", label: "🔗 紹介者変更履歴" },
   { href: "/admin/audit", label: "🔍 監査ログ" },
+  { href: "/admin/export", label: "📥 CSV エクスポート" },
   { href: "/admin/site-settings", label: "⚙️ サイト設定" },
 ];
 

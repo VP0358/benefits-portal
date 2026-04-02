@@ -9,9 +9,25 @@ export default async function AdminUsersPage() {
 
   return (
     <main className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-slate-800">会員管理</h1>
-        <p className="mt-2 text-slate-600">会員情報とポイント残高を確認できます。</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-800">会員管理</h1>
+          <p className="mt-2 text-slate-600">会員情報とポイント残高を確認できます。</p>
+        </div>
+        <div className="flex gap-2">
+          <a
+            href="/api/admin/export/members"
+            className="rounded-xl border px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            📥 CSV
+          </a>
+          <Link
+            href="/admin/users/new"
+            className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm text-white hover:bg-slate-700"
+          >
+            ＋ 新規登録
+          </Link>
+        </div>
       </div>
       <div className="rounded-3xl bg-white shadow-sm overflow-hidden">
         <div className="grid grid-cols-[120px_1fr_1fr_80px_120px_80px] gap-4 border-b px-6 py-4 font-semibold text-slate-700 text-sm">
