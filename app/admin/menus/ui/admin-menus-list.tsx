@@ -10,8 +10,15 @@ type MenuItem = {
   linkUrl: string;
   imageUrl: string | null;
   iconType: string | null;
+  menuType: string;
   isActive: boolean;
   sortOrder: number;
+};
+
+const menuTypeLabel: Record<string, string> = {
+  url:     "🔗 URLリンク",
+  skin:    "💆 肌診断",
+  contact: "📞 相談窓口",
 };
 
 export default function AdminMenusList({ initialMenus }: { initialMenus: MenuItem[] }) {
@@ -51,12 +58,22 @@ export default function AdminMenusList({ initialMenus }: { initialMenus: MenuIte
         </button>
       </div>
       <div className="rounded-3xl bg-white shadow-sm overflow-hidden">
-        <div className="grid grid-cols-[60px_1fr_1fr_100px_80px] gap-4 border-b px-6 py-4 font-semibold text-slate-700 text-sm">
-          <div>順番</div><div>タイトル</div><div>リンク</div><div>状態</div><div>操作</div>
+        {/* テーブルヘッダー */}
+        <div className="hidden md:grid md:grid-cols-[50px_1fr_120px_180px_90px_70px] gap-3 border-b px-6 py-3 font-semibold text-slate-600 text-xs bg-slate-50">
+          <div>順番</div>
+          <div>メニュー</div>
+          <div>種別</div>
+          <div>リンク/設定</div>
+          <div>状態</div>
+          <div>操作</div>
         </div>
+
         {menus.length === 0 && (
-          <div className="px-6 py-8 text-center text-slate-500 text-sm">メニューがありません</div>
+          <div className="px-6 py-10 text-center text-slate-500 text-sm">
+            メニューがありません。「新規追加」から作成してください。
+          </div>
         )}
+
         {menus.map((menu, index) => (
           <div
             key={menu.id}
@@ -64,21 +81,68 @@ export default function AdminMenusList({ initialMenus }: { initialMenus: MenuIte
             onDragStart={() => setDraggingId(menu.id)}
             onDragOver={e => e.preventDefault()}
             onDrop={() => { if (draggingId) moveItem(draggingId, menu.id); setDraggingId(null); }}
-            className={`grid cursor-move grid-cols-[60px_1fr_1fr_100px_80px] gap-4 border-b px-6 py-4 text-sm hover:bg-slate-50 transition-colors ${draggingId === menu.id ? "opacity-50 bg-slate-50" : ""}`}
+            className={`border-b last:border-b-0 px-6 py-4 text-sm hover:bg-slate-50 transition-colors cursor-move
+              md:grid md:grid-cols-[50px_1fr_120px_180px_90px_70px] md:gap-3 md:items-center
+              ${draggingId === menu.id ? "opacity-50 bg-slate-50" : ""}`}
           >
-            <div className="text-slate-500">{index + 1}</div>
-            <div>
-              <div className="font-semibold text-slate-800">{menu.title}</div>
-              <div className="text-xs text-slate-500">{menu.subtitle}</div>
+            {/* 順番 */}
+            <div className="text-slate-400 text-xs font-mono hidden md:block">{index + 1}</div>
+
+            {/* タイトル */}
+            <div className="mb-2 md:mb-0">
+              <div className="flex items-center gap-2">
+                {menu.imageUrl ? (
+                  <img src={menu.imageUrl} alt="" className="h-8 w-8 rounded-lg object-cover border border-slate-200 flex-shrink-0" />
+                ) : (
+                  <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center text-base flex-shrink-0">
+                    {menu.iconType === "smartphone" ? "📱"
+                     : menu.iconType === "plane"   ? "✈️"
+                     : menu.iconType === "smile"   ? "😊"
+                     : menu.iconType === "cart"    ? "🛒"
+                     : menu.iconType === "message" ? "💬"
+                     : menu.iconType === "jar"     ? "🫙"
+                     : menu.iconType === "star"    ? "⭐"
+                     : menu.iconType === "heart"   ? "❤️"
+                     : "🔗"}
+                  </div>
+                )}
+                <div>
+                  <div className="font-semibold text-slate-800">{menu.title}</div>
+                  {menu.subtitle && <div className="text-xs text-slate-400">{menu.subtitle}</div>}
+                </div>
+              </div>
             </div>
-            <div className="truncate text-slate-600">{menu.linkUrl}</div>
-            <div>
+
+            {/* 種別 */}
+            <div className="hidden md:block">
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-600">
+                {menuTypeLabel[menu.menuType] ?? menu.menuType}
+              </span>
+            </div>
+
+            {/* リンク/設定 */}
+            <div className="hidden md:block truncate text-slate-500 text-xs">
+              {menu.menuType === "url" && menu.linkUrl
+                ? <a href={menu.linkUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline truncate block">{menu.linkUrl}</a>
+                : <span className="text-slate-400">{menuTypeLabel[menu.menuType] ?? "―"}</span>
+              }
+            </div>
+
+            {/* 状態 */}
+            <div className="hidden md:block">
               <span className={`rounded-full px-2 py-1 text-xs ${menu.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
                 {menu.isActive ? "公開" : "非公開"}
               </span>
             </div>
-            <div>
-              <Link href={`/admin/menus/${menu.id}/edit`} className="rounded-lg border px-3 py-1.5 text-xs hover:bg-slate-50">
+
+            {/* 操作 */}
+            <div className="flex items-center gap-2">
+              {/* モバイル用: 状態バッジ */}
+              <span className={`md:hidden rounded-full px-2 py-1 text-xs ${menu.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                {menu.isActive ? "公開" : "非公開"}
+              </span>
+              <Link href={`/admin/menus/${menu.id}/edit`}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs hover:bg-slate-50 transition-colors whitespace-nowrap">
                 編集
               </Link>
             </div>

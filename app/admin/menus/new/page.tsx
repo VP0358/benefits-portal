@@ -5,165 +5,243 @@ import { useRouter } from "next/navigation";
 import ImageUpload from "../ui/image-upload";
 
 const iconOptions = [
-  { value: "smartphone", label: "📱 スマホ" },
-  { value: "plane",      label: "✈️ 旅行" },
-  { value: "smile",      label: "😊 笑顔" },
-  { value: "cart",       label: "🛒 カート" },
-  { value: "message",    label: "💬 相談" },
-  { value: "jar",        label: "🫙 予約" },
-  { value: "star",       label: "⭐ スター" },
-  { value: "heart",      label: "❤️ ハート" },
+  { value: "smartphone", emoji: "📱", label: "スマホ" },
+  { value: "plane",      emoji: "✈️", label: "旅行" },
+  { value: "smile",      emoji: "😊", label: "笑顔" },
+  { value: "cart",       emoji: "🛒", label: "カート" },
+  { value: "message",    emoji: "💬", label: "相談" },
+  { value: "jar",        emoji: "🫙", label: "予約" },
+  { value: "star",       emoji: "⭐", label: "スター" },
+  { value: "heart",      emoji: "❤️", label: "ハート" },
 ];
 
 const menuTypes = [
-  { value: "url",     label: "🔗 URLリンク（VPphone / 旅行 / ショッピング / 細胞浴予約）" },
-  { value: "skin",    label: "💆 肌診断（全国代理店一覧）" },
-  { value: "contact", label: "📞 相談窓口（お問い合わせフォーム）" },
+  { value: "url",     label: "🔗 URLリンク",   desc: "VPphone / 旅行 / ショッピング / 細胞浴予約" },
+  { value: "skin",    label: "💆 肌診断",       desc: "全国代理店一覧を表示" },
+  { value: "contact", label: "📞 相談窓口",     desc: "お問い合わせフォームを表示" },
 ];
 
 type SkinShop = { name: string; area: string; address: string; phone: string; url?: string };
+
+type MenuForm = {
+  title: string;
+  subtitle: string;
+  iconType: string;
+  imageUrl: string;
+  menuType: string;
+  linkUrl: string;
+  skinShops: SkinShop[];
+  contactNote: string;
+  isActive: boolean;
+  isHighlight: boolean;
+  sortOrder: number;
+};
+
 const defaultShop: SkinShop = { name: "", area: "", address: "", phone: "", url: "" };
 
 export default function AdminMenuNewPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [form, setForm] = useState({
+  const [saving,  setSaving]  = useState(false);
+  const [error,   setError]   = useState("");
+  const [form, setForm] = useState<MenuForm>({
     title: "", subtitle: "", iconType: "smartphone", imageUrl: "",
-    menuType: "url", linkUrl: "", skinShops: [{ ...defaultShop }], contactNote: "",
-    isActive: true, isHighlight: false, sortOrder: 0,
+    menuType: "url", linkUrl: "", skinShops: [{ ...defaultShop }],
+    contactNote: "", isActive: true, isHighlight: false, sortOrder: 0,
   });
 
   function updateShop(idx: number, field: keyof SkinShop, value: string) {
-    const updated = form.skinShops.map((s, i) => i === idx ? { ...s, [field]: value } : s);
-    setForm({ ...form, skinShops: updated });
+    setForm(f => ({ ...f, skinShops: f.skinShops.map((s, i) => i === idx ? { ...s, [field]: value } : s) }));
   }
-  function addShop() { setForm({ ...form, skinShops: [...form.skinShops, { ...defaultShop }] }); }
-  function removeShop(idx: number) {
-    setForm({ ...form, skinShops: form.skinShops.filter((_, i) => i !== idx) });
-  }
+  function addShop()          { setForm(f => ({ ...f, skinShops: [...f.skinShops, { ...defaultShop }] })); }
+  function removeShop(idx: number) { setForm(f => ({ ...f, skinShops: f.skinShops.filter((_, i) => i !== idx) })); }
 
-  function buildContentData(): string | null {
-    if (form.menuType === "skin") return JSON.stringify({ shops: form.skinShops.filter(s => s.name) });
+  function buildContentData() {
+    if (form.menuType === "skin")    return JSON.stringify({ shops: form.skinShops.filter(s => s.name) });
     if (form.menuType === "contact") return JSON.stringify({ note: form.contactNote });
     return null;
   }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setLoading(true);
-    setError("");
-    const payload = {
-      title: form.title,
-      subtitle: form.subtitle || null,
-      iconType: form.iconType,
-      imageUrl: form.imageUrl || null,
-      menuType: form.menuType,
-      linkUrl: form.menuType === "url" ? form.linkUrl : "",
-      contentData: buildContentData(),
-      isActive: form.isActive,
-      isHighlight: form.isHighlight,
-      sortOrder: form.sortOrder,
-    };
+    setSaving(true); setError("");
     const res = await fetch("/api/admin/menus", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        title:       form.title,
+        subtitle:    form.subtitle   || null,
+        iconType:    form.iconType,
+        imageUrl:    form.imageUrl   || null,
+        menuType:    form.menuType,
+        linkUrl:     form.menuType === "url" ? form.linkUrl : "",
+        contentData: buildContentData(),
+        isActive:    form.isActive,
+        isHighlight: form.isHighlight,
+        sortOrder:   form.sortOrder,
+      }),
     });
-    setLoading(false);
-    if (!res.ok) { setError("保存に失敗しました。"); return; }
+    setSaving(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      setError(data?.error ? JSON.stringify(data.error) : "作成に失敗しました。");
+      return;
+    }
     router.push("/admin/menus");
-    router.refresh();
   }
 
-  return (
-    <main className="rounded-3xl bg-white p-6 shadow-sm">
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">新規メニュー追加</h1>
-      <form onSubmit={onSubmit} className="space-y-6">
+  const ic = iconOptions.find(o => o.value === form.iconType);
 
-        {/* 基本情報 */}
-        <section className="rounded-2xl border border-slate-100 p-5 space-y-4">
-          <h2 className="text-sm font-bold text-slate-600 uppercase tracking-wide">基本情報</h2>
+  return (
+    <div className="space-y-5">
+
+      {/* ヘッダー */}
+      <div className="rounded-3xl bg-white p-6 shadow-sm flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-slate-800">➕ メニュー新規作成</h1>
+          <p className="text-sm text-slate-400 mt-0.5">入力後「作成する」を押してください</p>
+        </div>
+        <button type="button" onClick={() => router.push("/admin/menus")}
+          className="rounded-xl border px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">
+          ← 一覧に戻る
+        </button>
+      </div>
+
+      <form onSubmit={onSubmit} className="space-y-5">
+
+        {/* ━━━ ① 名称・表示設定 ━━━ */}
+        <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
+          <h2 className="text-sm font-bold text-slate-600 flex items-center gap-2">
+            <span className="rounded-full bg-slate-900 text-white text-xs px-2 py-0.5">1</span>
+            名称・表示設定
+          </h2>
+
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium">タイトル <span className="text-red-500">*</span></label>
-              <input required className="w-full rounded-xl border px-4 py-3 focus:outline-none focus:border-slate-400"
+              <label className={labelClass}>メニュー名 <span className="text-red-500">*</span></label>
+              <input required className={inputClass} placeholder="例：VPphone"
                 value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">補足テキスト</label>
-              <input className="w-full rounded-xl border px-4 py-3 focus:outline-none focus:border-slate-400"
+              <label className={labelClass}>サブテキスト（小さく表示）</label>
+              <input className={inputClass} placeholder="例：契約・確認"
                 value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} />
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">アイコン</label>
-              <select className="w-full rounded-xl border px-4 py-3"
-                value={form.iconType} onChange={e => setForm({ ...form, iconType: e.target.value })}>
-                {iconOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">並び順</label>
-              <input className="w-full rounded-xl border px-4 py-3" type="number"
-                value={form.sortOrder} onChange={e => setForm({ ...form, sortOrder: Number(e.target.value) })} />
-            </div>
-            <div className="flex items-center gap-6 pt-2">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="checkbox" checked={form.isActive}
-                  onChange={e => setForm({ ...form, isActive: e.target.checked })} />公開する
-              </label>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="checkbox" checked={form.isHighlight}
-                  onChange={e => setForm({ ...form, isHighlight: e.target.checked })} />強調表示
-              </label>
-            </div>
           </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium">画像</label>
-            <ImageUpload value={form.imageUrl} onChange={url => setForm({ ...form, imageUrl: url })} />
-          </div>
-        </section>
 
-        {/* メニュータイプ */}
-        <section className="rounded-2xl border border-slate-100 p-5 space-y-4">
-          <h2 className="text-sm font-bold text-slate-600 uppercase tracking-wide">メニュー種別・コンテンツ設定</h2>
+          {/* アイコン選択 */}
           <div>
-            <label className="mb-2 block text-sm font-medium">メニュー種別 <span className="text-red-500">*</span></label>
-            <div className="space-y-2">
-              {menuTypes.map(t => (
-                <label key={t.value} className="flex items-center gap-3 rounded-xl border p-3 cursor-pointer hover:bg-slate-50 transition-colors">
-                  <input type="radio" name="menuType" value={t.value}
-                    checked={form.menuType === t.value}
-                    onChange={() => setForm({ ...form, menuType: t.value })} />
-                  <span className="text-sm">{t.label}</span>
-                </label>
+            <label className={labelClass}>アイコン</label>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {iconOptions.map(opt => (
+                <button key={opt.value} type="button"
+                  onClick={() => setForm({ ...form, iconType: opt.value })}
+                  className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm transition-colors ${
+                    form.iconType === opt.value
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-200 hover:border-slate-400"
+                  }`}>
+                  <span>{opt.emoji}</span><span>{opt.label}</span>
+                </button>
               ))}
             </div>
           </div>
 
-          {form.menuType === "url" && (
+          {/* 並び順・公開設定 */}
+          <div className="flex items-center gap-6 flex-wrap pt-1">
             <div>
-              <label className="mb-1 block text-sm font-medium">リンクURL <span className="text-red-500">*</span></label>
-              <p className="text-xs text-slate-400 mb-2">VPphone契約先・格安旅行サイト・ショッピングサイト・細胞浴予約サイトのURLを貼り付けてください</p>
-              <input required={form.menuType === "url"}
-                className="w-full rounded-xl border px-4 py-3 focus:outline-none focus:border-slate-400"
+              <label className={labelClass}>並び順</label>
+              <input type="number" min="0" className="w-24 rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:border-slate-500"
+                value={form.sortOrder}
+                onChange={e => setForm({ ...form, sortOrder: Number(e.target.value) })} />
+            </div>
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none mt-4">
+              <input type="checkbox" checked={form.isActive}
+                onChange={e => setForm({ ...form, isActive: e.target.checked })}
+                className="rounded" />
+              <span>公開する</span>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${form.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                {form.isActive ? "公開中" : "非公開"}
+              </span>
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none mt-4">
+              <input type="checkbox" checked={form.isHighlight}
+                onChange={e => setForm({ ...form, isHighlight: e.target.checked })}
+                className="rounded" />
+              <span>強調表示</span>
+            </label>
+          </div>
+        </div>
+
+        {/* ━━━ ② 画像設定 ━━━ */}
+        <div className="rounded-3xl bg-white p-6 shadow-sm space-y-3">
+          <h2 className="text-sm font-bold text-slate-600 flex items-center gap-2">
+            <span className="rounded-full bg-slate-900 text-white text-xs px-2 py-0.5">2</span>
+            メニュー画像
+            <span className="text-xs font-normal text-slate-400">（設定しない場合はアイコンで表示）</span>
+          </h2>
+          <ImageUpload value={form.imageUrl} onChange={url => setForm({ ...form, imageUrl: url })} />
+        </div>
+
+        {/* ━━━ ③ メニュー種別・URL設定 ━━━ */}
+        <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
+          <h2 className="text-sm font-bold text-slate-600 flex items-center gap-2">
+            <span className="rounded-full bg-slate-900 text-white text-xs px-2 py-0.5">3</span>
+            メニュー種別・URL設定
+          </h2>
+
+          {/* 種別選択 */}
+          <div className="grid gap-2 md:grid-cols-3">
+            {menuTypes.map(t => (
+              <button key={t.value} type="button"
+                onClick={() => setForm({ ...form, menuType: t.value })}
+                className={`rounded-2xl border-2 p-4 text-left transition-colors ${
+                  form.menuType === t.value
+                    ? "border-slate-900 bg-slate-50"
+                    : "border-slate-100 hover:border-slate-300"
+                }`}>
+                <div className="font-semibold text-sm text-slate-800">{t.label}</div>
+                <div className="text-xs text-slate-400 mt-0.5">{t.desc}</div>
+              </button>
+            ))}
+          </div>
+
+          {/* URLリンク入力 */}
+          {form.menuType === "url" && (
+            <div className="rounded-2xl bg-blue-50 p-4 space-y-2">
+              <label className="block text-sm font-bold text-blue-800">
+                🔗 リンク先URL <span className="text-red-500">*</span>
+              </label>
+              <p className="text-xs text-blue-600">
+                タップすると外部サイトへ移動します。契約先・格安サイト・ショッピングサイトなどのURLを貼り付けてください。
+              </p>
+              <input
+                required={form.menuType === "url"}
+                className="w-full rounded-xl border border-blue-200 bg-white px-4 py-3 text-sm focus:outline-none focus:border-blue-400"
                 placeholder="https://example.com"
                 value={form.linkUrl}
-                onChange={e => setForm({ ...form, linkUrl: e.target.value })} />
+                onChange={e => setForm({ ...form, linkUrl: e.target.value })}
+              />
+              {form.linkUrl && (
+                <a href={form.linkUrl} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-blue-600 underline">
+                  ↗ URLを確認する
+                </a>
+              )}
             </div>
           )}
 
+          {/* 肌診断：代理店リスト */}
           {form.menuType === "skin" && (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">全国代理店リスト</label>
+                <span className="text-sm font-medium text-slate-700">全国代理店リスト</span>
                 <button type="button" onClick={addShop}
-                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs text-white hover:bg-emerald-700">
+                  className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs text-white hover:bg-emerald-700">
                   ＋ 代理店を追加
                 </button>
               </div>
               {form.skinShops.map((shop, idx) => (
-                <div key={idx} className="rounded-xl border border-slate-200 p-4 space-y-3 bg-slate-50">
+                <div key={idx} className="rounded-2xl border border-slate-200 p-4 bg-slate-50 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-500">代理店 {idx + 1}</span>
                     {form.skinShops.length > 1 && (
@@ -172,67 +250,82 @@ export default function AdminMenuNewPage() {
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="mb-1 block text-xs text-slate-500">店舗名 *</label>
-                      <input className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none"
-                        placeholder="○○美容院" value={shop.name}
-                        onChange={e => updateShop(idx, "name", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-slate-500">エリア</label>
-                      <input className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none"
-                        placeholder="東京都" value={shop.area}
-                        onChange={e => updateShop(idx, "area", e.target.value)} />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="mb-1 block text-xs text-slate-500">住所</label>
-                      <input className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none"
-                        placeholder="東京都渋谷区○○1-2-3" value={shop.address}
-                        onChange={e => updateShop(idx, "address", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-slate-500">電話番号</label>
-                      <input className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none"
-                        placeholder="03-1234-5678" value={shop.phone}
-                        onChange={e => updateShop(idx, "phone", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs text-slate-500">予約URL（任意）</label>
-                      <input className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none"
-                        placeholder="https://..." value={shop.url ?? ""}
-                        onChange={e => updateShop(idx, "url", e.target.value)} />
-                    </div>
+                    {[
+                      { field: "name"    as const, label: "店舗名 *",    placeholder: "○○美容院" },
+                      { field: "area"    as const, label: "エリア",       placeholder: "東京都" },
+                      { field: "address" as const, label: "住所",         placeholder: "渋谷区○○1-2-3", span: true },
+                      { field: "phone"   as const, label: "電話番号",     placeholder: "03-1234-5678" },
+                      { field: "url"     as const, label: "予約URL（任意）", placeholder: "https://..." },
+                    ].map(({ field, label, placeholder, span }) => (
+                      <div key={field} className={span ? "col-span-2" : ""}>
+                        <label className="mb-1 block text-xs text-slate-500">{label}</label>
+                        <input className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:border-slate-400 bg-white"
+                          placeholder={placeholder}
+                          value={shop[field] ?? ""}
+                          onChange={e => updateShop(idx, field, e.target.value)} />
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
             </div>
           )}
 
+          {/* 相談窓口 */}
           {form.menuType === "contact" && (
-            <div>
-              <label className="mb-1 block text-sm font-medium">フォーム上部の説明文（任意）</label>
+            <div className="rounded-2xl bg-purple-50 p-4 space-y-2">
+              <label className="block text-sm font-bold text-purple-800">📝 フォーム上部の説明文（任意）</label>
+              <p className="text-xs text-purple-600">会員がフォームを開いたときに表示するメッセージです。</p>
               <textarea rows={4}
-                className="w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:border-slate-400"
+                className="w-full rounded-xl border border-purple-200 bg-white px-4 py-3 text-sm focus:outline-none focus:border-purple-400 resize-none"
                 placeholder="お気軽にご相談ください。担当者より折り返しご連絡いたします。"
                 value={form.contactNote}
                 onChange={e => setForm({ ...form, contactNote: e.target.value })} />
             </div>
           )}
-        </section>
+        </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {/* ━━━ ④ プレビュー ━━━ */}
+        <div className="rounded-3xl bg-white p-6 shadow-sm">
+          <h2 className="text-sm font-bold text-slate-600 flex items-center gap-2 mb-4">
+            <span className="rounded-full bg-slate-900 text-white text-xs px-2 py-0.5">4</span>
+            プレビュー（会員画面での表示イメージ）
+          </h2>
+          <div className="flex justify-center">
+            <div className="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 p-5 w-28">
+              {form.imageUrl ? (
+                <img src={form.imageUrl} alt={form.title}
+                  className="h-14 w-14 rounded-xl object-cover" />
+              ) : (
+                <div className="h-14 w-14 rounded-xl bg-slate-100 flex items-center justify-center text-2xl">
+                  {ic?.emoji ?? "🔗"}
+                </div>
+              )}
+              <div className="text-xs font-bold text-slate-700 text-center">{form.title || "タイトル"}</div>
+              {form.subtitle && <div className="text-[10px] text-slate-400 text-center">{form.subtitle}</div>}
+            </div>
+          </div>
+        </div>
 
+        {/* メッセージ */}
+        {error && <div className="rounded-2xl bg-red-50 px-5 py-3 text-sm text-red-600">{error}</div>}
+
+        {/* ボタン */}
         <div className="flex justify-end gap-3">
           <button type="button" onClick={() => router.push("/admin/menus")}
-            className="rounded-xl border px-4 py-3 text-sm text-slate-600 hover:bg-slate-50">
-            戻る
+            className="rounded-2xl border border-slate-200 px-5 py-3 text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+            キャンセル
           </button>
-          <button type="submit" disabled={loading}
-            className="rounded-xl bg-slate-900 px-5 py-3 text-sm text-white disabled:opacity-50 hover:bg-slate-800">
-            {loading ? "保存中..." : "保存する"}
+          <button type="submit" disabled={saving}
+            className="rounded-2xl bg-slate-900 px-8 py-3 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50 transition-colors shadow-sm">
+            {saving ? "作成中..." : "➕ 作成する"}
           </button>
         </div>
+
       </form>
-    </main>
+    </div>
   );
 }
+
+const labelClass = "mb-1.5 block text-xs font-semibold text-slate-500";
+const inputClass  = "w-full rounded-xl border border-slate-200 px-4 py-3 text-sm placeholder:text-slate-400 focus:border-slate-500 focus:outline-none";

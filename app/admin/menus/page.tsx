@@ -11,6 +11,7 @@ export default async function AdminMenusPage() {
     linkUrl: menu.linkUrl,
     imageUrl: menu.imageUrl,
     iconType: menu.iconType,
+    menuType: menu.menuType ?? "url",
     isActive: menu.isActive,
     sortOrder: menu.sortOrder,
   }));
