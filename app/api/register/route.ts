@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { hash } from "bcryptjs";
+import { sendWelcomeEmail } from "@/lib/mailer";
 
 const schema = z.object({
   name: z.string().min(1).max(100),
@@ -135,6 +136,11 @@ export async function POST(req: NextRequest) {
 
     return newUser;
   });
+
+  // 登録完了メールを非同期で送信（失敗しても登録自体は成功扱い）
+  sendWelcomeEmail({ to: user.email, name: user.name }).catch(err =>
+    console.error("[register] welcome email failed:", err)
+  );
 
   return NextResponse.json({
     id: user.id.toString(),
