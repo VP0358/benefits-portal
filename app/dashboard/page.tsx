@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import SignOutButton from "@/app/components/sign-out-button";
 import ViolaLogo from "@/app/components/viola-logo";
 import MenuCard from "./ui/menu-card";
+import ReferralContractsButton from "./ui/referral-contracts-button";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -104,6 +105,9 @@ export default async function DashboardPage() {
             </div>
           )}
         </Link>
+
+        {/* 今月の直紹介 携帯契約件数ボタン */}
+        <ReferralContractsButton />
 
         {/* 履歴・お知らせ */}
         <div className="grid grid-cols-2 gap-3">
