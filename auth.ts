@@ -6,8 +6,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
   trustHost: true,
+  // NEXTAUTH_URL は設定しない → AUTH_TRUST_HOST=true で両ドメイン対応
   pages: {
     signIn: "/login",
+  },
+  cookies: {
+    sessionToken: {
+      name: "next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
   },
   callbacks: {
     async jwt({ token, user }) {
@@ -39,7 +51,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const email    = credentials.email    as string;
           const password = credentials.password as string;
 
-          // Prismaを動的importしてEdge Runtimeの問題を回避
           const { prisma } = await import("@/lib/prisma");
 
           // 管理者チェック

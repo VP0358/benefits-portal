@@ -1,14 +1,12 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 import ViolaLogo from "@/app/components/viola-logo";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [error, setError]     = useState("");
+  const [form, setForm]       = useState({ email: "", password: "" });
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -16,13 +14,13 @@ export default function LoginPage() {
     setError("");
 
     try {
-      // CSRFトークン取得
-      const csrfRes = await fetch("/api/auth/csrf");
+      // ① CSRFトークン取得
+      const csrfRes  = await fetch("/api/auth/csrf");
       const csrfData = await csrfRes.json();
       const csrfToken = csrfData.csrfToken ?? "";
 
-      // credentials でログイン（フォームエンコード）
-      const res = await fetch("/api/auth/callback/credentials", {
+      // ② credentials でログイン
+      await fetch("/api/auth/callback/credentials", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
@@ -35,9 +33,10 @@ export default function LoginPage() {
         redirect: "manual",
       });
 
-      // レスポンスのステータスに関わらずセッションを確認
+      // ③ セッション確認（少し待ってからCookieが反映される）
+      await new Promise(r => setTimeout(r, 500));
       const sessionRes = await fetch("/api/auth/session", { cache: "no-store" });
-      const session = await sessionRes.json();
+      const session    = await sessionRes.json();
 
       if (!session?.user) {
         setError("メールアドレスまたはパスワードが正しくありません。");
@@ -45,11 +44,11 @@ export default function LoginPage() {
         return;
       }
 
-      // ロールに応じてリダイレクト
+      // ④ ロールに応じてページ遷移（window.location で確実にCookieを送る）
       if (session.user.role === "admin") {
-        window.location.href = "/admin";
+        window.location.replace("/admin");
       } else {
-        window.location.href = "/dashboard";
+        window.location.replace("/dashboard");
       }
     } catch (err) {
       console.error("Login error:", err);
@@ -80,7 +79,7 @@ export default function LoginPage() {
               className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:border-slate-600 focus:outline-none"
               placeholder="example@email.com"
               value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              onChange={e => setForm({ ...form, email: e.target.value })}
             />
           </div>
 
@@ -95,7 +94,7 @@ export default function LoginPage() {
               className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:border-slate-600 focus:outline-none"
               placeholder="パスワードを入力"
               value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              onChange={e => setForm({ ...form, password: e.target.value })}
             />
           </div>
 
