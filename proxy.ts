@@ -1,28 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 
-// ドメイン設定
-const MEMBER_DOMAIN = "viola-pure.net"; // 会員サイト
-const ADMIN_DOMAIN  = "viola-pure.xyz"; // 管理サイト
+const MEMBER_DOMAIN = "viola-pure.net";
+const ADMIN_DOMAIN  = "viola-pure.xyz";
 
-// 認証不要なパス（ミドルウェアをスキップ）
-const PUBLIC_PATHS = ["/login", "/register", "/api/auth"];
+// 認証不要なパス
+const PUBLIC_PATHS = ["/login", "/register", "/api/auth", "/_next", "/favicon"];
 
 export default auth(function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const hostname = req.headers.get("host") ?? "";
-  const session = (req as NextRequest & { auth: unknown }).auth as { user?: { role?: string } } | null;
+  const host     = req.headers.get("host") ?? "";
+  // www. を除去して比較
+  const hostname = host.replace(/^www\./, "").split(":")[0];
+  const session  = (req as NextRequest & { auth: unknown }).auth as
+    { user?: { role?: string } } | null;
 
-  const isMemberDomain =
-    hostname === MEMBER_DOMAIN || hostname === `www.${MEMBER_DOMAIN}`;
-  const isAdminDomain =
-    hostname === ADMIN_DOMAIN || hostname === `www.${ADMIN_DOMAIN}`;
+  const isMemberDomain = hostname === MEMBER_DOMAIN;
+  const isAdminDomain  = hostname === ADMIN_DOMAIN;
 
-  // ─────────────────────────────────────────────
-  // ① 公開パスはチェックしない
-  // ─────────────────────────────────────────────
+  // ① 公開パスはスキップ
   if (PUBLIC_PATHS.some(p => pathname.startsWith(p))) {
-    // ログイン済みで /login にアクセスしたらリダイレクト
+    // ログイン済みで /login → リダイレクト
     if (pathname === "/login" && session?.user) {
       const url = req.nextUrl.clone();
       url.pathname = session.user.role === "admin" ? "/admin" : "/dashboard";
@@ -31,27 +29,34 @@ export default auth(function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // ─────────────────────────────────────────────
-  // ② 未ログインなら /login へ
-  // ─────────────────────────────────────────────
+  // ② 未ログイン → /login
   if (!session?.user) {
-    const loginUrl = req.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    return NextResponse.redirect(loginUrl);
+    const url = req.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
   }
 
-  // ─────────────────────────────────────────────
-  // ③ ドメインによるアクセス制限
-  // ─────────────────────────────────────────────
+  // ③ ルート "/" のリダイレクト
+  if (pathname === "/") {
+    const url = req.nextUrl.clone();
+    if (isMemberDomain) {
+      url.pathname = "/dashboard";
+    } else if (isAdminDomain) {
+      url.pathname = "/admin";
+    } else {
+      url.pathname = session.user.role === "admin" ? "/admin" : "/dashboard";
+    }
+    return NextResponse.redirect(url);
+  }
 
-  // 【会員ドメイン (viola-pure.net)】から /admin にアクセスしようとした場合
+  // ④ 会員ドメインから /admin へのアクセスをブロック
   if (isMemberDomain && pathname.startsWith("/admin")) {
     const url = req.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
-  // 【管理ドメイン (viola-pure.xyz)】から会員ページにアクセスしようとした場合
+  // ⑤ 管理ドメインから会員ページへのアクセスをブロック
   if (
     isAdminDomain &&
     (pathname.startsWith("/dashboard") ||
@@ -65,25 +70,7 @@ export default auth(function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // ルートリダイレクト
-  if (pathname === "/") {
-    const url = req.nextUrl.clone();
-    if (isMemberDomain) {
-      url.pathname = "/dashboard";
-    } else if (isAdminDomain) {
-      url.pathname = "/admin";
-    } else {
-      // ドメイン不明の場合はロールで判断
-      url.pathname = session.user.role === "admin" ? "/admin" : "/dashboard";
-    }
-    return NextResponse.redirect(url);
-  }
-
-  // ─────────────────────────────────────────────
-  // ④ ロールチェック
-  // ─────────────────────────────────────────────
-
-  // 管理者ルート：admin ロールのみ許可
+  // ⑥ ロールチェック：管理ルートはadminのみ
   if (pathname.startsWith("/admin") && session.user.role !== "admin") {
     const url = req.nextUrl.clone();
     url.pathname = "/dashboard";

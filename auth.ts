@@ -3,23 +3,11 @@ import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: { strategy: "jwt" },
-  secret: process.env.NEXTAUTH_SECRET,
+  session:   { strategy: "jwt" },
+  secret:    process.env.NEXTAUTH_SECRET,
   trustHost: true,
-  // NEXTAUTH_URL は設定しない → AUTH_TRUST_HOST=true で両ドメイン対応
   pages: {
     signIn: "/login",
-  },
-  cookies: {
-    sessionToken: {
-      name: "next-auth.session-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-      },
-    },
   },
   callbacks: {
     async jwt({ token, user }) {
@@ -31,7 +19,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id   = token.id as string;
+        session.user.id   = token.id   as string;
         session.user.role = token.role as "admin" | "member";
       }
       return session;
