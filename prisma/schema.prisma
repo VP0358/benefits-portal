@@ -51,9 +51,14 @@ model User {
   id            BigInt     @id @default(autoincrement())
   memberCode    String     @unique @db.VarChar(50)
   name          String     @db.VarChar(255)
+  nameKana      String?    @db.VarChar(255)
   email         String     @unique @db.VarChar(255)
   passwordHash  String     @db.VarChar(255)
+  phone         String?    @db.VarChar(30)
+  postalCode    String?    @db.VarChar(10)
+  address       String?    @db.VarChar(500)
   status        UserStatus @default(active)
+  referralCode  String?    @unique @db.VarChar(30)
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
   lastLoginAt   DateTime?

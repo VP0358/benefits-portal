@@ -9,8 +9,12 @@ export default function NewUserPage() {
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     name: "",
+    nameKana: "",
     email: "",
     password: "",
+    phone: "",
+    postalCode: "",
+    address: "",
     memberCode: "",
     status: "active",
   });
@@ -25,8 +29,12 @@ export default function NewUserPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: form.name,
+        nameKana: form.nameKana || undefined,
         email: form.email,
         password: form.password,
+        phone: form.phone || undefined,
+        postalCode: form.postalCode || undefined,
+        address: form.address || undefined,
         memberCode: form.memberCode || undefined,
         status: form.status,
       }),
@@ -64,6 +72,15 @@ export default function NewUserPage() {
               />
             </div>
             <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">フリガナ</label>
+              <input
+                placeholder="例: ヤマダ タロウ"
+                className="w-full rounded-xl border px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400"
+                value={form.nameKana}
+                onChange={e => setForm({ ...form, nameKana: e.target.value })}
+              />
+            </div>
+            <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">メールアドレス *</label>
               <input
                 required
@@ -72,6 +89,34 @@ export default function NewUserPage() {
                 className="w-full rounded-xl border px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400"
                 value={form.email}
                 onChange={e => setForm({ ...form, email: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">電話番号</label>
+              <input
+                type="tel"
+                placeholder="例: 090-1234-5678"
+                className="w-full rounded-xl border px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400"
+                value={form.phone}
+                onChange={e => setForm({ ...form, phone: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">郵便番号</label>
+              <input
+                placeholder="例: 123-4567"
+                className="w-full rounded-xl border px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400"
+                value={form.postalCode}
+                onChange={e => setForm({ ...form, postalCode: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">住所</label>
+              <input
+                placeholder="例: 東京都渋谷区〇〇町1-2-3"
+                className="w-full rounded-xl border px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400"
+                value={form.address}
+                onChange={e => setForm({ ...form, address: e.target.value })}
               />
             </div>
             <div>

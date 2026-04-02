@@ -9,17 +9,26 @@ export default async function DashboardPage() {
   if (!session?.user?.email) redirect("/login");
   if (session.user.role === "admin") redirect("/admin");
 
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
-    include: { pointWallet: true },
-  });
+  const [user, menus, siteSettingsRows] = await Promise.all([
+    prisma.user.findUnique({
+      where: { email: session.user.email },
+      include: { pointWallet: true },
+    }),
+    prisma.menu.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: "asc" },
+    }),
+    prisma.siteSetting.findMany({
+      where: { settingKey: { in: ["btnBuyImageUrl", "btnPointsImageUrl", "btnReferralImageUrl"] } },
+    }),
+  ]);
 
   if (!user) redirect("/login");
 
-  const menus = await prisma.menu.findMany({
-    where: { isActive: true },
-    orderBy: { sortOrder: "asc" },
-  });
+  const siteSettings = Object.fromEntries(siteSettingsRows.map(r => [r.settingKey, r.settingValue]));
+  const btnBuyImage = siteSettings.btnBuyImageUrl ?? null;
+  const btnPointsImage = siteSettings.btnPointsImageUrl ?? null;
+  const btnReferralImage = siteSettings.btnReferralImageUrl ?? null;
 
   const iconMap: Record<string, string> = {
     smartphone: "📱", plane: "✈️", smile: "😊", cart: "🛒",
@@ -63,14 +72,38 @@ export default async function DashboardPage() {
         {/* アクションボタン */}
         <div className="grid grid-cols-2 gap-3">
           <Link href="/orders/checkout"
-            className="flex items-center justify-center gap-2 rounded-2xl bg-slate-900 py-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors">
-            🛒 商品を購入
+            className="flex items-center justify-center gap-2 rounded-2xl bg-slate-900 py-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-colors overflow-hidden">
+            {btnBuyImage
+              ? <img src={btnBuyImage} alt="商品を購入" className="h-full w-full object-cover" />
+              : <><span>🛒</span><span>商品を購入</span></>
+            }
           </Link>
           <Link href="/points/use"
-            className="flex items-center justify-center gap-2 rounded-2xl bg-white border-2 border-slate-200 py-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors">
-            💳 ポイントを使う
+            className="flex items-center justify-center gap-2 rounded-2xl bg-white border-2 border-slate-200 py-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors overflow-hidden">
+            {btnPointsImage
+              ? <img src={btnPointsImage} alt="ポイントを使う" className="h-full w-full object-cover" />
+              : <><span>💳</span><span>ポイントを使う</span></>
+            }
           </Link>
         </div>
+
+        {/* 紹介バナー */}
+        <Link href="/referral"
+          className="flex items-center gap-4 rounded-2xl overflow-hidden shadow-sm hover:opacity-95 transition-opacity"
+          style={btnReferralImage ? {} : { background: "linear-gradient(to right, #10b981, #14b8a6)" }}>
+          {btnReferralImage ? (
+            <img src={btnReferralImage} alt="友達・知人を紹介する" className="w-full h-auto object-cover" />
+          ) : (
+            <div className="flex items-center gap-4 p-5 w-full">
+              <div className="text-3xl">🎁</div>
+              <div>
+                <div className="font-bold text-white text-sm">友達・知人を紹介する</div>
+                <div className="text-xs text-emerald-100 mt-0.5">紹介URLをシェアして一緒に使おう！</div>
+              </div>
+              <div className="ml-auto text-white text-lg">›</div>
+            </div>
+          )}
+        </Link>
 
         {/* 履歴・お知らせ */}
         <div className="grid grid-cols-2 gap-3">

@@ -52,8 +52,15 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
           <div className="mt-4 space-y-2 text-sm text-slate-700">
             <div>会員番号: <span className="font-medium">{user!.memberCode}</span></div>
             <div>氏名: <span className="font-medium">{user!.name}</span></div>
+            {user!.nameKana && <div>フリガナ: <span className="font-medium">{user!.nameKana}</span></div>}
             <div>メール: {user!.email}</div>
+            {user!.phone && <div>電話番号: {user!.phone}</div>}
+            {user!.postalCode && <div>郵便番号: {user!.postalCode}</div>}
+            {user!.address && <div>住所: {user!.address}</div>}
             <div>状態: <span className={`rounded-full px-2 py-0.5 text-xs ${user!.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{user!.status}</span></div>
+            {user!.referralCode && (
+              <div>紹介コード: <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">{user!.referralCode}</span></div>
+            )}
           </div>
         </section>
         <section className="rounded-3xl bg-white p-6 shadow-sm">

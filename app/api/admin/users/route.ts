@@ -32,8 +32,12 @@ export async function GET() {
 
 const createUserSchema = z.object({
   name: z.string().min(1).max(100),
+  nameKana: z.string().max(100).optional(),
   email: z.string().email(),
   password: z.string().min(8),
+  phone: z.string().max(30).optional(),
+  postalCode: z.string().max(10).optional(),
+  address: z.string().max(500).optional(),
   memberCode: z.string().min(1).max(50).optional(),
   status: z.enum(["active", "suspended", "invited"]).optional().default("active"),
 });
@@ -46,7 +50,7 @@ export async function POST(req: NextRequest) {
   const parsed = createUserSchema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const { name, email, password, status } = parsed.data;
+  const { name, nameKana, email, password, phone, postalCode, address, status } = parsed.data;
 
   // 既存チェック
   const exists = await prisma.user.findUnique({ where: { email } });
@@ -67,7 +71,7 @@ export async function POST(req: NextRequest) {
 
   const passwordHash = await hash(password, 12);
   const user = await prisma.user.create({
-    data: { name, email, passwordHash, memberCode, status },
+    data: { name, nameKana, email, passwordHash, memberCode, phone, postalCode, address, status },
   });
 
   // ポイントウォレット初期化
