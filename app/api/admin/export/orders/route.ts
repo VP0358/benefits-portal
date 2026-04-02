@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const guard = await requireAdmin();
   if (guard.error) return guard.error;
 
-  const { searchParams } = new URL(req.url);
+  const { searchParams } = req.nextUrl;
   const from = searchParams.get("from");
   const to = searchParams.get("to");
 

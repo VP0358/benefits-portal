@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const guard = await requireAdmin();
   if (guard.error) return guard.error;
 
-  const { searchParams } = new URL(req.url);
+  const { searchParams } = req.nextUrl;
   const now = new Date();
   const from = parseDate(searchParams.get("from"), new Date(now.getFullYear(), now.getMonth() - 11, 1));
   const to = parseDate(searchParams.get("to"), new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999));

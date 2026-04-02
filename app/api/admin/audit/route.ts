@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
   const guard = await requireAdmin();
   if (guard.error) return guard.error;
 
-  const { searchParams } = new URL(req.url);
+  const { searchParams } = req.nextUrl;
   const actionType = searchParams.get("actionType");
   const targetTable = searchParams.get("targetTable");
   const q = searchParams.get("q");

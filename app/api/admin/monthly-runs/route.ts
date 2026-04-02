@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
   const guard = await requireAdmin();
   if (guard.error) return guard.error;
 
-  const { searchParams } = new URL(req.url);
+  const { searchParams } = req.nextUrl;
   const rewardMonth = searchParams.get("rewardMonth");
   const mode = searchParams.get("mode");
   const page = Math.max(Number(searchParams.get("page") || 1), 1);

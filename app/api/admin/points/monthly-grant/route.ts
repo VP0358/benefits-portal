@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   const guard = await requireAdmin();
   if (guard.error) return guard.error;
 
-  const url = new URL(req.url);
+  const url = req.nextUrl;
   const isExecute = url.pathname.endsWith("/execute");
 
   const json = await req.json();
