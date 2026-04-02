@@ -69,7 +69,7 @@ export default function AdminMenusList({ initialMenus }: { initialMenus: MenuIte
         </div>
 
         {menus.length === 0 && (
-          <div className="px-6 py-10 text-center text-slate-500 text-sm">
+          <div className="px-6 py-10 text-center text-slate-600 text-sm">
             メニューがありません。「新規追加」から作成してください。
           </div>
         )}
@@ -86,7 +86,7 @@ export default function AdminMenusList({ initialMenus }: { initialMenus: MenuIte
               ${draggingId === menu.id ? "opacity-50 bg-slate-50" : ""}`}
           >
             {/* 順番 */}
-            <div className="text-slate-400 text-xs font-mono hidden md:block">{index + 1}</div>
+            <div className="text-slate-600 text-xs font-mono hidden md:block">{index + 1}</div>
 
             {/* タイトル */}
             <div className="mb-2 md:mb-0">
@@ -108,29 +108,29 @@ export default function AdminMenusList({ initialMenus }: { initialMenus: MenuIte
                 )}
                 <div>
                   <div className="font-semibold text-slate-800">{menu.title}</div>
-                  {menu.subtitle && <div className="text-xs text-slate-400">{menu.subtitle}</div>}
+                  {menu.subtitle && <div className="text-xs text-slate-600">{menu.subtitle}</div>}
                 </div>
               </div>
             </div>
 
             {/* 種別 */}
             <div className="hidden md:block">
-              <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-600">
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
                 {menuTypeLabel[menu.menuType] ?? menu.menuType}
               </span>
             </div>
 
             {/* リンク/設定 */}
-            <div className="hidden md:block truncate text-slate-500 text-xs">
+            <div className="hidden md:block truncate text-slate-700 text-xs">
               {menu.menuType === "url" && menu.linkUrl
                 ? <a href={menu.linkUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline truncate block">{menu.linkUrl}</a>
-                : <span className="text-slate-400">{menuTypeLabel[menu.menuType] ?? "―"}</span>
+                : <span className="text-slate-600">{menuTypeLabel[menu.menuType] ?? "―"}</span>
               }
             </div>
 
             {/* 状態 */}
             <div className="hidden md:block">
-              <span className={`rounded-full px-2 py-1 text-xs ${menu.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+              <span className={`rounded-full px-2 py-1 text-xs ${menu.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-700"}`}>
                 {menu.isActive ? "公開" : "非公開"}
               </span>
             </div>
@@ -138,11 +138,11 @@ export default function AdminMenusList({ initialMenus }: { initialMenus: MenuIte
             {/* 操作 */}
             <div className="flex items-center gap-2">
               {/* モバイル用: 状態バッジ */}
-              <span className={`md:hidden rounded-full px-2 py-1 text-xs ${menu.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+              <span className={`md:hidden rounded-full px-2 py-1 text-xs ${menu.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-700"}`}>
                 {menu.isActive ? "公開" : "非公開"}
               </span>
               <Link href={`/admin/menus/${menu.id}/edit`}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs hover:bg-slate-50 transition-colors whitespace-nowrap">
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-100 transition-colors whitespace-nowrap">
                 編集
               </Link>
             </div>

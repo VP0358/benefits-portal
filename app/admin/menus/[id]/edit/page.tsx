@@ -128,7 +128,7 @@ export default function AdminMenuEditPage() {
   }
 
   if (loading) return (
-    <div className="rounded-3xl bg-white p-10 shadow-sm text-center text-slate-400">読み込み中...</div>
+    <div className="rounded-3xl bg-white p-10 shadow-sm text-center text-slate-600">読み込み中...</div>
   );
 
   const ic = iconOptions.find(o => o.value === form.iconType);
@@ -140,10 +140,10 @@ export default function AdminMenuEditPage() {
       <div className="rounded-3xl bg-white p-6 shadow-sm flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-800">📋 メニュー編集</h1>
-          <p className="text-sm text-slate-400 mt-0.5">変更後「更新する」を押してください</p>
+          <p className="text-sm text-slate-600 mt-0.5">変更後「更新する」を押してください</p>
         </div>
         <button type="button" onClick={() => router.push("/admin/menus")}
-          className="rounded-xl border px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">
+          className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-100">
           ← 一覧に戻る
         </button>
       </div>
@@ -152,7 +152,7 @@ export default function AdminMenuEditPage() {
 
         {/* ━━━ ① 名称・表示設定 ━━━ */}
         <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
-          <h2 className="text-sm font-bold text-slate-600 flex items-center gap-2">
+          <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
             <span className="rounded-full bg-slate-900 text-white text-xs px-2 py-0.5">1</span>
             名称・表示設定
           </h2>
@@ -210,10 +210,10 @@ export default function AdminMenuEditPage() {
 
         {/* ━━━ ② 画像設定 ━━━ */}
         <div className="rounded-3xl bg-white p-6 shadow-sm space-y-3">
-          <h2 className="text-sm font-bold text-slate-600 flex items-center gap-2">
+          <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
             <span className="rounded-full bg-slate-900 text-white text-xs px-2 py-0.5">2</span>
             メニュー画像
-            <span className="text-xs font-normal text-slate-400">（設定しない場合はアイコンで表示）</span>
+            <span className="text-xs font-normal text-slate-600">（設定しない場合はアイコンで表示）</span>
           </h2>
 
           {/* 現在の画像プレビュー */}
@@ -222,8 +222,8 @@ export default function AdminMenuEditPage() {
               <img src={form.imageUrl} alt="現在の画像"
                 className="h-16 w-16 rounded-xl object-cover border border-slate-200" />
               <div className="flex-1 min-w-0">
-                <div className="text-xs text-slate-500 mb-1">現在の画像</div>
-                <div className="text-xs text-slate-400 truncate">{form.imageUrl}</div>
+                <div className="text-xs text-slate-700 mb-1">現在の画像</div>
+                <div className="text-xs text-slate-600 truncate">{form.imageUrl}</div>
               </div>
               <button type="button"
                 onClick={() => setForm({ ...form, imageUrl: "" })}
@@ -238,7 +238,7 @@ export default function AdminMenuEditPage() {
 
         {/* ━━━ ③ メニュー種別・URL設定 ━━━ */}
         <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
-          <h2 className="text-sm font-bold text-slate-600 flex items-center gap-2">
+          <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
             <span className="rounded-full bg-slate-900 text-white text-xs px-2 py-0.5">3</span>
             メニュー種別・URL設定
           </h2>
@@ -254,7 +254,7 @@ export default function AdminMenuEditPage() {
                     : "border-slate-100 hover:border-slate-300"
                 }`}>
                 <div className="font-semibold text-sm text-slate-800">{t.label}</div>
-                <div className="text-xs text-slate-400 mt-0.5">{t.desc}</div>
+                <div className="text-xs text-slate-600 mt-0.5">{t.desc}</div>
               </button>
             ))}
           </div>
@@ -297,7 +297,7 @@ export default function AdminMenuEditPage() {
               {form.skinShops.map((shop, idx) => (
                 <div key={idx} className="rounded-2xl border border-slate-200 p-4 bg-slate-50 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-500">代理店 {idx + 1}</span>
+                    <span className="text-xs font-bold text-slate-700">代理店 {idx + 1}</span>
                     {form.skinShops.length > 1 && (
                       <button type="button" onClick={() => removeShop(idx)}
                         className="text-xs text-red-500 hover:text-red-700">削除</button>
@@ -312,7 +312,7 @@ export default function AdminMenuEditPage() {
                       { field: "url"     as const, label: "予約URL（任意）", placeholder: "https://..." },
                     ].map(({ field, label, placeholder, span }) => (
                       <div key={field} className={span ? "col-span-2" : ""}>
-                        <label className="mb-1 block text-xs text-slate-500">{label}</label>
+                        <label className="mb-1 block text-xs text-slate-700">{label}</label>
                         <input className="w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:border-slate-400 bg-white"
                           placeholder={placeholder}
                           value={shop[field] ?? ""}
@@ -341,7 +341,7 @@ export default function AdminMenuEditPage() {
 
         {/* ━━━ ④ プレビュー ━━━ */}
         <div className="rounded-3xl bg-white p-6 shadow-sm">
-          <h2 className="text-sm font-bold text-slate-600 flex items-center gap-2 mb-4">
+          <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
             <span className="rounded-full bg-slate-900 text-white text-xs px-2 py-0.5">4</span>
             プレビュー（会員画面での表示イメージ）
           </h2>
@@ -356,7 +356,7 @@ export default function AdminMenuEditPage() {
                 </div>
               )}
               <div className="text-xs font-bold text-slate-700 text-center">{form.title || "タイトル"}</div>
-              {form.subtitle && <div className="text-[10px] text-slate-400 text-center">{form.subtitle}</div>}
+              {form.subtitle && <div className="text-[10px] text-slate-600 text-center">{form.subtitle}</div>}
             </div>
           </div>
         </div>
@@ -382,5 +382,5 @@ export default function AdminMenuEditPage() {
   );
 }
 
-const labelClass = "mb-1.5 block text-xs font-semibold text-slate-500";
+const labelClass = "mb-1.5 block text-xs font-semibold text-slate-700";
 const inputClass  = "w-full rounded-xl border border-slate-200 px-4 py-3 text-sm placeholder:text-slate-400 focus:border-slate-500 focus:outline-none";
