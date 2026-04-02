@@ -109,7 +109,7 @@ export default function ContactsPanel() {
               className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
                 filter === t.key
                   ? "bg-slate-900 text-white"
-                  : "bg-white text-slate-600 border hover:bg-slate-50"
+                  : "bg-white text-slate-800 border hover:bg-slate-50"
               }`}>
               {t.label}
               {t.key === "unread" && unread > 0 && (
@@ -119,16 +119,16 @@ export default function ContactsPanel() {
               )}
             </button>
           ))}
-          <div className="ml-auto text-sm text-slate-400 flex items-center">
+          <div className="ml-auto text-sm text-slate-700 flex items-center">
             全 {total} 件
           </div>
         </div>
 
         {/* 一覧テーブル */}
         {loading ? (
-          <div className="rounded-2xl bg-white p-8 text-center text-slate-400 shadow-sm">読み込み中...</div>
+          <div className="rounded-2xl bg-white p-8 text-center text-slate-700 shadow-sm">読み込み中...</div>
         ) : items.length === 0 ? (
-          <div className="rounded-2xl bg-white p-8 text-center text-slate-400 shadow-sm">
+          <div className="rounded-2xl bg-white p-8 text-center text-slate-700 shadow-sm">
             {filter === "unread" ? "未読の相談はありません ✅" : "相談はありません"}
           </div>
         ) : (
@@ -164,10 +164,10 @@ export default function ContactsPanel() {
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 text-xs text-slate-500 truncate">{item.content}</p>
+                      <p className="mt-1 text-xs text-slate-700 truncate">{item.content}</p>
                     </div>
                   </div>
-                  <span className="shrink-0 text-xs text-slate-400 whitespace-nowrap">
+                  <span className="shrink-0 text-xs text-slate-700 whitespace-nowrap">
                     {formatDate(item.createdAt)}
                   </span>
                 </div>
@@ -181,15 +181,15 @@ export default function ContactsPanel() {
           <div className="mt-4 flex justify-center gap-2">
             <button disabled={page <= 1}
               onClick={() => setPage(p => p - 1)}
-              className="rounded-xl border px-3 py-1.5 text-sm disabled:opacity-40 hover:bg-slate-50">
+              className="rounded-xl border px-3 py-1.5 text-sm font-medium text-slate-800 disabled:opacity-40 hover:bg-slate-50">
               ← 前へ
             </button>
-            <span className="rounded-xl border px-3 py-1.5 text-sm bg-white">
+            <span className="rounded-xl border px-3 py-1.5 text-sm font-medium text-slate-800 bg-white">
               {page} / {totalPages}
             </span>
             <button disabled={page >= totalPages}
               onClick={() => setPage(p => p + 1)}
-              className="rounded-xl border px-3 py-1.5 text-sm disabled:opacity-40 hover:bg-slate-50">
+              className="rounded-xl border px-3 py-1.5 text-sm font-medium text-slate-800 disabled:opacity-40 hover:bg-slate-50">
               次へ →
             </button>
           </div>
@@ -202,14 +202,14 @@ export default function ContactsPanel() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-slate-800">相談詳細</h2>
             <button onClick={() => setSelected(null)}
-              className="text-slate-400 hover:text-slate-600 text-lg">✕</button>
+              className="text-slate-700 hover:text-slate-600 text-lg">✕</button>
           </div>
 
           {/* ステータスバッジ */}
           <div className="flex items-center gap-2 mb-4">
             <span className={`rounded-full px-3 py-1 text-xs font-bold ${
               selected.isRead
-                ? "bg-slate-100 text-slate-500"
+                ? "bg-slate-100 text-slate-700"
                 : "bg-red-100 text-red-600"
             }`}>
               {selected.isRead ? "✅ 既読" : "🔴 未読"}
@@ -236,14 +236,14 @@ export default function ContactsPanel() {
           </div>
 
           <div className="mt-4">
-            <div className="mb-1 text-xs font-semibold text-slate-500 uppercase tracking-wide">相談内容</div>
+            <div className="mb-1 text-xs font-semibold text-slate-700 uppercase tracking-wide">相談内容</div>
             <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
               {selected.content}
             </div>
           </div>
 
           {selected.readAt && (
-            <p className="mt-3 text-xs text-slate-400">
+            <p className="mt-3 text-xs text-slate-700">
               既読日時: {formatDate(selected.readAt)}
             </p>
           )}
@@ -263,7 +263,7 @@ export default function ContactsPanel() {
 function Row({ label, value, href }: { label: string; value: string; href?: string }) {
   return (
     <div className="flex gap-2">
-      <span className="w-20 shrink-0 text-xs font-medium text-slate-400 pt-0.5">{label}</span>
+      <span className="w-20 shrink-0 text-xs font-medium text-slate-700 pt-0.5">{label}</span>
       {href ? (
         <a href={href} className="text-blue-600 underline break-all">{value}</a>
       ) : (

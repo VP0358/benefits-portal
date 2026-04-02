@@ -82,24 +82,24 @@ function ManualExpireModal({
       <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-bold text-slate-800">手動ポイント失効</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
+          <button onClick={onClose} className="text-slate-700 hover:text-slate-600">✕</button>
         </div>
 
         {/* 会員情報 */}
         <div className="rounded-xl bg-slate-50 px-4 py-3 mb-4">
           <div className="text-sm font-semibold text-slate-700">{item.name}</div>
-          <div className="text-xs text-slate-400">{item.memberCode} / {item.email}</div>
+          <div className="text-xs text-slate-700">{item.memberCode} / {item.email}</div>
           <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-center">
             <div className="rounded-lg bg-white p-2 border">
-              <div className="text-slate-400">自動</div>
+              <div className="text-slate-700">自動</div>
               <div className="font-bold text-slate-700">{item.autoPointsBalance.toLocaleString()}pt</div>
             </div>
             <div className="rounded-lg bg-white p-2 border">
-              <div className="text-slate-400">手動</div>
+              <div className="text-slate-700">手動</div>
               <div className="font-bold text-slate-700">{item.manualPointsBalance.toLocaleString()}pt</div>
             </div>
             <div className="rounded-lg bg-white p-2 border">
-              <div className="text-slate-400">外部</div>
+              <div className="text-slate-700">外部</div>
               <div className="font-bold text-slate-700">{item.externalPointsBalance.toLocaleString()}pt</div>
             </div>
           </div>
@@ -145,7 +145,7 @@ function ManualExpireModal({
             {mode === "partial" && (
               <div className="mt-2">
                 <input type="number" min={1} max={maxBalance}
-                  className="w-full rounded-xl border px-4 py-2.5 text-sm focus:outline-none focus:border-slate-400"
+                  className="w-full rounded-xl border px-4 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:border-slate-400"
                   placeholder={`1 〜 ${maxBalance.toLocaleString()}`}
                   value={amount}
                   onChange={e => setAmount(e.target.value)} />
@@ -156,7 +156,7 @@ function ManualExpireModal({
           {/* 失効理由 */}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">失効理由</label>
-            <input className="w-full rounded-xl border px-4 py-2.5 text-sm focus:outline-none focus:border-slate-400"
+            <input className="w-full rounded-xl border px-4 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:border-slate-400"
               value={description} onChange={e => setDescription(e.target.value)} />
           </div>
 
@@ -171,7 +171,7 @@ function ManualExpireModal({
 
           <div className="flex gap-3">
             <button onClick={onClose}
-              className="flex-1 rounded-xl border px-4 py-3 text-sm text-slate-600 hover:bg-slate-50">
+              className="flex-1 rounded-xl border px-4 py-3 text-sm text-slate-800 hover:bg-slate-50">
               キャンセル
             </button>
             <button onClick={onSubmit} disabled={processing || expireAmount <= 0}
@@ -238,7 +238,7 @@ function BulkExpireModal({
       <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-bold text-slate-800">一括ポイント失効</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
+          <button onClick={onClose} className="text-slate-700 hover:text-slate-600">✕</button>
         </div>
 
         <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 mb-4 text-sm text-red-700">
@@ -275,7 +275,7 @@ function BulkExpireModal({
           {/* 理由 */}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">失効理由</label>
-            <input className="w-full rounded-xl border px-4 py-2.5 text-sm focus:outline-none focus:border-slate-400"
+            <input className="w-full rounded-xl border px-4 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:border-slate-400"
               value={description} onChange={e => setDescription(e.target.value)} />
           </div>
 
@@ -289,7 +289,7 @@ function BulkExpireModal({
 
           <div className="flex gap-3">
             <button onClick={onClose}
-              className="flex-1 rounded-xl border px-4 py-3 text-sm text-slate-600 hover:bg-slate-50">
+              className="flex-1 rounded-xl border px-4 py-3 text-sm text-slate-800 hover:bg-slate-50">
               キャンセル
             </button>
             <button onClick={onSubmit} disabled={processing || targetPt <= 0}
@@ -362,7 +362,7 @@ export default function PointExpireManager() {
           { label: "外部ポイント計", value: `${totalPoints.external.toLocaleString()}pt`, color: "text-purple-700" },
         ].map(c => (
           <div key={c.label} className="rounded-2xl bg-slate-50 border p-4 text-center">
-            <div className="text-xs text-slate-400 mb-1">{c.label}</div>
+            <div className="text-xs text-slate-700 mb-1">{c.label}</div>
             <div className={`text-lg font-bold ${c.color}`}>{c.value}</div>
           </div>
         ))}
@@ -373,7 +373,7 @@ export default function PointExpireManager() {
         <input
           type="text"
           placeholder="会員名 / 会員番号 / メールで検索"
-          className="flex-1 min-w-[200px] rounded-xl border px-4 py-2.5 text-sm focus:outline-none focus:border-slate-400"
+          className="flex-1 min-w-[200px] rounded-xl border px-4 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:border-slate-400"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -388,9 +388,9 @@ export default function PointExpireManager() {
 
       {/* 一覧テーブル */}
       {loading ? (
-        <div className="py-12 text-center text-slate-400">読み込み中...</div>
+        <div className="py-12 text-center text-slate-700">読み込み中...</div>
       ) : filtered.length === 0 ? (
-        <div className="py-12 text-center text-slate-400 rounded-2xl border border-dashed">
+        <div className="py-12 text-center text-slate-700 rounded-2xl border border-dashed">
           {search ? "検索結果がありません" : "ポイント残高のある会員はいません"}
         </div>
       ) : (
@@ -398,12 +398,12 @@ export default function PointExpireManager() {
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">会員</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-700">会員</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-amber-600">自動</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-blue-600">手動</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-purple-600">外部</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">利用可能計</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500">手動失効</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-700">利用可能計</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-700">手動失効</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -411,7 +411,7 @@ export default function PointExpireManager() {
                 <tr key={item.userId} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3">
                     <div className="font-medium text-slate-800">{item.name}</div>
-                    <div className="text-xs text-slate-400">{item.memberCode} / {item.email}</div>
+                    <div className="text-xs text-slate-700">{item.memberCode} / {item.email}</div>
                   </td>
                   <td className="px-4 py-3 text-right font-medium text-amber-700">
                     {item.autoPointsBalance > 0 ? item.autoPointsBalance.toLocaleString() + "pt" : <span className="text-slate-300">—</span>}

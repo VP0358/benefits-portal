@@ -85,7 +85,7 @@ export default function ReferralRewardsPanel() {
 
       {/* ── 月選択コントロール ── */}
       <div className="rounded-2xl bg-white border p-4 flex flex-wrap items-center gap-3">
-        <span className="text-sm font-semibold text-slate-600">集計期間：</span>
+        <span className="text-sm font-semibold text-slate-800">集計期間：</span>
 
         <label className="flex items-center gap-1.5 text-sm cursor-pointer">
           <input type="checkbox" checked={allTime} onChange={e => setAllTime(e.target.checked)} />
@@ -95,7 +95,7 @@ export default function ReferralRewardsPanel() {
         {!allTime && (
           <>
             <select
-              className="rounded-xl border px-3 py-1.5 text-sm focus:outline-none"
+              className="rounded-xl border px-3 py-1.5 text-sm font-medium text-slate-800 focus:outline-none"
               value={year}
               onChange={e => setYear(Number(e.target.value))}
             >
@@ -104,7 +104,7 @@ export default function ReferralRewardsPanel() {
               ))}
             </select>
             <select
-              className="rounded-xl border px-3 py-1.5 text-sm focus:outline-none"
+              className="rounded-xl border px-3 py-1.5 text-sm font-medium text-slate-800 focus:outline-none"
               value={month}
               onChange={e => setMonth(Number(e.target.value))}
             >
@@ -135,7 +135,7 @@ export default function ReferralRewardsPanel() {
             <div className="text-2xl font-bold text-blue-700">{data.totalContracts}<span className="text-sm font-normal ml-0.5">件</span></div>
           </div>
           <div className="rounded-2xl bg-slate-50 p-4 text-center">
-            <div className="text-xs text-slate-500 font-medium mb-1">合計契約プラン額</div>
+            <div className="text-xs text-slate-700 font-medium mb-1">合計契約プラン額</div>
             <div className="text-2xl font-bold text-slate-700">¥{data.totalFee.toLocaleString()}</div>
           </div>
           <div className="rounded-2xl bg-amber-50 p-4 text-center">
@@ -147,9 +147,9 @@ export default function ReferralRewardsPanel() {
 
       {/* ── 一覧 ── */}
       {loading ? (
-        <div className="py-16 text-center text-slate-400">読み込み中...</div>
+        <div className="py-16 text-center text-slate-700">読み込み中...</div>
       ) : !data || data.referrers.length === 0 ? (
-        <div className="rounded-3xl bg-white p-12 text-center text-slate-400 shadow-sm">
+        <div className="rounded-3xl bg-white p-12 text-center text-slate-700 shadow-sm">
           <div className="text-4xl mb-3">📭</div>
           <div className="font-medium">{periodLabel} の報酬対象データがありません</div>
           <div className="text-sm mt-1">携帯契約に「確定日」を設定すると表示されます</div>
@@ -157,7 +157,7 @@ export default function ReferralRewardsPanel() {
       ) : (
         <div className="space-y-4">
           {data.referrers.map((r, idx) => (
-            <div key={r.referrerId} className="rounded-3xl bg-white shadow-sm overflow-hidden border border-slate-100">
+            <div key={r.referrerId} className="rounded-3xl bg-white shadow-sm overflow-hidden border border-slate-300">
 
               {/* ── 紹介者ヘッダー ── */}
               <button
@@ -169,9 +169,9 @@ export default function ReferralRewardsPanel() {
                     {/* 順位バッジ */}
                     <div className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
                       idx === 0 ? "bg-amber-100 text-amber-700" :
-                      idx === 1 ? "bg-slate-200 text-slate-600" :
+                      idx === 1 ? "bg-slate-200 text-slate-800" :
                       idx === 2 ? "bg-orange-100 text-orange-600" :
-                      "bg-slate-100 text-slate-500"
+                      "bg-slate-100 text-slate-700"
                     }`}>
                       {idx + 1}
                     </div>
@@ -183,28 +183,28 @@ export default function ReferralRewardsPanel() {
                       >
                         {r.referrerName}
                       </Link>
-                      <div className="text-xs text-slate-400">{r.referrerCode}</div>
+                      <div className="text-xs text-slate-700">{r.referrerCode}</div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-6">
                     {/* 件数 */}
                     <div className="text-center hidden sm:block">
-                      <div className="text-xs text-slate-400 mb-0.5">直紹介件数</div>
+                      <div className="text-xs text-slate-700 mb-0.5">直紹介件数</div>
                       <div className="text-lg font-bold text-blue-700">{r.contractCount}<span className="text-xs font-normal ml-0.5">件</span></div>
                     </div>
                     {/* 合計プラン額 */}
                     <div className="text-center hidden md:block">
-                      <div className="text-xs text-slate-400 mb-0.5">合計契約額</div>
+                      <div className="text-xs text-slate-700 mb-0.5">合計契約額</div>
                       <div className="text-lg font-bold text-slate-700">¥{r.totalFee.toLocaleString()}</div>
                     </div>
                     {/* 報酬額 */}
                     <div className="text-center">
-                      <div className="text-xs text-slate-400 mb-0.5">報酬額（1/4）</div>
+                      <div className="text-xs text-slate-700 mb-0.5">報酬額（1/4）</div>
                       <div className="text-xl font-bold text-emerald-600">¥{r.totalReward.toLocaleString()}</div>
                     </div>
                     {/* 展開ボタン */}
-                    <div className={`text-slate-400 text-lg transition-transform duration-200 ${openIds.has(r.referrerId) ? "rotate-180" : ""}`}>
+                    <div className={`text-slate-700 text-lg transition-transform duration-200 ${openIds.has(r.referrerId) ? "rotate-180" : ""}`}>
                       ▾
                     </div>
                   </div>
@@ -217,13 +217,13 @@ export default function ReferralRewardsPanel() {
 
                   {/* プラン統計サマリー */}
                   <div className="px-6 py-4 bg-slate-50/60">
-                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">
+                    <div className="text-xs font-bold text-slate-700 uppercase tracking-wide mb-3">
                       📊 直紹介者の契約プラン統計
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="text-xs text-slate-400">
+                          <tr className="text-xs text-slate-700">
                             <th className="text-left pb-2 font-medium">プラン名</th>
                             <th className="text-right pb-2 font-medium">件数</th>
                             <th className="text-right pb-2 font-medium">月額（1件）</th>
@@ -236,7 +236,7 @@ export default function ReferralRewardsPanel() {
                             <tr key={p.planName} className="border-t border-slate-100">
                               <td className="py-2 font-medium text-slate-700">{p.planName}</td>
                               <td className="py-2 text-right text-blue-700 font-bold">{p.count}件</td>
-                              <td className="py-2 text-right text-slate-500">
+                              <td className="py-2 text-right text-slate-700">
                                 ¥{p.count > 0 ? (p.totalFee / p.count).toLocaleString() : 0}
                               </td>
                               <td className="py-2 text-right text-slate-700 font-medium">
@@ -265,13 +265,13 @@ export default function ReferralRewardsPanel() {
 
                   {/* 契約明細 */}
                   <div className="px-6 py-4">
-                    <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">
+                    <div className="text-xs font-bold text-slate-700 uppercase tracking-wide mb-3">
                       📋 契約明細（直紹介した会員一覧）
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="text-xs text-slate-400 border-b border-slate-100">
+                          <tr className="text-xs text-slate-700 border-b border-slate-100">
                             <th className="text-left pb-2 font-medium">会員名</th>
                             <th className="text-left pb-2 font-medium">プラン</th>
                             <th className="text-right pb-2 font-medium">月額</th>
@@ -289,16 +289,16 @@ export default function ReferralRewardsPanel() {
                                 >
                                   {c.contractedUserName}
                                 </Link>
-                                <span className="ml-2 text-xs text-slate-400">{c.contractedUserCode}</span>
+                                <span className="ml-2 text-xs text-slate-700">{c.contractedUserCode}</span>
                               </td>
-                              <td className="py-2.5 text-slate-600">{c.planName}</td>
+                              <td className="py-2.5 text-slate-800">{c.planName}</td>
                               <td className="py-2.5 text-right text-slate-700 font-medium">
                                 ¥{c.monthlyFee.toLocaleString()}
                               </td>
                               <td className="py-2.5 text-right font-bold text-emerald-600">
                                 ¥{c.reward.toLocaleString()}
                               </td>
-                              <td className="py-2.5 text-xs text-slate-500">
+                              <td className="py-2.5 text-xs text-slate-700">
                                 {new Date(c.confirmedAt).toLocaleDateString("ja-JP")}
                               </td>
                             </tr>
@@ -316,7 +316,7 @@ export default function ReferralRewardsPanel() {
       )}
 
       {/* 注記 */}
-      <div className="rounded-2xl bg-slate-50 p-4 text-xs text-slate-400 space-y-1">
+      <div className="rounded-2xl bg-slate-50 p-4 text-xs text-slate-700 space-y-1">
         <div>※ 対象：ステータスが「有効」かつ「確定日」が設定された携帯契約のみ</div>
         <div>※ 報酬額 = 合計契約プラン額 × {(REWARD_RATE * 100).toFixed(0)}%（月額の1/4、小数点以下切り捨て）</div>
         <div>※ 紹介関係は直紹介（isActive = true）のみ対象</div>

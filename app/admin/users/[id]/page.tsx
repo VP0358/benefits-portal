@@ -44,7 +44,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
     <main className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-slate-800">会員詳細</h1>
-        <p className="mt-2 text-slate-600">{user!.memberCode} / {user!.name}</p>
+        <p className="mt-2 text-slate-800">{user!.memberCode} / {user!.name}</p>
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-3xl bg-white p-6 shadow-sm">
@@ -73,7 +73,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
               { label: "利用可能", value: user!.pointWallet?.availablePointsBalance ?? 0 },
             ].map(item => (
               <div key={item.label} className="rounded-2xl bg-slate-50 p-3">
-                <div className="text-xs text-slate-500">{item.label}ポイント</div>
+                <div className="text-xs text-slate-700">{item.label}ポイント</div>
                 <div className="mt-1 text-lg font-bold text-slate-800">{item.value.toLocaleString()}</div>
               </div>
             ))}
@@ -112,12 +112,12 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
       <section className="rounded-3xl bg-white p-6 shadow-sm">
         <h2 className="text-xl font-bold text-slate-800">最新ポイント履歴</h2>
         <div className="mt-4 space-y-2 text-sm">
-          {user!.pointLogs.length === 0 ? <div className="text-slate-500">履歴はありません。</div> : user!.pointLogs.map(log => (
+          {user!.pointLogs.length === 0 ? <div className="text-slate-700">履歴はありません。</div> : user!.pointLogs.map(log => (
             <div key={log.id.toString()} className="grid grid-cols-[160px_120px_100px_1fr] gap-4 rounded-2xl border p-3">
-              <div className="text-slate-500">{new Date(log.occurredAt).toLocaleString("ja-JP")}</div>
+              <div className="text-slate-700">{new Date(log.occurredAt).toLocaleString("ja-JP")}</div>
               <div>{log.transactionType}</div>
               <div className={log.points > 0 ? "text-emerald-600 font-medium" : "text-red-600 font-medium"}>{log.points > 0 ? "+" : ""}{log.points.toLocaleString()}</div>
-              <div className="text-slate-600">{log.description}</div>
+              <div className="text-slate-800">{log.description}</div>
             </div>
           ))}
         </div>

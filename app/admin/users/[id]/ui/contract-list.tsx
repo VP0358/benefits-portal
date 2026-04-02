@@ -18,9 +18,9 @@ function statusLabel(status: string) {
     pending: { label: "申込中", cls: "bg-yellow-50 text-yellow-700 border-yellow-200" },
     active: { label: "有効", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
     canceled: { label: "解約済", cls: "bg-red-50 text-red-700 border-red-200" },
-    suspended: { label: "停止", cls: "bg-slate-100 text-slate-500 border-slate-200" },
+    suspended: { label: "停止", cls: "bg-slate-100 text-slate-700 border-slate-200" },
   };
-  return map[status] ?? { label: status, cls: "bg-slate-100 text-slate-600 border-slate-200" };
+  return map[status] ?? { label: status, cls: "bg-slate-100 text-slate-800 border-slate-200" };
 }
 
 export default function ContractList({ contracts: initial }: { contracts: Contract[] }) {
@@ -88,7 +88,7 @@ export default function ContractList({ contracts: initial }: { contracts: Contra
   }
 
   if (contracts.length === 0) {
-    return <div className="text-sm text-slate-500">契約はありません。</div>;
+    return <div className="text-sm text-slate-700">契約はありません。</div>;
   }
 
   return (
@@ -101,27 +101,27 @@ export default function ContractList({ contracts: initial }: { contracts: Contra
             <div className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">プラン名</label>
+                  <label className="mb-1 block text-xs font-medium text-slate-800">プラン名</label>
                   <input
-                    className="w-full rounded-xl border px-3 py-2 text-sm"
+                    className="w-full rounded-xl border px-3 py-2 text-sm font-medium text-slate-800"
                     value={editForm.planName ?? ""}
                     onChange={e => setEditForm({ ...editForm, planName: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">月額料金（円）</label>
+                  <label className="mb-1 block text-xs font-medium text-slate-800">月額料金（円）</label>
                   <input
                     type="number"
                     min="0"
-                    className="w-full rounded-xl border px-3 py-2 text-sm"
+                    className="w-full rounded-xl border px-3 py-2 text-sm font-medium text-slate-800"
                     value={editForm.monthlyFee ?? 0}
                     onChange={e => setEditForm({ ...editForm, monthlyFee: Number(e.target.value) })}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">ステータス</label>
+                  <label className="mb-1 block text-xs font-medium text-slate-800">ステータス</label>
                   <select
-                    className="w-full rounded-xl border px-3 py-2 text-sm"
+                    className="w-full rounded-xl border px-3 py-2 text-sm font-medium text-slate-800"
                     value={editForm.status ?? "active"}
                     onChange={e => setEditForm({ ...editForm, status: e.target.value })}
                   >
@@ -132,19 +132,19 @@ export default function ContractList({ contracts: initial }: { contracts: Contra
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">開始日</label>
+                  <label className="mb-1 block text-xs font-medium text-slate-800">開始日</label>
                   <input
                     type="date"
-                    className="w-full rounded-xl border px-3 py-2 text-sm"
+                    className="w-full rounded-xl border px-3 py-2 text-sm font-medium text-slate-800"
                     value={editForm.startedAt ?? ""}
                     onChange={e => setEditForm({ ...editForm, startedAt: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-600">契約確定日</label>
+                  <label className="mb-1 block text-xs font-medium text-slate-800">契約確定日</label>
                   <input
                     type="date"
-                    className="w-full rounded-xl border px-3 py-2 text-sm"
+                    className="w-full rounded-xl border px-3 py-2 text-sm font-medium text-slate-800"
                     value={editForm.confirmedAt ?? ""}
                     onChange={e => setEditForm({ ...editForm, confirmedAt: e.target.value })}
                   />
@@ -154,7 +154,7 @@ export default function ContractList({ contracts: initial }: { contracts: Contra
                 <button
                   type="button"
                   onClick={cancelEdit}
-                  className="rounded-xl border px-4 py-2 text-sm text-slate-600"
+                  className="rounded-xl border px-4 py-2 text-sm text-slate-800"
                 >
                   キャンセル
                 </button>
@@ -174,7 +174,7 @@ export default function ContractList({ contracts: initial }: { contracts: Contra
               <div className="flex items-start justify-between">
                 <div>
                   <div className="font-semibold text-slate-800">{contract.planName}</div>
-                  <div className="text-xs text-slate-500 mt-0.5">契約番号: {contract.contractNumber}</div>
+                  <div className="text-xs text-slate-700 mt-0.5">契約番号: {contract.contractNumber}</div>
                 </div>
                 <span className={`rounded-full border px-2 py-0.5 text-xs ${statusLabel(contract.status).cls}`}>
                   {statusLabel(contract.status).label}
@@ -182,10 +182,10 @@ export default function ContractList({ contracts: initial }: { contracts: Contra
               </div>
               <div className="text-sm text-slate-700">月額: {Number(contract.monthlyFee).toLocaleString()}円</div>
               {contract.startedAt && (
-                <div className="text-xs text-slate-500">開始日: {new Date(contract.startedAt).toLocaleDateString("ja-JP")}</div>
+                <div className="text-xs text-slate-700">開始日: {new Date(contract.startedAt).toLocaleDateString("ja-JP")}</div>
               )}
               {contract.confirmedAt && (
-                <div className="text-xs text-slate-500">確定日: {new Date(contract.confirmedAt).toLocaleDateString("ja-JP")}</div>
+                <div className="text-xs text-slate-700">確定日: {new Date(contract.confirmedAt).toLocaleDateString("ja-JP")}</div>
               )}
               {contract.canceledAt && (
                 <div className="text-xs text-red-500">解約日: {new Date(contract.canceledAt).toLocaleDateString("ja-JP")}</div>
@@ -195,7 +195,7 @@ export default function ContractList({ contracts: initial }: { contracts: Contra
                   <button
                     type="button"
                     onClick={() => startEdit(contract)}
-                    className="rounded-xl border px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
+                    className="rounded-xl border px-3 py-1.5 text-xs text-slate-800 hover:bg-slate-50"
                   >
                     編集
                   </button>

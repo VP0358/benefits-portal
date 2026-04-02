@@ -7,7 +7,7 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   pending: { label: "申込中", cls: "bg-yellow-50 text-yellow-700 border-yellow-200" },
   active: { label: "有効", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   canceled: { label: "解約済", cls: "bg-red-50 text-red-700 border-red-200" },
-  suspended: { label: "停止中", cls: "bg-slate-100 text-slate-500 border-slate-200" },
+  suspended: { label: "停止中", cls: "bg-slate-100 text-slate-700 border-slate-200" },
 };
 
 const REWARD_RATE = 0.25;
@@ -72,7 +72,7 @@ export default async function AdminContractsPage({
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-xl font-bold text-slate-800">📱 携帯契約一覧</h1>
-            <p className="text-sm text-slate-500 mt-0.5">全 {total.toLocaleString()} 件</p>
+            <p className="text-sm text-slate-700 mt-0.5">全 {total.toLocaleString()} 件</p>
           </div>
           {/* 集計カード */}
           <div className="flex gap-3 flex-wrap">
@@ -104,7 +104,7 @@ export default async function AdminContractsPage({
               className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
                 statusFilter === opt.value
                   ? "bg-slate-900 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  : "bg-slate-100 text-slate-800 hover:bg-slate-200"
               }`}
             >
               {opt.label}
@@ -119,23 +119,23 @@ export default async function AdminContractsPage({
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                <th className="text-left px-5 py-3 font-semibold text-slate-600">会員</th>
-                <th className="text-left px-5 py-3 font-semibold text-slate-600">プラン名</th>
-                <th className="text-left px-5 py-3 font-semibold text-slate-600">契約番号</th>
-                <th className="text-right px-5 py-3 font-semibold text-slate-600">月額</th>
-                <th className="text-right px-5 py-3 font-semibold text-slate-600 whitespace-nowrap">
+                <th className="text-left px-5 py-3 font-semibold text-slate-800">会員</th>
+                <th className="text-left px-5 py-3 font-semibold text-slate-800">プラン名</th>
+                <th className="text-left px-5 py-3 font-semibold text-slate-800">契約番号</th>
+                <th className="text-right px-5 py-3 font-semibold text-slate-800">月額</th>
+                <th className="text-right px-5 py-3 font-semibold text-slate-800 whitespace-nowrap">
                   報酬額 (×1/4)
                 </th>
-                <th className="text-left px-5 py-3 font-semibold text-slate-600">直紹介者</th>
-                <th className="text-left px-5 py-3 font-semibold text-slate-600">ステータス</th>
-                <th className="text-left px-5 py-3 font-semibold text-slate-600">確定日</th>
+                <th className="text-left px-5 py-3 font-semibold text-slate-800">直紹介者</th>
+                <th className="text-left px-5 py-3 font-semibold text-slate-800">ステータス</th>
+                <th className="text-left px-5 py-3 font-semibold text-slate-800">確定日</th>
                 <th className="px-5 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {contracts.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-5 py-10 text-center text-slate-400">
+                  <td colSpan={9} className="px-5 py-10 text-center text-slate-700">
                     該当する契約がありません
                   </td>
                 </tr>
@@ -153,10 +153,10 @@ export default async function AdminContractsPage({
                       >
                         {c.user.name}
                       </Link>
-                      <div className="text-xs text-slate-400">{c.user.memberCode}</div>
+                      <div className="text-xs text-slate-700">{c.user.memberCode}</div>
                     </td>
                     <td className="px-5 py-3 font-medium text-slate-700">{c.planName}</td>
-                    <td className="px-5 py-3 text-slate-500 text-xs font-mono">{c.contractNumber}</td>
+                    <td className="px-5 py-3 text-slate-700 text-xs font-mono">{c.contractNumber}</td>
                     <td className="px-5 py-3 text-right font-semibold text-slate-800">
                       ¥{Number(c.monthlyFee).toLocaleString()}
                     </td>
@@ -176,7 +176,7 @@ export default async function AdminContractsPage({
                           className="text-slate-700 hover:text-slate-500"
                         >
                           {referrer.name}
-                          <span className="block text-xs text-slate-400">{referrer.memberCode}</span>
+                          <span className="block text-xs text-slate-700">{referrer.memberCode}</span>
                         </Link>
                       ) : (
                         <span className="text-slate-300 text-xs">紹介なし</span>
@@ -187,7 +187,7 @@ export default async function AdminContractsPage({
                         {s.label}
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-xs text-slate-500">
+                    <td className="px-5 py-3 text-xs text-slate-700">
                       {c.confirmedAt
                         ? new Date(c.confirmedAt).toLocaleDateString("ja-JP")
                         : "—"}
@@ -195,7 +195,7 @@ export default async function AdminContractsPage({
                     <td className="px-5 py-3">
                       <Link
                         href={`/admin/users/${c.user.id}`}
-                        className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-200 transition-colors"
+                        className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs text-slate-800 hover:bg-slate-200 transition-colors"
                       >
                         詳細
                       </Link>
@@ -213,18 +213,18 @@ export default async function AdminContractsPage({
             {page > 1 && (
               <Link
                 href={`/admin/contracts?status=${statusFilter}&page=${page - 1}`}
-                className="rounded-xl border px-4 py-2 text-sm hover:bg-slate-50"
+                className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
               >
                 ← 前へ
               </Link>
             )}
-            <span className="px-4 py-2 text-sm text-slate-500">
+            <span className="px-4 py-2 text-sm text-slate-700">
               {page} / {pages}
             </span>
             {page < pages && (
               <Link
                 href={`/admin/contracts?status=${statusFilter}&page=${page + 1}`}
-                className="rounded-xl border px-4 py-2 text-sm hover:bg-slate-50"
+                className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
               >
                 次へ →
               </Link>

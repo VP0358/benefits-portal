@@ -78,7 +78,7 @@ export default function ImageUpload({ value, onChange }: Props) {
           <div className="flex gap-2">
             <input
               type="url"
-              className="flex-1 rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+              className="flex-1 rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 focus:outline-none focus:border-blue-400"
               placeholder="https://example.com/image.jpg"
               value={urlInput}
               onChange={e => setUrlInput(e.target.value)}
@@ -115,7 +115,7 @@ export default function ImageUpload({ value, onChange }: Props) {
         <div className="rounded-2xl border bg-slate-50 p-4">
           <div className="mb-2 text-xs font-semibold text-slate-700">プレビュー</div>
           <img src={value} alt="preview" className="h-20 w-20 rounded-xl object-cover shadow-sm" />
-          <div className="mt-2 truncate text-xs text-slate-600">{value}</div>
+          <div className="mt-2 truncate text-xs text-slate-800">{value}</div>
         </div>
       )}
 

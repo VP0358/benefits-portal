@@ -57,7 +57,7 @@ export default function MonthlyGrantManager() {
         </div>
       </div>
       <div className="flex gap-3">
-        <button onClick={runPreview} disabled={loading} className="rounded-xl border px-4 py-3 text-sm disabled:opacity-50">{loading ? "確認中..." : "プレビュー確認"}</button>
+        <button onClick={runPreview} disabled={loading} className="rounded-xl border px-4 py-3 text-sm font-medium text-slate-800 disabled:opacity-50">{loading ? "確認中..." : "プレビュー確認"}</button>
         <button onClick={runExecute} disabled={executing} className="rounded-xl bg-slate-900 px-4 py-3 text-sm text-white disabled:opacity-50">{executing ? "実行中..." : "本実行"}</button>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -67,16 +67,16 @@ export default function MonthlyGrantManager() {
           <div className="grid gap-4 md:grid-cols-3">
             {[{ label: "対象契約数", value: preview.totalContracts }, { label: "紹介者件数", value: preview.totalReferrers }, { label: "総付与ポイント", value: `${preview.totalRewardPoints.toLocaleString()}pt` }].map(item => (
               <div key={item.label} className="rounded-2xl bg-slate-50 p-4">
-                <div className="text-sm text-slate-500">{item.label}</div>
+                <div className="text-sm text-slate-700">{item.label}</div>
                 <div className="mt-2 text-2xl font-bold text-slate-800">{item.value}</div>
               </div>
             ))}
           </div>
           <div className="space-y-3">
-            {preview.targets.length === 0 ? <div className="text-sm text-slate-500">対象データはありません。</div> : preview.targets.map(target => (
+            {preview.targets.length === 0 ? <div className="text-sm text-slate-700">対象データはありません。</div> : preview.targets.map(target => (
               <div key={target.contractId} className="rounded-2xl border p-4">
                 <div className="font-semibold text-slate-800">{target.contractedUserName}</div>
-                <div className="text-sm text-slate-500">月額: {target.baseMonthlyFee.toLocaleString()}円</div>
+                <div className="text-sm text-slate-700">月額: {target.baseMonthlyFee.toLocaleString()}円</div>
                 <div className="mt-2 space-y-1">
                   {target.referrers.map((ref, i) => (
                     <div key={i} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">

@@ -75,7 +75,7 @@ export default function AdminAccountPanel() {
   }
 
   if (loading) {
-    return <div className="rounded-3xl bg-white p-8 text-center text-slate-400 shadow-sm">読み込み中...</div>;
+    return <div className="rounded-3xl bg-white p-8 text-center text-slate-700 shadow-sm">読み込み中...</div>;
   }
 
   return (
@@ -83,19 +83,19 @@ export default function AdminAccountPanel() {
 
       {/* 現在の情報 */}
       <div className="rounded-3xl bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-bold text-slate-600 mb-4">現在のログイン情報</h2>
+        <h2 className="text-sm font-bold text-slate-800 mb-4">現在のログイン情報</h2>
         <div className="space-y-2 text-sm">
           <div className="flex gap-3">
-            <span className="w-32 text-slate-400 shrink-0">管理者名</span>
+            <span className="w-32 text-slate-700 shrink-0">管理者名</span>
             <span className="font-medium text-slate-700">{info?.name}</span>
           </div>
           <div className="flex gap-3">
-            <span className="w-32 text-slate-400 shrink-0">現在のメール</span>
+            <span className="w-32 text-slate-700 shrink-0">現在のメール</span>
             <span className="font-medium text-slate-700">{info?.email}</span>
           </div>
           <div className="flex gap-3">
-            <span className="w-32 text-slate-400 shrink-0">権限</span>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{info?.role}</span>
+            <span className="w-32 text-slate-700 shrink-0">権限</span>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-800">{info?.role}</span>
           </div>
         </div>
       </div>
@@ -107,7 +107,7 @@ export default function AdminAccountPanel() {
         </h2>
 
         <div>
-          <label className="mb-1.5 block text-xs font-semibold text-slate-500">新しいメールアドレス</label>
+          <label className="mb-1.5 block text-xs font-semibold text-slate-700">新しいメールアドレス</label>
           <input type="email" required value={newEmail}
             onChange={e => setNewEmail(e.target.value)}
             className={inputClass}
@@ -119,11 +119,11 @@ export default function AdminAccountPanel() {
       <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
         <h2 className="text-sm font-bold text-slate-700 border-b pb-2">
           パスワード変更
-          <span className="ml-2 text-xs font-normal text-slate-400">（変更する場合のみ入力）</span>
+          <span className="ml-2 text-xs font-normal text-slate-700">（変更する場合のみ入力）</span>
         </h2>
 
         <div>
-          <label className="mb-1.5 block text-xs font-semibold text-slate-500">現在のパスワード *</label>
+          <label className="mb-1.5 block text-xs font-semibold text-slate-700">現在のパスワード *</label>
           <input type="password" required value={currentPw}
             onChange={e => setCurrentPw(e.target.value)}
             className={inputClass}
@@ -132,7 +132,7 @@ export default function AdminAccountPanel() {
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-semibold text-slate-500">新しいパスワード</label>
+          <label className="mb-1.5 block text-xs font-semibold text-slate-700">新しいパスワード</label>
           <input type="password" value={newPw}
             onChange={e => setNewPw(e.target.value)}
             className={inputClass}
@@ -141,7 +141,7 @@ export default function AdminAccountPanel() {
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-semibold text-slate-500">新しいパスワード（確認）</label>
+          <label className="mb-1.5 block text-xs font-semibold text-slate-700">新しいパスワード（確認）</label>
           <input type="password" value={confirmPw}
             onChange={e => setConfirmPw(e.target.value)}
             className={inputClass}

@@ -24,7 +24,7 @@ export default function ProductImageUpload({ value, onChange }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
-        <button type="button" onClick={() => inputRef.current?.click()} className="rounded-xl border px-4 py-2 text-sm" disabled={uploading}>
+        <button type="button" onClick={() => inputRef.current?.click()} className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800" disabled={uploading}>
           {uploading ? "アップロード中..." : "画像をアップロード"}
         </button>
         {value && <button type="button" onClick={() => onChange("")} className="rounded-xl border px-4 py-2 text-sm text-red-600">画像を外す</button>}
@@ -34,7 +34,7 @@ export default function ProductImageUpload({ value, onChange }: Props) {
       {value && (
         <div className="rounded-2xl border bg-slate-50 p-4">
           <img src={value} alt="preview" className="h-24 w-24 rounded-xl object-cover shadow-sm" />
-          <div className="mt-2 truncate text-xs text-slate-500">{value}</div>
+          <div className="mt-2 truncate text-xs text-slate-700">{value}</div>
         </div>
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}

@@ -63,7 +63,7 @@ export default function CsvExportPanel() {
             className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
               activeTab === tab.key
                 ? "bg-slate-900 text-white"
-                : "border text-slate-600 hover:bg-slate-50"
+                : "border text-slate-800 hover:bg-slate-50"
             }`}
           >
             {tab.icon} {tab.label}
@@ -76,13 +76,13 @@ export default function CsvExportPanel() {
         <div className="space-y-4">
           <div>
             <h3 className="font-semibold text-slate-800 mb-3">会員一覧 CSV ダウンロード</h3>
-            <p className="text-sm text-slate-500 mb-4">
+            <p className="text-sm text-slate-700 mb-4">
               会員番号・氏名・メール・ステータス・ポイント残高・紹介者・有効契約を含むCSVをダウンロードします。
             </p>
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">ステータスで絞り込み（任意）</label>
               <select
-                className="rounded-xl border px-4 py-2 text-sm w-64"
+                className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 w-64"
                 value={filters.memberStatus}
                 onChange={e => setFilters({ ...filters, memberStatus: e.target.value })}
               >
@@ -108,7 +108,7 @@ export default function CsvExportPanel() {
         <div className="space-y-4">
           <div>
             <h3 className="font-semibold text-slate-800 mb-3">注文一覧 CSV ダウンロード</h3>
-            <p className="text-sm text-slate-500 mb-4">
+            <p className="text-sm text-slate-700 mb-4">
               注文番号・ステータス・会員情報・金額・利用ポイントを含むCSVをダウンロードします。
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -116,7 +116,7 @@ export default function CsvExportPanel() {
                 <label className="mb-1 block text-sm font-medium text-slate-700">注文日（開始）</label>
                 <input
                   type="date"
-                  className="w-full rounded-xl border px-4 py-2 text-sm"
+                  className="w-full rounded-xl border px-4 py-2 text-sm font-medium text-slate-800"
                   value={filters.orderFrom}
                   onChange={e => setFilters({ ...filters, orderFrom: e.target.value })}
                 />
@@ -125,7 +125,7 @@ export default function CsvExportPanel() {
                 <label className="mb-1 block text-sm font-medium text-slate-700">注文日（終了）</label>
                 <input
                   type="date"
-                  className="w-full rounded-xl border px-4 py-2 text-sm"
+                  className="w-full rounded-xl border px-4 py-2 text-sm font-medium text-slate-800"
                   value={filters.orderTo}
                   onChange={e => setFilters({ ...filters, orderTo: e.target.value })}
                 />
@@ -147,7 +147,7 @@ export default function CsvExportPanel() {
         <div className="space-y-4">
           <div>
             <h3 className="font-semibold text-slate-800 mb-3">監査ログ CSV ダウンロード</h3>
-            <p className="text-sm text-slate-500 mb-4">
+            <p className="text-sm text-slate-700 mb-4">
               管理者の操作ログ（最新5,000件）をCSVでダウンロードします。
             </p>
           </div>

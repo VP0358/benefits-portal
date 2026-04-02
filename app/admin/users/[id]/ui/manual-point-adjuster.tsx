@@ -33,25 +33,25 @@ export default function ManualPointAdjuster({ userId }: { userId: string }) {
       <div className="grid gap-4 md:grid-cols-2">
         <div>
           <label className="mb-1 block text-sm font-medium">ポイント区分</label>
-          <select className="w-full rounded-xl border px-4 py-3 text-sm" value={form.pointSourceType} onChange={e => setForm({ ...form, pointSourceType: e.target.value })}>
+          <select className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={form.pointSourceType} onChange={e => setForm({ ...form, pointSourceType: e.target.value })}>
             <option value="manual">手動ポイント</option>
             <option value="external">外部ポイント</option>
           </select>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">操作種別</label>
-          <select className="w-full rounded-xl border px-4 py-3 text-sm" value={form.mode} onChange={e => setForm({ ...form, mode: e.target.value })}>
+          <select className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={form.mode} onChange={e => setForm({ ...form, mode: e.target.value })}>
             <option value="add">加算</option>
             <option value="subtract">減算</option>
           </select>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">ポイント数</label>
-          <input type="number" min="1" required className="w-full rounded-xl border px-4 py-3 text-sm" value={form.points} onChange={e => setForm({ ...form, points: Number(e.target.value) })} />
+          <input type="number" min="1" required className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={form.points} onChange={e => setForm({ ...form, points: Number(e.target.value) })} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">理由</label>
-          <input required placeholder="例: 外部ポイント反映" className="w-full rounded-xl border px-4 py-3 text-sm" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+          <input required placeholder="例: 外部ポイント反映" className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
         </div>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}

@@ -43,7 +43,7 @@ export default function ReferralManager({
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 md:flex-row">
-        <select className="w-full rounded-xl border px-4 py-3 text-sm" value={selected} onChange={e => setSelected(e.target.value)}>
+        <select className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={selected} onChange={e => setSelected(e.target.value)}>
           <option value="">紹介者を選択してください</option>
           {referrerOptions.map(item => <option key={item.id} value={item.id}>{item.name} ({item.email})</option>)}
         </select>
@@ -53,11 +53,11 @@ export default function ReferralManager({
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="space-y-2">
-        {referrals.length === 0 ? <div className="text-sm text-slate-500">紹介者は未登録です。</div> : referrals.map(ref => (
+        {referrals.length === 0 ? <div className="text-sm text-slate-700">紹介者は未登録です。</div> : referrals.map(ref => (
           <div key={ref.id} className="flex items-center justify-between rounded-2xl border p-3">
             <div>
               <div className="font-semibold text-slate-800 text-sm">{ref.referrerName}</div>
-              <div className="text-xs text-slate-500">{ref.referrerEmail}</div>
+              <div className="text-xs text-slate-700">{ref.referrerEmail}</div>
             </div>
             <button type="button" onClick={() => removeReferral(ref.id)} className="rounded-xl border border-red-200 px-3 py-2 text-xs text-red-600">解除</button>
           </div>

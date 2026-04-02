@@ -14,16 +14,16 @@ export default async function AdminProductsPage() {
         <div className="grid grid-cols-[1fr_120px_80px_80px] gap-4 border-b px-6 py-4 font-semibold text-slate-700 text-sm">
           <div>商品名</div><div>価格</div><div>状態</div><div>操作</div>
         </div>
-        {products.length === 0 && <div className="px-6 py-8 text-center text-slate-500 text-sm">商品がありません</div>}
+        {products.length === 0 && <div className="px-6 py-8 text-center text-slate-700 text-sm">商品がありません</div>}
         {products.map(p => (
           <div key={p.id.toString()} className="grid grid-cols-[1fr_120px_80px_80px] gap-4 border-b px-6 py-4 text-sm hover:bg-slate-50">
             <div>
               <div className="font-semibold text-slate-800">{p.name}</div>
-              {p.description && <div className="text-xs text-slate-500">{p.description}</div>}
+              {p.description && <div className="text-xs text-slate-700">{p.description}</div>}
             </div>
             <div className="font-medium text-slate-800">{p.price.toLocaleString()}円</div>
-            <div><span className={`rounded-full px-2 py-1 text-xs ${p.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{p.isActive ? "公開" : "非公開"}</span></div>
-            <div><Link href={`/admin/products/${p.id.toString()}/edit`} className="rounded-lg border px-3 py-1.5 text-xs hover:bg-slate-50">編集</Link></div>
+            <div><span className={`rounded-full px-2 py-1 text-xs ${p.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-700"}`}>{p.isActive ? "公開" : "非公開"}</span></div>
+            <div><Link href={`/admin/products/${p.id.toString()}/edit`} className="rounded-lg border px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-50">編集</Link></div>
           </div>
         ))}
       </div>

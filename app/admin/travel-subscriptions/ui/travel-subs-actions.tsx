@@ -66,7 +66,7 @@ function LevelSelector({
                   : "border-slate-200 bg-white text-slate-700 hover:border-slate-400"
               }`}
             >
-              <div className={`text-xs font-bold ${isActive ? "text-white" : "text-slate-500"}`}>
+              <div className={`text-xs font-bold ${isActive ? "text-white" : "text-slate-700"}`}>
                 Lv{lv}
               </div>
               <div className={`text-xs mt-0.5 font-semibold ${isActive ? "text-slate-200" : "text-slate-700"}`}>
@@ -84,14 +84,14 @@ function LevelSelector({
 function PricingPreview({ tier }: { tier: PricingTier }) {
   const tierLabel = tier === "early" ? "初回申込者50名まで" : "申込者51名から";
   return (
-    <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+    <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-800">
       <div className="font-semibold text-slate-700 mb-2">
         📋 {tierLabel} の料金
       </div>
       <div className="grid grid-cols-5 gap-1 text-center">
         {TRAVEL_LEVELS.map(lv => (
           <div key={lv}>
-            <div className="text-slate-400">Lv{lv}</div>
+            <div className="text-slate-700">Lv{lv}</div>
             <div className="font-semibold text-slate-800">
               ¥{TRAVEL_LEVEL_FEES[tier][lv].toLocaleString()}
             </div>
@@ -217,17 +217,17 @@ export default function TravelSubsActions({ mode, users, subId, currentStatus, s
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 overflow-y-auto">
             <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl my-4">
               <h2 className="text-lg font-bold text-slate-800 mb-1">✈️ 旅行サブスク 新規登録</h2>
-              <p className="text-xs text-slate-500 mb-5">Lvを選択すると月額が自動で設定されます</p>
+              <p className="text-xs text-slate-700 mb-5">Lvを選択すると月額が自動で設定されます</p>
 
               <form onSubmit={handleRegister} className="space-y-5">
                 {/* 会員選択 */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">会員 *</label>
+                  <label className="block text-xs font-semibold text-slate-800 mb-1">会員 *</label>
                   <select
                     required
                     value={regForm.userId}
                     onChange={e => setRegForm({ ...regForm, userId: e.target.value })}
-                    className="w-full rounded-xl border px-3 py-2.5 text-sm"
+                    className="w-full rounded-xl border px-3 py-2.5 text-sm font-medium text-slate-800"
                   >
                     <option value="">会員を選択してください</option>
                     {users.map(u => (
@@ -238,7 +238,7 @@ export default function TravelSubsActions({ mode, users, subId, currentStatus, s
 
                 {/* 更新制度 選択 */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-2">更新制度 *</label>
+                  <label className="block text-xs font-semibold text-slate-800 mb-2">更新制度 *</label>
                   <div className="grid grid-cols-2 gap-2">
                     {TRAVEL_PRICING_TIERS.map(t => (
                       <button
@@ -248,7 +248,7 @@ export default function TravelSubsActions({ mode, users, subId, currentStatus, s
                         className={`rounded-xl border-2 py-3 text-sm font-semibold transition-all ${
                           regForm.pricingTier === t.value
                             ? "border-violet-500 bg-violet-50 text-violet-700"
-                            : "border-slate-200 text-slate-600 hover:border-slate-400"
+                            : "border-slate-200 text-slate-800 hover:border-slate-400"
                         }`}
                       >
                         {t.value === "early" ? "🌸 " : "📌 "}{t.label}
@@ -259,7 +259,7 @@ export default function TravelSubsActions({ mode, users, subId, currentStatus, s
 
                 {/* Lv 選択 */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-2">レベル *</label>
+                  <label className="block text-xs font-semibold text-slate-800 mb-2">レベル *</label>
                   <LevelSelector
                     tier={regForm.pricingTier}
                     selected={regForm.level}
@@ -282,33 +282,33 @@ export default function TravelSubsActions({ mode, users, subId, currentStatus, s
                 {/* ステータス・日付 */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">ステータス</label>
+                    <label className="block text-xs font-semibold text-slate-800 mb-1">ステータス</label>
                     <select
                       value={regForm.status}
                       onChange={e => setRegForm({ ...regForm, status: e.target.value })}
-                      className="w-full rounded-xl border px-3 py-2 text-sm"
+                      className="w-full rounded-xl border px-3 py-2 text-sm font-medium text-slate-800"
                     >
                       {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">開始日</label>
+                    <label className="block text-xs font-semibold text-slate-800 mb-1">開始日</label>
                     <input type="date" value={regForm.startedAt}
                       onChange={e => setRegForm({ ...regForm, startedAt: e.target.value })}
-                      className="w-full rounded-xl border px-3 py-2 text-sm" />
+                      className="w-full rounded-xl border px-3 py-2 text-sm font-medium text-slate-800" />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">確定日</label>
+                    <label className="block text-xs font-semibold text-slate-800 mb-1">確定日</label>
                     <input type="date" value={regForm.confirmedAt}
                       onChange={e => setRegForm({ ...regForm, confirmedAt: e.target.value })}
-                      className="w-full rounded-xl border px-3 py-2 text-sm" />
+                      className="w-full rounded-xl border px-3 py-2 text-sm font-medium text-slate-800" />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">備考</label>
+                    <label className="block text-xs font-semibold text-slate-800 mb-1">備考</label>
                     <input value={regForm.note}
                       onChange={e => setRegForm({ ...regForm, note: e.target.value })}
                       placeholder="任意"
-                      className="w-full rounded-xl border px-3 py-2 text-sm" />
+                      className="w-full rounded-xl border px-3 py-2 text-sm font-medium text-slate-800" />
                   </div>
                 </div>
 
@@ -317,7 +317,7 @@ export default function TravelSubsActions({ mode, users, subId, currentStatus, s
                 <div className="flex justify-end gap-2 pt-2">
                   <button type="button"
                     onClick={() => { setShowRegister(false); setError(""); }}
-                    className="rounded-xl border px-5 py-2.5 text-sm text-slate-600 hover:bg-slate-50">
+                    className="rounded-xl border px-5 py-2.5 text-sm text-slate-800 hover:bg-slate-50">
                     キャンセル
                   </button>
                   <button type="submit" disabled={saving}
@@ -342,7 +342,7 @@ export default function TravelSubsActions({ mode, users, subId, currentStatus, s
         <>
           <button type="button"
             onClick={() => { setShowEdit(true); setError(""); }}
-            className="rounded-xl border px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50">
+            className="rounded-xl border px-3 py-1.5 text-xs text-slate-800 hover:bg-slate-50">
             Lv変更
           </button>
           <button type="button" onClick={handleCancel} disabled={saving}
@@ -356,12 +356,12 @@ export default function TravelSubsActions({ mode, users, subId, currentStatus, s
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 overflow-y-auto">
           <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl my-4">
             <h2 className="text-lg font-bold text-slate-800 mb-1">✈️ 旅行サブスク 編集</h2>
-            <p className="text-xs text-slate-500 mb-5">Lvを変更すると月額が自動で更新されます</p>
+            <p className="text-xs text-slate-700 mb-5">Lvを変更すると月額が自動で更新されます</p>
 
             <form onSubmit={handleEdit} className="space-y-5">
               {/* 更新制度 */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-2">更新制度 *</label>
+                <label className="block text-xs font-semibold text-slate-800 mb-2">更新制度 *</label>
                 <div className="grid grid-cols-2 gap-2">
                   {TRAVEL_PRICING_TIERS.map(t => (
                     <button key={t.value} type="button"
@@ -369,7 +369,7 @@ export default function TravelSubsActions({ mode, users, subId, currentStatus, s
                       className={`rounded-xl border-2 py-3 text-sm font-semibold transition-all ${
                         editForm.pricingTier === t.value
                           ? "border-violet-500 bg-violet-50 text-violet-700"
-                          : "border-slate-200 text-slate-600 hover:border-slate-400"
+                          : "border-slate-200 text-slate-800 hover:border-slate-400"
                       }`}>
                       {t.value === "early" ? "🌸 " : "📌 "}{t.label}
                     </button>
@@ -379,7 +379,7 @@ export default function TravelSubsActions({ mode, users, subId, currentStatus, s
 
               {/* Lv 選択 */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-2">レベル *</label>
+                <label className="block text-xs font-semibold text-slate-800 mb-2">レベル *</label>
                 <LevelSelector
                   tier={editForm.pricingTier}
                   selected={editForm.level}
@@ -405,30 +405,30 @@ export default function TravelSubsActions({ mode, users, subId, currentStatus, s
               {/* ステータス・日付・備考 */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">ステータス</label>
+                  <label className="block text-xs font-semibold text-slate-800 mb-1">ステータス</label>
                   <select value={editForm.status}
                     onChange={e => setEditForm({ ...editForm, status: e.target.value })}
-                    className="w-full rounded-xl border px-3 py-2 text-sm">
+                    className="w-full rounded-xl border px-3 py-2 text-sm font-medium text-slate-800">
                     {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">開始日</label>
+                  <label className="block text-xs font-semibold text-slate-800 mb-1">開始日</label>
                   <input type="date" value={editForm.startedAt}
                     onChange={e => setEditForm({ ...editForm, startedAt: e.target.value })}
-                    className="w-full rounded-xl border px-3 py-2 text-sm" />
+                    className="w-full rounded-xl border px-3 py-2 text-sm font-medium text-slate-800" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">確定日</label>
+                  <label className="block text-xs font-semibold text-slate-800 mb-1">確定日</label>
                   <input type="date" value={editForm.confirmedAt}
                     onChange={e => setEditForm({ ...editForm, confirmedAt: e.target.value })}
-                    className="w-full rounded-xl border px-3 py-2 text-sm" />
+                    className="w-full rounded-xl border px-3 py-2 text-sm font-medium text-slate-800" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">備考</label>
+                  <label className="block text-xs font-semibold text-slate-800 mb-1">備考</label>
                   <input value={editForm.note}
                     onChange={e => setEditForm({ ...editForm, note: e.target.value })}
-                    className="w-full rounded-xl border px-3 py-2 text-sm" />
+                    className="w-full rounded-xl border px-3 py-2 text-sm font-medium text-slate-800" />
                 </div>
               </div>
 
@@ -437,7 +437,7 @@ export default function TravelSubsActions({ mode, users, subId, currentStatus, s
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button"
                   onClick={() => { setShowEdit(false); setError(""); }}
-                  className="rounded-xl border px-5 py-2.5 text-sm text-slate-600 hover:bg-slate-50">
+                  className="rounded-xl border px-5 py-2.5 text-sm text-slate-800 hover:bg-slate-50">
                   キャンセル
                 </button>
                 <button type="submit" disabled={saving}

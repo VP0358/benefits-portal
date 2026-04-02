@@ -34,22 +34,22 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     router.refresh();
   }
 
-  if (!data) return <div className="rounded-3xl bg-white p-6 shadow-sm text-slate-500">読み込み中...</div>;
+  if (!data) return <div className="rounded-3xl bg-white p-6 shadow-sm text-slate-700">読み込み中...</div>;
 
   return (
     <main className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
       <h1 className="text-2xl font-bold text-slate-800">商品編集</h1>
       <div>
         <label className="mb-1 block text-sm font-medium">商品名</label>
-        <input className="w-full rounded-xl border px-4 py-3 text-sm" value={data.name} onChange={e => setData({ ...data, name: e.target.value })} />
+        <input className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={data.name} onChange={e => setData({ ...data, name: e.target.value })} />
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium">説明</label>
-        <textarea className="w-full rounded-xl border px-4 py-3 text-sm" rows={3} value={data.description} onChange={e => setData({ ...data, description: e.target.value })} />
+        <textarea className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" rows={3} value={data.description} onChange={e => setData({ ...data, description: e.target.value })} />
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium">価格（円）</label>
-        <input type="number" min="0" className="w-full rounded-xl border px-4 py-3 text-sm" value={data.price} onChange={e => setData({ ...data, price: Number(e.target.value) })} />
+        <input type="number" min="0" className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={data.price} onChange={e => setData({ ...data, price: Number(e.target.value) })} />
       </div>
       <div>
         <label className="mb-2 block text-sm font-medium">画像</label>
@@ -60,7 +60,7 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
       </label>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex justify-end gap-3">
-        <button onClick={() => router.push("/admin/products")} className="rounded-xl border px-4 py-3 text-sm">戻る</button>
+        <button onClick={() => router.push("/admin/products")} className="rounded-xl border px-4 py-3 text-sm font-medium text-slate-800">戻る</button>
         <button onClick={save} disabled={saving} className="rounded-xl bg-slate-900 px-5 py-3 text-sm text-white disabled:opacity-50">{saving ? "更新中..." : "更新する"}</button>
       </div>
     </main>

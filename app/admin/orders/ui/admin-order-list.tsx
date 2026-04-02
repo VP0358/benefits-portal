@@ -19,9 +19,9 @@ export default function AdminOrderList() {
     fetch("/api/admin/orders").then(r => r.json()).then(d => { setRows(d); setLoading(false); }).catch(() => { setError("取得に失敗しました"); setLoading(false); });
   }, []);
 
-  if (loading) return <div className="text-slate-500">読み込み中...</div>;
+  if (loading) return <div className="text-slate-700">読み込み中...</div>;
   if (error) return <p className="text-sm text-red-600">{error}</p>;
-  if (rows.length === 0) return <div className="text-sm text-slate-500">注文はありません。</div>;
+  if (rows.length === 0) return <div className="text-sm text-slate-700">注文はありません。</div>;
 
   return (
     <div className="space-y-4">
@@ -30,7 +30,7 @@ export default function AdminOrderList() {
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="font-semibold text-slate-800">{row.orderNumber}</div>
-              <div className="text-sm text-slate-500">{new Date(row.orderedAt).toLocaleString("ja-JP")}</div>
+              <div className="text-sm text-slate-700">{new Date(row.orderedAt).toLocaleString("ja-JP")}</div>
             </div>
             <span className={`self-start rounded-full px-3 py-1 text-xs ${row.status === "canceled" ? "bg-red-50 text-red-700" : row.status === "completed" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}>
               {row.status}
@@ -45,7 +45,7 @@ export default function AdminOrderList() {
             <div className="font-semibold">支払: {row.totalAmount.toLocaleString()}円</div>
           </div>
           <div className="mt-4 flex justify-end">
-            <Link href={`/admin/orders/${row.id}`} className="rounded-xl border px-4 py-2 text-sm">詳細 / 状態変更</Link>
+            <Link href={`/admin/orders/${row.id}`} className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800">詳細 / 状態変更</Link>
           </div>
         </div>
       ))}

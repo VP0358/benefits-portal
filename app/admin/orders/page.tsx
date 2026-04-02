@@ -6,7 +6,7 @@ export default function AdminOrdersPage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-800">注文管理</h1>
-          <p className="mt-2 text-slate-600">全注文を確認し、状態管理できます。</p>
+          <p className="mt-2 text-slate-800">全注文を確認し、状態管理できます。</p>
         </div>
         <a
           href="/api/admin/export/orders"

@@ -55,7 +55,7 @@ export default function NewUserPage() {
     <main className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-slate-800">会員新規登録</h1>
-        <p className="mt-2 text-slate-500 text-sm">新しい会員を登録します。</p>
+        <p className="mt-2 text-slate-700 text-sm">新しい会員を登録します。</p>
       </div>
 
       <section className="rounded-3xl bg-white p-6 shadow-sm max-w-2xl">
@@ -160,7 +160,7 @@ export default function NewUserPage() {
             <button
               type="button"
               onClick={() => router.push("/admin/users")}
-              className="rounded-xl border px-5 py-3 text-sm text-slate-600"
+              className="rounded-xl border px-5 py-3 text-sm text-slate-800"
             >
               キャンセル
             </button>

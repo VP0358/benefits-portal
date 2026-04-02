@@ -17,8 +17,8 @@ export default function MonthlyRunsTable() {
       .then(d => { setRows(d.rows); setTotalPages(d.pagination.totalPages); setLoading(false); });
   }, [page]);
 
-  if (loading) return <div className="text-slate-500">読み込み中...</div>;
-  if (rows.length === 0) return <div className="text-sm text-slate-500">履歴はありません。</div>;
+  if (loading) return <div className="text-slate-700">読み込み中...</div>;
+  if (rows.length === 0) return <div className="text-sm text-slate-700">履歴はありません。</div>;
 
   return (
     <div className="space-y-3">
@@ -27,7 +27,7 @@ export default function MonthlyRunsTable() {
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
               <div className="font-semibold text-slate-800">{row.rewardMonth}</div>
-              <div className="text-sm text-slate-500">{new Date(row.createdAt).toLocaleString("ja-JP")}</div>
+              <div className="text-sm text-slate-700">{new Date(row.createdAt).toLocaleString("ja-JP")}</div>
             </div>
             <span className={`rounded-full px-3 py-1 text-xs ${row.mode === "execute" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}>{row.mode}</span>
           </div>
@@ -39,9 +39,9 @@ export default function MonthlyRunsTable() {
         </div>
       ))}
       <div className="flex items-center justify-between">
-        <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="rounded-xl border px-4 py-2 text-sm disabled:opacity-50">前へ</button>
-        <div className="text-sm text-slate-500">{page} / {totalPages}</div>
-        <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="rounded-xl border px-4 py-2 text-sm disabled:opacity-50">次へ</button>
+        <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 disabled:opacity-50">前へ</button>
+        <div className="text-sm text-slate-700">{page} / {totalPages}</div>
+        <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 disabled:opacity-50">次へ</button>
       </div>
     </div>
   );

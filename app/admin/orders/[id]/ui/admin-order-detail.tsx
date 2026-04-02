@@ -48,7 +48,7 @@ export default function AdminOrderDetail({ orderId }: { orderId: string }) {
     await fetchOrder();
   }
 
-  if (loading) return <div className="text-slate-500">読み込み中...</div>;
+  if (loading) return <div className="text-slate-700">読み込み中...</div>;
   if (error && !data) return <p className="text-sm text-red-600">{error}</p>;
   if (!data) return null;
 
@@ -69,7 +69,7 @@ export default function AdminOrderDetail({ orderId }: { orderId: string }) {
       </div>
       <div className="space-y-2">
         {data.items.map(item => (
-          <div key={item.id} className="flex items-center justify-between rounded-xl border px-4 py-3 text-sm">
+          <div key={item.id} className="flex items-center justify-between rounded-xl border px-4 py-3 text-sm font-medium text-slate-800">
             <span>{item.productName} × {item.quantity}</span>
             <span>{item.lineAmount.toLocaleString()}円</span>
           </div>
@@ -78,7 +78,7 @@ export default function AdminOrderDetail({ orderId }: { orderId: string }) {
       <div className="rounded-2xl border p-4 space-y-3">
         <label className="block text-sm font-medium">注文状態を変更</label>
         <div className="flex flex-col gap-3 md:flex-row">
-          <select className="w-full rounded-xl border px-4 py-3 text-sm" value={status} onChange={e => setStatus(e.target.value)}>
+          <select className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={status} onChange={e => setStatus(e.target.value)}>
             {["created","paid","shipped","completed","canceled"].map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           <button type="button" onClick={saveStatus} disabled={saving} className="rounded-xl bg-slate-900 px-5 py-3 text-sm text-white disabled:opacity-50 whitespace-nowrap">{saving ? "保存中..." : "状態を保存"}</button>

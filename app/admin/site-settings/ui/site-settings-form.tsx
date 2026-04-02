@@ -65,7 +65,7 @@ export default function SiteSettingsForm() {
     setMessage("保存しました。ページ再読み込み後に反映されます。");
   }
 
-  if (loading) return <div className="text-slate-500">読み込み中...</div>;
+  if (loading) return <div className="text-slate-700">読み込み中...</div>;
 
   return (
     <div className="space-y-8">
@@ -91,7 +91,7 @@ export default function SiteSettingsForm() {
           {settings.faviconUrl && (
             <div className="mt-3 rounded-2xl border bg-slate-50 p-4 flex items-center gap-3">
               <img src={settings.faviconUrl} alt="favicon" className="h-10 w-10 rounded object-cover" />
-              <div className="text-sm text-slate-500">現在のファビコン</div>
+              <div className="text-sm text-slate-700">現在のファビコン</div>
               <button
                 type="button"
                 onClick={() => update("faviconUrl", "")}
@@ -107,7 +107,7 @@ export default function SiteSettingsForm() {
       {/* ボタン画像設定 */}
       <section className="space-y-5">
         <h3 className="font-semibold text-slate-700 border-b pb-2">ボタン画像設定</h3>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-700">
           会員ダッシュボードのボタンに表示する画像を設定できます。<br />
           未設定の場合はデフォルトのテキストボタンが表示されます。
         </p>
@@ -132,7 +132,7 @@ export default function SiteSettingsForm() {
           <div key={item.key} className="rounded-2xl border p-4 space-y-3">
             <div>
               <div className="text-sm font-medium text-slate-700">{item.label}</div>
-              <div className="text-xs text-slate-400 mt-0.5">{item.desc}</div>
+              <div className="text-xs text-slate-700 mt-0.5">{item.desc}</div>
             </div>
             <ProductImageUpload value={settings[item.key]} onChange={v => update(item.key, v)} />
             {settings[item.key] && (
@@ -142,7 +142,7 @@ export default function SiteSettingsForm() {
                   alt={item.label}
                   className="h-12 w-auto max-w-[200px] rounded object-contain"
                 />
-                <span className="text-xs text-slate-500">現在の画像</span>
+                <span className="text-xs text-slate-700">現在の画像</span>
                 <button
                   type="button"
                   onClick={() => update(item.key, "")}

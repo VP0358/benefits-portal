@@ -32,29 +32,29 @@ export default function AuditLogTable() {
   return (
     <div className="space-y-4">
       <div className="flex gap-3">
-        <input className="flex-1 rounded-xl border px-4 py-3 text-sm" placeholder="検索（action / table / id）" value={q} onChange={e => setQ(e.target.value)} />
+        <input className="flex-1 rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" placeholder="検索（action / table / id）" value={q} onChange={e => setQ(e.target.value)} />
         <button type="button" onClick={() => { setPage(1); setAppliedQ(q); }} className="rounded-xl bg-slate-900 px-4 py-3 text-sm text-white">検索</button>
       </div>
-      <div className="text-sm text-slate-500">総件数: {total}</div>
-      {loading && <div className="text-slate-500">読み込み中...</div>}
-      {!loading && rows.length === 0 && <div className="text-sm text-slate-500">監査ログはありません。</div>}
+      <div className="text-sm text-slate-700">総件数: {total}</div>
+      {loading && <div className="text-slate-700">読み込み中...</div>}
+      {!loading && rows.length === 0 && <div className="text-sm text-slate-700">監査ログはありません。</div>}
       {!loading && rows.map(row => (
         <div key={row.id} className="rounded-2xl border p-4">
           <div className="grid gap-3 md:grid-cols-[1fr_150px_150px_80px]">
             <div className="text-sm text-slate-800 font-medium">{row.actionType}</div>
-            <div className="text-sm text-slate-600">{row.targetTable}{row.targetId ? ` / ${row.targetId}` : ""}</div>
-            <div className="text-sm text-slate-500">{new Date(row.createdAt).toLocaleString("ja-JP")}</div>
-            <button type="button" onClick={() => setExpandedId(expandedId === row.id ? null : row.id)} className="rounded-xl border px-3 py-2 text-xs text-right">
+            <div className="text-sm text-slate-800">{row.targetTable}{row.targetId ? ` / ${row.targetId}` : ""}</div>
+            <div className="text-sm text-slate-700">{new Date(row.createdAt).toLocaleString("ja-JP")}</div>
+            <button type="button" onClick={() => setExpandedId(expandedId === row.id ? null : row.id)} className="rounded-xl border px-3 py-2 text-xs font-medium text-slate-800 text-right">
               {expandedId === row.id ? "閉じる" : "詳細"}
             </button>
           </div>
-          {expandedId === row.id && <div className="mt-3 rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-600">管理者ID: {row.adminId || "-"}</div>}
+          {expandedId === row.id && <div className="mt-3 rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-800">管理者ID: {row.adminId || "-"}</div>}
         </div>
       ))}
       <div className="flex items-center justify-between">
-        <button type="button" disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="rounded-xl border px-4 py-2 text-sm disabled:opacity-50">前へ</button>
-        <div className="text-sm text-slate-500">{page} / {totalPages}</div>
-        <button type="button" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="rounded-xl border px-4 py-2 text-sm disabled:opacity-50">次へ</button>
+        <button type="button" disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 disabled:opacity-50">前へ</button>
+        <div className="text-sm text-slate-700">{page} / {totalPages}</div>
+        <button type="button" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 disabled:opacity-50">次へ</button>
       </div>
     </div>
   );

@@ -8,7 +8,7 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   pending:   { label: "申込中",  cls: "bg-yellow-50 text-yellow-700 border-yellow-200" },
   active:    { label: "有効",    cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   canceled:  { label: "解約済",  cls: "bg-red-50 text-red-700 border-red-200" },
-  suspended: { label: "停止中",  cls: "bg-slate-100 text-slate-500 border-slate-200" },
+  suspended: { label: "停止中",  cls: "bg-slate-100 text-slate-700 border-slate-200" },
 };
 
 const LV_COLORS = [
@@ -89,7 +89,7 @@ export default async function AdminTravelSubsPage({
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-xl font-bold text-slate-800">✈️ 旅行サブスク一覧</h1>
-            <p className="text-sm text-slate-500 mt-0.5">全 {total.toLocaleString()} 件</p>
+            <p className="text-sm text-slate-700 mt-0.5">全 {total.toLocaleString()} 件</p>
           </div>
           <div className="flex gap-3 flex-wrap">
             {(["active", "pending", "canceled", "suspended"] as const).map(s => (
@@ -106,7 +106,7 @@ export default async function AdminTravelSubsPage({
 
       {/* 料金表 */}
       <div className="rounded-3xl bg-white p-5 shadow-sm">
-        <div className="text-xs font-semibold text-slate-600 mb-3">料金マスター</div>
+        <div className="text-xs font-semibold text-slate-800 mb-3">料金マスター</div>
         <div className="grid grid-cols-2 gap-4">
           {(["early", "standard"] as const).map(tier => (
             <div key={tier} className={`rounded-2xl p-4 ${tier === "early" ? "bg-violet-50" : "bg-blue-50"}`}>
@@ -123,7 +123,7 @@ export default async function AdminTravelSubsPage({
                       ¥{(tier === "early"
                         ? [2000,1700,1500,1200,1000]
                         : [3000,2700,2500,2000,1500])[lv-1].toLocaleString()}
-                      <span className="text-xs font-normal text-slate-500 ml-0.5">/ 月</span>
+                      <span className="text-xs font-normal text-slate-700 ml-0.5">/ 月</span>
                     </span>
                   </div>
                 ))}
@@ -149,7 +149,7 @@ export default async function AdminTravelSubsPage({
               className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
                 statusFilter === opt.value
                   ? "bg-slate-900 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  : "bg-slate-100 text-slate-800 hover:bg-slate-200"
               }`}
             >
               {opt.label}
@@ -165,21 +165,21 @@ export default async function AdminTravelSubsPage({
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                <th className="text-left px-5 py-3 font-semibold text-slate-600">会員</th>
-                <th className="text-center px-4 py-3 font-semibold text-slate-600">Lv</th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600">制度</th>
-                <th className="text-right px-5 py-3 font-semibold text-slate-600">月額</th>
-                <th className="text-left px-5 py-3 font-semibold text-slate-600">直紹介者</th>
-                <th className="text-left px-5 py-3 font-semibold text-slate-600">ステータス</th>
-                <th className="text-left px-5 py-3 font-semibold text-slate-600">確定日</th>
-                <th className="text-left px-5 py-3 font-semibold text-slate-600">備考</th>
+                <th className="text-left px-5 py-3 font-semibold text-slate-800">会員</th>
+                <th className="text-center px-4 py-3 font-semibold text-slate-800">Lv</th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-800">制度</th>
+                <th className="text-right px-5 py-3 font-semibold text-slate-800">月額</th>
+                <th className="text-left px-5 py-3 font-semibold text-slate-800">直紹介者</th>
+                <th className="text-left px-5 py-3 font-semibold text-slate-800">ステータス</th>
+                <th className="text-left px-5 py-3 font-semibold text-slate-800">確定日</th>
+                <th className="text-left px-5 py-3 font-semibold text-slate-800">備考</th>
                 <th className="px-5 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {subs.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-5 py-10 text-center text-slate-400">
+                  <td colSpan={9} className="px-5 py-10 text-center text-slate-700">
                     該当するサブスクリプションがありません
                   </td>
                 </tr>
@@ -195,7 +195,7 @@ export default async function AdminTravelSubsPage({
                         className="font-medium text-slate-800 hover:text-slate-600">
                         {s.user.name}
                       </Link>
-                      <div className="text-xs text-slate-400">{s.user.memberCode}</div>
+                      <div className="text-xs text-slate-700">{s.user.memberCode}</div>
                     </td>
                     {/* Lv バッジ */}
                     <td className="px-4 py-3 text-center">
@@ -218,7 +218,7 @@ export default async function AdminTravelSubsPage({
                       {referrer ? (
                         <Link href={`/admin/users/${referrer.id}`} className="text-slate-700 hover:text-slate-500">
                           {referrer.name}
-                          <span className="block text-xs text-slate-400">{referrer.memberCode}</span>
+                          <span className="block text-xs text-slate-700">{referrer.memberCode}</span>
                         </Link>
                       ) : (
                         <span className="text-slate-300 text-xs">紹介なし</span>
@@ -229,10 +229,10 @@ export default async function AdminTravelSubsPage({
                         {st.label}
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-xs text-slate-500">
+                    <td className="px-5 py-3 text-xs text-slate-700">
                       {s.confirmedAt ? new Date(s.confirmedAt).toLocaleDateString("ja-JP") : "—"}
                     </td>
-                    <td className="px-5 py-3 text-xs text-slate-500 max-w-[100px] truncate">
+                    <td className="px-5 py-3 text-xs text-slate-700 max-w-[100px] truncate">
                       {s.note ?? "—"}
                     </td>
                     <td className="px-5 py-3">
@@ -265,12 +265,12 @@ export default async function AdminTravelSubsPage({
           <div className="flex justify-center gap-2 px-5 py-4 border-t border-slate-100">
             {page > 1 && (
               <Link href={`/admin/travel-subscriptions?status=${statusFilter}&page=${page - 1}`}
-                className="rounded-xl border px-4 py-2 text-sm hover:bg-slate-50">← 前へ</Link>
+                className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50">← 前へ</Link>
             )}
-            <span className="px-4 py-2 text-sm text-slate-500">{page} / {pages}</span>
+            <span className="px-4 py-2 text-sm text-slate-700">{page} / {pages}</span>
             {page < pages && (
               <Link href={`/admin/travel-subscriptions?status=${statusFilter}&page=${page + 1}`}
-                className="rounded-xl border px-4 py-2 text-sm hover:bg-slate-50">次へ →</Link>
+                className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50">次へ →</Link>
             )}
           </div>
         )}

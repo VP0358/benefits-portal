@@ -59,7 +59,7 @@ export default function AdminMenusList({ initialMenus }: { initialMenus: MenuIte
       </div>
       <div className="rounded-3xl bg-white shadow-sm overflow-hidden">
         {/* テーブルヘッダー */}
-        <div className="hidden md:grid md:grid-cols-[50px_1fr_120px_180px_90px_70px] gap-3 border-b px-6 py-3 font-semibold text-slate-600 text-xs bg-slate-50">
+        <div className="hidden md:grid md:grid-cols-[50px_1fr_120px_180px_90px_70px] gap-3 border-b px-6 py-3 font-semibold text-slate-800 text-xs bg-slate-50">
           <div>順番</div>
           <div>メニュー</div>
           <div>種別</div>
@@ -69,7 +69,7 @@ export default function AdminMenusList({ initialMenus }: { initialMenus: MenuIte
         </div>
 
         {menus.length === 0 && (
-          <div className="px-6 py-10 text-center text-slate-600 text-sm">
+          <div className="px-6 py-10 text-center text-slate-800 text-sm">
             メニューがありません。「新規追加」から作成してください。
           </div>
         )}
@@ -86,13 +86,13 @@ export default function AdminMenusList({ initialMenus }: { initialMenus: MenuIte
               ${draggingId === menu.id ? "opacity-50 bg-slate-50" : ""}`}
           >
             {/* 順番 */}
-            <div className="text-slate-600 text-xs font-mono hidden md:block">{index + 1}</div>
+            <div className="text-slate-800 text-xs font-mono hidden md:block">{index + 1}</div>
 
             {/* タイトル */}
             <div className="mb-2 md:mb-0">
               <div className="flex items-center gap-2">
                 {menu.imageUrl ? (
-                  <img src={menu.imageUrl} alt="" className="h-8 w-8 rounded-lg object-cover border border-slate-200 flex-shrink-0" />
+                  <img src={menu.imageUrl} alt="" className="h-8 w-8 rounded-lg object-cover border border-slate-400 flex-shrink-0" />
                 ) : (
                   <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center text-base flex-shrink-0">
                     {menu.iconType === "smartphone" ? "📱"
@@ -108,7 +108,7 @@ export default function AdminMenusList({ initialMenus }: { initialMenus: MenuIte
                 )}
                 <div>
                   <div className="font-semibold text-slate-800">{menu.title}</div>
-                  {menu.subtitle && <div className="text-xs text-slate-600">{menu.subtitle}</div>}
+                  {menu.subtitle && <div className="text-xs text-slate-800">{menu.subtitle}</div>}
                 </div>
               </div>
             </div>
@@ -124,7 +124,7 @@ export default function AdminMenusList({ initialMenus }: { initialMenus: MenuIte
             <div className="hidden md:block truncate text-slate-700 text-xs">
               {menu.menuType === "url" && menu.linkUrl
                 ? <a href={menu.linkUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline truncate block">{menu.linkUrl}</a>
-                : <span className="text-slate-600">{menuTypeLabel[menu.menuType] ?? "―"}</span>
+                : <span className="text-slate-800">{menuTypeLabel[menu.menuType] ?? "―"}</span>
               }
             </div>
 

@@ -29,15 +29,15 @@ export default function NewProductPage() {
       <h1 className="text-2xl font-bold text-slate-800">商品新規追加</h1>
       <div>
         <label className="mb-1 block text-sm font-medium">商品名 <span className="text-red-500">*</span></label>
-        <input required className="w-full rounded-xl border px-4 py-3 text-sm" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+        <input required className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium">説明</label>
-        <textarea className="w-full rounded-xl border px-4 py-3 text-sm" rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+        <textarea className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium">価格（円）</label>
-        <input type="number" min="0" className="w-full rounded-xl border px-4 py-3 text-sm" value={form.price} onChange={e => setForm({ ...form, price: Number(e.target.value) })} />
+        <input type="number" min="0" className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={form.price} onChange={e => setForm({ ...form, price: Number(e.target.value) })} />
       </div>
       <div>
         <label className="mb-2 block text-sm font-medium">画像</label>
@@ -48,7 +48,7 @@ export default function NewProductPage() {
       </label>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex justify-end gap-3">
-        <button onClick={() => router.push("/admin/products")} className="rounded-xl border px-4 py-3 text-sm">戻る</button>
+        <button onClick={() => router.push("/admin/products")} className="rounded-xl border px-4 py-3 text-sm font-medium text-slate-800">戻る</button>
         <button onClick={submit} disabled={saving} className="rounded-xl bg-slate-900 px-5 py-3 text-sm text-white disabled:opacity-50">{saving ? "保存中..." : "保存する"}</button>
       </div>
     </main>

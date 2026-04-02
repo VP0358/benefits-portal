@@ -33,19 +33,19 @@ export default function ContractForm({ userId }: { userId: string }) {
       <div className="grid gap-4 md:grid-cols-2">
         <div>
           <label className="mb-1 block text-sm font-medium">契約番号</label>
-          <input required className="w-full rounded-xl border px-4 py-3 text-sm" value={form.contractNumber} onChange={e => setForm({ ...form, contractNumber: e.target.value })} />
+          <input required className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={form.contractNumber} onChange={e => setForm({ ...form, contractNumber: e.target.value })} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">プラン名</label>
-          <input required className="w-full rounded-xl border px-4 py-3 text-sm" value={form.planName} onChange={e => setForm({ ...form, planName: e.target.value })} />
+          <input required className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={form.planName} onChange={e => setForm({ ...form, planName: e.target.value })} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">月額料金</label>
-          <input type="number" min="0" className="w-full rounded-xl border px-4 py-3 text-sm" value={form.monthlyFee} onChange={e => setForm({ ...form, monthlyFee: Number(e.target.value) })} />
+          <input type="number" min="0" className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={form.monthlyFee} onChange={e => setForm({ ...form, monthlyFee: Number(e.target.value) })} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">状態</label>
-          <select className="w-full rounded-xl border px-4 py-3 text-sm" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+          <select className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
             <option value="pending">申込中</option>
             <option value="active">有効</option>
             <option value="canceled">解約</option>
@@ -54,11 +54,11 @@ export default function ContractForm({ userId }: { userId: string }) {
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">開始日</label>
-          <input type="date" className="w-full rounded-xl border px-4 py-3 text-sm" value={form.startedAt} onChange={e => setForm({ ...form, startedAt: e.target.value })} />
+          <input type="date" className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={form.startedAt} onChange={e => setForm({ ...form, startedAt: e.target.value })} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">契約確定日</label>
-          <input type="date" className="w-full rounded-xl border px-4 py-3 text-sm" value={form.confirmedAt} onChange={e => setForm({ ...form, confirmedAt: e.target.value })} />
+          <input type="date" className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={form.confirmedAt} onChange={e => setForm({ ...form, confirmedAt: e.target.value })} />
         </div>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
