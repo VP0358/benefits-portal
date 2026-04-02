@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import ViolaLogo from "@/app/components/viola-logo";
 
 export default function LoginPage() {
@@ -16,36 +17,23 @@ export default function LoginPage() {
     setError("");
 
     try {
-      // CSRFトークンを取得
-      const csrfRes = await fetch("/api/auth/csrf");
-      const { csrfToken } = await csrfRes.json();
-
-      // ログインリクエスト
-      const res = await fetch("/api/auth/callback/credentials", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          email: form.email,
-          password: form.password,
-          csrfToken,
-          callbackUrl: "/",
-          json: "true",
-        }),
-        redirect: "follow",
+      const result = await signIn("credentials", {
+        email: form.email,
+        password: form.password,
+        redirect: false,
       });
 
-      // セッション確認
-      const sessionRes = await fetch("/api/auth/session");
-      const session = await sessionRes.json();
-
-      if (!session?.user) {
+      if (!result || result.error) {
         setError("メールアドレスまたはパスワードが正しくありません。");
         setLoading(false);
         return;
       }
 
-      // ロールに応じてリダイレクト
-      if (session.user.role === "admin") {
+      // セッション確認してロールに応じてリダイレクト
+      const sessionRes = await fetch("/api/auth/session");
+      const session = await sessionRes.json();
+
+      if (session?.user?.role === "admin") {
         router.push("/admin");
       } else {
         router.push("/dashboard");

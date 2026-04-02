@@ -3,12 +3,15 @@ import { auth } from "@/auth";
 
 // ドメイン設定
 const MEMBER_DOMAIN = "viola-pure.net"; // 会員サイト
-const ADMIN_DOMAIN = "viola-pure.xyz"; // 管理サイト
+const ADMIN_DOMAIN  = "viola-pure.xyz"; // 管理サイト
 
-export default auth(function middleware(req) {
+// 認証不要なパス（ミドルウェアをスキップ）
+const PUBLIC_PATHS = ["/login", "/register", "/api/auth"];
+
+export default auth(function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const hostname = req.headers.get("host") ?? "";
-  const session = req.auth;
+  const session = (req as NextRequest & { auth: unknown }).auth as { user?: { role?: string } } | null;
 
   const isMemberDomain =
     hostname === MEMBER_DOMAIN || hostname === `www.${MEMBER_DOMAIN}`;
@@ -16,10 +19,21 @@ export default auth(function middleware(req) {
     hostname === ADMIN_DOMAIN || hostname === `www.${ADMIN_DOMAIN}`;
 
   // ─────────────────────────────────────────────
-  // ① 認証チェック
+  // ① 公開パスはチェックしない
   // ─────────────────────────────────────────────
+  if (PUBLIC_PATHS.some(p => pathname.startsWith(p))) {
+    // ログイン済みで /login にアクセスしたらリダイレクト
+    if (pathname === "/login" && session?.user) {
+      const url = req.nextUrl.clone();
+      url.pathname = session.user.role === "admin" ? "/admin" : "/dashboard";
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next();
+  }
 
-  // 未ログインなら /login へ
+  // ─────────────────────────────────────────────
+  // ② 未ログインなら /login へ
+  // ─────────────────────────────────────────────
   if (!session?.user) {
     const loginUrl = req.nextUrl.clone();
     loginUrl.pathname = "/login";
@@ -27,11 +41,10 @@ export default auth(function middleware(req) {
   }
 
   // ─────────────────────────────────────────────
-  // ② ドメインによるアクセス制限
+  // ③ ドメインによるアクセス制限
   // ─────────────────────────────────────────────
 
   // 【会員ドメイン (viola-pure.net)】から /admin にアクセスしようとした場合
-  // → /dashboard にリダイレクト
   if (isMemberDomain && pathname.startsWith("/admin")) {
     const url = req.nextUrl.clone();
     url.pathname = "/dashboard";
@@ -39,7 +52,6 @@ export default auth(function middleware(req) {
   }
 
   // 【管理ドメイン (viola-pure.xyz)】から会員ページにアクセスしようとした場合
-  // → /admin にリダイレクト
   if (
     isAdminDomain &&
     (pathname.startsWith("/dashboard") ||
@@ -53,22 +65,22 @@ export default auth(function middleware(req) {
     return NextResponse.redirect(url);
   }
 
-  // 【会員ドメイン (viola-pure.net)】のルート "/" → /dashboard へ
-  if (isMemberDomain && pathname === "/") {
+  // ルートリダイレクト
+  if (pathname === "/") {
     const url = req.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
-  }
-
-  // 【管理ドメイン (viola-pure.xyz)】のルート "/" → /admin へ
-  if (isAdminDomain && pathname === "/") {
-    const url = req.nextUrl.clone();
-    url.pathname = "/admin";
+    if (isMemberDomain) {
+      url.pathname = "/dashboard";
+    } else if (isAdminDomain) {
+      url.pathname = "/admin";
+    } else {
+      // ドメイン不明の場合はロールで判断
+      url.pathname = session.user.role === "admin" ? "/admin" : "/dashboard";
+    }
     return NextResponse.redirect(url);
   }
 
   // ─────────────────────────────────────────────
-  // ③ ロールチェック
+  // ④ ロールチェック
   // ─────────────────────────────────────────────
 
   // 管理者ルート：admin ロールのみ許可
@@ -84,6 +96,7 @@ export default auth(function middleware(req) {
 export const config = {
   matcher: [
     "/",
+    "/login",
     "/dashboard/:path*",
     "/admin/:path*",
     "/points/:path*",
