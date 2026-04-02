@@ -4,10 +4,10 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 const contactSchema = z.object({
-  name: z.string().min(1).max(100),
-  phone: z.string().min(1).max(30),
-  email: z.string().email().max(255),
-  content: z.string().min(1).max(2000),
+  name:      z.string().min(1).max(100),
+  phone:     z.string().min(1).max(30),
+  email:     z.string().email().max(255),
+  content:   z.string().min(1).max(2000),
   menuTitle: z.string().max(255).optional(),
 });
 
@@ -25,14 +25,21 @@ export async function POST(req: NextRequest) {
 
   const { name, phone, email, content, menuTitle } = parsed.data;
 
-  // 管理者の監査ログに相談内容を記録
-  await prisma.adminAuditLog.create({
+  // 送信者のユーザーIDを取得（会員の場合）
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    select: { id: true },
+  });
+
+  await prisma.contactInquiry.create({
     data: {
-      adminId: null,
-      actionType: "contact_form_submitted",
-      targetTable: "contact",
-      targetId: null,
-      afterJson: { name, phone, email, content, menuTitle, submittedAt: new Date().toISOString() },
+      name,
+      phone,
+      email,
+      content,
+      menuTitle: menuTitle ?? null,
+      isRead:  false,
+      userId:  user?.id ?? null,
     },
   });
 
