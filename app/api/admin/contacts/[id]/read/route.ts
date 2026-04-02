@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "../../../../route-guard";
+import { requireAdmin } from "@/app/api/admin/route-guard";
 
 function parseId(id: string) {
   try { return BigInt(id); } catch { return null; }

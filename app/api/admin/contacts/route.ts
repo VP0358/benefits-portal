@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "../route-guard";
+import { requireAdmin } from "@/app/api/admin/route-guard";
 
 // GET /api/admin/contacts?page=1&filter=unread|read|all
 export async function GET(req: NextRequest) {
