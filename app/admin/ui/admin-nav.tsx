@@ -27,7 +27,8 @@ const navItems = [
 
 // 相談窓口は特別扱い（未読バッジを付ける）
 const CONTACT_HREF = "/admin/contacts";
-const CONTACT_LABEL = "💬 相談窓口";
+const CONTACT_LABEL = "💬 相談窓口";{ href: "/admin/announcements", label: "お知らせ管理", icon: "📢" },
+
 
 export default function AdminNav() {
   const pathname = usePathname();
