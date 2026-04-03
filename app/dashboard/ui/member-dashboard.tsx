@@ -241,7 +241,7 @@ export default function MemberDashboard({
                   </div>
                   <p className="font-bold text-base leading-snug">{activeAnn?.title}</p>
                   <p className="text-sm font-medium opacity-90 mt-1 line-clamp-3">{activeAnn?.content}</p>
-                 </Link>
+                 </div>
                  {announcements.length > 1 && (
                   <div className="flex justify-center gap-1.5 pb-3">
                     {announcements.map((_, i) => (
@@ -252,7 +252,9 @@ export default function MemberDashboard({
                               }`} />
                     ))}
                   </div>
-                )}
+                   }}
+                </Link>
+
               </div>
 
               {/* リスト（スライダー以外） */}
