@@ -1,47 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-
-const contactSchema = z.object({
-  name:      z.string().min(1).max(100),
-  phone:     z.string().min(1).max(30),
-  email:     z.string().email().max(255),
-  content:   z.string().min(1).max(2000),
-  menuTitle: z.string().max(255).optional(),
-});
+import { auth } from "@/auth";
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  try {
+    const session = await auth();
+    const body    = await req.json();
+
+    const { name, phone, email, menuTitle, content } = body;
+
+    if (!name || !email || !content) {
+      return NextResponse.json({ error: "必須項目が不足しています" }, { status: 400 });
+    }
+
+    const inquiry = await prisma.contactInquiry.create({
+      data: {
+        name,
+        phone:     phone ?? "",
+        email,
+        menuTitle: menuTitle ?? null,
+        content,
+        userId:    session?.user?.id ? BigInt(session.user.id) : null,
+      },
+    });
+
+    return NextResponse.json({ ok: true, id: inquiry.id.toString() }, { status: 201 });
+  } catch (err) {
+    console.error("Contact API error:", err);
+    return NextResponse.json({ error: "サーバーエラー" }, { status: 500 });
   }
-
-  const json = await req.json();
-  const parsed = contactSchema.safeParse(json);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  }
-
-  const { name, phone, email, content, menuTitle } = parsed.data;
-
-  // 送信者のユーザーIDを取得（会員の場合）
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
-    select: { id: true },
-  });
-
-  await prisma.contactInquiry.create({
-    data: {
-      name,
-      phone,
-      email,
-      content,
-      menuTitle: menuTitle ?? null,
-      isRead:  false,
-      userId:  user?.id ?? null,
-    },
-  });
-
-  return NextResponse.json({ success: true });
 }
