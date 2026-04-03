@@ -22,12 +22,13 @@ const navItems = [
   { href: "/admin/audit",            label: "🔍 監査ログ" },
   { href: "/admin/export",           label: "📥 CSV エクスポート" },
   { href: "/admin/site-settings",    label: "⚙️ サイト設定" },
-  { href: "/admin/account",          label: "🔐 ログイン情報変更" },
+  { href: "/admin/account",          label: "🔐 ログイン情報変更" },  
+  { href: "/admin/announcements", label: "📢 お知らせ管理" },
 ];
 
 // 相談窓口は特別扱い（未読バッジを付ける）
 const CONTACT_HREF = "/admin/contacts";
-const CONTACT_LABEL = "💬 相談窓口";{ href: "/admin/announcements", label: "お知らせ管理", icon: "📢" },
+const CONTACT_LABEL = "💬 相談窓口";
 
 
 export default function AdminNav() {
