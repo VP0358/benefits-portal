@@ -37,11 +37,11 @@ const TAG_STYLE: Record<string, { bg: string; text: string }> = {
 
 // スライドごとの背景グラデーション
 const SLIDE_BG = [
-  "linear-gradient(135deg, #16a34a, #4ade80)",
   "linear-gradient(135deg, #2563eb, #60a5fa)",
   "linear-gradient(135deg, #7c3aed, #a78bfa)",
   "linear-gradient(135deg, #ea580c, #fb923c)",
   "linear-gradient(135deg, #0891b2, #22d3ee)",
+  "linear-gradient(135deg, #db2777, #f472b6)",
 ];
 
 const TAG_LABEL: Record<string, string> = {
@@ -226,7 +226,7 @@ export default function MemberDashboard({
           ) : (
             <>
               {/* カラースライダー（1枚大きく） */}
-              <div className="rounded-2xl shadow overflow-hidden mb-3 transition-all duration-500"
+              <Link href="/announcements" className="block rounded-2xl shadow overflow-hidden mb-3 transition-all duration-500 hover:opacity-95 active:scale-95"
                    style={{ background: slideBg }}>
                 <div className="p-5 text-white min-h-[130px]">
                   <div className="flex items-center gap-2 mb-3">
@@ -241,8 +241,8 @@ export default function MemberDashboard({
                   </div>
                   <p className="font-bold text-base leading-snug">{activeAnn?.title}</p>
                   <p className="text-sm font-medium opacity-90 mt-1 line-clamp-3">{activeAnn?.content}</p>
-                </div>
-                {announcements.length > 1 && (
+                 </Link>
+                 {announcements.length > 1 && (
                   <div className="flex justify-center gap-1.5 pb-3">
                     {announcements.map((_, i) => (
                       <button key={i}
