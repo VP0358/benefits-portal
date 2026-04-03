@@ -349,16 +349,3 @@ model Announcement {
 
   @@map("announcements")
 }
-model MobileContract {
-  id              String   @id @default(cuid())
-  referrerId      String
-  referrer        User     @relation("ReferrerContracts", fields: [referrerId], references: [id])
-  contractMonth   String   // "2026-04" 形式（月初にリセット判定用）
-  planName        String   @default("standard")
-  rewardAmount    Int      @default(0)   // 管理者が設定した報酬額（円）
-  pointAwarded    Int      @default(0)   // rewardAmount / 4
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@map("mobile_contracts")
-}
