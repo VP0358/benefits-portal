@@ -350,22 +350,25 @@ model Announcement {
   @@map("announcements")
 }
 model MobileContract {
-  id              BigInt    @id @default(autoincrement())
+  id              BigInt         @id @default(autoincrement())
   userId          BigInt
-  planName        String    @db.VarChar(255)
+  referrerId      BigInt?
+  planName        String         @db.VarChar(255)
   status          ContractStatus @default(pending)
   startedAt       DateTime?
   confirmedAt     DateTime?
   canceledAt      DateTime?
-  note            String?   @db.VarChar(500)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  note            String?        @db.VarChar(500)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
-  user                  User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  referrerContracts     ContractReferralReward[]
-  referrerOf            User?                    @relation("ReferrerContracts", fields: [userId], references: [id])
+  user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referrer         User?                    @relation("ReferrerContracts", fields: [referrerId], references: [id])
+  referralRewards  ContractReferralReward[]
 
   @@index([userId])
   @@index([status])
+  @@index([referrerId])
   @@map("mobile_contracts")
 }
+
