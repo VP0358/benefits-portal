@@ -44,6 +44,7 @@ export default function MemberDashboard({ user, announcements, menus }: {
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [slide, setSlide]       = useState(0);
+  const [unreadCount, setUnreadCount] = useState(announcements.length);
   const slideRef                = useRef(0);
   const [avatar, setAvatar]     = useState("😊");
 
@@ -66,7 +67,33 @@ export default function MemberDashboard({ user, announcements, menus }: {
     const close = () => setMenuOpen(false);
     document.addEventListener("click", close);
     return () => document.removeEventListener("click", close);
-  }, [menuOpen]);
+  }, [menuOpen])
+
+useEffect(() => {
+  const check = () => {
+    const stored = localStorage.getItem("readAnnouncements");
+    const read: string[] = stored ? JSON.parse(stored) : [];
+    const unread = announcements.filter(a => !read.includes(a.id));
+    setUnreadCount(unread.length);
+    
+useEffect(() => {
+  const check = () => {
+    const stored = localStorage.getItem("readAnnouncements");
+    const read: string[] = stored ? JSON.parse(stored) : [];
+    const unread = announcements.filter(a => !read.includes(a.id));
+    setUnreadCount(unread.length);
+  };
+  check();
+  window.addEventListener("announcementsRead", check);
+  return () => window.removeEventListener("announcementsRead", check);
+}, [announcements]);
+
+  };
+  check();
+  window.addEventListener("announcementsRead", check);
+  return () => window.removeEventListener("announcementsRead", check);
+}, [announcements]);
+
 
   const activeAnn = announcements[slide];
   const slideBg   = SLIDE_BG[slide % SLIDE_BG.length];
@@ -86,9 +113,9 @@ export default function MemberDashboard({ user, announcements, menus }: {
         <div className="flex items-center gap-3">
           <Link href="#news" className="relative text-gray-500 text-xl">
             🔔
-            {announcements.length > 0 && (
+            {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
-                {announcements.length}
+                {unreadCount}
               </span>
             )}
           </Link>
