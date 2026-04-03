@@ -8,15 +8,10 @@ export default async function DashboardPage() {
   if (!session?.user) redirect("/login");
   if (session.user.role === "admin") redirect("/admin");
 
-  const [user, announcements, menus] = await Promise.all([
+  const [user, menus] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
       include: { pointWallet: true },
-    }),
-    prisma.announcement.findMany({
-      where: { isPublished: true },
-      orderBy: { createdAt: "desc" },
-      take: 10,
     }),
     prisma.menu.findMany({
       where: { isActive: true },
@@ -25,6 +20,34 @@ export default async function DashboardPage() {
   ]);
 
   if (!user) redirect("/login");
+
+  // Announcementテーブルは存在しない場合に備えてtry-catch
+  let announcements: {
+    id: string;
+    title: string;
+    content: string;
+    tag: string;
+    isPublished: boolean;
+    publishedAt: string | null;
+  }[] = [];
+
+  try {
+    const rows = await prisma.announcement.findMany({
+      where: { isPublished: true },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    });
+    announcements = rows.map((a) => ({
+      id: a.id,
+      title: a.title,
+      content: a.content,
+      tag: a.tag,
+      isPublished: a.isPublished,
+      publishedAt: a.publishedAt ? a.publishedAt.toISOString() : null,
+    }));
+  } catch (e) {
+    console.error("Announcement fetch error:", e);
+  }
 
   return (
     <MemberDashboard
@@ -36,14 +59,7 @@ export default async function DashboardPage() {
         phone: user.phone ?? "",
         availablePoints: user.pointWallet?.availablePoints ?? 0,
       }}
-      announcements={announcements.map((a) => ({
-        id: a.id,
-        title: a.title,
-        content: a.content,
-        tag: a.tag,
-        isPublished: a.isPublished,
-        publishedAt: a.publishedAt ? a.publishedAt.toISOString() : null,
-      }))}
+      announcements={announcements}
       menus={menus.map((m) => ({
         id: m.id,
         title: m.title,
