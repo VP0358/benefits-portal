@@ -194,11 +194,25 @@ export default function TravelSubsActions({ mode, users, subId, currentStatus, s
   async function handleCancel() {
   if (!subId || !confirm("このサブスクリプションを解約しますか？")) return;
   setSaving(true);
-  const res = await fetch(`/api/admin/travel-subscriptions/${subId}`, { method: "DELETE" });
-  setSaving(false);
-  if (!res.ok) { setError("解約に失敗しました。"); return; }
-  router.refresh();
+  setError("");
+  try {
+    const res = await fetch(`/api/admin/travel-subscriptions/${subId}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => null);
+      setError(d?.error ?? `解約に失敗しました（${res.status}）`);
+      setSaving(false);
+      return;
+    }
+    setSaving(false);
+    router.refresh();
+  } catch (e) {
+    setSaving(false);
+    setError("通信エラーが発生しました。");
+  }
 }
+
 
   // ════════════════════════════════════════
   // 新規登録モード
