@@ -226,9 +226,9 @@ export default function MemberDashboard({
           ) : (
             <>
               {/* カラースライダー（1枚大きく） */}
-              <Link href="/announcements" className="block rounded-2xl shadow overflow-hidden mb-3 transition-all duration-500 hover:opacity-95 active:scale-95"
+                            <Link href="/announcements" className="block rounded-2xl shadow overflow-hidden mb-3 transition-all duration-500 hover:opacity-95 active:scale-95"
                    style={{ background: slideBg }}>
-                <div className="p-5 text-white min-h-[130px]">
+                <div className="p-5 text-white min-h-[130px]" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-2 mb-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${tagStyle.bg} ${tagStyle.text}`}>
                       {TAG_LABEL[activeAnn?.tag] ?? "お知らせ"}
