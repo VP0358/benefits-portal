@@ -8,23 +8,24 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const userId = Number(session.user.id);
+
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-  const contracts = await prisma.mobileContract.findMany({
-    where: { referrerId: session.user.id },
+  const rewards = await prisma.contractReferralReward.findMany({
+    where: { referrerUserId: userId },
     orderBy: { createdAt: "desc" },
   });
 
-  const thisMonthCount = contracts.filter(c => c.contractMonth === currentMonth).length;
-  const totalCount = contracts.length;
-  const totalPoints = contracts.reduce((sum, c) => sum + c.pointAwarded, 0);
+  const thisMonthRewards = rewards.filter(r => r.rewardMonth === currentMonth);
+  const totalPoints = rewards.reduce((sum, r) => sum + r.rewardPoints, 0);
 
   return NextResponse.json({
     currentMonth,
-    thisMonthCount,
-    totalCount,
+    thisMonthCount: thisMonthRewards.length,
+    totalCount: rewards.length,
     totalPoints,
-    contracts,
+    rewards,
   });
 }
