@@ -9,7 +9,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (session.user.role !== "admin") redirect("/dashboard");
 
   return (
-    <div className="min-h-screen bg-[#e6f2dc]">
+    <div className="min-h-screen bg-[#f5f3ff]">
       <div className="mx-auto grid max-w-7xl gap-6 p-4 lg:grid-cols-[240px_1fr] lg:p-6">
         <AdminNav />
         <div className="min-w-0">{children}</div>
