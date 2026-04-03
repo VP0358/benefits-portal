@@ -13,8 +13,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "福利厚生ポータル",
-  description: "福利厚生ポータルシステム",
+  title: "VIOLA Pure 福利厚生ポータル",
+  description: "VIOLA Pure 会員向け福利厚生ポータルシステム",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
+};
+
 };
 
 export default function RootLayout({
