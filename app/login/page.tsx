@@ -15,8 +15,8 @@ export default function LoginPage() {
 
     try {
       // ① CSRFトークン取得
-      const csrfRes  = await fetch("/api/auth/csrf");
-      const csrfData = await csrfRes.json();
+      const csrfRes   = await fetch("/api/auth/csrf");
+      const csrfData  = await csrfRes.json();
       const csrfToken = csrfData.csrfToken ?? "";
 
       // ② credentials でログイン
@@ -33,8 +33,8 @@ export default function LoginPage() {
         redirect: "manual",
       });
 
-      // ③ セッション確認（少し待ってからCookieが反映される）
-      await new Promise(r => setTimeout(r, 500));
+      // ③ セッション確認
+      await new Promise((r) => setTimeout(r, 500));
       const sessionRes = await fetch("/api/auth/session", { cache: "no-store" });
       const session    = await sessionRes.json();
 
@@ -44,12 +44,13 @@ export default function LoginPage() {
         return;
       }
 
-      // ④ ロールに応じてページ遷移（window.location で確実にCookieを送る）
+      // ④ ロールで振り分け（管理者は管理者ログインページへ誘導）
       if (session.user.role === "admin") {
-        window.location.replace("/admin");
-      } else {
-        window.location.replace("/dashboard");
+        setError("管理者アカウントです。管理者ログインページをご利用ください。");
+        setLoading(false);
+        return;
       }
+      window.location.replace("/dashboard");
     } catch (err) {
       console.error("Login error:", err);
       setError("ログインに失敗しました。もう一度お試しください。");
@@ -58,43 +59,52 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#e6f2dc] flex items-center justify-center p-4">
-      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-sm">
+    <main className="min-h-screen flex items-center justify-center p-4"
+          style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 50%, #bbf7d0 100%)" }}>
+      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-lg">
+        {/* ロゴ */}
         <div className="mb-8 text-center">
           <div className="flex justify-center mb-4">
             <ViolaLogo size="lg" />
           </div>
-          <p className="mt-2 text-slate-500 text-sm">ログインしてください</p>
+          <h1 className="text-xl font-bold text-green-700">会員ログイン</h1>
+          <p className="mt-1 text-slate-500 text-sm">福利厚生ポータルへようこそ</p>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-900">
+            <label className="mb-1 block text-sm font-semibold text-slate-700">
               メールアドレス
             </label>
             <input
               type="email"
               required
               autoComplete="email"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:border-slate-600 focus:outline-none"
-              placeholder="example@email.com"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900
+                         placeholder:text-slate-400
+                         focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent
+                         transition"
+              placeholder="example@mail.com"
               value={form.email}
-              onChange={e => setForm({ ...form, email: e.target.value })}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-semibold text-slate-900">
+            <label className="mb-1 block text-sm font-semibold text-slate-700">
               パスワード
             </label>
             <input
               type="password"
               required
               autoComplete="current-password"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:border-slate-600 focus:outline-none"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-900
+                         placeholder:text-slate-400
+                         focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent
+                         transition"
               placeholder="パスワードを入力"
               value={form.password}
-              onChange={e => setForm({ ...form, password: e.target.value })}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
             />
           </div>
 
@@ -107,22 +117,30 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
+            className="w-full rounded-xl px-4 py-3 font-semibold text-white
+                       transition disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg, #16a34a, #0d9488)" }}
           >
             {loading ? "ログイン中..." : "ログイン"}
           </button>
         </form>
 
-        {/* 新規登録リンク */}
+        {/* 新規登録 */}
         <div className="mt-6 text-center">
-          <p className="text-sm text-slate-500">
-            アカウントをお持ちでない方は
-          </p>
+          <p className="text-sm text-slate-500">アカウントをお持ちでない方は</p>
           <a
             href="/register"
-            className="mt-2 block w-full rounded-xl border-2 border-slate-900 px-4 py-3 text-center font-semibold text-slate-900 hover:bg-slate-50 transition-colors"
+            className="mt-2 block w-full rounded-xl border-2 border-green-600 px-4 py-3
+                       text-center font-semibold text-green-700 hover:bg-green-50 transition"
           >
             新規会員登録
+          </a>
+        </div>
+
+        {/* 管理者リンク */}
+        <div className="mt-4 text-center">
+          <a href="/admin/login" className="text-xs text-slate-400 hover:text-slate-600 transition">
+            管理者の方はこちら →
           </a>
         </div>
       </div>
