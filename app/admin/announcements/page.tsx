@@ -106,8 +106,8 @@ export default function AnnouncementsAdminPage() {
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">タイトル</label>
               <input
-                className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                placeholder="タイトルを入力"
+              className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              placeholder="タイトルを入力"
                 value={editing.title ?? ""}
                 onChange={(e) => setEditing({ ...editing, title: e.target.value })}
               />
@@ -128,8 +128,8 @@ export default function AnnouncementsAdminPage() {
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">内容</label>
               <textarea
-                className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm h-32 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                placeholder="お知らせの内容を入力"
+              className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm text-gray-900 placeholder:text-gray-400 h-32 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              placeholder="お知らせの内容を入力"
                 value={editing.content ?? ""}
                 onChange={(e) => setEditing({ ...editing, content: e.target.value })}
               />
@@ -197,8 +197,8 @@ export default function AnnouncementsAdminPage() {
                       {new Date(a.createdAt).toLocaleDateString("ja-JP")}
                     </span>
                   </div>
-                  <p className="font-semibold text-gray-800 text-sm truncate">{a.title}</p>
-                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{a.content}</p>
+                  <p className="font-bold text-gray-900 text-sm truncate">{a.title}</p>
+                  <p className="text-xs font-medium text-gray-700 mt-0.5 line-clamp-2">{a.content}</p>
                 </div>
                 <div className="flex flex-col gap-2 min-w-max text-right">
                   <button
