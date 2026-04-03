@@ -183,7 +183,21 @@ export default function MenuCard({
     } catch { /* ignore */ }
   }
 
-  // URL系 → 直接リンク
+  if (menuType === "contact") {
+  return (
+    <a
+      href="/contact"
+      className="rounded-2xl bg-white p-4 shadow-sm text-center hover:shadow-md transition-shadow cursor-pointer block"
+    >
+      <div className="text-2xl mb-1">{icon}</div>
+      <div className="text-xs font-semibold text-slate-800">{title}</div>
+      {subtitle && (
+        <div className="text-xs text-slate-400 mt-0.5">{subtitle}</div>
+      )}
+    </a>
+  );
+}
+
   if (menuType === "url") {
     return (
       <a href={linkUrl || "#"} target="_blank" rel="noopener noreferrer"
