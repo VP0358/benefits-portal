@@ -1,135 +1,69 @@
-import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { hash } from "bcryptjs";
-import { sendWelcomeEmail } from "@/lib/mailer";
+import bcrypt from "bcryptjs";
 
-const schema = z.object({
-  name: z.string().min(1).max(100),
-  nameKana: z.string().min(1).max(100),
-  email: z.string().email(),
-  password: z.string().min(8),
-  phone: z.string().min(1).max(30),
-  postalCode: z.string().min(1).max(10),
-  address: z.string().min(1).max(500),
-  referralCode: z.string().optional(), // 紹介者のreferralCode
-});
-
-/** ユニークな referralCode を生成 */
-async function generateReferralCode(): Promise<string> {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  for (let i = 0; i < 10; i++) {
-    const code = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-    const exists = await prisma.user.findUnique({ where: { referralCode: code } });
-    if (!exists) return code;
-  }
-  throw new Error("referralCode generation failed");
-}
-
-/** ユニークな memberCode を生成 */
-async function generateMemberCode(): Promise<string> {
-  const count = await prisma.user.count();
-  let code = `M${String(count + 1).padStart(4, "0")}`;
-  let tries = 0;
-  while (await prisma.user.findUnique({ where: { memberCode: code } })) {
-    tries++;
-    code = `M${String(count + 1 + tries).padStart(4, "0")}`;
-  }
-  return code;
-}
-
-/** GET: 紹介者情報取得（紹介コード確認） */
-export async function GET(req: NextRequest) {
-  const { searchParams } = req.nextUrl;
-  const code = searchParams.get("ref");
-  if (!code) return NextResponse.json({ referrer: null });
-
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const ref = searchParams.get("ref");
+  if (!ref) return NextResponse.json({ error: "ref is required" }, { status: 400 });
   const referrer = await prisma.user.findUnique({
-    where: { referralCode: code },
+    where: { referralCode: ref },
     select: { id: true, name: true, memberCode: true },
   });
-
-  if (!referrer) return NextResponse.json({ referrer: null });
-
-  return NextResponse.json({
-    referrer: {
-      id: referrer.id.toString(),
-      name: referrer.name,
-      memberCode: referrer.memberCode,
-    },
-  });
+  if (!referrer) return NextResponse.json({ error: "紹介コードが無効です" }, { status: 404 });
+  return NextResponse.json(referrer);
 }
 
-/** POST: 新規会員登録（紹介経由） */
-export async function POST(req: NextRequest) {
-  const json = await req.json();
-  const parsed = schema.safeParse(json);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+export async function POST(request: Request) {
+  const body = await request.json();
+  const { name, nameKana, email, password, phone, postalCode, address, referralCode } = body;
+
+  if (!name || !email || !password || !phone) {
+    return NextResponse.json({ error: "必須項目が不足しています" }, { status: 400 });
   }
 
-  const { name, nameKana, email, password, phone, postalCode, address, referralCode } = parsed.data;
-
-  // メール重複チェック
-  const exists = await prisma.user.findUnique({ where: { email } });
-  if (exists) {
-    return NextResponse.json({ error: "このメールアドレスは既に使用されています。" }, { status: 409 });
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    return NextResponse.json({ error: "このメールアドレスはすでに登録されています" }, { status: 409 });
   }
 
-  // 紹介者取得
-  let referrer: { id: bigint } | null = null;
+  const hashed = await bcrypt.hash(password, 12);
+  const memberCode = "M" + Date.now().toString().slice(-8);
+  const newReferralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+
+  // 紹介者を検索
+  let referrerId: bigint | null = null;
   if (referralCode) {
-    referrer = await prisma.user.findUnique({
+    const referrer = await prisma.user.findUnique({
       where: { referralCode },
       select: { id: true },
     });
+    if (referrer) referrerId = referrer.id;
   }
 
-  const passwordHash = await hash(password, 12);
-  const memberCode = await generateMemberCode();
-  const myReferralCode = await generateReferralCode();
-
+  // トランザクションで会員登録 + 紹介リレーション作成
   const user = await prisma.$transaction(async (tx) => {
-    // ユーザー作成
     const newUser = await tx.user.create({
       data: {
         name,
         nameKana,
         email,
-        passwordHash,
+        passwordHash: hashed,
         phone,
         postalCode,
         address,
+        referralCode: newReferralCode,
         memberCode,
-        referralCode: myReferralCode,
-        status: "active",
       },
     });
 
-    // ポイントウォレット作成
-    await tx.pointWallet.create({
-      data: { userId: newUser.id },
-    });
-
-    // 紹介者との紐づけ
-    if (referrer) {
+    // 紹介者がいれば UserReferral を作成
+    if (referrerId) {
       await tx.userReferral.create({
         data: {
+          referrerId,
           userId: newUser.id,
-          referrerUserId: referrer.id,
-          relationType: "direct",
           isActive: true,
-          validFrom: new Date(),
-        },
-      });
-
-      // 紹介履歴記録
-      await tx.referralHistory.create({
-        data: {
-          userId: newUser.id,
-          referrerUserId: referrer.id,
-          actionType: "add",
-          note: "紹介URLからの自動登録",
         },
       });
     }
@@ -137,15 +71,8 @@ export async function POST(req: NextRequest) {
     return newUser;
   });
 
-  // 登録完了メールを非同期で送信（失敗しても登録自体は成功扱い）
-  sendWelcomeEmail({ to: user.email, name: user.name }).catch(err =>
-    console.error("[register] welcome email failed:", err)
+  return NextResponse.json(
+    { id: user.id.toString(), memberCode: user.memberCode },
+    { status: 201 }
   );
-
-  return NextResponse.json({
-    id: user.id.toString(),
-    memberCode: user.memberCode,
-    name: user.name,
-    email: user.email,
-  }, { status: 201 });
 }
