@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma migrate resolve --applied 20260402_add_travel_subecription && prisma migrate deploy && next build",
+    "build": "prisma db push --accept-data-loss && next build",
     "start": "next start",
     "lint": "eslint",
     "seed": "tsx prisma/seed.ts",
