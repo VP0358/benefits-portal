@@ -19,18 +19,17 @@ export default function EditProductPage() {
 
   useEffect(() => {
     if (!params.id) return;
-    fetch(`/api/admin/products`)
+    fetch(`/api/admin/products/${params.id}`)
       .then(r => r.json())
-      .then((list: {
+      .then((p: {
         id: string;
         name: string;
         description: string | null;
         price: number;
         imageUrl: string | null;
         isActive: boolean;
-      }[]) => {
-        const p = list.find(x => x.id.toString() === params.id);
-        if (p) setData({
+      }) => {
+        if (p?.id) setData({
           name: p.name,
           description: p.description || "",
           price: p.price,

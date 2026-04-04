@@ -15,6 +15,17 @@ function parseId(id: string) {
   try { return BigInt(id); } catch { return null; }
 }
 
+export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const guard = await requireAdmin();
+  if (guard.error) return guard.error;
+  const { id } = await params;
+  const pid = parseId(id);
+  if (!pid) return NextResponse.json({ error: "invalid id" }, { status: 400 });
+  const product = await prisma.product.findUnique({ where: { id: pid } });
+  if (!product) return NextResponse.json({ error: "not found" }, { status: 404 });
+  return NextResponse.json({ ...product, id: product.id.toString() });
+}
+
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireAdmin();
   if (guard.error) return guard.error;
