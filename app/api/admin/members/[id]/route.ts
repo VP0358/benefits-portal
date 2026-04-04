@@ -8,7 +8,7 @@ function parseId(id: string) {
 
 // ── 契約解除（PATCH） ──────────────────────────────────────
 export async function PATCH(
-  req: Request,
+  _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
@@ -31,7 +31,8 @@ export async function PATCH(
   // canceledAt カラムが本番DBに存在しない場合に備えて try-catch
   let updated;
   try {
-    updated = await prisma.user.update({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    updated = await (prisma.user as any).update({
       where: { id: userId },
       data: { status: "canceled", canceledAt: now },
     });
@@ -43,23 +44,26 @@ export async function PATCH(
     });
   }
 
-  // 監査ログ
-  await prisma.adminAuditLog.create({
-    data: {
-      adminId: session.user.id ? BigInt(session.user.id) : null,
-      actionType: "cancel_member",
-      targetTable: "User",
-      targetId: userId.toString(),
-      beforeJson: { status: user.status },
-      afterJson:  { status: "canceled", canceledAt: now.toISOString() },
-    },
-  }).catch(() => {});
+  // 監査ログ（エラーは無視）
+  try {
+    const adminId = session.user.id ? BigInt(session.user.id) : BigInt(0);
+    await prisma.adminAuditLog.create({
+      data: {
+        adminId,
+        actionType: "cancel_member",
+        targetTable: "User",
+        targetId: userId.toString(),
+        beforeJson: { status: user.status },
+        afterJson:  { status: "canceled", canceledAt: now.toISOString() },
+      },
+    });
+  } catch { /* 監査ログ失敗は無視 */ }
 
   return NextResponse.json({
     ok: true,
     id: updated.id.toString(),
     status: updated.status,
-    canceledAt: updated.canceledAt?.toISOString() ?? null,
+    canceledAt: updated.canceledAt ? new Date(updated.canceledAt).toISOString() : null,
   });
 }
 
