@@ -64,6 +64,7 @@ model User {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
   lastLoginAt   DateTime?
+  canceledAt    DateTime?
 
   referrals     UserReferral[]   @relation("ReferralsOfUser")
   referredBy    UserReferral[]   @relation("ReferrerOfUser")
