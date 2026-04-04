@@ -36,10 +36,25 @@ export async function POST(req: NextRequest) {
       where: { email: { not: "info@c-p.link" } },
     }).catch(() => {});
 
-    // テスト会員リセット（upsert）
+    // テスト会員リセット（upsert） - memberCodeの重複を避けるため既存チェック
+    // まず同じmemberCodeの別ユーザーがいれば削除
+    await prisma.user.deleteMany({
+      where: {
+        memberCode: "M0001",
+        email: { not: "support@c-p.link" },
+      },
+    }).catch(() => {});
+
+    await prisma.user.deleteMany({
+      where: {
+        referralCode: "VIOLA001",
+        email: { not: "support@c-p.link" },
+      },
+    }).catch(() => {});
+
     const member = await prisma.user.upsert({
       where:  { email: "support@c-p.link" },
-      update: { passwordHash: memberHash, status: "active" },
+      update: { passwordHash: memberHash, status: "active", name: "VIOLAさん" },
       create: {
         memberCode:   "M0001",
         name:         "VIOLAさん",
@@ -50,11 +65,31 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // PointWalletがなければ作成
+    const existingWallet = await prisma.pointWallet.findUnique({
+      where: { userId: member.id },
+    });
+    if (!existingWallet) {
+      await prisma.pointWallet.create({
+        data: {
+          userId:                  member.id,
+          autoPointsBalance:       50000,
+          manualPointsBalance:     10000,
+          externalPointsBalance:   18541,
+          availablePointsBalance:  78541,
+          usedPointsBalance:       0,
+          expiredPointsBalance:    0,
+        },
+      });
+    }
+
     return NextResponse.json({
       success: true,
       message: "ログイン情報をリセットしました",
       admin:  { email: admin.email,  password: "colors1010" },
       member: { email: member.email, password: "colors1010" },
+      memberId: member.id.toString(),
+      walletCreated: !existingWallet,
     });
   } catch (e) {
     console.error(e);
