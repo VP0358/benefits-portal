@@ -42,6 +42,7 @@ export default function MemberDashboard({
   const [avatar, setAvatar] = useState("😊");
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const slideRef = useRef(0);
+  const [contractCount, setContractCount] = useState<number | null>(null);
 
   // アバター読み込み
   useEffect(() => {
@@ -66,6 +67,14 @@ export default function MemberDashboard({
     document.addEventListener("click", close);
     return () => document.removeEventListener("click", close);
   }, [menuOpen]);
+
+  // 今月の携帯契約件数を取得
+  useEffect(() => {
+    fetch("/api/referral/contracts")
+      .then(r => r.json())
+      .then(d => setContractCount(d.thisMonthCount ?? 0))
+      .catch(() => setContractCount(0));
+  }, []);
 
   // 未読カウント管理
   useEffect(() => {
@@ -206,7 +215,17 @@ export default function MemberDashboard({
               <p className="text-xs text-gray-600 mt-0.5">直紹介した会員の今月の契約件数</p>
             </div>
           </div>
-          <span className="text-gray-400 text-lg">›</span>
+          <div className="flex items-center gap-2">
+            {contractCount === null ? (
+              <span className="text-sm text-gray-400 animate-pulse">...</span>
+            ) : (
+              <span className="text-2xl font-black text-green-600">
+                {contractCount}
+                <span className="text-xs font-semibold text-gray-500 ml-0.5">件</span>
+              </span>
+            )}
+            <span className="text-gray-400 text-lg">›</span>
+          </div>
         </Link>
 
         {/* お知らせスライダー */}

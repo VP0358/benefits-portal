@@ -9,7 +9,7 @@ const navItems = [
   { href: "/admin",                  label: "🏠 ダッシュボード" },
   { href: "/admin/dashboard",        label: "📊 売上 / ポイント" },
   { href: "/admin/menus",            label: "📋 メニュー管理" },
-  { href: "/admin/users",            label: "👥 会員管理" },
+  { href: "/admin/members",           label: "👥 会員管理" },
   { href: "/admin/contracts",        label: "📱 携帯契約一覧" },
   { href: "/admin/travel-subscriptions", label: "✈️ 旅行サブスク一覧" },
   { href: "/admin/referral-rewards", label: "💰 紹介者報酬計算" },

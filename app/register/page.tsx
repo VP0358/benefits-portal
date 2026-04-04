@@ -27,6 +27,7 @@ function RegisterForm() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [countdown, setCountdown] = useState(3);
 
   // 紹介コードから紹介者情報を取得
   useEffect(() => {
@@ -34,7 +35,11 @@ function RegisterForm() {
     setRefLoading(true);
     fetch(`/api/register?ref=${encodeURIComponent(refCode)}`)
       .then(r => r.json())
-      .then(d => { setReferrer(d.referrer); setRefLoading(false); })
+      .then(d => {
+        // APIは { id, name, memberCode } を直接返す
+        setReferrer(d?.id ? d : (d.referrer ?? null));
+        setRefLoading(false);
+      })
       .catch(() => setRefLoading(false));
   }, [refCode]);
 
@@ -93,6 +98,23 @@ function RegisterForm() {
     setDone(true);
   }
 
+  // 登録完了後の自動リダイレクト（3秒カウントダウン）
+  useEffect(() => {
+    if (!done) return;
+    setCountdown(3);
+    const tick = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(tick);
+          router.push("/login");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [done, router]);
+
   // 登録完了画面
   if (done) {
     return (
@@ -109,11 +131,14 @@ function RegisterForm() {
               <span className="font-semibold">{referrer.name}</span> さんの紹介で登録されました。
             </div>
           )}
+          <p className="text-sm text-slate-400">
+            {countdown} 秒後に自動でログインページへ移動します...
+          </p>
           <button
             onClick={() => router.push("/login")}
             className="w-full rounded-2xl bg-slate-900 py-4 text-sm font-semibold text-white hover:bg-slate-800 transition-colors"
           >
-            ログインする
+            今すぐログインする →
           </button>
         </div>
       </div>

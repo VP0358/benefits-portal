@@ -118,13 +118,13 @@ export default function MonthlyGrantManager() {
           {/* サマリー */}
           <div className="grid gap-3 sm:grid-cols-3">
             {[
-              { label: "対象契約数",   value: `${preview.totalContracts}件` },
-              { label: "紹介者件数",   value: `${preview.totalReferrers}件` },
-              { label: "総付与ポイント", value: `${preview.totalRewardPoints.toLocaleString()}pt` },
+              { label: "対象契約数",    value: `${preview.totalContracts}件`,                        color: "text-slate-900" },
+              { label: "紹介者件数",    value: `${preview.totalReferrers}件`,                        color: "text-slate-900" },
+              { label: "総付与ポイント", value: `${preview.totalRewardPoints.toLocaleString()}pt`,   color: "text-emerald-600" },
             ].map(item => (
               <div key={item.label} className="rounded-2xl bg-slate-50 p-4 text-center">
                 <div className="text-xs font-semibold text-slate-600">{item.label}</div>
-                <div className="mt-1.5 text-xl font-bold text-slate-900">{item.value}</div>
+                <div className={`mt-1.5 text-xl font-bold ${item.color}`}>{item.value}</div>
               </div>
             ))}
           </div>
@@ -145,7 +145,7 @@ export default function MonthlyGrantManager() {
                       <div key={i}
                         className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-2 text-sm">
                         <span className="font-medium text-slate-800">{ref.referrerUserName}</span>
-                        <span className="font-bold text-slate-900">{ref.rewardPoints.toLocaleString()}pt</span>
+                        <span className="font-bold text-emerald-600">{ref.rewardPoints.toLocaleString()}pt</span>
                       </div>
                     ))}
                   </div>

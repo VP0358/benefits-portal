@@ -1,13 +1,16 @@
-import PointUsageHistory from "./ui/point-usage-history";
+import PointTransactionHistory from "./ui/point-usage-history";
+import Link from "next/link";
 
 export default function PointHistoryPage() {
   return (
-    <main className="min-h-screen bg-[#e6f2dc] p-4">
-      <div className="mx-auto max-w-2xl space-y-6">
-        <h1 className="text-2xl font-bold text-slate-800">ポイント利用履歴</h1>
-        <section className="rounded-3xl bg-white p-6 shadow-sm"><PointUsageHistory /></section>
-        <a href="/dashboard" className="block text-center text-sm text-slate-500">← ダッシュボードに戻る</a>
-      </div>
-    </main>
+    <div className="min-h-screen bg-[#e6f2dc] pb-20">
+      <header className="sticky top-0 z-30 bg-white shadow-sm flex items-center gap-3 px-4 py-3">
+        <Link href="/dashboard" className="text-green-700 text-xl font-bold">‹</Link>
+        <span className="font-bold text-green-900 text-base">📊 ポイント履歴</span>
+      </header>
+      <main className="max-w-md mx-auto px-4 pt-5">
+        <PointTransactionHistory />
+      </main>
+    </div>
   );
 }
