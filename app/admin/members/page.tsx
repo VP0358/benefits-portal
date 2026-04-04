@@ -68,10 +68,8 @@ export default async function AdminMembersPage({
     ];
   }
 
-  // 契約一覧タブの場合は canceledAt 降順
-  const orderBy = tab === "canceled"
-    ? { canceledAt: "desc" as const }
-    : { createdAt: "desc" as const };
+  // 契約解除者タブは updatedAt 降順（canceledAt は DB未適用の場合があるため）
+  const orderBy = { updatedAt: "desc" as const };
 
   const [total, members, canceledCount, activeCount] = await Promise.all([
     prisma.user.count({ where: baseWhere }),
@@ -87,10 +85,10 @@ export default async function AdminMembersPage({
           include: { referrer: { select: { id: true, name: true, memberCode: true } } },
           take: 1,
         },
-        // 契約登録日：最新のアクティブな携帯契約の confirmedAt を使用
+        // 契約登録日：最新の携帯契約（active/pending）の confirmedAt を使用
         contracts: {
-          where: { status: "active" },
-          orderBy: { confirmedAt: "desc" },
+          where: { status: { in: ["active", "pending"] } },
+          orderBy: { createdAt: "desc" },
           take: 1,
           select: { confirmedAt: true, startedAt: true, createdAt: true },
         },
@@ -374,17 +372,11 @@ export default async function AdminMembersPage({
                       <td className="px-5 py-3 text-xs text-slate-600">
                         {contractDate ? fmtDate(contractDate) : <span className="text-slate-300">—</span>}
                       </td>
-                      {/* 契約解除日時（年/月/日 時:分:秒） */}
+                      {/* 契約解除日時（年/月/日 時:分:秒）updatedAt で代用 */}
                       <td className="px-5 py-3">
-                        {(m as typeof m & { canceledAt?: Date | null }).canceledAt ? (
-                          <div>
-                            <div className="text-xs font-bold text-red-700">
-                              {fmtDateTime((m as typeof m & { canceledAt?: Date | null }).canceledAt)}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-slate-300">—</span>
-                        )}
+                        <div className="text-xs font-bold text-red-700">
+                          {fmtDateTime(m.updatedAt)}
+                        </div>
                       </td>
                       {/* 入会日 */}
                       <td className="px-5 py-3 text-xs text-slate-500">

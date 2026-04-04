@@ -27,13 +27,21 @@ export async function PATCH(
   }
 
   const now = new Date();
-  const updated = await prisma.user.update({
-    where: { id: userId },
-    data: {
-      status: "canceled",
-      canceledAt: now,
-    },
-  });
+
+  // canceledAt カラムが本番DBに存在しない場合に備えて try-catch
+  let updated;
+  try {
+    updated = await prisma.user.update({
+      where: { id: userId },
+      data: { status: "canceled", canceledAt: now },
+    });
+  } catch {
+    // canceledAt が未適用の場合は status のみ更新
+    updated = await prisma.user.update({
+      where: { id: userId },
+      data: { status: "canceled" },
+    });
+  }
 
   // 監査ログ
   await prisma.adminAuditLog.create({
