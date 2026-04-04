@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import ContractsOrgChart from "./ui/contracts-org-chart";
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   pending: { label: "申込中", cls: "bg-yellow-50 text-yellow-700 border-yellow-200" },
@@ -15,12 +16,13 @@ const REWARD_RATE = 0.25;
 export default async function AdminContractsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; page?: string }>;
+  searchParams: Promise<{ status?: string; page?: string; tab?: string }>;
 }) {
   const session = await auth();
   if (!session?.user || session.user.role !== "admin") redirect("/login");
 
   const sp = await searchParams;
+  const activeTab = sp.tab ?? "list"; // "list" | "org"
   const statusFilter = sp.status ?? "";
   const page = Math.max(1, Number(sp.page ?? "1"));
   const limit = 30;
@@ -30,39 +32,39 @@ export default async function AdminContractsPage({
     ? { status: statusFilter as "pending" | "active" | "canceled" | "suspended" }
     : {};
 
-  const [total, contracts] = await Promise.all([
+  const [total, contracts, statusCounts] = await Promise.all([
     prisma.mobileContract.count({ where }),
-    prisma.mobileContract.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: limit,
-      include: {
-        user: {
-          select: {
-            id: true,
-            memberCode: true,
-            name: true,
-            referrals: {
-              where: { isActive: true },
-              include: {
-                referrer: { select: { id: true, memberCode: true, name: true } },
+    activeTab === "list"
+      ? prisma.mobileContract.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          skip,
+          take: limit,
+          include: {
+            user: {
+              select: {
+                id: true,
+                memberCode: true,
+                name: true,
+                referrals: {
+                  where: { isActive: true },
+                  include: {
+                    referrer: { select: { id: true, memberCode: true, name: true } },
+                  },
+                  take: 1,
+                },
               },
-              take: 1,
             },
           },
-        },
-      },
+        })
+      : Promise.resolve([]),
+    prisma.mobileContract.groupBy({
+      by: ["status"],
+      _count: { id: true },
     }),
   ]);
 
   const pages = Math.ceil(total / limit);
-
-  // ステータス別件数
-  const statusCounts = await prisma.mobileContract.groupBy({
-    by: ["status"],
-    _count: { id: true },
-  });
   const countByStatus = Object.fromEntries(statusCounts.map(s => [s.status, s._count.id]));
 
   return (
@@ -71,7 +73,7 @@ export default async function AdminContractsPage({
       <div className="rounded-3xl bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-xl font-bold text-slate-800">📱 携帯契約一覧</h1>
+            <h1 className="text-xl font-bold text-slate-800">📱 携帯契約管理</h1>
             <p className="text-sm text-slate-700 mt-0.5">全 {total.toLocaleString()} 件</p>
           </div>
           {/* 集計カード */}
@@ -88,150 +90,184 @@ export default async function AdminContractsPage({
         </div>
       </div>
 
-      {/* フィルター */}
+      {/* タブ切り替え */}
       <div className="rounded-3xl bg-white p-4 shadow-sm">
-        <div className="flex gap-2 flex-wrap">
-          {[
-            { value: "", label: "すべて" },
-            { value: "active", label: "有効" },
-            { value: "pending", label: "申込中" },
-            { value: "suspended", label: "停止中" },
-            { value: "canceled", label: "解約済" },
-          ].map(opt => (
-            <Link
-              key={opt.value}
-              href={`/admin/contracts?status=${opt.value}`}
-              className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
-                statusFilter === opt.value
-                  ? "bg-slate-900 text-white"
-                  : "bg-slate-100 text-slate-800 hover:bg-slate-200"
-              }`}
-            >
-              {opt.label}
-            </Link>
-          ))}
+        <div className="flex gap-2">
+          <Link
+            href="/admin/contracts?tab=list"
+            className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors ${
+              activeTab === "list"
+                ? "bg-slate-900 text-white"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            📋 契約一覧
+          </Link>
+          <Link
+            href="/admin/contracts?tab=org"
+            className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors ${
+              activeTab === "org"
+                ? "bg-slate-900 text-white"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            🌳 携帯契約 組織図
+          </Link>
         </div>
       </div>
 
-      {/* テーブル */}
-      <div className="rounded-3xl bg-white shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-100">
-              <tr>
-                <th className="text-left px-5 py-3 font-semibold text-slate-800">会員</th>
-                <th className="text-left px-5 py-3 font-semibold text-slate-800">プラン名</th>
-                <th className="text-left px-5 py-3 font-semibold text-slate-800">契約番号</th>
-                <th className="text-right px-5 py-3 font-semibold text-slate-800">月額</th>
-                <th className="text-right px-5 py-3 font-semibold text-slate-800 whitespace-nowrap">
-                  報酬額 (×1/4)
-                </th>
-                <th className="text-left px-5 py-3 font-semibold text-slate-800">直紹介者</th>
-                <th className="text-left px-5 py-3 font-semibold text-slate-800">ステータス</th>
-                <th className="text-left px-5 py-3 font-semibold text-slate-800">確定日</th>
-                <th className="px-5 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {contracts.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="px-5 py-10 text-center text-slate-700">
-                    該当する契約がありません
-                  </td>
-                </tr>
-              )}
-              {contracts.map(c => {
-                const s = STATUS_LABEL[c.status] ?? STATUS_LABEL.pending;
-                const referrer = c.user.referrals[0]?.referrer ?? null;
-                const reward = Math.floor(Number(c.monthlyFee) * REWARD_RATE);
-                return (
-                  <tr key={c.id.toString()} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-5 py-3">
-                      <Link
-                        href={`/admin/users/${c.user.id}`}
-                        className="font-medium text-slate-800 hover:text-slate-600"
-                      >
-                        {c.user.name}
-                      </Link>
-                      <div className="text-xs text-slate-700">{c.user.memberCode}</div>
-                    </td>
-                    <td className="px-5 py-3 font-medium text-slate-700">{c.planName}</td>
-                    <td className="px-5 py-3 text-slate-700 text-xs font-mono">{c.contractNumber}</td>
-                    <td className="px-5 py-3 text-right font-semibold text-slate-800">
-                      ¥{Number(c.monthlyFee).toLocaleString()}
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      {c.status === "active" && c.confirmedAt ? (
-                        <span className="font-bold text-emerald-600">
-                          ¥{reward.toLocaleString()}
-                        </span>
-                      ) : (
-                        <span className="text-slate-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3">
-                      {referrer ? (
-                        <Link
-                          href={`/admin/users/${referrer.id}`}
-                          className="text-slate-700 hover:text-slate-500"
-                        >
-                          {referrer.name}
-                          <span className="block text-xs text-slate-700">{referrer.memberCode}</span>
-                        </Link>
-                      ) : (
-                        <span className="text-slate-300 text-xs">紹介なし</span>
-                      )}
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className={`rounded-full border px-2.5 py-0.5 text-xs ${s.cls}`}>
-                        {s.label}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-xs text-slate-700">
-                      {c.confirmedAt
-                        ? new Date(c.confirmedAt).toLocaleDateString("ja-JP")
-                        : "—"}
-                    </td>
-                    <td className="px-5 py-3">
-                      <Link
-                        href={`/admin/users/${c.user.id}`}
-                        className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs text-slate-800 hover:bg-slate-200 transition-colors"
-                      >
-                        詳細
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      {/* ─── 契約一覧タブ ─── */}
+      {activeTab === "list" && (
+        <>
+          {/* フィルター */}
+          <div className="rounded-3xl bg-white p-4 shadow-sm">
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { value: "", label: "すべて" },
+                { value: "active", label: "有効" },
+                { value: "pending", label: "申込中" },
+                { value: "suspended", label: "停止中" },
+                { value: "canceled", label: "解約済" },
+              ].map(opt => (
+                <Link
+                  key={opt.value}
+                  href={`/admin/contracts?tab=list&status=${opt.value}`}
+                  className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+                    statusFilter === opt.value
+                      ? "bg-slate-900 text-white"
+                      : "bg-slate-100 text-slate-800 hover:bg-slate-200"
+                  }`}
+                >
+                  {opt.label}
+                </Link>
+              ))}
+            </div>
+          </div>
 
-        {/* ページネーション */}
-        {pages > 1 && (
-          <div className="flex justify-center gap-2 px-5 py-4 border-t border-slate-100">
-            {page > 1 && (
-              <Link
-                href={`/admin/contracts?status=${statusFilter}&page=${page - 1}`}
-                className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-              >
-                ← 前へ
-              </Link>
-            )}
-            <span className="px-4 py-2 text-sm text-slate-700">
-              {page} / {pages}
-            </span>
-            {page < pages && (
-              <Link
-                href={`/admin/contracts?status=${statusFilter}&page=${page + 1}`}
-                className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
-              >
-                次へ →
-              </Link>
+          {/* テーブル */}
+          <div className="rounded-3xl bg-white shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    <th className="text-left px-5 py-3 font-semibold text-slate-800">会員</th>
+                    <th className="text-left px-5 py-3 font-semibold text-slate-800">プラン名</th>
+                    <th className="text-left px-5 py-3 font-semibold text-slate-800">契約番号</th>
+                    <th className="text-right px-5 py-3 font-semibold text-slate-800">月額</th>
+                    <th className="text-right px-5 py-3 font-semibold text-slate-800 whitespace-nowrap">
+                      報酬額 (×1/4)
+                    </th>
+                    <th className="text-left px-5 py-3 font-semibold text-slate-800">直紹介者</th>
+                    <th className="text-left px-5 py-3 font-semibold text-slate-800">ステータス</th>
+                    <th className="text-left px-5 py-3 font-semibold text-slate-800">確定日</th>
+                    <th className="px-5 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {contracts.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="px-5 py-10 text-center text-slate-700">
+                        該当する契約がありません
+                      </td>
+                    </tr>
+                  )}
+                  {contracts.map(c => {
+                    const s = STATUS_LABEL[c.status] ?? STATUS_LABEL.pending;
+                    const referrer = c.user.referrals[0]?.referrer ?? null;
+                    const reward = Math.floor(Number(c.monthlyFee) * REWARD_RATE);
+                    return (
+                      <tr key={c.id.toString()} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-5 py-3">
+                          <Link
+                            href={`/admin/users/${c.user.id}`}
+                            className="font-medium text-slate-800 hover:text-slate-600"
+                          >
+                            {c.user.name}
+                          </Link>
+                          <div className="text-xs text-slate-700">{c.user.memberCode}</div>
+                        </td>
+                        <td className="px-5 py-3 font-medium text-slate-700">{c.planName}</td>
+                        <td className="px-5 py-3 text-slate-700 text-xs font-mono">{c.contractNumber}</td>
+                        <td className="px-5 py-3 text-right font-semibold text-slate-800">
+                          ¥{Number(c.monthlyFee).toLocaleString()}
+                        </td>
+                        <td className="px-5 py-3 text-right">
+                          {c.status === "active" && c.confirmedAt ? (
+                            <span className="font-bold text-emerald-600">
+                              ¥{reward.toLocaleString()}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3">
+                          {referrer ? (
+                            <Link
+                              href={`/admin/users/${referrer.id}`}
+                              className="text-slate-700 hover:text-slate-500"
+                            >
+                              {referrer.name}
+                              <span className="block text-xs text-slate-700">{referrer.memberCode}</span>
+                            </Link>
+                          ) : (
+                            <span className="text-slate-500 text-xs">紹介なし</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3">
+                          <span className={`rounded-full border px-2.5 py-0.5 text-xs ${s.cls}`}>
+                            {s.label}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-xs text-slate-700">
+                          {c.confirmedAt
+                            ? new Date(c.confirmedAt).toLocaleDateString("ja-JP")
+                            : "—"}
+                        </td>
+                        <td className="px-5 py-3">
+                          <Link
+                            href={`/admin/users/${c.user.id}`}
+                            className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs text-slate-800 hover:bg-slate-200 transition-colors"
+                          >
+                            詳細
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ページネーション */}
+            {pages > 1 && (
+              <div className="flex justify-center gap-2 px-5 py-4 border-t border-slate-100">
+                {page > 1 && (
+                  <Link
+                    href={`/admin/contracts?tab=list&status=${statusFilter}&page=${page - 1}`}
+                    className="rounded-xl border-2 border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                  >
+                    ← 前へ
+                  </Link>
+                )}
+                <span className="px-4 py-2 text-sm text-slate-700">
+                  {page} / {pages}
+                </span>
+                {page < pages && (
+                  <Link
+                    href={`/admin/contracts?tab=list&status=${statusFilter}&page=${page + 1}`}
+                    className="rounded-xl border-2 border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                  >
+                    次へ →
+                  </Link>
+                )}
+              </div>
             )}
           </div>
-        )}
-      </div>
+        </>
+      )}
+
+      {/* ─── 組織図タブ ─── */}
+      {activeTab === "org" && <ContractsOrgChart />}
     </main>
   );
 }
