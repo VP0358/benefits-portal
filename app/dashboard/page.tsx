@@ -57,7 +57,7 @@ export default async function DashboardPage() {
         memberCode: user.memberCode ?? "",
         email: user.email ?? "",
         phone: user.phone ?? "",
-        availablePoints: user.pointWallet?.availablePoints ?? 0,
+        availablePoints: user.pointWallet?.availablePointsBalance ?? 0,
       }}
       announcements={announcements}
       menus={menus.map((m) => ({
