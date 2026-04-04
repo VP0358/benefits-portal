@@ -1,11 +1,23 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import AdminNav from "./ui/admin-nav";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  // /admin/login はサイドバーなしで表示（ログインページ）
+  const hdrs = await headers();
+  const pathname =
+    hdrs.get("x-next-pathname") ??
+    hdrs.get("x-invoke-path") ??
+    hdrs.get("x-matched-path") ??
+    "";
+  if (pathname === "/admin/login" || pathname.startsWith("/admin/login")) {
+    return <>{children}</>;
+  }
+
   const session = await auth();
 
-  if (!session?.user?.email) redirect("/login");
+  if (!session?.user?.email) redirect("/admin/login");
   if (session.user.role !== "admin") redirect("/dashboard");
 
   return (

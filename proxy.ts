@@ -5,7 +5,7 @@ const MEMBER_DOMAIN = "viola-pure.net";
 const ADMIN_DOMAIN  = "viola-pure.xyz";
 
 // 認証不要なパス
-const PUBLIC_PATHS = ["/login", "/register", "/api/auth", "/api/register", "/_next", "/favicon"];
+const PUBLIC_PATHS = ["/login", "/admin/login", "/register", "/api/auth", "/api/register", "/_next", "/favicon"];
 
 export default auth(function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -26,7 +26,16 @@ export default auth(function middleware(req: NextRequest) {
       url.pathname = session.user.role === "admin" ? "/admin" : "/dashboard";
       return NextResponse.redirect(url);
     }
-    return NextResponse.next();
+    // ログイン済みで /admin/login → /admin へリダイレクト
+    if (pathname === "/admin/login" && session?.user?.role === "admin") {
+      const url = req.nextUrl.clone();
+      url.pathname = "/admin";
+      return NextResponse.redirect(url);
+    }
+    // パスをリクエストヘッダーに付与（layout側での判定用）
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set("x-next-pathname", pathname);
+    return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
   // ② 未ログイン → /login
