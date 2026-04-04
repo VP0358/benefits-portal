@@ -28,16 +28,17 @@ export default function AnnouncementsPage() {
   const [list, setList] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [readIds, setReadIds] = useState<string[]>([]);
+
   useEffect(() => {
+    // 既読IDを取得
+    const stored = localStorage.getItem("readAnnouncements");
+    if (stored) setReadIds(JSON.parse(stored));
+
     fetch("/api/announcements?published=true")
       .then(r => r.json())
       .then(d => {
         setList(d);
-        // 全件既読としてlocalStorageに保存
-        const ids = d.map((a: Announcement) => a.id);
-        localStorage.setItem("readAnnouncements", JSON.stringify(ids));
-        // カスタムイベントを発火してベルに通知
-        window.dispatchEvent(new Event("announcementsRead"));
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -59,22 +60,28 @@ export default function AnnouncementsPage() {
             <p className="text-sm font-medium text-gray-600">現在お知らせはありません</p>
           </div>
         ) : (
-          list.map(a => (
-            <Link key={a.id} href={`/announcements/${a.id}`}
-              className="block bg-white rounded-2xl shadow p-4 hover:shadow-md transition active:scale-95">
-              <div className="flex items-center gap-2 mb-2">
-                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${TAG_STYLE[a.tag] ?? "bg-gray-400 text-white"}`}>
-                  {TAG_LABEL[a.tag] ?? "お知らせ"}
-                </span>
-                <span className="text-xs font-medium text-gray-500">
-                  {a.publishedAt ? new Date(a.publishedAt).toLocaleDateString("ja-JP") : ""}
-                </span>
-              </div>
-              <p className="font-bold text-gray-900 text-sm">{a.title}</p>
-              <p className="text-xs font-medium text-gray-600 mt-1 line-clamp-2">{a.content}</p>
-              <p className="text-xs text-green-600 font-semibold mt-2 text-right">続きを読む →</p>
-            </Link>
-          ))
+          list.map(a => {
+            const isRead = readIds.includes(a.id);
+            return (
+              <Link key={a.id} href={`/announcements/${a.id}`}
+                className={`block bg-white rounded-2xl shadow p-4 hover:shadow-md transition active:scale-95 relative ${!isRead ? "border-l-4 border-green-500" : ""}`}>
+                {!isRead && (
+                  <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-green-500" />
+                )}
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${TAG_STYLE[a.tag] ?? "bg-gray-400 text-white"}`}>
+                    {TAG_LABEL[a.tag] ?? "お知らせ"}
+                  </span>
+                  <span className="text-xs font-medium text-gray-500">
+                    {a.publishedAt ? new Date(a.publishedAt).toLocaleDateString("ja-JP") : ""}
+                  </span>
+                </div>
+                <p className={`font-bold text-sm ${isRead ? "text-gray-700" : "text-gray-900"}`}>{a.title}</p>
+                <p className="text-xs font-medium text-gray-600 mt-1 line-clamp-2">{a.content}</p>
+                <p className="text-xs text-green-600 font-semibold mt-2 text-right">続きを読む →</p>
+              </Link>
+            );
+          })
         )}
       </main>
     </div>

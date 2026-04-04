@@ -26,27 +26,31 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const { newEmail, currentPassword, newPassword } = await req.json();
-
-  if (!currentPassword) {
-    return NextResponse.json(
-      { error: "現在のパスワードを入力してください。" },
-      { status: 400 }
-    );
-  }
+  const { newName, newEmail, currentPassword, newPassword } = await req.json();
 
   const admin = await prisma.admin.findUnique({
     where: { email: session.user.email },
   });
   if (!admin) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  // 現在のパスワード確認
-  const ok = await compare(currentPassword, admin.passwordHash);
-  if (!ok) {
-    return NextResponse.json(
-      { error: "現在のパスワードが正しくありません。" },
-      { status: 400 }
-    );
+  // メールアドレス変更・パスワード変更時のみ現在のパスワードが必要
+  const needsPasswordCheck =
+    (newEmail && newEmail !== admin.email) || !!newPassword;
+
+  if (needsPasswordCheck) {
+    if (!currentPassword) {
+      return NextResponse.json(
+        { error: "メールアドレスまたはパスワードを変更する場合は現在のパスワードが必要です。" },
+        { status: 400 }
+      );
+    }
+    const ok = await compare(currentPassword, admin.passwordHash);
+    if (!ok) {
+      return NextResponse.json(
+        { error: "現在のパスワードが正しくありません。" },
+        { status: 400 }
+      );
+    }
   }
 
   // メールアドレス重複チェック
@@ -62,6 +66,7 @@ export async function PATCH(req: NextRequest) {
 
   // 更新データ構築
   const updateData: Record<string, unknown> = {};
+  if (newName && newName !== admin.name) updateData.name = newName;
   if (newEmail && newEmail !== admin.email) updateData.email = newEmail;
   if (newPassword) {
     if (newPassword.length < 8) {
