@@ -307,6 +307,7 @@ model TravelSubscription {
   pricingTier    String         @default("early") @db.VarChar(20) // "early"=初回50名, "standard"=51名〜
   monthlyFee     Decimal        @db.Decimal(10, 2)
   status         ContractStatus @default(pending)
+  forceStatus    String         @default("none") @db.VarChar(20) // "none"|"forced_active"|"forced_inactive"
   startedAt      DateTime?
   confirmedAt    DateTime?
   canceledAt     DateTime?

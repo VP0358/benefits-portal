@@ -45,6 +45,18 @@ export default function MemberDashboard({
   const slideRef = useRef(0);
   const [contractCount, setContractCount] = useState<number | null>(null);
 
+  // 旅行サブスク状態
+  type TravelSubInfo = {
+    displayStatus: "active" | "inactive" | "none";
+    sub: {
+      level: number;
+      planName: string;
+      monthlyFee: number;
+      forceStatus: string;
+    } | null;
+  };
+  const [travelSub, setTravelSub] = useState<TravelSubInfo | null>(null);
+
   // アバター読み込み（DB画像 > localStorage絵文字）
   useEffect(() => {
     // DBから取得
@@ -101,6 +113,14 @@ export default function MemberDashboard({
       .then(r => r.json())
       .then(d => setContractCount(d.thisMonthCount ?? 0))
       .catch(() => setContractCount(0));
+  }, []);
+
+  // 旅行サブスク状態を取得
+  useEffect(() => {
+    fetch("/api/my/travel-subscription")
+      .then(r => r.json())
+      .then(d => setTravelSub(d))
+      .catch(() => setTravelSub({ displayStatus: "none", sub: null }));
   }, []);
 
   // 未読カウント管理
@@ -269,6 +289,98 @@ export default function MemberDashboard({
             <span className="text-gray-400 text-lg">›</span>
           </div>
         </Link>
+
+        {/* 旅行サブスクボタン */}
+        {(() => {
+          // Lv別カラー定義（level 1〜5）
+          const LV_STYLE: Record<number, { bg: string; border: string; badge: string; text: string }> = {
+            1: { bg: "bg-violet-50",  border: "border-violet-200", badge: "bg-violet-500 text-white",  text: "text-violet-700" },
+            2: { bg: "bg-blue-50",    border: "border-blue-200",   badge: "bg-blue-500 text-white",    text: "text-blue-700" },
+            3: { bg: "bg-emerald-50", border: "border-emerald-200",badge: "bg-emerald-500 text-white", text: "text-emerald-700" },
+            4: { bg: "bg-amber-50",   border: "border-amber-200",  badge: "bg-amber-500 text-white",   text: "text-amber-700" },
+            5: { bg: "bg-rose-50",    border: "border-rose-200",   badge: "bg-rose-500 text-white",    text: "text-rose-700" },
+          };
+
+          // 強制ステータス別の特別スタイル
+          const FORCE_STYLE = {
+            forced_active:   { bg: "bg-cyan-50",   border: "border-cyan-300",   badge: "bg-cyan-500 text-white",   text: "text-cyan-700",   label: "✨ 特別アクティブ" },
+            forced_inactive: { bg: "bg-orange-50", border: "border-orange-300", badge: "bg-orange-500 text-white", text: "text-orange-700", label: "⏸ 一時停止中" },
+          };
+
+          if (!travelSub) {
+            // ローディング中
+            return (
+              <div className="block bg-white rounded-2xl p-4 shadow flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">✈️</span>
+                  <div>
+                    <p className="font-bold text-gray-800 text-sm">旅行サブスク</p>
+                    <p className="text-xs text-gray-400 animate-pulse mt-0.5">読み込み中...</p>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          const { displayStatus, sub } = travelSub;
+          const lv = sub?.level ?? 1;
+          const lvStyle = LV_STYLE[lv] ?? LV_STYLE[1];
+          const forceStyle = sub?.forceStatus && sub.forceStatus !== "none"
+            ? FORCE_STYLE[sub.forceStatus as keyof typeof FORCE_STYLE]
+            : null;
+
+          // 未登録
+          if (displayStatus === "none") {
+            return (
+              <div className="block bg-white rounded-2xl p-4 shadow border-2 border-dashed border-gray-200 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">✈️</span>
+                  <div>
+                    <p className="font-bold text-gray-800 text-sm">旅行サブスク</p>
+                    <p className="text-xs text-gray-500 mt-0.5">未登録</p>
+                  </div>
+                </div>
+                <span className="rounded-full bg-gray-100 text-gray-500 text-xs font-semibold px-3 py-1">
+                  💤 未登録
+                </span>
+              </div>
+            );
+          }
+
+          // 強制ステータス適用中
+          const appliedStyle = forceStyle ?? (displayStatus === "active" ? null : null);
+          const cardBg    = forceStyle ? forceStyle.bg    : (displayStatus === "active" ? lvStyle.bg    : "bg-slate-50");
+          const cardBorder= forceStyle ? forceStyle.border: (displayStatus === "active" ? lvStyle.border : "border-slate-200");
+          const badgeStyle= forceStyle ? forceStyle.badge : (displayStatus === "active" ? lvStyle.badge  : "bg-slate-400 text-white");
+          const labelText = forceStyle ? forceStyle.label
+            : displayStatus === "active" ? "✅ アクティブ" : "❌ 非アクティブ";
+
+          return (
+            <div className={`rounded-2xl p-4 shadow border-2 ${cardBg} ${cardBorder} flex items-center justify-between`}>
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <span className="text-2xl">✈️</span>
+                </div>
+                <div>
+                  <p className="font-bold text-gray-800 text-sm">旅行サブスク</p>
+                  {sub && (
+                    <p className="text-xs text-gray-500 mt-0.5">{sub.planName} · ¥{sub.monthlyFee.toLocaleString()}/月</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-1.5">
+                {sub && (
+                  <span className={`rounded-full text-xs font-bold px-2.5 py-0.5 ${lvStyle.badge}`}>
+                    Lv{lv}
+                  </span>
+                )}
+                <span className={`rounded-full text-xs font-semibold px-2.5 py-1 ${badgeStyle}`}>
+                  {labelText}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* お知らせスライダー */}
         <section id="news">
