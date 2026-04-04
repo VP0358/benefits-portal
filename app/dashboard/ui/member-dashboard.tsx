@@ -40,14 +40,41 @@ export default function MemberDashboard({
   const [slide, setSlide] = useState(0);
   const [unreadCount, setUnreadCount] = useState(announcements.length);
   const [avatar, setAvatar] = useState("😊");
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const slideRef = useRef(0);
   const [contractCount, setContractCount] = useState<number | null>(null);
 
-  // アバター読み込み
+  // アバター読み込み（DB画像 > localStorage絵文字）
   useEffect(() => {
-    const saved = localStorage.getItem("userAvatar");
-    if (saved) setAvatar(saved);
+    // DBから取得
+    fetch("/api/my/avatar")
+      .then(r => r.json())
+      .then(d => {
+        if (d.avatarUrl) {
+          setProfileAvatarUrl(d.avatarUrl);
+          localStorage.setItem("profileAvatarUrl", d.avatarUrl);
+        } else {
+          setProfileAvatarUrl(null);
+          // 絵文字アバターを読む
+          const saved = localStorage.getItem("userAvatar");
+          if (saved) setAvatar(saved);
+        }
+      })
+      .catch(() => {
+        const saved = localStorage.getItem("userAvatar");
+        if (saved) setAvatar(saved);
+        const url = localStorage.getItem("profileAvatarUrl");
+        if (url) setProfileAvatarUrl(url);
+      });
+
+    // 画像更新イベントを監視
+    const onAvatarUpdated = () => {
+      const url = localStorage.getItem("profileAvatarUrl");
+      setProfileAvatarUrl(url ?? null);
+    };
+    window.addEventListener("avatarUpdated", onAvatarUpdated);
+    return () => window.removeEventListener("avatarUpdated", onAvatarUpdated);
   }, []);
 
   // スライダー自動切替
@@ -134,7 +161,7 @@ export default function MemberDashboard({
                 { href: "/points/use",      label: "💎 ポイントを使う" },
                 { href: "/points/history",  label: "📊 ポイント履歴" },
                 { href: "/announcements",   label: "🔔 お知らせ" },
-                { href: "/orders",          label: "📦 福利厚生使用履歴" },
+                { href: "/orders/history",   label: "📦 福利厚生使用履歴" },
                 { href: "/profile",         label: "👤 マイアカウント" },
                 { href: "/referral",        label: "🎁 友達を紹介する" },
               ].map(item => (
@@ -164,8 +191,10 @@ export default function MemberDashboard({
           style={{ background: "linear-gradient(135deg, #16a34a, #4ade80)" }}>
           <div className="flex items-center gap-3 mb-3">
             <button onClick={() => setShowAvatarPicker(!showAvatarPicker)}
-              className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-2xl hover:bg-white/30 transition">
-              {avatar}
+              className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-2xl hover:bg-white/30 transition overflow-hidden">
+              {profileAvatarUrl ? (
+                <img src={profileAvatarUrl} alt="アバター" className="w-full h-full object-cover rounded-full" />
+              ) : avatar}
             </button>
             <div>
               <p className="text-sm font-medium opacity-90">こんにちは 👋</p>
@@ -175,12 +204,24 @@ export default function MemberDashboard({
           </div>
           {showAvatarPicker && (
             <div className="bg-white/20 rounded-xl p-3 mb-3">
-              <p className="text-xs font-bold mb-2">アイコンを選択</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-bold">アイコンを選択</p>
+                <Link href="/profile#avatar"
+                  className="text-[10px] bg-white/30 rounded-lg px-2 py-1 font-semibold hover:bg-white/40 transition"
+                  onClick={() => setShowAvatarPicker(false)}>
+                  📷 写真に変更 →
+                </Link>
+              </div>
+              {profileAvatarUrl && (
+                <p className="text-[10px] opacity-80 mb-2">📸 プロフィール写真が設定されています</p>
+              )}
               <div className="grid grid-cols-6 gap-2">
                 {AVATAR_OPTIONS.map(em => (
                   <button key={em} onClick={() => {
                     setAvatar(em);
+                    setProfileAvatarUrl(null);
                     localStorage.setItem("userAvatar", em);
+                    localStorage.removeItem("profileAvatarUrl");
                     setShowAvatarPicker(false);
                   }} className="text-2xl hover:scale-125 transition">
                     {em}
@@ -288,7 +329,7 @@ export default function MemberDashboard({
           <h2 className="text-sm font-bold text-gray-700 mb-2 px-1">📌 クイックアクセス</h2>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { href: "/orders",         icon: "📦", label: "福利厚生使用履歴" },
+              { href: "/orders/history",  icon: "📦", label: "福利厚生使用履歴" },
               { href: "/points/history", icon: "📊", label: "ポイント履歴" },
               { href: "/profile",        icon: "👤", label: "マイアカウント" },
               { href: "/referral",       icon: "🎁", label: "友達を紹介する" },

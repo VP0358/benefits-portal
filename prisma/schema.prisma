@@ -58,6 +58,7 @@ model User {
   postalCode    String?    @db.VarChar(10)
   address       String?    @db.VarChar(500)
   status        UserStatus @default(active)
+  avatarUrl     String?    @db.VarChar(500)
   referralCode  String?    @unique @db.VarChar(30)
   referrerContracts MobileContract[] @relation("ReferrerContracts")
   createdAt     DateTime   @default(now())

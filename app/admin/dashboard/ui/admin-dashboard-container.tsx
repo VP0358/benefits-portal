@@ -18,12 +18,12 @@ export default function AdminDashboardContainer() {
       <div className="rounded-3xl bg-white p-6 shadow-sm">
         <div className="grid gap-4 md:grid-cols-[1fr_1fr_160px]">
           <div>
-            <label className="mb-1 block text-sm font-medium">開始日</label>
-            <input type="date" className="w-full rounded-xl border px-4 py-3" value={draftFrom} onChange={e => setDraftFrom(e.target.value)} />
+            <label className="mb-1 block text-sm font-semibold text-slate-700">開始日</label>
+            <input type="date" className="w-full rounded-xl border-2 border-slate-400 px-4 py-3 text-slate-900 font-medium focus:border-slate-600 focus:outline-none" value={draftFrom} onChange={e => setDraftFrom(e.target.value)} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">終了日</label>
-            <input type="date" className="w-full rounded-xl border px-4 py-3" value={draftTo} onChange={e => setDraftTo(e.target.value)} />
+            <label className="mb-1 block text-sm font-semibold text-slate-700">終了日</label>
+            <input type="date" className="w-full rounded-xl border-2 border-slate-400 px-4 py-3 text-slate-900 font-medium focus:border-slate-600 focus:outline-none" value={draftTo} onChange={e => setDraftTo(e.target.value)} />
           </div>
           <div className="flex items-end">
             <button type="button" onClick={apply} className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm text-white">反映</button>

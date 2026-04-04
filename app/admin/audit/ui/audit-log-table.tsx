@@ -32,7 +32,7 @@ export default function AuditLogTable() {
   return (
     <div className="space-y-4">
       <div className="flex gap-3">
-        <input className="flex-1 rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" placeholder="検索（action / table / id）" value={q} onChange={e => setQ(e.target.value)} />
+        <input className="flex-1 rounded-xl border-2 border-slate-400 px-4 py-3 text-sm font-semibold text-slate-900 placeholder:text-slate-500 focus:border-slate-600 focus:outline-none" placeholder="検索（action / table / id）" value={q} onChange={e => setQ(e.target.value)} />
         <button type="button" onClick={() => { setPage(1); setAppliedQ(q); }} className="rounded-xl bg-slate-900 px-4 py-3 text-sm text-white">検索</button>
       </div>
       <div className="text-sm text-slate-700">総件数: {total}</div>
@@ -52,9 +52,9 @@ export default function AuditLogTable() {
         </div>
       ))}
       <div className="flex items-center justify-between">
-        <button type="button" disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 disabled:opacity-50">前へ</button>
-        <div className="text-sm text-slate-700">{page} / {totalPages}</div>
-        <button type="button" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 disabled:opacity-50">次へ</button>
+        <button type="button" disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="rounded-xl border-2 border-slate-400 px-5 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition">前へ</button>
+        <div className="text-sm font-semibold text-slate-700">{page} / {totalPages}</div>
+        <button type="button" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="rounded-xl border-2 border-slate-400 px-5 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition">次へ</button>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import ViolaLogo from "@/app/components/viola-logo";
 
@@ -21,6 +21,12 @@ export default function ProfilePage() {
   const [saving, setSaving]   = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError]     = useState("");
+
+  // プロフィール画像
+  const [avatarUrl, setAvatarUrl]         = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError]     = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // フォーム状態
   const [name,       setName]       = useState("");
@@ -46,7 +52,45 @@ export default function ProfilePage() {
         setNewEmail(data.email ?? "");
       })
       .finally(() => setLoading(false));
+
+    // アバター取得
+    fetch("/api/my/avatar")
+      .then(r => r.json())
+      .then(d => setAvatarUrl(d.avatarUrl ?? null))
+      .catch(() => {});
   }, []);
+
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarError("");
+    setAvatarUploading(true);
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      const res = await fetch("/api/my/avatar", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) { setAvatarError(data.error ?? "アップロードに失敗しました"); }
+      else {
+        setAvatarUrl(data.avatarUrl);
+        // localStorageにも保存してダッシュボードに即反映
+        localStorage.setItem("profileAvatarUrl", data.avatarUrl);
+        window.dispatchEvent(new Event("avatarUpdated"));
+      }
+    } catch { setAvatarError("通信エラーが発生しました"); }
+    setAvatarUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function handleAvatarDelete() {
+    if (!confirm("プロフィール画像を削除しますか？")) return;
+    setAvatarUploading(true);
+    await fetch("/api/my/avatar", { method: "DELETE" });
+    setAvatarUrl(null);
+    localStorage.removeItem("profileAvatarUrl");
+    window.dispatchEvent(new Event("avatarUpdated"));
+    setAvatarUploading(false);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -236,6 +280,66 @@ export default function ProfilePage() {
             キャンセル
           </button>
         </form>
+
+        {/* ── プロフィール画像 ── */}
+        <div className="rounded-3xl bg-white p-5 shadow-sm space-y-4">
+          <h2 className="text-sm font-bold text-slate-700 border-b pb-2">
+            プロフィール画像
+            <span className="ml-2 text-xs font-normal text-slate-400">（ダッシュボードのアイコンに反映）</span>
+          </h2>
+
+          {/* 現在の画像プレビュー */}
+          <div className="flex items-center gap-4">
+            <div className="w-20 h-20 rounded-full border-2 border-slate-200 overflow-hidden flex items-center justify-center bg-slate-50 flex-shrink-0">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt="プロフィール画像"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-3xl">😊</span>
+              )}
+            </div>
+            <div className="flex-1 space-y-2">
+              <p className="text-xs text-slate-500">
+                JPEG / PNG / WebP / GIF（最大5MB）
+              </p>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={avatarUploading}
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50 transition"
+                >
+                  {avatarUploading ? "アップロード中..." : "画像を選択"}
+                </button>
+                {avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={handleAvatarDelete}
+                    disabled={avatarUploading}
+                    className="rounded-xl border border-red-200 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50 transition"
+                  >
+                    削除
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {avatarError && (
+            <p className="rounded-xl bg-red-50 px-4 py-2 text-xs text-red-600">{avatarError}</p>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            className="hidden"
+            onChange={handleAvatarUpload}
+          />
+        </div>
 
       </div>
     </main>

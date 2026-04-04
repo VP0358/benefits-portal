@@ -147,7 +147,7 @@ export default async function AdminMembersPage({
                           {referrer.name}
                           <span className="block text-slate-400">{referrer.memberCode}</span>
                         </Link>
-                      ) : <span className="text-slate-300">なし</span>}
+                      ) : <span className="text-slate-500">なし</span>}
                     </td>
                     <td className="px-5 py-3 text-right font-bold text-slate-800">
                       {pts.toLocaleString()}<span className="text-xs text-slate-500 ml-0.5">pt</span>
