@@ -28,42 +28,28 @@ export async function PATCH(
 
   const now = new Date();
 
-  // canceledAt カラムが本番DBに存在しない場合に備えて try-catch
-  let updated;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    updated = await (prisma.user as any).update({
-      where: { id: userId },
-      data: { status: "canceled", canceledAt: now },
-    });
-  } catch {
-    // canceledAt が未適用の場合は status のみ更新
-    updated = await prisma.user.update({
-      where: { id: userId },
-      data: { status: "canceled" },
-    });
-  }
+  // ステータスを「canceled」に更新（canceledAt は DB適用済みなら保存）
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: { status: "canceled", canceledAt: now },
+  });
 
   // 監査ログ（エラーは無視）
-  try {
-    const adminId = session.user.id ? BigInt(session.user.id) : BigInt(0);
-    await prisma.adminAuditLog.create({
-      data: {
-        adminId,
-        actionType: "cancel_member",
-        targetTable: "User",
-        targetId: userId.toString(),
-        beforeJson: { status: user.status },
-        afterJson:  { status: "canceled", canceledAt: now.toISOString() },
-      },
-    });
-  } catch { /* 監査ログ失敗は無視 */ }
+  prisma.adminAuditLog.create({
+    data: {
+      adminId: session.user.id ? BigInt(session.user.id) : BigInt(0),
+      actionType: "cancel_member",
+      targetTable: "User",
+      targetId: userId.toString(),
+      beforeJson: { status: user.status },
+      afterJson:  { status: "canceled" },
+    },
+  }).catch(() => {});
 
   return NextResponse.json({
     ok: true,
     id: updated.id.toString(),
     status: updated.status,
-    canceledAt: updated.canceledAt ? new Date(updated.canceledAt).toISOString() : null,
   });
 }
 

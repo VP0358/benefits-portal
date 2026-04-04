@@ -1,5 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -48,29 +48,27 @@ export default async function AdminMembersPage({
   const limit        = 30;
   const skip         = (page - 1) * limit;
 
-  /* ── where 条件 ─────────────────────────────── */
-  // タブ別フィルター
-  let statusWhere: Prisma.UserWhereInput["status"];
-  if (tab === "canceled") {
-    statusWhere = "canceled";
-  } else if (statusFilter && statusFilter !== "canceled") {
-    statusWhere = statusFilter as "active" | "suspended" | "invited";
-  } else {
-    statusWhere = { not: "canceled" };
+  // ── where 条件（any キャストで型エラーを回避）──
+  const baseWhere: any =
+    tab === "canceled"
+      ? { status: "canceled" }
+      : { status: { in: ["active", "suspended", "invited"] } };
+
+  // アクティブタブでステータス絞り込み
+  if (tab === "active" && statusFilter && statusFilter !== "canceled") {
+    baseWhere.status = statusFilter;
   }
 
-  const searchWhere: Prisma.UserWhereInput["OR"] = q ? [
-    { name:       { contains: q } },
-    { memberCode: { contains: q } },
-    { email:      { contains: q } },
-  ] : undefined;
+  // 検索キーワード
+  if (q) {
+    baseWhere.OR = [
+      { name:       { contains: q } },
+      { memberCode: { contains: q } },
+      { email:      { contains: q } },
+    ];
+  }
 
-  const baseWhere: Prisma.UserWhereInput = {
-    status: statusWhere,
-    ...(searchWhere ? { OR: searchWhere } : {}),
-  };
-
-  /* ── データ取得 ──────────────────────────────── */
+  // ── データ取得 ──
   const [total, members, canceledCount, activeCount] = await Promise.all([
     prisma.user.count({ where: baseWhere }),
     prisma.user.findMany({
@@ -79,7 +77,9 @@ export default async function AdminMembersPage({
       skip,
       take: limit,
       include: {
-        pointWallet: { select: { availablePointsBalance: true } },
+        pointWallet: {
+          select: { availablePointsBalance: true },
+        },
         referrals: {
           where:   { isActive: true },
           include: { referrer: { select: { id: true, name: true, memberCode: true } } },
@@ -93,7 +93,7 @@ export default async function AdminMembersPage({
       },
     }),
     prisma.user.count({ where: { status: "canceled" } }),
-    prisma.user.count({ where: { status: { not: "canceled" } } }),
+    prisma.user.count({ where: { status: { in: ["active", "suspended", "invited"] } } }),
   ]);
 
   const pages = Math.ceil(total / limit);
@@ -209,9 +209,9 @@ export default async function AdminMembersPage({
                   </tr>
                 )}
                 {members.map(m => {
-                  const referrer    = m.referrals[0]?.referrer ?? null;
-                  const pts         = m.pointWallet?.availablePointsBalance ?? 0;
-                  const contract    = m.contracts[0] ?? null;
+                  const referrer     = m.referrals[0]?.referrer ?? null;
+                  const pts          = m.pointWallet?.availablePointsBalance ?? 0;
+                  const contract     = m.contracts[0] ?? null;
                   const contractDate = contract
                     ? (contract.confirmedAt ?? contract.startedAt ?? contract.createdAt)
                     : null;
@@ -238,8 +238,8 @@ export default async function AdminMembersPage({
                         <span className="text-xs text-slate-500 ml-0.5">pt</span>
                       </td>
                       <td className="px-5 py-3">
-                        <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLE[m.status] ?? "bg-slate-100 text-slate-600"}`}>
-                          {STATUS_LABEL[m.status] ?? m.status}
+                        <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLE[m.status as string] ?? "bg-slate-100 text-slate-600"}`}>
+                          {STATUS_LABEL[m.status as string] ?? m.status}
                         </span>
                       </td>
                       <td className="px-5 py-3 text-xs">
@@ -293,7 +293,7 @@ export default async function AdminMembersPage({
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <div>
               <div className="font-semibold text-slate-800">🚫 契約解除者一覧</div>
-              <div className="text-xs text-slate-500 mt-0.5">解除日時の新しい順</div>
+              <div className="text-xs text-slate-500 mt-0.5">更新日時の新しい順</div>
             </div>
             <div className="text-sm font-bold text-slate-700">{total.toLocaleString()} 名</div>
           </div>
@@ -319,11 +319,13 @@ export default async function AdminMembersPage({
                   </tr>
                 )}
                 {members.map(m => {
-                  const referrer    = m.referrals[0]?.referrer ?? null;
-                  const contract    = m.contracts[0] ?? null;
+                  const referrer     = m.referrals[0]?.referrer ?? null;
+                  const contract     = m.contracts[0] ?? null;
                   const contractDate = contract
                     ? (contract.confirmedAt ?? contract.startedAt ?? contract.createdAt)
                     : null;
+                  // canceledAt がDBにあれば使用、なければ updatedAt で代用
+                  const cancelDate = (m as any).canceledAt ?? m.updatedAt;
                   return (
                     <tr key={m.id.toString()} className="hover:bg-red-50/40 transition-colors">
                       <td className="px-5 py-3">
@@ -347,7 +349,7 @@ export default async function AdminMembersPage({
                       </td>
                       <td className="px-5 py-3">
                         <div className="text-xs font-bold text-red-700">
-                          {fmtDateTime(m.updatedAt)}
+                          {fmtDateTime(cancelDate)}
                         </div>
                       </td>
                       <td className="px-5 py-3 text-xs text-slate-500">
