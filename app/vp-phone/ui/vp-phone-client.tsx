@@ -31,7 +31,7 @@ const STATUS_LABEL: Record<string, { label: string; cls: string; icon: string }>
   canceled:   { label: "キャンセル済み", cls: "bg-gray-50 text-gray-700 border-gray-300",        icon: "🚫" },
 };
 
-// ── 音声回線プラン（docomo回線・写真より） ──────────────────
+// ── 音声回線プラン（docomo回線） ──────────────────
 type VoicePlan = {
   id: string;
   label: string;
@@ -70,7 +70,7 @@ const VOICE_OPTIONS: VoiceOption[] = [
   { id: "catchhon",  label: "キャッチホン", price: 385 },
 ];
 
-// ── 大容量データ回線プラン（未来Wi-Fi・写真より） ──────────
+// ── 大容量データ回線プラン（未来Wi-Fi） ──────────
 type DataCapacityPlan = {
   id: string;
   label: string;
@@ -161,12 +161,18 @@ export default function VpPhoneClient({
     lineDisplayName: "",
     referrerCode:    "",
     referrerName:    "",
+    // カード情報
+    cardNumber:      "",
+    cardExpiry:      "",
+    cardCvc:         "",
+    cardName:        "",
   });
   const [saving, setSaving]         = useState(false);
   const [error, setError]           = useState("");
   const [submitted, setSubmitted]   = useState(false);
   const [agreed, setAgreed]         = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showCardCvc, setShowCardCvc]   = useState(false);
 
   const app        = existingApplication;
   const statusInfo = app ? (STATUS_LABEL[app.status] ?? STATUS_LABEL.pending) : null;
@@ -203,12 +209,28 @@ export default function VpPhoneClient({
     return "";
   }
 
+  // カード番号フォーマット（4桁ごとにスペース）
+  function formatCardNumber(value: string): string {
+    const digits = value.replace(/\D/g, "").slice(0, 16);
+    return digits.replace(/(.{4})/g, "$1 ").trim();
+  }
+
+  // 有効期限フォーマット（MM/YY）
+  function formatExpiry(value: string): string {
+    const digits = value.replace(/\D/g, "").slice(0, 4);
+    if (digits.length >= 3) return digits.slice(0, 2) + "/" + digits.slice(2);
+    return digits;
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!contractType) { setError("契約種別を選択してください"); return; }
     if (!agreed) { setError("個人情報の取扱いへの同意が必要です"); return; }
     if (form.password && form.password !== form.passwordConfirm) {
       setError("パスワードが一致しません"); return;
+    }
+    if (!form.cardNumber || !form.cardExpiry || !form.cardCvc || !form.cardName) {
+      setError("お支払いカード情報をすべてご入力ください"); return;
     }
     setSaving(true); setError("");
 
@@ -297,12 +319,11 @@ export default function VpPhoneClient({
   }
 
   // ── チェックオプション共通 ─────────────────────────────────
-  function CheckCard({ item, checked, onChange, color = "green" }: {
-    item: VoiceOption; checked: boolean; onChange: (v: boolean) => void; color?: "green";
+  function CheckCard({ item, checked, onChange }: {
+    item: VoiceOption; checked: boolean; onChange: (v: boolean) => void;
   }) {
-    const ring = "border-green-500 bg-green-50";
     return (
-      <label className={`flex items-center gap-3 rounded-xl border-2 p-3 cursor-pointer transition-all ${checked ? ring : "border-gray-200 bg-white hover:border-gray-300"}`}>
+      <label className={`flex items-center gap-3 rounded-xl border-2 p-3 cursor-pointer transition-all ${checked ? "border-green-500 bg-green-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
         <input type="checkbox" className="sr-only" checked={checked} onChange={e => onChange(e.target.checked)} />
         <div className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all ${checked ? "border-green-500 bg-green-500" : "border-gray-300"}`}>
           {checked && <span className="text-white text-[10px] font-bold">✓</span>}
@@ -446,9 +467,117 @@ export default function VpPhoneClient({
 
             <form onSubmit={onSubmit} className="space-y-4">
 
-              {/* ────────── ① 契約種別選択 ────────── */}
+              {/* ────────── ① 申込者情報（最初に表示） ────────── */}
               <div className="rounded-2xl bg-white p-5 shadow-sm">
-                <h3 className="font-bold text-gray-800 text-sm mb-4 pb-2 border-b border-gray-100">📋 契約種別の選択</h3>
+                <h3 className="font-bold text-gray-800 text-sm mb-4 pb-2 border-b border-gray-100">👤 申込者情報</h3>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={lbl}>お名前（漢字）<span className="text-red-500 ml-1">*</span></label>
+                      <input required className={inp} placeholder="山田 太郎"
+                        value={form.nameKanji} onChange={e => setForm({ ...form, nameKanji: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className={lbl}>お名前（かな）<span className="text-red-500 ml-1">*</span></label>
+                      <input required className={inp} placeholder="やまだ たろう"
+                        value={form.nameKana} onChange={e => setForm({ ...form, nameKana: e.target.value })} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={lbl}>メールアドレス<span className="text-red-500 ml-1">*</span></label>
+                    <input required type="email" className={inp} placeholder="example@email.com"
+                      value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className={lbl}>パスワード（任意）</label>
+                    <div className="relative">
+                      <input type={showPassword ? "text" : "password"} className={inp}
+                        placeholder="VP未来phone申し込み用パスワード（任意）"
+                        value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
+                        autoComplete="new-password" />
+                      <button type="button" onClick={() => setShowPassword(s => !s)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">
+                        {showPassword ? "隠す" : "表示"}
+                      </button>
+                    </div>
+                    {form.password && (
+                      <div className="mt-2">
+                        <label className={lbl}>パスワード（確認）</label>
+                        <input type={showPassword ? "text" : "password"} className={inp}
+                          placeholder="パスワードをもう一度入力"
+                          value={form.passwordConfirm} onChange={e => setForm({ ...form, passwordConfirm: e.target.value })}
+                          autoComplete="new-password" />
+                        {form.passwordConfirm && form.password !== form.passwordConfirm && (
+                          <p className="text-xs text-red-600 mt-1">パスワードが一致しません</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className={lbl}>電話番号<span className="text-red-500 ml-1">*</span></label>
+                    <input required type="tel" className={inp} placeholder="090-1234-5678"
+                      value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className={lbl}>生年月日<span className="text-red-500 ml-1">*</span></label>
+                    <input required type="date" className={inp}
+                      value={form.birthDate} onChange={e => setForm({ ...form, birthDate: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className={lbl}>性別<span className="text-red-500 ml-1">*</span></label>
+                    <div className="flex gap-4">
+                      {[{ value:"male",label:"男性"},{value:"female",label:"女性"},{value:"other",label:"その他"}].map(opt => (
+                        <label key={opt.value} className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                          <input type="radio" name="gender" value={opt.value}
+                            checked={form.gender === opt.value}
+                            onChange={() => setForm({ ...form, gender: opt.value })}
+                            className="w-4 h-4 text-green-600" />
+                          {opt.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 紹介者情報 */}
+              <div className="rounded-2xl bg-white p-5 shadow-sm">
+                <h3 className="font-bold text-gray-800 text-sm mb-4 pb-2 border-b border-gray-100">👥 紹介者情報（任意）</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className={lbl}>紹介者コード（会員コード）</label>
+                    <input className={inp} placeholder="例: M0001"
+                      value={form.referrerCode} onChange={e => setForm({ ...form, referrerCode: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className={lbl}>紹介者名</label>
+                    <input className={inp} placeholder="例: 山田 花子"
+                      value={form.referrerName} onChange={e => setForm({ ...form, referrerName: e.target.value })} />
+                  </div>
+                  <p className="text-[10px] text-gray-500">※ 紹介者がいる場合はご入力ください。紹介者に紹介ポイントが付与されます。</p>
+                </div>
+              </div>
+
+              {/* LINE情報 */}
+              <div className="rounded-2xl bg-white p-5 shadow-sm">
+                <h3 className="font-bold text-gray-800 text-sm mb-4 pb-2 border-b border-gray-100">💬 LINE情報（任意）</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className={lbl}>LINE ID</label>
+                    <input className={inp} placeholder="例: yamada_taro"
+                      value={form.lineId} onChange={e => setForm({ ...form, lineId: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className={lbl}>LINE表示名</label>
+                    <input className={inp} placeholder="例: 山田太郎"
+                      value={form.lineDisplayName} onChange={e => setForm({ ...form, lineDisplayName: e.target.value })} />
+                  </div>
+                </div>
+              </div>
+
+              {/* ────────── ② 契約種別選択 ────────── */}
+              <div className="rounded-2xl bg-white p-5 shadow-sm">
+                <h3 className="font-bold text-gray-800 text-sm mb-4 pb-2 border-b border-gray-100">📋 契約種別の選択<span className="text-red-500 ml-1">*</span></h3>
                 <div className="grid grid-cols-1 gap-3">
 
                   {/* 音声回線ボタン */}
@@ -495,7 +624,7 @@ export default function VpPhoneClient({
                 </div>
               </div>
 
-              {/* ────────── ② 音声回線プラン選択 ────────── */}
+              {/* ────────── ③ 音声回線プラン選択 ────────── */}
               {contractType === "voice" && (
                 <>
                   {/* 月額合計バー */}
@@ -568,7 +697,7 @@ export default function VpPhoneClient({
                 </>
               )}
 
-              {/* ────────── ③ 大容量データ回線プラン選択 ────────── */}
+              {/* ────────── ④ 大容量データ回線プラン選択 ────────── */}
               {contractType === "data" && (
                 <>
                   {/* 月額合計バー */}
@@ -634,114 +763,159 @@ export default function VpPhoneClient({
                 </>
               )}
 
-              {/* ────────── ④ 申込者情報 ────────── */}
+              {/* ────────── ⑤ 合計金額サマリー（同意前） ────────── */}
               {contractType && (
                 <>
-                  <div className="rounded-2xl bg-white p-5 shadow-sm">
-                    <h3 className="font-bold text-gray-800 text-sm mb-4 pb-2 border-b border-gray-100">👤 申込者情報</h3>
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className={lbl}>お名前（漢字）<span className="text-red-500 ml-1">*</span></label>
-                          <input required className={inp} placeholder="山田 太郎"
-                            value={form.nameKanji} onChange={e => setForm({ ...form, nameKanji: e.target.value })} />
+                  {/* 合計金額まとめカード */}
+                  <div className={`rounded-2xl border-2 p-5 shadow-sm ${contractType === "voice" ? "bg-green-50 border-green-300" : "bg-purple-50 border-purple-300"}`}>
+                    <h3 className={`font-bold text-sm mb-4 pb-2 border-b ${contractType === "voice" ? "text-green-800 border-green-200" : "text-purple-800 border-purple-200"}`}>
+                      💴 お支払い金額のまとめ
+                    </h3>
+                    {contractType === "voice" ? (
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-700">データプラン</span>
+                          <span className="font-semibold">¥{fmt(VOICE_DATA_PLANS.find(p => p.id === voiceDataPlan)?.price ?? 0)}/月</span>
                         </div>
-                        <div>
-                          <label className={lbl}>お名前（かな）<span className="text-red-500 ml-1">*</span></label>
-                          <input required className={inp} placeholder="やまだ たろう"
-                            value={form.nameKana} onChange={e => setForm({ ...form, nameKana: e.target.value })} />
+                        {kakehoudai !== "none" && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-700">かけ放題</span>
+                            <span className="font-semibold">¥{fmt(KAKEHOUDAI_PLANS.find(p => p.id === kakehoudai)?.price ?? 0)}/月</span>
+                          </div>
+                        )}
+                        {voiceOpts.map(id => {
+                          const opt = VOICE_OPTIONS.find(o => o.id === id);
+                          return opt ? (
+                            <div key={id} className="flex justify-between items-center">
+                              <span className="text-gray-700">{opt.label}</span>
+                              <span className="font-semibold">¥{fmt(opt.price)}/月</span>
+                            </div>
+                          ) : null;
+                        })}
+                        <div className={`flex justify-between items-center pt-2 mt-2 border-t border-green-300`}>
+                          <span className="font-bold text-green-800">月額合計（税込）</span>
+                          <span className="text-xl font-black text-green-700">¥{fmt(voiceTotal)}<span className="text-sm">/月</span></span>
                         </div>
                       </div>
-                      <div>
-                        <label className={lbl}>メールアドレス<span className="text-red-500 ml-1">*</span></label>
-                        <input required type="email" className={inp} placeholder="example@email.com"
-                          value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
-                      </div>
-                      <div>
-                        <label className={lbl}>パスワード（任意）</label>
-                        <div className="relative">
-                          <input type={showPassword ? "text" : "password"} className={inp}
-                            placeholder="VP未来phone申し込み用パスワード（任意）"
-                            value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
-                            autoComplete="new-password" />
-                          <button type="button" onClick={() => setShowPassword(s => !s)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">
-                            {showPassword ? "隠す" : "表示"}
-                          </button>
+                    ) : (
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-700">データ容量</span>
+                          <span className="font-semibold">¥{fmt(DATA_CAPACITY_PLANS.find(p => p.id === dataCapacity)?.price ?? 0)}/月</span>
                         </div>
-                        {form.password && (
-                          <div className="mt-2">
-                            <label className={lbl}>パスワード（確認）</label>
-                            <input type={showPassword ? "text" : "password"} className={inp}
-                              placeholder="パスワードをもう一度入力"
-                              value={form.passwordConfirm} onChange={e => setForm({ ...form, passwordConfirm: e.target.value })}
-                              autoComplete="new-password" />
-                            {form.passwordConfirm && form.password !== form.passwordConfirm && (
-                              <p className="text-xs text-red-600 mt-1">パスワードが一致しません</p>
-                            )}
+                        {(() => {
+                          const tp = DATA_TYPE_PLANS.find(p => p.id === dataType);
+                          if (!tp) return null;
+                          if (tp.priceType === "monthly") return (
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-700">{tp.label}</span>
+                              <span className="font-semibold">+¥{fmt(tp.price ?? 0)}/月</span>
+                            </div>
+                          );
+                          if (tp.priceType === "onetime") return (
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-700">{tp.label}</span>
+                              <span className="font-semibold text-orange-600">¥{fmt(tp.price ?? 0)}（一括）</span>
+                            </div>
+                          );
+                          return (
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-700">{tp.label}</span>
+                              <span className="text-gray-500">追加料金なし</span>
+                            </div>
+                          );
+                        })()}
+                        <div className="flex justify-between items-center pt-2 mt-2 border-t border-purple-300">
+                          <span className="font-bold text-purple-800">月額合計（税込）</span>
+                          <span className="text-xl font-black text-purple-700">¥{fmt(dataTotals.total)}<span className="text-sm">/月</span></span>
+                        </div>
+                        {dataTotals.typeOnetime > 0 && (
+                          <div className="flex justify-between items-center text-xs text-orange-600">
+                            <span>端末代（別途一括）</span>
+                            <span className="font-bold">¥{fmt(dataTotals.typeOnetime)}</span>
                           </div>
                         )}
                       </div>
+                    )}
+                    <div className={`mt-3 pt-2 border-t text-[10px] ${contractType === "voice" ? "border-green-200 text-green-700" : "border-purple-200 text-purple-700"}`}>
+                      ※ 表示金額はすべて税込です。申し込み後、担当者よりご確認の連絡をいたします。
+                    </div>
+                  </div>
+
+                  {/* ────────── ⑥ お支払い情報（カード/デビットのみ） ────────── */}
+                  <div className="rounded-2xl bg-white p-5 shadow-sm">
+                    <h3 className="font-bold text-gray-800 text-sm mb-1 pb-2 border-b border-gray-100">💳 お支払い情報</h3>
+                    <div className="mb-4 mt-2 rounded-xl bg-blue-50 border border-blue-100 px-4 py-3">
+                      <p className="text-xs font-bold text-blue-800 flex items-center gap-1.5">
+                        <span>💳</span> お支払い方法：クレジットカード・デビットカードのみ
+                      </p>
+                      <p className="text-[10px] text-blue-600 mt-1">
+                        VISA / Mastercard / JCB / American Express 対応
+                      </p>
+                    </div>
+                    <div className="space-y-4">
                       <div>
-                        <label className={lbl}>電話番号<span className="text-red-500 ml-1">*</span></label>
-                        <input required type="tel" className={inp} placeholder="090-1234-5678"
-                          value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+                        <label className={lbl}>カード番号<span className="text-red-500 ml-1">*</span></label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          className={inp}
+                          placeholder="1234 5678 9012 3456"
+                          value={form.cardNumber}
+                          onChange={e => setForm({ ...form, cardNumber: formatCardNumber(e.target.value) })}
+                          maxLength={19}
+                          autoComplete="cc-number"
+                        />
                       </div>
-                      <div>
-                        <label className={lbl}>生年月日<span className="text-red-500 ml-1">*</span></label>
-                        <input required type="date" className={inp}
-                          value={form.birthDate} onChange={e => setForm({ ...form, birthDate: e.target.value })} />
-                      </div>
-                      <div>
-                        <label className={lbl}>性別<span className="text-red-500 ml-1">*</span></label>
-                        <div className="flex gap-4">
-                          {[{ value:"male",label:"男性"},{value:"female",label:"女性"},{value:"other",label:"その他"}].map(opt => (
-                            <label key={opt.value} className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
-                              <input type="radio" name="gender" value={opt.value}
-                                checked={form.gender === opt.value}
-                                onChange={() => setForm({ ...form, gender: opt.value })}
-                                className="w-4 h-4 text-green-600" />
-                              {opt.label}
-                            </label>
-                          ))}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={lbl}>有効期限<span className="text-red-500 ml-1">*</span></label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            className={inp}
+                            placeholder="MM/YY"
+                            value={form.cardExpiry}
+                            onChange={e => setForm({ ...form, cardExpiry: formatExpiry(e.target.value) })}
+                            maxLength={5}
+                            autoComplete="cc-exp"
+                          />
+                        </div>
+                        <div>
+                          <label className={lbl}>セキュリティコード<span className="text-red-500 ml-1">*</span></label>
+                          <div className="relative">
+                            <input
+                              type={showCardCvc ? "text" : "password"}
+                              inputMode="numeric"
+                              className={inp}
+                              placeholder="CVC"
+                              value={form.cardCvc}
+                              onChange={e => setForm({ ...form, cardCvc: e.target.value.replace(/\D/g, "").slice(0, 4) })}
+                              maxLength={4}
+                              autoComplete="cc-csc"
+                            />
+                            <button type="button" onClick={() => setShowCardCvc(s => !s)}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-[10px]">
+                              {showCardCvc ? "隠す" : "表示"}
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-
-                  {/* 紹介者情報 */}
-                  <div className="rounded-2xl bg-white p-5 shadow-sm">
-                    <h3 className="font-bold text-gray-800 text-sm mb-4 pb-2 border-b border-gray-100">👥 紹介者情報（任意）</h3>
-                    <div className="space-y-4">
                       <div>
-                        <label className={lbl}>紹介者コード（会員コード）</label>
-                        <input className={inp} placeholder="例: M0001"
-                          value={form.referrerCode} onChange={e => setForm({ ...form, referrerCode: e.target.value })} />
-                      </div>
-                      <div>
-                        <label className={lbl}>紹介者名</label>
-                        <input className={inp} placeholder="例: 山田 花子"
-                          value={form.referrerName} onChange={e => setForm({ ...form, referrerName: e.target.value })} />
-                      </div>
-                      <p className="text-[10px] text-gray-500">※ 紹介者がいる場合はご入力ください。紹介者に紹介ポイントが付与されます。</p>
-                    </div>
-                  </div>
-
-                  {/* LINE情報 */}
-                  <div className="rounded-2xl bg-white p-5 shadow-sm">
-                    <h3 className="font-bold text-gray-800 text-sm mb-4 pb-2 border-b border-gray-100">💬 LINE情報（任意）</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <label className={lbl}>LINE ID</label>
-                        <input className={inp} placeholder="例: yamada_taro"
-                          value={form.lineId} onChange={e => setForm({ ...form, lineId: e.target.value })} />
-                      </div>
-                      <div>
-                        <label className={lbl}>LINE表示名</label>
-                        <input className={inp} placeholder="例: 山田太郎"
-                          value={form.lineDisplayName} onChange={e => setForm({ ...form, lineDisplayName: e.target.value })} />
+                        <label className={lbl}>カード名義（ローマ字）<span className="text-red-500 ml-1">*</span></label>
+                        <input
+                          type="text"
+                          className={inp}
+                          placeholder="TARO YAMADA"
+                          value={form.cardName}
+                          onChange={e => setForm({ ...form, cardName: e.target.value.toUpperCase() })}
+                          autoComplete="cc-name"
+                        />
                       </div>
                     </div>
+                    <p className="text-[10px] text-gray-400 mt-3">
+                      ※ カード情報は安全に処理されます。担当者がご確認後、正式な決済手続きをご案内いたします。
+                    </p>
                   </div>
 
                   {/* 同意 */}
