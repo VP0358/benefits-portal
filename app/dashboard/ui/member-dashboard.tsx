@@ -212,11 +212,12 @@ function VpPhoneButton({ forceOpen = false, onModalClose }: { forceOpen?: boolea
 
       {/* 契約詳細モーダル */}
       {showModal && appData && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={() => { setShowModal(false); onModalClose?.(); }}>
-          <div className="w-full max-w-md bg-white rounded-t-3xl shadow-2xl pb-safe overflow-y-auto max-h-[90vh]"
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-6" onClick={() => { setShowModal(false); onModalClose?.(); }}>
+          <div className="w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col"
+            style={{ maxHeight: "90vh" }}
             onClick={e => e.stopPropagation()}>
-            {/* モーダルヘッダー */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            {/* モーダルヘッダー（固定） */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <span className="text-xl">📱</span>
                 <h2 className="font-bold text-gray-800 text-sm">VP未来phone 申し込み状況</h2>
@@ -224,7 +225,8 @@ function VpPhoneButton({ forceOpen = false, onModalClose }: { forceOpen?: boolea
               <button onClick={() => { setShowModal(false); onModalClose?.(); }} className="text-gray-400 text-2xl hover:text-gray-600 leading-none">✕</button>
             </div>
 
-            <div className="px-5 py-4 space-y-4">
+            <div className="overflow-y-auto flex-1">
+            <div className="px-5 py-4 space-y-4 sm:px-7 sm:py-5">
               {/* ステータスバッジ */}
               <div className={`rounded-2xl border-2 p-4 ${info.cardBg} ${info.cardBorder}`}>
                 <div className="flex items-center gap-3">
@@ -392,6 +394,7 @@ function VpPhoneButton({ forceOpen = false, onModalClose }: { forceOpen?: boolea
                 onClick={() => setShowModal(false)}>
                 申し込みページで詳細を確認する →
               </Link>
+            </div>
             </div>
           </div>
         </div>
@@ -573,11 +576,13 @@ function TravelSubButton() {
 
       {/* 旅行サブスク詳細・申込モーダル */}
       {showApplyModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50"
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-6"
           onClick={() => { setShowApplyModal(false); setApplyDone(false); setApplyError(""); }}>
-          <div className="w-full max-w-md bg-white rounded-t-3xl shadow-2xl overflow-y-auto max-h-[90vh]"
+          <div className="w-full sm:max-w-2xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col"
+            style={{ maxHeight: "90vh" }}
             onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            {/* 固定ヘッダー */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <span className="text-xl">✈️</span>
                 <h2 className="font-bold text-gray-800 text-sm">旅行サブスク</h2>
@@ -586,7 +591,9 @@ function TravelSubButton() {
                 className="text-gray-400 text-2xl hover:text-gray-600 leading-none">✕</button>
             </div>
 
-            <div className="px-5 py-4 space-y-4 pb-8">
+            {/* スクロール可能なコンテンツ */}
+            <div className="overflow-y-auto flex-1">
+            <div className="px-5 py-4 space-y-4 pb-10 sm:px-8 sm:py-6">
               {/* 現在のステータス */}
               {sub && (
                 <div className={`rounded-2xl border-2 p-4 ${cardBg} ${cardBorder}`}>
@@ -705,7 +712,7 @@ function TravelSubButton() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-600 mb-1">現在の自身のレベル<span className="text-red-500 ml-1">*</span></label>
-                      <p className="text-[10px] text-gray-500 mb-2">入会時点での自身の現在レベルを選択してください</p>
+                      <p className="text-[10px] text-gray-500 mb-2">自身の現在実績レベルを選択してください</p>
                       <div className="grid grid-cols-5 gap-1.5">
                         {[1,2,3,4,5].map(l => (
                           <button
@@ -759,6 +766,7 @@ function TravelSubButton() {
                   </button>
                 </div>
               )}
+            </div>
             </div>
           </div>
         </div>
