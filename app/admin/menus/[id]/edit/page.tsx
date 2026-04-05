@@ -383,4 +383,4 @@ export default function AdminMenuEditPage() {
 }
 
 const labelClass = "mb-1.5 block text-xs font-semibold text-slate-700";
-const inputClass  = "w-full rounded-xl border border-slate-200 px-4 py-3 text-sm placeholder:text-slate-400 focus:border-slate-500 focus:outline-none";
+const inputClass  = "w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-500 focus:outline-none";
