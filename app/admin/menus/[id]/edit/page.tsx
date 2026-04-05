@@ -266,12 +266,12 @@ export default function AdminMenuEditPage() {
                 🔗 リンク先URL <span className="text-red-500">*</span>
               </label>
               <p className="text-xs text-blue-600">
-                タップすると外部サイトへ移動します。契約先・格安サイト・ショッピングサイトなどのURLを貼り付けてください。
+                タップすると移動します。VPphoneの場合は <code className="bg-blue-100 px-1 rounded">/vp-phone</code> を入力するとモーダルで表示されます。外部サイトはhttps://〜で入力してください。
               </p>
               <input
                 required={form.menuType === "url"}
                 className="w-full rounded-xl border border-blue-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 focus:outline-none focus:border-blue-400"
-                placeholder="https://example.com"
+                placeholder="/vp-phone または https://example.com"
                 value={form.linkUrl}
                 onChange={e => setForm({ ...form, linkUrl: e.target.value })}
               />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 import Link from "next/link";
 
 interface User { id:string; name:string; memberCode:string; email:string; phone:string; availablePoints:number; }
@@ -51,7 +51,11 @@ type VpAppData = {
   createdAt?: string;
 };
 
-function VpPhoneButton({ forceOpen = false, onModalClose }: { forceOpen?: boolean; onModalClose?: () => void }) {
+// VpPhoneModalRef 型は後で定義するため、ここで先行宣言
+type VpPhoneModalRef = { open: () => void };
+
+const VpPhoneButton = forwardRef<VpPhoneModalRef, { onModalClose?: () => void }>(
+function VpPhoneButtonInner({ onModalClose }, ref) {
   const [appData, setAppData] = useState<VpAppData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -86,12 +90,10 @@ function VpPhoneButton({ forceOpen = false, onModalClose }: { forceOpen?: boolea
 
   useEffect(() => { loadData(); }, []);
 
-  // 外部からモーダルを強制開ける（福利厚生メニューからのアクセス）
-  useEffect(() => {
-    if (forceOpen && !loading) {
-      setShowModal(true);
-    }
-  }, [forceOpen, loading]);
+  // 外部から open() を呼べるようにする（福利厚生メニューからのタップ）
+  useImperativeHandle(ref, () => ({
+    open: () => setShowModal(true),
+  }));
 
   // ステータス別スタイル定義
   type SInfo = { label: string; icon: string; cardBg: string; cardBorder: string; badgeBg: string; badgeText: string; pulse?: boolean };
@@ -401,7 +403,8 @@ function VpPhoneButton({ forceOpen = false, onModalClose }: { forceOpen?: boolea
       )}
     </>
   );
-}
+});
+VpPhoneButton.displayName = "VpPhoneButton";
 
 // ────────── 旅行サブスクボタン（申込モーダル付き） ──────────
 type TravelSubData = {
@@ -775,11 +778,6 @@ function TravelSubButton() {
   );
 }
 
-// ────────── 福利厚生メニュー VPphone モーダルトリガー ──────────
-type VpPhoneModalRef = {
-  open: () => void;
-};
-
 // ──────────── メインダッシュボード ────────────
 export default function MemberDashboard({
   user, announcements, menus
@@ -796,8 +794,8 @@ export default function MemberDashboard({
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const slideRef = useRef(0);
   const [contractCount, setContractCount] = useState<number | null>(null);
-  // 福利厚生メニューからVPphone モーダルを開くためのフラグ
-  const [openVpPhoneModal, setOpenVpPhoneModal] = useState(false);
+  // 福利厚生メニューからVPphone モーダルを ref 経由で直接開く
+  const vpPhoneRef = useRef<VpPhoneModalRef>(null);
 
   // アバター読み込み（DB画像 > localStorage絵文字）
   useEffect(() => {
@@ -1000,7 +998,7 @@ export default function MemberDashboard({
         </div>
 
         {/* VP未来phone申し込みボタン（モーダル付き） */}
-        <VpPhoneButton forceOpen={openVpPhoneModal} onModalClose={() => setOpenVpPhoneModal(false)} />
+        <VpPhoneButton ref={vpPhoneRef} />
 
         {/* 携帯契約ボタン */}
         <Link href="/referral/contracts"
@@ -1070,14 +1068,15 @@ export default function MemberDashboard({
           <div className="grid grid-cols-3 gap-3">
             {menus.map(m => {
               const emoji = ICON_MAP[m.iconType ?? ""] ?? "📌";
-              // VP phone関連メニューは /vp-phone に飛ばす
-              const isVpPhone = m.title?.includes("phone") || m.title?.includes("Phone") ||
-                m.title?.includes("未来phone") || m.linkUrl?.includes("vp-phone") ||
-                m.iconType === "smartphone";
+              // VP phone関連メニューはモーダルで開く
+              // linkUrlに「vp-phone」が含まれる or タイトルに「VP」「VPphone」「未来phone」が含まれる場合
+              const isVpPhone = m.linkUrl?.includes("vp-phone") ||
+                m.title?.includes("VPphone") || m.title?.includes("VP未来phone") ||
+                m.title?.includes("未来phone");
               if (isVpPhone) {
                 return (
                   <button key={m.id} type="button"
-                    onClick={() => setOpenVpPhoneModal(true)}
+                    onClick={() => vpPhoneRef.current?.open()}
                     className="bg-white rounded-2xl p-3 text-center shadow hover:shadow-md transition active:scale-95 w-full">
                     <div className="text-3xl mb-1">{emoji}</div>
                     <p className="text-xs font-bold text-gray-800 leading-tight">{m.title}</p>
