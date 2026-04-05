@@ -51,7 +51,7 @@ type VpAppData = {
   createdAt?: string;
 };
 
-function VpPhoneButton() {
+function VpPhoneButton({ forceOpen = false, onModalClose }: { forceOpen?: boolean; onModalClose?: () => void }) {
   const [appData, setAppData] = useState<VpAppData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -85,6 +85,13 @@ function VpPhoneButton() {
 
   useEffect(() => { loadData(); }, []);
 
+  // 外部からモーダルを強制開ける（福利厚生メニューからのアクセス）
+  useEffect(() => {
+    if (forceOpen && !loading) {
+      setShowModal(true);
+    }
+  }, [forceOpen, loading]);
+
   // ステータス別スタイル定義
   type SInfo = { label: string; icon: string; cardBg: string; cardBorder: string; badgeBg: string; badgeText: string; pulse?: boolean };
   const STATUS_INFO: Record<string, SInfo> = {
@@ -97,16 +104,21 @@ function VpPhoneButton() {
 
   const info = appData ? STATUS_INFO[appData.status] : null;
 
+  // 解約・キャンセル申請（契約中→contract_cancel、それ以外→cancel_apply）
   async function handleCancel() {
     if (!appData) return;
     setCanceling(true);
     setCancelMsg("");
+    const cancelType = appData.status === "contracted" ? "contract_cancel" : "cancel_apply";
     try {
       const res = await fetch(`/api/my/vp-phone/${appData.id}/cancel`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cancelType }),
       });
       if (res.ok) {
-        setCancelMsg("解約申請を受け付けました。担当者よりご連絡いたします。");
+        const d = await res.json().catch(() => null);
+        setCancelMsg(d?.message || "解約申請を受け付けました。担当者よりご連絡いたします。");
         setCancelConfirm(false);
         loadData();
       } else {
@@ -199,7 +211,7 @@ function VpPhoneButton() {
 
       {/* 契約詳細モーダル */}
       {showModal && appData && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={() => setShowModal(false)}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={() => { setShowModal(false); onModalClose?.(); }}>
           <div className="w-full max-w-md bg-white rounded-t-3xl shadow-2xl pb-safe overflow-y-auto max-h-[90vh]"
             onClick={e => e.stopPropagation()}>
             {/* モーダルヘッダー */}
@@ -208,7 +220,7 @@ function VpPhoneButton() {
                 <span className="text-xl">📱</span>
                 <h2 className="font-bold text-gray-800 text-sm">VP未来phone 申し込み状況</h2>
               </div>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 text-2xl hover:text-gray-600 leading-none">✕</button>
+              <button onClick={() => { setShowModal(false); onModalClose?.(); }} className="text-gray-400 text-2xl hover:text-gray-600 leading-none">✕</button>
             </div>
 
             <div className="px-5 py-4 space-y-4">
@@ -396,7 +408,7 @@ function TravelSubButton() {
           name: applyForm.name,
           phone: applyForm.phone,
           email: applyForm.email,
-          content: `【旅行サブスク申込】\n会員コード: ${applyForm.memberCode || "未入力"}\n氏名: ${applyForm.name}\n電話番号: ${applyForm.phone}\nメール: ${applyForm.email}\n希望レベル: Lv${applyForm.level}（¥${TRAVEL_FEES.early[applyForm.level].toLocaleString()}/月 ※先着50名料金）\n\n※支払日：毎月15日（翌月前払い）\n※お支払い方法：銀行振込のみ`,
+          content: `【旅行サブスク申込】\n会員コード: ${applyForm.memberCode || "未入力"}\n氏名: ${applyForm.name}\n電話番号: ${applyForm.phone}\nメール: ${applyForm.email}\n現在レベル: Lv${applyForm.level}（¥${TRAVEL_FEES.early[applyForm.level].toLocaleString()}/月 ※先着50名料金）\n\n※支払日：毎月15日（翌月前払い）\n※お支払い方法：銀行振込のみ`,
           menuTitle: "旅行サブスク申込",
         }),
       });
@@ -645,7 +657,8 @@ function TravelSubButton() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-2">希望レベル<span className="text-red-500 ml-1">*</span></label>
+                      <label className="block text-xs font-bold text-gray-600 mb-1">現在の自身のレベル<span className="text-red-500 ml-1">*</span></label>
+                      <p className="text-[10px] text-gray-500 mb-2">入会時点での自身の現在レベルを選択してください</p>
                       <div className="grid grid-cols-5 gap-1.5">
                         {[1,2,3,4,5].map(l => (
                           <button
@@ -670,7 +683,7 @@ function TravelSubButton() {
 
                     {/* 選択プレビュー */}
                     <div className="rounded-xl bg-violet-50 border border-violet-200 px-4 py-3 flex justify-between items-center">
-                      <span className="text-xs text-violet-700">選択中: Lv{applyForm.level}</span>
+                      <span className="text-xs text-violet-700">現在レベル: Lv{applyForm.level}</span>
                       <span className="font-bold text-violet-800">¥{TRAVEL_FEES.early[applyForm.level].toLocaleString()}/月〜</span>
                     </div>
 
@@ -707,6 +720,11 @@ function TravelSubButton() {
   );
 }
 
+// ────────── 福利厚生メニュー VPphone モーダルトリガー ──────────
+type VpPhoneModalRef = {
+  open: () => void;
+};
+
 // ──────────── メインダッシュボード ────────────
 export default function MemberDashboard({
   user, announcements, menus
@@ -723,6 +741,8 @@ export default function MemberDashboard({
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const slideRef = useRef(0);
   const [contractCount, setContractCount] = useState<number | null>(null);
+  // 福利厚生メニューからVPphone モーダルを開くためのフラグ
+  const [openVpPhoneModal, setOpenVpPhoneModal] = useState(false);
 
   // アバター読み込み（DB画像 > localStorage絵文字）
   useEffect(() => {
@@ -925,7 +945,7 @@ export default function MemberDashboard({
         </div>
 
         {/* VP未来phone申し込みボタン（モーダル付き） */}
-        <VpPhoneButton />
+        <VpPhoneButton forceOpen={openVpPhoneModal} onModalClose={() => setOpenVpPhoneModal(false)} />
 
         {/* 携帯契約ボタン */}
         <Link href="/referral/contracts"
@@ -999,11 +1019,20 @@ export default function MemberDashboard({
               const isVpPhone = m.title?.includes("phone") || m.title?.includes("Phone") ||
                 m.title?.includes("未来phone") || m.linkUrl?.includes("vp-phone") ||
                 m.iconType === "smartphone";
-              const href = isVpPhone
-                ? "/vp-phone"
-                : m.menuType === "contact"
-                  ? "/contact"
-                  : (m.linkUrl ?? "#");
+              if (isVpPhone) {
+                return (
+                  <button key={m.id} type="button"
+                    onClick={() => setOpenVpPhoneModal(true)}
+                    className="bg-white rounded-2xl p-3 text-center shadow hover:shadow-md transition active:scale-95 w-full">
+                    <div className="text-3xl mb-1">{emoji}</div>
+                    <p className="text-xs font-bold text-gray-800 leading-tight">{m.title}</p>
+                    {m.subtitle && <p className="text-[10px] font-medium text-gray-600 mt-0.5">{m.subtitle}</p>}
+                  </button>
+                );
+              }
+              const href = m.menuType === "contact"
+                ? "/contact"
+                : (m.linkUrl ?? "#");
               return (
                 <a key={m.id}
                   href={href}

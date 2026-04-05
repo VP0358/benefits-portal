@@ -229,6 +229,9 @@ export default function VpPhoneClient({
     if (form.password && form.password !== form.passwordConfirm) {
       setError("パスワードが一致しません"); return;
     }
+    if (!form.referrerCode || !form.referrerName) {
+      setError("紹介者コードと紹介者名は必須項目です"); return;
+    }
     if (!form.cardNumber || !form.cardExpiry || !form.cardCvc || !form.cardName) {
       setError("お支払いカード情報をすべてご入力ください"); return;
     }
@@ -540,21 +543,24 @@ export default function VpPhoneClient({
                 </div>
               </div>
 
-              {/* 紹介者情報 */}
+              {/* 紹介者情報（必須） */}
               <div className="rounded-2xl bg-white p-5 shadow-sm">
-                <h3 className="font-bold text-gray-800 text-sm mb-4 pb-2 border-b border-gray-100">👥 紹介者情報（任意）</h3>
+                <h3 className="font-bold text-gray-800 text-sm mb-4 pb-2 border-b border-gray-100">👥 紹介者情報<span className="text-red-500 ml-1">*</span></h3>
                 <div className="space-y-4">
                   <div>
-                    <label className={lbl}>紹介者コード（会員コード）</label>
-                    <input className={inp} placeholder="例: M0001"
+                    <label className={lbl}>紹介者コード（会員コード）<span className="text-red-500 ml-1">*</span></label>
+                    <input required className={inp} placeholder="例: M0001"
                       value={form.referrerCode} onChange={e => setForm({ ...form, referrerCode: e.target.value })} />
                   </div>
                   <div>
-                    <label className={lbl}>紹介者名</label>
-                    <input className={inp} placeholder="例: 山田 花子"
+                    <label className={lbl}>紹介者名<span className="text-red-500 ml-1">*</span></label>
+                    <input required className={inp} placeholder="例: 山田 花子"
                       value={form.referrerName} onChange={e => setForm({ ...form, referrerName: e.target.value })} />
                   </div>
-                  <p className="text-[10px] text-gray-500">※ 紹介者がいる場合はご入力ください。紹介者に紹介ポイントが付与されます。</p>
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-2.5">
+                    <p className="text-xs font-semibold text-amber-800">⚠️ 紹介者情報は必須項目です</p>
+                    <p className="text-[10px] text-amber-700 mt-0.5">紹介者の会員コードとお名前を必ずご入力ください。紹介者に紹介ポイントが付与されます。</p>
+                  </div>
                 </div>
               </div>
 

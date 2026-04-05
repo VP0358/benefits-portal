@@ -166,8 +166,26 @@ export default async function AdminVpPhonePage({
             : "未入力";
           const hasPassword = !!(a as typeof a & { password?: string | null }).password;
 
+          // adminNoteから申請種別タグを検出
+          const note = a.adminNote ?? "";
+          const isCancelApply    = note.includes("【申込取消申請】");
+          const isContractCancel = note.includes("【解約申請】");
+          const isPlanChange     = note.includes("【プラン変更申請】");
+          const cancelBadge =
+            isContractCancel ? { label: "🚫 解約申請",     cls: "bg-red-600 text-white" } :
+            isPlanChange     ? { label: "🔄 プラン変更申請", cls: "bg-blue-600 text-white" } :
+            isCancelApply    ? { label: "✋ 申込取消申請",   cls: "bg-orange-500 text-white" } :
+            null;
+
           return (
             <div key={a.id.toString()} className="rounded-3xl bg-white shadow-sm overflow-hidden">
+              {/* キャンセル申請種別バナー */}
+              {a.status === "canceled" && cancelBadge && (
+                <div className={`px-5 py-2 flex items-center gap-2 ${cancelBadge.cls}`}>
+                  <span className="text-xs font-bold">{cancelBadge.label}</span>
+                  <span className="text-xs opacity-80">（会員より申請）</span>
+                </div>
+              )}
               {/* カードヘッダー */}
               <div className={`px-5 py-3 border-b flex items-center justify-between ${st.cls}`}>
                 <div className="flex items-center gap-2">
