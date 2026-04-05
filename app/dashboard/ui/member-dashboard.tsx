@@ -30,33 +30,39 @@ const ICON_MAP: Record<string,string> = {
 const AVATAR_OPTIONS = ["😊","😎","🦁","🐯","🐼","🦊","🐸","🌸","⭐","🔥","💎","🎯"];
 
 function VpPhoneButton() {
-  const [status, setStatus] = useState<string | null>(null);
+  const [appData, setAppData] = useState<{ status: string; contractType?: string; desiredPlan?: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/my/vp-phone")
       .then(r => r.json())
       .then(d => {
-        setStatus(d.application?.status ?? null);
+        setAppData(d.application ? {
+          status:       d.application.status,
+          contractType: d.application.contractType ?? "",
+          desiredPlan:  d.application.desiredPlan ?? "",
+        } : null);
         setLoading(false);
       })
       .catch(() => { setLoading(false); });
   }, []);
 
-  const STATUS_INFO: Record<string, { label: string; bg: string; textCls: string; badge: string }> = {
-    pending:    { label: "審査待ち",   bg: "bg-yellow-50 border-yellow-200", textCls: "text-yellow-800", badge: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-    reviewing:  { label: "審査中",     bg: "bg-blue-50 border-blue-200",     textCls: "text-blue-800",   badge: "bg-blue-100 text-blue-700 border-blue-200" },
-    contracted: { label: "契約済み",   bg: "bg-emerald-50 border-emerald-200", textCls: "text-emerald-800", badge: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-    rejected:   { label: "審査不可",   bg: "bg-red-50 border-red-200",       textCls: "text-red-800",    badge: "bg-red-100 text-red-700 border-red-200" },
-    canceled:   { label: "取消済み",   bg: "bg-gray-50 border-gray-200",     textCls: "text-gray-700",   badge: "bg-gray-100 text-gray-600 border-gray-200" },
+  // ステータス別スタイル定義
+  type SInfo = { label: string; icon: string; cardBg: string; cardBorder: string; badgeBg: string; badgeText: string; pulse?: boolean };
+  const STATUS_INFO: Record<string, SInfo> = {
+    pending:    { label: "審査待ち",  icon: "⏳", cardBg: "bg-yellow-50",  cardBorder: "border-yellow-300", badgeBg: "bg-yellow-400",  badgeText: "text-white", pulse: true },
+    reviewing:  { label: "審査中",    icon: "🔍", cardBg: "bg-blue-50",    cardBorder: "border-blue-400",   badgeBg: "bg-blue-500",    badgeText: "text-white", pulse: true },
+    contracted: { label: "契約済み",  icon: "✅", cardBg: "bg-emerald-50", cardBorder: "border-emerald-400",badgeBg: "bg-emerald-500", badgeText: "text-white" },
+    rejected:   { label: "審査不可",  icon: "❌", cardBg: "bg-red-50",    cardBorder: "border-red-300",    badgeBg: "bg-red-500",     badgeText: "text-white" },
+    canceled:   { label: "取消済み",  icon: "🚫", cardBg: "bg-gray-50",   cardBorder: "border-gray-300",   badgeBg: "bg-gray-400",    badgeText: "text-white" },
   };
 
-  const info = status ? STATUS_INFO[status] : null;
+  const info = appData ? STATUS_INFO[appData.status] : null;
 
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl p-4 shadow flex items-center gap-3">
-        <span className="text-2xl">📱</span>
+      <div className="bg-white rounded-2xl p-4 shadow border-2 border-gray-100 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center text-xl">📱</div>
         <div className="flex-1">
           <p className="font-bold text-gray-800 text-sm">VP未来phone 申し込み</p>
           <p className="text-xs text-gray-400 animate-pulse mt-0.5">読み込み中...</p>
@@ -65,35 +71,70 @@ function VpPhoneButton() {
     );
   }
 
+  // 未申し込み
+  if (!info) {
+    return (
+      <Link href="/vp-phone"
+        className="block rounded-2xl p-4 shadow border-2 border-dashed border-green-300 bg-white hover:shadow-md hover:border-green-400 transition flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+            style={{ background: "linear-gradient(135deg,#16a34a,#4ade80)" }}>📱</div>
+          <div>
+            <p className="font-bold text-sm text-gray-800">VP未来phone 申し込み</p>
+            <p className="text-[10px] text-gray-500 mt-0.5">お得なスマートフォン回線</p>
+          </div>
+        </div>
+        <span className="rounded-full bg-green-500 text-white px-3 py-1 text-xs font-bold shadow">
+          申し込む →
+        </span>
+      </Link>
+    );
+  }
+
+  // 申し込み済み（ステータスあり）
+  const contractTypeLabel = appData?.contractType === "voice" ? "音声回線" : appData?.contractType === "data" ? "データ回線" : "";
+
   return (
     <Link href="/vp-phone"
-      className={`block rounded-2xl p-4 shadow flex items-center justify-between hover:shadow-md transition border-2 ${
-        info ? info.bg : "bg-white border-green-100"
-      }`}>
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-          style={{ background: "linear-gradient(135deg, #16a34a, #4ade80)" }}>
-          📱
+      className={`block rounded-2xl p-4 shadow border-2 hover:shadow-md transition ${info.cardBg} ${info.cardBorder}`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+            style={{ background: "linear-gradient(135deg,#16a34a,#4ade80)" }}>📱</div>
+          <div>
+            <p className="font-bold text-sm text-gray-800">VP未来phone 申し込み</p>
+            {contractTypeLabel && (
+              <p className="text-[10px] text-gray-500 mt-0.5">{contractTypeLabel}</p>
+            )}
+          </div>
         </div>
-        <div>
-          <p className={`font-bold text-sm ${info ? info.textCls : "text-gray-800"}`}>VP未来phone 申し込み</p>
-          <p className="text-[10px] text-gray-500 mt-0.5">
-            {!status ? "お得なスマートフォン回線" : "申し込み状況を確認"}
-          </p>
+        <div className="flex flex-col items-end gap-1">
+          <span className={`rounded-full px-3 py-1 text-xs font-bold flex items-center gap-1 ${info.badgeBg} ${info.badgeText} ${info.pulse ? "animate-pulse" : ""}`}>
+            <span>{info.icon}</span>
+            <span>{info.label}</span>
+          </span>
+          <span className="text-gray-400 text-xs">タップして確認 →</span>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        {info ? (
-          <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${info.badge}`}>
-            {info.label}
-          </span>
-        ) : (
-          <span className="rounded-full bg-green-100 text-green-700 border border-green-200 px-2.5 py-0.5 text-[10px] font-bold">
-            申し込む
-          </span>
-        )}
-        <span className="text-gray-400 text-lg">›</span>
-      </div>
+      {/* contracted なら祝福メッセージ */}
+      {appData?.status === "contracted" && (
+        <div className="mt-2 bg-emerald-100 rounded-xl px-3 py-2 text-xs font-semibold text-emerald-800">
+          🎉 VP未来phone の契約が完了しています！
+        </div>
+      )}
+      {/* pending/reviewing なら進捗バー */}
+      {(appData?.status === "pending" || appData?.status === "reviewing") && (
+        <div className="mt-2">
+          <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
+            <span>申込完了</span><span>審査中</span><span>契約完了</span>
+          </div>
+          <div className="w-full bg-white/60 rounded-full h-1.5">
+            <div className={`h-1.5 rounded-full transition-all ${
+              appData.status === "reviewing" ? "bg-blue-500 w-2/3" : "bg-yellow-400 w-1/3"
+            }`} />
+          </div>
+        </div>
+      )}
     </Link>
   );
 }
@@ -497,9 +538,18 @@ export default function MemberDashboard({
           <div className="grid grid-cols-3 gap-3">
             {menus.map(m => {
               const emoji = ICON_MAP[m.iconType ?? ""] ?? "📌";
+              // VP phone関連メニューは /vp-phone に飛ばす
+              const isVpPhone = m.title?.includes("phone") || m.title?.includes("Phone") ||
+                m.title?.includes("未来phone") || m.linkUrl?.includes("vp-phone") ||
+                m.iconType === "smartphone";
+              const href = isVpPhone
+                ? "/vp-phone"
+                : m.menuType === "contact"
+                  ? "/contact"
+                  : (m.linkUrl ?? "#");
               return (
                 <a key={m.id}
-                  href={m.menuType === "contact" ? "/contact" : (m.linkUrl ?? "#")}
+                  href={href}
                   className="bg-white rounded-2xl p-3 text-center shadow hover:shadow-md transition active:scale-95">
                   <div className="text-3xl mb-1">{emoji}</div>
                   <p className="text-xs font-bold text-gray-800 leading-tight">{m.title}</p>
