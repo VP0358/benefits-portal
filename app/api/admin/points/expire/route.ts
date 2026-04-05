@@ -149,7 +149,7 @@ export async function POST(req: NextRequest) {
       actionType: "expire_points_manual",
       targetTable: "pointWallet",
       targetId: userId ?? "all",
-      beforeJson: null,
+      beforeJson: undefined,
       afterJson: { expiredCount, totalExpiredPoints, pointType: pointType ?? "all", amount: amount ?? "full" },
     },
   }).catch(() => {});

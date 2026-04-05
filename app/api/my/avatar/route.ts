@@ -47,7 +47,6 @@ export async function POST(req: NextRequest) {
   if (s3Bucket && s3AccessKeyId && s3SecretAccessKey) {
     // S3にアップロード
     const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
     const ext = file.type.split("/")[1].replace("jpeg", "jpg");
     const key = `avatars/user-${session.user.id}-${Date.now()}.${ext}`;
 
@@ -63,20 +62,21 @@ export async function POST(req: NextRequest) {
     const timeStr = now.toISOString().replace(/[-:.]/g, "").slice(0, 15) + "Z";
     const scope = `${dateStr}/${s3Region}/s3/aws4_request`;
 
-    async function hmacSha256(key: ArrayBuffer | Uint8Array, data: string) {
+    async function hmacSha256(key: Uint8Array, data: string): Promise<Uint8Array> {
       const cryptoKey = await crypto.subtle.importKey(
-        "raw", key instanceof Uint8Array ? key : new Uint8Array(key),
+        "raw", key.buffer.slice(key.byteOffset, key.byteOffset + key.byteLength) as ArrayBuffer,
         { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
       );
       return new Uint8Array(await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(data)));
     }
-    async function sha256hex(data: ArrayBuffer | string) {
-      const buf = typeof data === "string" ? new TextEncoder().encode(data) : data;
+    async function sha256hex(data: ArrayBuffer | string): Promise<string> {
+      const buf = typeof data === "string" ? new TextEncoder().encode(data).buffer as ArrayBuffer : data as ArrayBuffer;
       const hash = await crypto.subtle.digest("SHA-256", buf);
       return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
     }
 
-    const payloadHash = await sha256hex(buffer);
+    const bufferUint8 = new Uint8Array(bytes);
+    const payloadHash = await sha256hex(bytes);
     const canonicalHeaders = `content-type:${file.type}\nhost:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${timeStr}\n`;
     const signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date";
     const canonicalRequest = `PUT\n/${s3Bucket}/${key}\n\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
         "x-amz-date": timeStr,
         Authorization: authorization,
       },
-      body: buffer,
+      body: bufferUint8,
     });
 
     if (!s3Res.ok) {
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
   } else {
     // S3未設定の場合: base64でDBに保存（開発用 / 小さい画像のみ）
     const bytes = await file.arrayBuffer();
-    const base64 = Buffer.from(bytes).toString("base64");
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(bytes)));
     publicUrl = `data:${file.type};base64,${base64}`;
   }
 

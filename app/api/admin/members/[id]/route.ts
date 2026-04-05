@@ -22,7 +22,7 @@ export async function PATCH(
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return NextResponse.json({ error: "会員が見つかりません" }, { status: 404 });
-  if (user.status === "canceled") {
+  if ((user.status as string) === "canceled") {
     return NextResponse.json({ error: "すでに契約解除済みです" }, { status: 400 });
   }
 
@@ -31,7 +31,8 @@ export async function PATCH(
   // ステータスを「canceled」に更新（canceledAt は DB適用済みなら保存）
   const updated = await prisma.user.update({
     where: { id: userId },
-    data: { status: "canceled", canceledAt: now },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data: { status: "canceled" as any, canceledAt: now },
   });
 
   // 監査ログ（エラーは無視）
@@ -69,7 +70,7 @@ export async function DELETE(
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return NextResponse.json({ error: "会員が見つかりません" }, { status: 404 });
-  if (user.status !== "canceled") {
+  if ((user.status as string) !== "canceled") {
     return NextResponse.json({ error: "契約解除済み会員のみ削除できます" }, { status: 400 });
   }
 

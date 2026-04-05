@@ -26,7 +26,7 @@ export async function GET() {
 
   // この会員が直紹介した会員のIDリスト
   const referrals = await prisma.userReferral.findMany({
-    where: { referrerId: user.id, isActive: true },
+    where: { referrerUserId: user.id, isActive: true },
     select: { userId: true, user: { select: { name: true, memberCode: true } } },
   });
 

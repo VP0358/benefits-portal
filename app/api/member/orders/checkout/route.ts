@@ -33,6 +33,8 @@ export async function POST(req: NextRequest) {
   const user = await prisma.user.findUnique({ where: { email: session.user.email }, include: { pointWallet: true } });
   if (!user?.pointWallet) return NextResponse.json({ error: "point wallet not found" }, { status: 404 });
 
+  const wallet = user.pointWallet;
+
   const productIds = parsed.data.items.map(item => toBigInt(item.productId));
   const products = await prisma.product.findMany({ where: { id: { in: productIds }, isActive: true } });
   if (products.length !== parsed.data.items.length) return NextResponse.json({ error: "some products not found" }, { status: 400 });
@@ -45,13 +47,13 @@ export async function POST(req: NextRequest) {
   const subtotalAmount = lines.reduce((sum, line) => sum + line.lineAmount, 0);
   const requestedPoints = parsed.data.usePoints;
 
-  if (requestedPoints > user.pointWallet.availablePointsBalance) return NextResponse.json({ error: "insufficient points" }, { status: 400 });
+  if (requestedPoints > wallet.availablePointsBalance) return NextResponse.json({ error: "insufficient points" }, { status: 400 });
   if (requestedPoints > subtotalAmount) return NextResponse.json({ error: "points exceed subtotal" }, { status: 400 });
 
   let remain = requestedPoints;
-  const autoUse = Math.min(user.pointWallet.autoPointsBalance, remain); remain -= autoUse;
-  const manualUse = Math.min(user.pointWallet.manualPointsBalance, remain); remain -= manualUse;
-  const externalUse = Math.min(user.pointWallet.externalPointsBalance, remain);
+  const autoUse = Math.min(wallet.autoPointsBalance, remain); remain -= autoUse;
+  const manualUse = Math.min(wallet.manualPointsBalance, remain); remain -= manualUse;
+  const externalUse = Math.min(wallet.externalPointsBalance, remain);
 
   const totalAmount = subtotalAmount - requestedPoints;
   const orderNumber = createOrderNumber();
@@ -71,11 +73,11 @@ export async function POST(req: NextRequest) {
       const updatedWallet = await tx.pointWallet.update({
         where: { userId: user.id },
         data: {
-          autoPointsBalance: user.pointWallet.autoPointsBalance - autoUse,
-          manualPointsBalance: user.pointWallet.manualPointsBalance - manualUse,
-          externalPointsBalance: user.pointWallet.externalPointsBalance - externalUse,
-          availablePointsBalance: user.pointWallet.availablePointsBalance - requestedPoints,
-          usedPointsBalance: user.pointWallet.usedPointsBalance + requestedPoints,
+          autoPointsBalance: wallet.autoPointsBalance - autoUse,
+          manualPointsBalance: wallet.manualPointsBalance - manualUse,
+          externalPointsBalance: wallet.externalPointsBalance - externalUse,
+          availablePointsBalance: wallet.availablePointsBalance - requestedPoints,
+          usedPointsBalance: wallet.usedPointsBalance + requestedPoints,
         },
       });
 

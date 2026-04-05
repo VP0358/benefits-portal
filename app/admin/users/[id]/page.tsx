@@ -95,7 +95,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
         <div className="mt-4">
           <ContractList contracts={user!.contracts.map(c => ({
             id: c.id.toString(),
-            contractNumber: c.contractNumber,
+            contractNumber: c.contractNumber ?? "",
             planName: c.planName,
             monthlyFee: Number(c.monthlyFee),
             status: c.status,

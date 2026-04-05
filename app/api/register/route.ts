@@ -61,9 +61,10 @@ export async function POST(request: Request) {
     if (referrerId) {
       await tx.userReferral.create({
         data: {
-          referrerId,
+          referrerUserId: referrerId,
           userId: newUser.id,
           isActive: true,
+          validFrom: new Date(),
         },
       });
     }

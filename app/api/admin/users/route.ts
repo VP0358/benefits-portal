@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       actionType: "create",
       targetTable: "user",
       targetId: user.id.toString(),
-      beforeJson: null,
+      beforeJson: undefined,
       afterJson: { email, name, memberCode },
     },
   }).catch(() => {});

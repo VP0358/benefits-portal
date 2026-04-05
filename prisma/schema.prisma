@@ -10,6 +10,7 @@ enum UserStatus {
   active
   suspended
   invited
+  canceled
 }
 
 enum AdminRole {
@@ -356,7 +357,9 @@ model MobileContract {
   id              BigInt         @id @default(autoincrement())
   userId          BigInt
   referrerId      BigInt?
+  contractNumber  String?        @db.VarChar(100)
   planName        String         @db.VarChar(255)
+  monthlyFee      Decimal        @default(0) @db.Decimal(10, 2)
   status          ContractStatus @default(pending)
   startedAt       DateTime?
   confirmedAt     DateTime?
