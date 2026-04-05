@@ -369,12 +369,17 @@ model VpPhoneApplication {
   nameKanji       String                     @db.VarChar(100)
   nameKana        String                     @db.VarChar(100)
   email           String                     @db.VarChar(255)
+  password        String?                    @db.VarChar(255)
   phone           String                     @db.VarChar(30)
   birthDate       String                     @db.VarChar(20)
   gender          String                     @db.VarChar(10)
   lineId          String?                    @db.VarChar(100)
   lineDisplayName String?                    @db.VarChar(100)
-  // 希望プラン
+  // 紹介者情報
+  referrerCode    String?                    @db.VarChar(100)
+  referrerName    String?                    @db.VarChar(100)
+  // 希望プラン種別: voice=音声回線契約, data=大容量データ回線契約
+  contractType    String?                    @db.VarChar(50)
   desiredPlan     String?                    @db.VarChar(255)
   // 管理情報
   status          VpPhoneApplicationStatus   @default(pending)
