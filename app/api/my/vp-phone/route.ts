@@ -1,0 +1,106 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { z } from "zod";
+
+const schema = z.object({
+  nameKanji:       z.string().min(1).max(100),
+  nameKana:        z.string().min(1).max(100),
+  email:           z.string().email().max(255),
+  phone:           z.string().min(1).max(30),
+  birthDate:       z.string().min(1).max(20),
+  gender:          z.enum(["male", "female", "other"]),
+  lineId:          z.string().max(100).optional(),
+  lineDisplayName: z.string().max(100).optional(),
+  desiredPlan:     z.string().max(255).optional(),
+});
+
+/**
+ * GET /api/my/vp-phone  – 自分の申し込み状況を取得
+ */
+export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const userId = BigInt(session.user.id);
+  const application = await prisma.vpPhoneApplication.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!application) {
+    return NextResponse.json({ application: null });
+  }
+
+  return NextResponse.json({
+    application: {
+      id:              application.id.toString(),
+      nameKanji:       application.nameKanji,
+      nameKana:        application.nameKana,
+      email:           application.email,
+      phone:           application.phone,
+      birthDate:       application.birthDate,
+      gender:          application.gender,
+      lineId:          application.lineId,
+      lineDisplayName: application.lineDisplayName,
+      desiredPlan:     application.desiredPlan,
+      status:          application.status,
+      adminNote:       application.adminNote,
+      contractedAt:    application.contractedAt?.toISOString() ?? null,
+      createdAt:       application.createdAt.toISOString(),
+      updatedAt:       application.updatedAt.toISOString(),
+    },
+  });
+}
+
+/**
+ * POST /api/my/vp-phone  – 申し込みを送信
+ */
+export async function POST(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const userId = BigInt(session.user.id);
+
+  // 既存申し込みチェック（pending/reviewing/contracted のいずれかがあれば拒否）
+  const existing = await prisma.vpPhoneApplication.findFirst({
+    where: {
+      userId,
+      status: { in: ["pending", "reviewing", "contracted"] },
+    },
+  });
+  if (existing) {
+    return NextResponse.json(
+      { error: "既に申し込みが存在します。審査完了後にご連絡します。" },
+      { status: 409 }
+    );
+  }
+
+  const json = await req.json();
+  const parsed = schema.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const d = parsed.data;
+  const application = await prisma.vpPhoneApplication.create({
+    data: {
+      userId,
+      nameKanji:       d.nameKanji,
+      nameKana:        d.nameKana,
+      email:           d.email,
+      phone:           d.phone,
+      birthDate:       d.birthDate,
+      gender:          d.gender,
+      lineId:          d.lineId ?? null,
+      lineDisplayName: d.lineDisplayName ?? null,
+      desiredPlan:     d.desiredPlan ?? null,
+    },
+  });
+
+  return NextResponse.json({
+    id: application.id.toString(),
+    status: application.status,
+    createdAt: application.createdAt.toISOString(),
+  }, { status: 201 });
+}

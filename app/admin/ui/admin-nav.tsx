@@ -11,6 +11,7 @@ const navItems = [
   { href: "/admin/menus",            label: "📋 メニュー管理" },
   { href: "/admin/members",           label: "👥 会員管理" },
   { href: "/admin/contracts",        label: "📱 携帯契約一覧" },
+  { href: "/admin/vp-phone",         label: "📲 VP未来phone申し込み" },
   { href: "/admin/travel-subscriptions", label: "✈️ 旅行サブスク一覧" },
   { href: "/admin/referral-rewards", label: "💰 紹介者報酬計算" },
   { href: "/admin/products",         label: "📦 商品管理" },

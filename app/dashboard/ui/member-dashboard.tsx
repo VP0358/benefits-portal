@@ -29,6 +29,75 @@ const ICON_MAP: Record<string,string> = {
 };
 const AVATAR_OPTIONS = ["😊","😎","🦁","🐯","🐼","🦊","🐸","🌸","⭐","🔥","💎","🎯"];
 
+function VpPhoneButton() {
+  const [status, setStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/my/vp-phone")
+      .then(r => r.json())
+      .then(d => {
+        setStatus(d.application?.status ?? null);
+        setLoading(false);
+      })
+      .catch(() => { setLoading(false); });
+  }, []);
+
+  const STATUS_INFO: Record<string, { label: string; bg: string; textCls: string; badge: string }> = {
+    pending:    { label: "審査待ち",   bg: "bg-yellow-50 border-yellow-200", textCls: "text-yellow-800", badge: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+    reviewing:  { label: "審査中",     bg: "bg-blue-50 border-blue-200",     textCls: "text-blue-800",   badge: "bg-blue-100 text-blue-700 border-blue-200" },
+    contracted: { label: "契約済み",   bg: "bg-emerald-50 border-emerald-200", textCls: "text-emerald-800", badge: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+    rejected:   { label: "審査不可",   bg: "bg-red-50 border-red-200",       textCls: "text-red-800",    badge: "bg-red-100 text-red-700 border-red-200" },
+    canceled:   { label: "取消済み",   bg: "bg-gray-50 border-gray-200",     textCls: "text-gray-700",   badge: "bg-gray-100 text-gray-600 border-gray-200" },
+  };
+
+  const info = status ? STATUS_INFO[status] : null;
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-2xl p-4 shadow flex items-center gap-3">
+        <span className="text-2xl">📱</span>
+        <div className="flex-1">
+          <p className="font-bold text-gray-800 text-sm">VP未来phone 申し込み</p>
+          <p className="text-xs text-gray-400 animate-pulse mt-0.5">読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Link href="/vp-phone"
+      className={`block rounded-2xl p-4 shadow flex items-center justify-between hover:shadow-md transition border-2 ${
+        info ? info.bg : "bg-white border-green-100"
+      }`}>
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+          style={{ background: "linear-gradient(135deg, #16a34a, #4ade80)" }}>
+          📱
+        </div>
+        <div>
+          <p className={`font-bold text-sm ${info ? info.textCls : "text-gray-800"}`}>VP未来phone 申し込み</p>
+          <p className="text-[10px] text-gray-500 mt-0.5">
+            {!status ? "お得なスマートフォン回線" : "申し込み状況を確認"}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        {info ? (
+          <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${info.badge}`}>
+            {info.label}
+          </span>
+        ) : (
+          <span className="rounded-full bg-green-100 text-green-700 border border-green-200 px-2.5 py-0.5 text-[10px] font-bold">
+            申し込む
+          </span>
+        )}
+        <span className="text-gray-400 text-lg">›</span>
+      </div>
+    </Link>
+  );
+}
+
 export default function MemberDashboard({
   user, announcements, menus
 }: {
@@ -178,6 +247,7 @@ export default function MemberDashboard({
               {[
                 { href: "/dashboard",       label: "🏠 ホーム" },
                 { href: "#menu",            label: "📋 福利厚生メニュー" },
+                { href: "/vp-phone",        label: "📱 VP未来phone申し込み" },
                 { href: "/points/use",      label: "💎 ポイントを使う" },
                 { href: "/points/history",  label: "📊 ポイント履歴" },
                 { href: "/announcements",   label: "🔔 お知らせ" },
@@ -266,6 +336,9 @@ export default function MemberDashboard({
             <p className="text-[10px] opacity-70 mt-1 text-right">最大 {maxPt.toLocaleString()} pt</p>
           </div>
         </div>
+
+        {/* VP未来phone申し込みボタン */}
+        <VpPhoneButton />
 
         {/* 携帯契約ボタン */}
         <Link href="/referral/contracts"
