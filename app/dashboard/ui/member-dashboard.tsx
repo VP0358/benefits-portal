@@ -58,6 +58,7 @@ function VpPhoneButton({ forceOpen = false, onModalClose }: { forceOpen?: boolea
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [cancelMsg, setCancelMsg] = useState("");
+  const [actionType, setActionType] = useState<string>("");
 
   const loadData = () => {
     setLoading(true);
@@ -104,12 +105,12 @@ function VpPhoneButton({ forceOpen = false, onModalClose }: { forceOpen?: boolea
 
   const info = appData ? STATUS_INFO[appData.status] : null;
 
-  // 解約・キャンセル申請（契約中→contract_cancel、それ以外→cancel_apply）
+  // 解約・キャンセル・プラン変更申請
   async function handleCancel() {
     if (!appData) return;
     setCanceling(true);
     setCancelMsg("");
-    const cancelType = appData.status === "contracted" ? "contract_cancel" : "cancel_apply";
+    const cancelType = actionType || (appData.status === "contracted" ? "contract_cancel" : "cancel_apply");
     try {
       const res = await fetch(`/api/my/vp-phone/${appData.id}/cancel`, {
         method: "POST",
@@ -296,33 +297,70 @@ function VpPhoneButton({ forceOpen = false, onModalClose }: { forceOpen?: boolea
 
               {/* アクションボタン */}
               <div className="space-y-2 pt-2">
-                {/* プラン変更 → 申込ページへ */}
-                {(appData.status === "contracted" || appData.status === "rejected" || appData.status === "canceled") && (
-                  <Link href="/vp-phone"
-                    className="block w-full rounded-xl bg-green-600 text-white py-3 text-sm font-bold text-center hover:bg-green-700 transition"
-                    onClick={() => setShowModal(false)}>
-                    {appData.status === "contracted" ? "🔄 プラン変更を申し込む" : "📱 再申し込みする"}
-                  </Link>
+
+                {/* ── 契約済み：プラン変更申請 ── */}
+                {appData.status === "contracted" && (
+                  <>
+                    {!cancelConfirm ? (
+                      <div className="space-y-2">
+                        <button
+                          type="button"
+                          onClick={() => { setCancelConfirm(true); setActionType("plan_change"); }}
+                          className="w-full rounded-xl border-2 border-blue-200 text-blue-700 py-3 text-sm font-semibold hover:bg-blue-50 transition">
+                          🔄 プラン変更を申請する
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setCancelConfirm(true); setActionType("contract_cancel"); }}
+                          className="w-full rounded-xl border-2 border-red-200 text-red-600 py-3 text-sm font-semibold hover:bg-red-50 transition">
+                          🚫 解約を申請する
+                        </button>
+                      </div>
+                    ) : (
+                      <div className={`rounded-xl border-2 p-4 space-y-3 ${actionType === "plan_change" ? "bg-blue-50 border-blue-200" : "bg-red-50 border-red-200"}`}>
+                        <p className={`text-sm font-bold ${actionType === "plan_change" ? "text-blue-700" : "text-red-700"}`}>
+                          {actionType === "plan_change" ? "🔄 プラン変更を申請しますか？" : "🚫 本当に解約を申請しますか？"}
+                        </p>
+                        <p className={`text-xs ${actionType === "plan_change" ? "text-blue-600" : "text-red-600"}`}>
+                          申請後、担当者よりご連絡いたします。
+                        </p>
+                        {cancelMsg && <p className="text-xs text-gray-700 font-semibold">{cancelMsg}</p>}
+                        <div className="flex gap-2">
+                          <button type="button"
+                            onClick={() => { setCancelConfirm(false); setCancelMsg(""); setActionType(""); }}
+                            className="flex-1 rounded-xl border border-gray-300 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition">
+                            やめる
+                          </button>
+                          <button type="button"
+                            onClick={handleCancel}
+                            disabled={canceling}
+                            className={`flex-1 rounded-xl text-white py-2.5 text-sm font-bold transition disabled:opacity-50 ${actionType === "plan_change" ? "bg-blue-500 hover:bg-blue-600" : "bg-red-500 hover:bg-red-600"}`}>
+                            {canceling ? "申請中..." : "はい、申請する"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
 
-                {/* 解約申請（pending/reviewing/contracted のみ） */}
-                {(appData.status === "pending" || appData.status === "reviewing" || appData.status === "contracted") && (
+                {/* ── 審査待ち・審査中：申込キャンセル ── */}
+                {(appData.status === "pending" || appData.status === "reviewing") && (
                   <>
                     {!cancelConfirm ? (
                       <button
                         type="button"
-                        onClick={() => setCancelConfirm(true)}
+                        onClick={() => { setCancelConfirm(true); setActionType("cancel_apply"); }}
                         className="w-full rounded-xl border-2 border-red-200 text-red-600 py-3 text-sm font-semibold hover:bg-red-50 transition">
-                        🚫 解約・申し込みキャンセルを申請する
+                        ✋ 申し込みをキャンセルする
                       </button>
                     ) : (
                       <div className="rounded-xl bg-red-50 border-2 border-red-200 p-4 space-y-3">
-                        <p className="text-sm font-bold text-red-700">本当に解約・キャンセルを申請しますか？</p>
-                        <p className="text-xs text-red-600">申請後、担当者よりご連絡いたします。</p>
+                        <p className="text-sm font-bold text-red-700">申し込みをキャンセルしますか？</p>
+                        <p className="text-xs text-red-600">キャンセル後、担当者よりご連絡いたします。</p>
                         {cancelMsg && <p className="text-xs text-red-700 font-semibold">{cancelMsg}</p>}
                         <div className="flex gap-2">
                           <button type="button"
-                            onClick={() => { setCancelConfirm(false); setCancelMsg(""); }}
+                            onClick={() => { setCancelConfirm(false); setCancelMsg(""); setActionType(""); }}
                             className="flex-1 rounded-xl border border-gray-300 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition">
                             やめる
                           </button>
@@ -330,12 +368,21 @@ function VpPhoneButton({ forceOpen = false, onModalClose }: { forceOpen?: boolea
                             onClick={handleCancel}
                             disabled={canceling}
                             className="flex-1 rounded-xl bg-red-500 text-white py-2.5 text-sm font-bold hover:bg-red-600 transition disabled:opacity-50">
-                            {canceling ? "申請中..." : "はい、申請する"}
+                            {canceling ? "申請中..." : "はい、キャンセルする"}
                           </button>
                         </div>
                       </div>
                     )}
                   </>
+                )}
+
+                {/* ── 審査不可・キャンセル済み：再申し込み ── */}
+                {(appData.status === "rejected" || appData.status === "canceled") && (
+                  <Link href="/vp-phone"
+                    className="block w-full rounded-xl bg-green-600 text-white py-3 text-sm font-bold text-center hover:bg-green-700 transition"
+                    onClick={() => setShowModal(false)}>
+                    📱 再申し込みする
+                  </Link>
                 )}
               </div>
 

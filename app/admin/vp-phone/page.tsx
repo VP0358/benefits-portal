@@ -24,13 +24,14 @@ const CONTRACT_TYPE_LABEL: Record<string, string> = {
 export default async function AdminVpPhonePage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; page?: string; view?: string }>;
+  searchParams: Promise<{ status?: string; page?: string; view?: string; }>;
 }) {
   const session = await auth();
   if (!session?.user || session.user.role !== "admin") redirect("/login");
 
   const sp = await searchParams;
   const statusFilter = sp.status ?? "";
+  const requestFilter = sp.view ?? ""; // "plan_change" | "contract_cancel" | "cancel_apply" | ""
   const page = Math.max(1, Number(sp.page ?? "1"));
   const limit = 30;
   const skip = (page - 1) * limit;
@@ -38,12 +39,16 @@ export default async function AdminVpPhonePage({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {};
   if (statusFilter) where.status = statusFilter;
+  // 申請種別フィルタ（adminNoteのタグで絞り込み）
+  if (requestFilter === "plan_change")     where.adminNote = { contains: "【プラン変更申請】" };
+  if (requestFilter === "contract_cancel") where.adminNote = { contains: "【解約申請】" };
+  if (requestFilter === "cancel_apply")    where.adminNote = { contains: "【申込取消申請】" };
 
-  const [total, applications, statusCounts] = await Promise.all([
+  const [total, applications, statusCounts, planChangeCnt, contractCancelCnt, cancelApplyCnt] = await Promise.all([
     prisma.vpPhoneApplication.count({ where }),
     prisma.vpPhoneApplication.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy: { updatedAt: "desc" },
       skip,
       take: limit,
       include: {
@@ -56,6 +61,9 @@ export default async function AdminVpPhonePage({
       by: ["status"],
       _count: { id: true },
     }),
+    prisma.vpPhoneApplication.count({ where: { adminNote: { contains: "【プラン変更申請】" } } }),
+    prisma.vpPhoneApplication.count({ where: { adminNote: { contains: "【解約申請】" } } }),
+    prisma.vpPhoneApplication.count({ where: { adminNote: { contains: "【申込取消申請】" } } }),
   ]);
 
   const countByStatus = Object.fromEntries(
@@ -120,8 +128,65 @@ export default async function AdminVpPhonePage({
         </div>
       </div>
 
-      {/* フィルター */}
+      {/* 申請種別フィルター（会員からの要対応申請） */}
+      {(planChangeCnt > 0 || contractCancelCnt > 0 || cancelApplyCnt > 0) && (
+        <div className="rounded-3xl bg-white p-4 shadow-sm">
+          <p className="text-xs font-bold text-slate-600 mb-3">⚠️ 会員からの申請（要対応）</p>
+          <div className="flex gap-2 flex-wrap">
+            <Link
+              href={`/admin/vp-phone`}
+              className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+                !requestFilter && !statusFilter ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              すべて
+            </Link>
+            {planChangeCnt > 0 && (
+              <Link
+                href={`/admin/vp-phone?view=plan_change`}
+                className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+                  requestFilter === "plan_change"
+                    ? "bg-blue-600 text-white"
+                    : "bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
+                }`}
+              >
+                🔄 プラン変更申請
+                <span className="ml-1.5 text-xs font-bold opacity-80">{planChangeCnt}</span>
+              </Link>
+            )}
+            {contractCancelCnt > 0 && (
+              <Link
+                href={`/admin/vp-phone?view=contract_cancel`}
+                className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+                  requestFilter === "contract_cancel"
+                    ? "bg-red-600 text-white"
+                    : "bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                }`}
+              >
+                🚫 解約申請
+                <span className="ml-1.5 text-xs font-bold opacity-80">{contractCancelCnt}</span>
+              </Link>
+            )}
+            {cancelApplyCnt > 0 && (
+              <Link
+                href={`/admin/vp-phone?view=cancel_apply`}
+                className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+                  requestFilter === "cancel_apply"
+                    ? "bg-orange-600 text-white"
+                    : "bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200"
+                }`}
+              >
+                ✋ 申込取消申請
+                <span className="ml-1.5 text-xs font-bold opacity-80">{cancelApplyCnt}</span>
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ステータスフィルター */}
       <div className="rounded-3xl bg-white p-4 shadow-sm">
+        <p className="text-xs font-bold text-slate-600 mb-3">ステータスで絞り込み</p>
         <div className="flex gap-2 flex-wrap">
           {[
             { value: "", label: "すべて" },
@@ -135,7 +200,7 @@ export default async function AdminVpPhonePage({
               key={opt.value}
               href={`/admin/vp-phone?status=${opt.value}`}
               className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
-                statusFilter === opt.value
+                statusFilter === opt.value && !requestFilter
                   ? "bg-slate-900 text-white"
                   : "bg-slate-100 text-slate-700 hover:bg-slate-200"
               }`}
@@ -172,18 +237,21 @@ export default async function AdminVpPhonePage({
           const isContractCancel = note.includes("【解約申請】");
           const isPlanChange     = note.includes("【プラン変更申請】");
           const cancelBadge =
-            isContractCancel ? { label: "🚫 解約申請",     cls: "bg-red-600 text-white" } :
+            isContractCancel ? { label: "🚫 解約申請",      cls: "bg-red-600 text-white" } :
             isPlanChange     ? { label: "🔄 プラン変更申請", cls: "bg-blue-600 text-white" } :
             isCancelApply    ? { label: "✋ 申込取消申請",   cls: "bg-orange-500 text-white" } :
             null;
 
+          // 申請種別バナーが有効かつ、管理者が対応済み（ステータスが rejected/canceled で adminNote にタグがある場合は対応済みの可能性）
+          // バナーは常時表示して管理者が認識できるようにする
+
           return (
             <div key={a.id.toString()} className="rounded-3xl bg-white shadow-sm overflow-hidden">
-              {/* キャンセル申請種別バナー */}
-              {a.status === "canceled" && cancelBadge && (
-                <div className={`px-5 py-2 flex items-center gap-2 ${cancelBadge.cls}`}>
-                  <span className="text-xs font-bold">{cancelBadge.label}</span>
-                  <span className="text-xs opacity-80">（会員より申請）</span>
+              {/* 変更・解約・取消申請バナー（ステータス問わず常時表示） */}
+              {cancelBadge && (
+                <div className={`px-5 py-2.5 flex items-center gap-2 ${cancelBadge.cls}`}>
+                  <span className="text-sm font-bold">{cancelBadge.label}</span>
+                  <span className="text-xs opacity-90">（会員より申請 ・要対応）</span>
                 </div>
               )}
               {/* カードヘッダー */}
