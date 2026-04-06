@@ -4,21 +4,26 @@ import { headers } from "next/headers";
 import AdminNav from "./ui/admin-nav";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  // /admin/login はサイドバーなしで表示（ログインページ）
+  // x-pathname ヘッダーで現在のパスを取得
+  // middleware が付与する "x-pathname" を使用
   const hdrs = await headers();
-  const pathname =
-    hdrs.get("x-next-pathname") ??
-    hdrs.get("x-invoke-path") ??
-    hdrs.get("x-matched-path") ??
-    "";
-  if (pathname === "/admin/login" || pathname.startsWith("/admin/login")) {
+  const pathname = hdrs.get("x-pathname") ?? "";
+
+  // /admin/login はログインページなのでそのまま表示（認証チェック不要）
+  if (pathname.startsWith("/admin/login")) {
     return <>{children}</>;
   }
 
+  // それ以外の /admin/* はセッション & role チェック
   const session = await auth();
 
-  if (!session?.user?.email) redirect("/admin/login");
-  if (session.user.role !== "admin") redirect("/admin/login");
+  if (!session?.user?.email) {
+    redirect("/admin/login");
+  }
+
+  if (session.user.role !== "admin") {
+    redirect("/admin/login");
+  }
 
   return (
     <div className="min-h-screen bg-[#f5f3ff]">
