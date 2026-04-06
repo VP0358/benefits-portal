@@ -1,6 +1,16 @@
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Providers } from "./providers";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
   title: "VIOLA Pure 福利厚生ポータル",
@@ -11,44 +21,19 @@ export const metadata: Metadata = {
   },
 };
 
-// viewport は Next.js 15以降 Metadata から分離して定義
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
-  colorScheme: "light",
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="ja"
-      style={{
-        colorScheme: "light",
-        backgroundColor: "#ffffff",
-      }}
-    >
+    <html lang="ja">
       <head>
-        {/* iPhoneダークモードで黒くなるのを完全に防止 */}
         <meta name="color-scheme" content="light" />
-        <meta name="supported-color-schemes" content="light" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </head>
-      <body
-        className="antialiased"
-        style={{
-          fontFamily: "system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif",
-          backgroundColor: "#ffffff",
-          color: "#171717",
-          colorScheme: "light",
-        }}
-      >
-        <Providers>
-          {children}
-        </Providers>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        {children}
       </body>
     </html>
   );

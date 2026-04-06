@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { signOut } from "next-auth/react";
 
 interface User { id:string; name:string; memberCode:string; email:string; phone:string; availablePoints:number; }
 interface Announcement { id:string; title:string; content:string; tag:string; isPublished:boolean; publishedAt:string|null; }
@@ -674,7 +673,7 @@ export default function MemberDashboard({
               ))}
             </nav>
             <div className="px-3 pb-6">
-              <button onClick={() => signOut({ callbackUrl: "/login" })} className="w-full px-4 py-3 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition text-left">
+              <button onClick={async () => { const { signOut } = await import("next-auth/react"); signOut({ callbackUrl: "/login" }); }} className="w-full px-4 py-3 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition text-left">
                 🚪 ログアウト
               </button>
             </div>
