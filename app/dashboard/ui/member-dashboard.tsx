@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import Link from "next/link";
 
 interface User { id:string; name:string; memberCode:string; email:string; phone:string; availablePoints:number; }
@@ -172,9 +172,14 @@ type TravelSubData = {
   } | null;
 };
 
-function TravelSubButton() {
+const TravelSubButton = forwardRef<{ openModal: () => void }>(function TravelSubButton(_, ref) {
   const [travelSub, setTravelSub] = useState<TravelSubData | null>(null);
   const [showApplyModal, setShowApplyModal] = useState(false);
+
+  // 外部からモーダルを開けるようにする
+  useImperativeHandle(ref, () => ({
+    openModal: () => setShowApplyModal(true),
+  }));
   const [applyForm, setApplyForm] = useState({
     memberCode: "",
     name: "",
@@ -527,7 +532,7 @@ function TravelSubButton() {
       )}
     </>
   );
-}
+});
 
 // ──────────── メインダッシュボード ────────────
 export default function MemberDashboard({
@@ -545,6 +550,7 @@ export default function MemberDashboard({
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const slideRef = useRef(0);
   const [contractCount, setContractCount] = useState<number | null>(null);
+  const travelSubRef = useRef<{ openModal: () => void }>(null);
 
   // アバター読み込み（DB画像 > localStorage絵文字）
   useEffect(() => {
@@ -770,7 +776,7 @@ export default function MemberDashboard({
         </Link>
 
         {/* 旅行サブスクボタン（申込モーダル付き） */}
-        <TravelSubButton />
+        <TravelSubButton ref={travelSubRef} />
 
         {/* お知らせスライダー */}
         <section id="news">
@@ -825,7 +831,19 @@ export default function MemberDashboard({
                   </a>
                 );
               }
-              // URLリンク（/vp-phone を含む場合は内部遷移、外部URLは新タブ）
+              // 旅行サブスク種別 → モーダルを開く（新しいタブではなく）
+              if (m.menuType === "travel_sub" || m.title.includes("旅行")) {
+                return (
+                  <button key={m.id}
+                    onClick={() => travelSubRef.current?.openModal()}
+                    className="bg-white rounded-2xl p-3 text-center shadow hover:shadow-md transition active:scale-95 w-full">
+                    <div className="text-3xl mb-1">{emoji}</div>
+                    <p className="text-xs font-bold text-gray-800 leading-tight">{m.title}</p>
+                    {m.subtitle && <p className="text-[10px] font-medium text-gray-600 mt-0.5">{m.subtitle}</p>}
+                  </button>
+                );
+              }
+              // URLリンク（内部パスはそのまま遷移、外部URLは新タブ）
               const href = m.linkUrl ?? "#";
               const isInternal = href.startsWith("/");
               return (
