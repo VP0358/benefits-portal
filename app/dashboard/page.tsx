@@ -15,7 +15,7 @@ export default async function DashboardPage() {
     }),
     prisma.menu.findMany({
       where: { isActive: true },
-      orderBy: { createdAt: "asc" },
+      orderBy: { sortOrder: "asc" },
     }),
   ]);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 
 interface User { id:string; name:string; memberCode:string; email:string; phone:string; availablePoints:number; }
@@ -51,11 +51,7 @@ type VpAppData = {
   createdAt?: string;
 };
 
-// VpPhoneModalRef 型は後で定義するため、ここで先行宣言
-type VpPhoneModalRef = { open: () => void };
-
-const VpPhoneButton = forwardRef<VpPhoneModalRef, { onModalClose?: () => void }>(
-function VpPhoneButtonInner({ onModalClose }, ref) {
+function VpPhoneButton({ onModalClose }: { onModalClose?: () => void }) {
   const [appData, setAppData] = useState<VpAppData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -89,11 +85,6 @@ function VpPhoneButtonInner({ onModalClose }, ref) {
   };
 
   useEffect(() => { loadData(); }, []);
-
-  // 外部から open() を呼べるようにする（福利厚生メニューからのタップ）
-  useImperativeHandle(ref, () => ({
-    open: () => setShowModal(true),
-  }));
 
   // ステータス別スタイル定義
   type SInfo = { label: string; icon: string; cardBg: string; cardBorder: string; badgeBg: string; badgeText: string; pulse?: boolean };
@@ -403,8 +394,7 @@ function VpPhoneButtonInner({ onModalClose }, ref) {
       )}
     </>
   );
-});
-VpPhoneButton.displayName = "VpPhoneButton";
+}
 
 // ────────── 旅行サブスクボタン（申込モーダル付き） ──────────
 type TravelSubData = {
@@ -794,8 +784,6 @@ export default function MemberDashboard({
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const slideRef = useRef(0);
   const [contractCount, setContractCount] = useState<number | null>(null);
-  // 福利厚生メニューからVPphone モーダルを ref 経由で直接開く
-  const vpPhoneRef = useRef<VpPhoneModalRef>(null);
 
   // アバター読み込み（DB画像 > localStorage絵文字）
   useEffect(() => {
@@ -998,7 +986,7 @@ export default function MemberDashboard({
         </div>
 
         {/* VP未来phone申し込みボタン（モーダル付き） */}
-        <VpPhoneButton ref={vpPhoneRef} />
+        <VpPhoneButton />
 
         {/* 携帯契約ボタン */}
         <Link href="/referral/contracts"
@@ -1068,28 +1056,25 @@ export default function MemberDashboard({
           <div className="grid grid-cols-3 gap-3">
             {menus.map(m => {
               const emoji = ICON_MAP[m.iconType ?? ""] ?? "📌";
-              // VP phone関連メニューはモーダルで開く
-              // linkUrlに「vp-phone」が含まれる or タイトルに「VP」「VPphone」「未来phone」が含まれる場合
-              const isVpPhone = m.linkUrl?.includes("vp-phone") ||
-                m.title?.includes("VPphone") || m.title?.includes("VP未来phone") ||
-                m.title?.includes("未来phone");
-              if (isVpPhone) {
+              // contact種別は相談ページへ
+              if (m.menuType === "contact") {
                 return (
-                  <button key={m.id} type="button"
-                    onClick={() => vpPhoneRef.current?.open()}
-                    className="bg-white rounded-2xl p-3 text-center shadow hover:shadow-md transition active:scale-95 w-full">
+                  <a key={m.id} href="/contact"
+                    className="bg-white rounded-2xl p-3 text-center shadow hover:shadow-md transition active:scale-95">
                     <div className="text-3xl mb-1">{emoji}</div>
                     <p className="text-xs font-bold text-gray-800 leading-tight">{m.title}</p>
                     {m.subtitle && <p className="text-[10px] font-medium text-gray-600 mt-0.5">{m.subtitle}</p>}
-                  </button>
+                  </a>
                 );
               }
-              const href = m.menuType === "contact"
-                ? "/contact"
-                : (m.linkUrl ?? "#");
+              // URLリンク（/vp-phone を含む場合は内部遷移、外部URLは新タブ）
+              const href = m.linkUrl ?? "#";
+              const isInternal = href.startsWith("/");
               return (
                 <a key={m.id}
                   href={href}
+                  target={isInternal ? undefined : "_blank"}
+                  rel={isInternal ? undefined : "noopener noreferrer"}
                   className="bg-white rounded-2xl p-3 text-center shadow hover:shadow-md transition active:scale-95">
                   <div className="text-3xl mb-1">{emoji}</div>
                   <p className="text-xs font-bold text-gray-800 leading-tight">{m.title}</p>
