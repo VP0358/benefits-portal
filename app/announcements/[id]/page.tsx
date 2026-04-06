@@ -83,7 +83,7 @@ export default function AnnouncementDetailPage() {
             <span className={`text-xs px-3 py-1 rounded-full font-bold ${TAG_STYLE[item.tag] ?? "bg-gray-400 text-white"}`}>
               {TAG_LABEL[item.tag] ?? "お知らせ"}
             </span>
-            <span className="text-xs font-medium text-gray-500">
+            <span className="text-xs font-medium text-gray-700">
               {item.publishedAt ? new Date(item.publishedAt).toLocaleDateString("ja-JP") : ""}
             </span>
           </div>

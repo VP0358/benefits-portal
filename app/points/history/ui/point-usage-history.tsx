@@ -18,7 +18,7 @@ const TYPE_CONFIG: Record<string, { label: string; color: string; bg: string; si
   adjust:          { label: "調整",     color: "text-blue-600",    bg: "bg-blue-50",    sign: "±" },
   external_import: { label: "外部取込", color: "text-purple-600",  bg: "bg-purple-50",  sign: "+" },
   use:             { label: "利用",     color: "text-red-500",     bg: "bg-red-50",     sign: "−" },
-  expire:          { label: "失効",     color: "text-gray-400",    bg: "bg-gray-50",    sign: "−" },
+  expire:          { label: "失効",     color: "text-gray-600",    bg: "bg-gray-50",    sign: "−" },
   reversal:        { label: "取消",     color: "text-orange-500",  bg: "bg-orange-50",  sign: "±" },
 };
 
@@ -79,7 +79,7 @@ export default function PointTransactionHistory() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="text-center py-10 text-gray-500 text-sm">
+        <div className="text-center py-10 text-gray-700 text-sm">
           履歴がありません
         </div>
       ) : (
@@ -105,14 +105,14 @@ export default function PointTransactionHistory() {
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.color}`}>
                       {cfg.label}
                     </span>
-                    <span className="text-[10px] text-gray-400">
+                    <span className="text-[10px] text-gray-600">
                       {SOURCE_LABEL[row.pointSourceType] ?? row.pointSourceType}
                     </span>
                   </div>
                   {row.description && (
                     <p className="text-xs text-gray-600 mt-1 truncate">{row.description}</p>
                   )}
-                  <p className="text-[10px] text-gray-400 mt-0.5">
+                  <p className="text-[10px] text-gray-600 mt-0.5">
                     {new Date(row.occurredAt).toLocaleString("ja-JP", {
                       year: "numeric", month: "2-digit", day: "2-digit",
                       hour: "2-digit", minute: "2-digit"
@@ -128,7 +128,7 @@ export default function PointTransactionHistory() {
                     {isPlus ? "+" : isMinus ? "−" : ""}{Math.abs(row.points).toLocaleString()}
                     <span className="text-xs font-semibold ml-0.5">pt</span>
                   </p>
-                  <p className="text-[10px] text-gray-400">残 {row.balanceAfter.toLocaleString()}pt</p>
+                  <p className="text-[10px] text-gray-600">残 {row.balanceAfter.toLocaleString()}pt</p>
                 </div>
               </div>
             );

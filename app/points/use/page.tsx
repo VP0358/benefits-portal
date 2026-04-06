@@ -127,7 +127,7 @@ export default function UsePointsPage() {
                 placeholder="0"
               />
               {inputAmt > 0 && wallet && inputAmt <= availablePts && (
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-700 mt-1">
                   利用後残高: <span className="font-bold text-gray-700">{(availablePts - inputAmt).toLocaleString()}pt</span>
                 </p>
               )}
@@ -138,7 +138,7 @@ export default function UsePointsPage() {
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                利用内容 <span className="text-gray-400 text-xs">（任意）</span>
+                利用内容 <span className="text-gray-600 text-xs">（任意）</span>
               </label>
               <input
                 type="text"

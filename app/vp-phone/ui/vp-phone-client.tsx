@@ -111,7 +111,7 @@ function RadioCard<T extends { id: string; label: string; price: number | null; 
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`text-sm font-semibold ${selected ? (color === "green" ? "text-green-800" : "text-purple-800") : "text-gray-800"}`}>{item.label}</span>
           {item.popular && <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${badge}`}>人気</span>}
-          {item.note && <span className="text-[10px] text-gray-500">{item.note}</span>}
+          {item.note && <span className="text-[10px] text-gray-700">{item.note}</span>}
         </div>
         {priceStr && <span className={`text-xs font-bold mt-0.5 block ${selected ? (color === "green" ? "text-green-700" : "text-purple-700") : "text-gray-600"}`}>{priceStr}</span>}
       </div>
@@ -176,7 +176,7 @@ function ApplicationStatusView({ app }: { app: ApplicationData }) {
         <div className="flex items-center gap-3 mb-4">
           <span className="text-3xl">{info.icon}</span>
           <div className="flex-1">
-            <p className="text-xs text-gray-500">現在のステータス</p>
+            <p className="text-xs text-gray-700">現在のステータス</p>
             <p className="font-bold text-lg text-gray-800">{info.label}</p>
           </div>
           <span className={`rounded-full px-3 py-1 text-xs font-bold ${info.badgeBg} ${info.badgeText} ${info.pulse ? "animate-pulse" : ""}`}>
@@ -187,7 +187,7 @@ function ApplicationStatusView({ app }: { app: ApplicationData }) {
         {/* 進捗バー（審査中のみ） */}
         {isPending && (
           <div className="mb-4">
-            <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+            <div className="flex justify-between text-[10px] text-gray-700 mb-1">
               <span>申込完了</span><span>審査中</span><span>契約完了</span>
             </div>
             <div className="w-full bg-white/60 rounded-full h-2">
@@ -207,19 +207,19 @@ function ApplicationStatusView({ app }: { app: ApplicationData }) {
             { label: "契約種別",  value: contractTypeLabel || "—" },
           ].map(row => (
             <div key={row.label} className="flex justify-between items-start gap-2">
-              <span className="text-xs text-gray-500 whitespace-nowrap">{row.label}</span>
+              <span className="text-xs text-gray-700 whitespace-nowrap">{row.label}</span>
               <span className="text-xs font-semibold text-gray-800 text-right break-all">{row.value}</span>
             </div>
           ))}
           {app.desiredPlan && (
             <div className="pt-2 border-t border-gray-200">
-              <p className="text-xs text-gray-500 mb-1">希望プラン</p>
+              <p className="text-xs text-gray-700 mb-1">希望プラン</p>
               <p className="text-xs font-semibold text-gray-800 break-all">{app.desiredPlan}</p>
             </div>
           )}
           {app.contractedAt && (
             <div className="flex justify-between pt-2 border-t border-gray-200">
-              <span className="text-xs text-gray-500">契約完了日</span>
+              <span className="text-xs text-gray-700">契約完了日</span>
               <span className="text-xs font-bold text-emerald-700">{new Date(app.contractedAt).toLocaleDateString("ja-JP")}</span>
             </div>
           )}
@@ -282,7 +282,7 @@ function ApplicationStatusView({ app }: { app: ApplicationData }) {
           {/* 契約済み：解約ボタン（下部に配置） */}
           {isActive && !confirm && (
             <div className="pt-2 border-t border-gray-200">
-              <p className="text-[10px] text-gray-400 text-center mb-2">解約をご希望の場合</p>
+              <p className="text-[10px] text-gray-600 text-center mb-2">解約をご希望の場合</p>
               <button type="button"
                 onClick={() => { setActionType("contract_cancel"); setConfirm(true); setMsg(""); }}
                 className="w-full rounded-2xl border-2 border-red-200 bg-white text-red-600 py-3 text-sm font-bold hover:bg-red-50 transition flex items-center justify-center gap-2 shadow-sm">
@@ -442,12 +442,12 @@ export default function VpPhoneClient({
 
       {/* ヘッダー */}
       <header className="sticky top-0 z-30 bg-white shadow-sm flex items-center gap-3 px-4 py-3">
-        <Link href="/dashboard" className="text-gray-500 text-lg hover:text-gray-700">←</Link>
+        <Link href="/dashboard" className="text-gray-700 text-lg hover:text-gray-700">←</Link>
         <div className="flex items-center gap-2">
           <span className="text-xl">📱</span>
           <div>
             <h1 className="font-bold text-green-800 text-sm leading-none">{headerTitle}</h1>
-            <p className="text-[10px] text-gray-500 mt-0.5">{headerSub}</p>
+            <p className="text-[10px] text-gray-700 mt-0.5">{headerSub}</p>
           </div>
         </div>
       </header>
@@ -484,11 +484,11 @@ export default function VpPhoneClient({
                 <div className="flex items-center gap-2">
                   <span className="text-xl">{STATUS_INFO[app.status]?.icon}</span>
                   <div>
-                    <p className="text-xs text-gray-500">前回の申し込み</p>
+                    <p className="text-xs text-gray-700">前回の申し込み</p>
                     <p className="text-sm font-bold text-gray-700">{STATUS_INFO[app.status]?.label}</p>
                   </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">再度お申し込みいただけます。</p>
+                <p className="text-xs text-gray-700 mt-2">再度お申し込みいただけます。</p>
               </div>
             )}
 
@@ -502,7 +502,7 @@ export default function VpPhoneClient({
                       <h2 className="font-bold text-gray-800">VP未来phone 申し込み</h2>
                       <span className="rounded-full bg-gray-400 text-white px-2.5 py-0.5 text-[10px] font-bold">未申込</span>
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5">お得なスマートフォン回線サービス</p>
+                    <p className="text-xs text-gray-700 mt-0.5">お得なスマートフォン回線サービス</p>
                   </div>
                 </div>
                 <div className="space-y-2 text-xs text-gray-700 mb-4">
@@ -549,7 +549,7 @@ export default function VpPhoneClient({
                     <label className={lbl}>パスワード（任意）</label>
                     <div className="relative">
                       <input type={showPassword ? "text" : "password"} className={inp} placeholder="VP未来phone申し込み用パスワード（任意）" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} autoComplete="new-password" />
-                      <button type="button" onClick={() => setShowPassword(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">{showPassword ? "隠す" : "表示"}</button>
+                      <button type="button" onClick={() => setShowPassword(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-600 text-xs">{showPassword ? "隠す" : "表示"}</button>
                     </div>
                     {form.password && (
                       <div className="mt-2">
@@ -618,7 +618,7 @@ export default function VpPhoneClient({
               {/* 契約種別選択（複数選択可） */}
               <div className="rounded-2xl bg-white p-5 shadow-sm">
                 <h3 className="font-bold text-gray-800 text-sm mb-1 pb-2 border-b border-gray-100">📋 契約種別の選択<span className="text-red-500 ml-1">*</span></h3>
-                <p className="text-[10px] text-gray-500 mb-3">※複数同時申込可能です</p>
+                <p className="text-[10px] text-gray-700 mb-3">※複数同時申込可能です</p>
                 <div className="grid grid-cols-1 gap-3">
                   {/* 音声回線 */}
                   <button type="button" onClick={() => setVoiceSelected(v => !v)}
@@ -633,7 +633,7 @@ export default function VpPhoneClient({
                           <p className="text-sm font-bold text-gray-800">音声回線契約</p>
                           {voiceSelected && <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">選択中</span>}
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5">通話・SMS・データ通信（docomo回線）</p>
+                        <p className="text-xs text-gray-700 mt-0.5">通話・SMS・データ通信（docomo回線）</p>
                         {voiceSelected && <p className="text-xs font-bold text-green-700 mt-1">月額小計: ¥{fmt(voiceTotal)}</p>}
                       </div>
                     </div>
@@ -651,7 +651,7 @@ export default function VpPhoneClient({
                           <p className="text-sm font-bold text-gray-800">大容量データ回線契約</p>
                           {dataSelected && <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded-full">選択中</span>}
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5">VP未来Wi-Fi（楽天回線）</p>
+                        <p className="text-xs text-gray-700 mt-0.5">VP未来Wi-Fi（楽天回線）</p>
                         {dataSelected && <p className="text-xs font-bold text-purple-700 mt-1">月額小計: ¥{fmt(dataTotals.total)}{dataTotals.typeOnetime > 0 ? ` ＋端末 ¥${fmt(dataTotals.typeOnetime)}` : ""}</p>}
                       </div>
                     </div>
@@ -668,7 +668,7 @@ export default function VpPhoneClient({
                   </div>
                   <div className="rounded-2xl bg-white p-5 shadow-sm">
                     <h3 className="font-bold text-gray-800 text-sm mb-1 pb-2 border-b border-gray-100">📡 データプラン（docomo回線）</h3>
-                    <p className="text-[10px] text-gray-500 mb-3">※料金は税込月額料金</p>
+                    <p className="text-[10px] text-gray-700 mb-3">※料金は税込月額料金</p>
                     <div className="space-y-2">{VOICE_DATA_PLANS.map(p => <RadioCard key={p.id} item={p} selected={voiceDataPlan === p.id} onSelect={() => setVoiceDataPlan(p.id)} color="green" />)}</div>
                   </div>
                   <div className="rounded-2xl bg-white p-5 shadow-sm">
@@ -691,12 +691,12 @@ export default function VpPhoneClient({
                   </div>
                   <div className="rounded-2xl bg-white p-5 shadow-sm">
                     <h3 className="font-bold text-gray-800 text-sm mb-1 pb-2 border-b border-gray-100">🗂️ データ容量（VP未来Wi-Fi）</h3>
-                    <p className="text-[10px] text-gray-500 mb-3">※料金は税込月額料金</p>
+                    <p className="text-[10px] text-gray-700 mb-3">※料金は税込月額料金</p>
                     <div className="space-y-2">{DATA_CAPACITY_PLANS.map(p => <RadioCard key={p.id} item={{ ...p, note: undefined, popular: undefined }} selected={dataCapacity === p.id} onSelect={() => setDataCapacity(p.id)} color="purple" />)}</div>
                   </div>
                   <div className="rounded-2xl bg-white p-5 shadow-sm">
                     <h3 className="font-bold text-gray-800 text-sm mb-3 pb-2 border-b border-gray-100">📡 データ通信のタイプ</h3>
-                    <p className="text-[10px] text-gray-500 mb-3">※SIM・レンタル機器の破損時は¥10,780（税込）を申し受けます</p>
+                    <p className="text-[10px] text-gray-700 mb-3">※SIM・レンタル機器の破損時は¥10,780（税込）を申し受けます</p>
                     <div className="space-y-2">{DATA_TYPE_PLANS.map(p => <RadioCard key={p.id} item={p} selected={dataType === p.id} onSelect={() => setDataType(p.id)} color="purple" priceLabel={p.priceType === "monthly" ? `+¥${fmt(p.price ?? 0)}/月` : p.priceType === "onetime" ? `買取 ¥${fmt(p.price ?? 0)}` : "追加料金なし"} />)}</div>
                   </div>
                 </>
@@ -722,7 +722,7 @@ export default function VpPhoneClient({
                       <h3 className="font-bold text-xs text-purple-800 mb-3 pb-2 border-b border-purple-200">📶 データ回線 内訳</h3>
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between"><span className="text-gray-700">データ容量</span><span className="font-semibold">¥{fmt(DATA_CAPACITY_PLANS.find(p => p.id === dataCapacity)?.price ?? 0)}/月</span></div>
-                        {(() => { const tp = DATA_TYPE_PLANS.find(p => p.id === dataType); if (!tp) return null; if (tp.priceType === "monthly") return <div className="flex justify-between"><span className="text-gray-700">{tp.label}</span><span className="font-semibold">+¥{fmt(tp.price ?? 0)}/月</span></div>; if (tp.priceType === "onetime") return <div className="flex justify-between"><span className="text-gray-700">{tp.label}</span><span className="font-semibold text-orange-600">¥{fmt(tp.price ?? 0)}（一括）</span></div>; return <div className="flex justify-between"><span className="text-gray-700">{tp.label}</span><span className="text-gray-500">追加料金なし</span></div>; })()}
+                        {(() => { const tp = DATA_TYPE_PLANS.find(p => p.id === dataType); if (!tp) return null; if (tp.priceType === "monthly") return <div className="flex justify-between"><span className="text-gray-700">{tp.label}</span><span className="font-semibold">+¥{fmt(tp.price ?? 0)}/月</span></div>; if (tp.priceType === "onetime") return <div className="flex justify-between"><span className="text-gray-700">{tp.label}</span><span className="font-semibold text-orange-600">¥{fmt(tp.price ?? 0)}（一括）</span></div>; return <div className="flex justify-between"><span className="text-gray-700">{tp.label}</span><span className="text-gray-700">追加料金なし</span></div>; })()}
                         <div className="flex justify-between pt-2 border-t border-purple-300"><span className="font-bold text-purple-800">データ回線 小計</span><span className="font-black text-purple-700">¥{fmt(dataTotals.total)}<span className="text-xs">/月</span></span></div>
                         {dataTotals.typeOnetime > 0 && <div className="flex justify-between text-xs text-orange-600"><span>端末代（別途一括）</span><span className="font-bold">¥{fmt(dataTotals.typeOnetime)}</span></div>}
                       </div>
@@ -780,7 +780,7 @@ export default function VpPhoneClient({
                           <label className={lbl}>セキュリティコード<span className="text-red-500 ml-1">*</span></label>
                           <div className="relative">
                             <input type={showCardCvc ? "text" : "password"} inputMode="numeric" className={inp} placeholder="CVC" value={form.cardCvc} onChange={e => setForm({ ...form, cardCvc: e.target.value.replace(/\D/g, "").slice(0, 4) })} maxLength={4} autoComplete="cc-csc" />
-                            <button type="button" onClick={() => setShowCardCvc(s => !s)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-[10px]">{showCardCvc ? "隠す" : "表示"}</button>
+                            <button type="button" onClick={() => setShowCardCvc(s => !s)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-600 text-[10px]">{showCardCvc ? "隠す" : "表示"}</button>
                           </div>
                         </div>
                       </div>
@@ -789,19 +789,19 @@ export default function VpPhoneClient({
                         <input type="text" className={inp} placeholder="TARO YAMADA" value={form.cardName} onChange={e => setForm({ ...form, cardName: e.target.value.toUpperCase() })} autoComplete="cc-name" />
                       </div>
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-3">※ カード情報は安全に処理されます。担当者がご確認後、正式な決済手続きをご案内いたします。</p>
+                    <p className="text-[10px] text-gray-600 mt-3">※ カード情報は安全に処理されます。担当者がご確認後、正式な決済手続きをご案内いたします。</p>
                   </div>
 
                   {/* 同意 */}
                   <div className="rounded-2xl bg-white p-5 shadow-sm space-y-3">
                     <h3 className="font-bold text-gray-800 text-sm mb-2 pb-2 border-b border-gray-100">✅ 規約への同意</h3>
                     <Link href="/vp-phone/terms" className="flex items-center justify-between rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 hover:bg-gray-100 transition">
-                      <div className="flex items-center gap-2"><span>📄</span><div><p className="text-xs font-semibold text-gray-800">利用規約・重要事項説明</p><p className="text-[10px] text-gray-500">VP未来phone / VP未来Wi-Fi</p></div></div>
-                      <span className="text-gray-400">›</span>
+                      <div className="flex items-center gap-2"><span>📄</span><div><p className="text-xs font-semibold text-gray-800">利用規約・重要事項説明</p><p className="text-[10px] text-gray-700">VP未来phone / VP未来Wi-Fi</p></div></div>
+                      <span className="text-gray-600">›</span>
                     </Link>
                     <Link href="/vp-phone/privacy" className="flex items-center justify-between rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 hover:bg-gray-100 transition">
-                      <div className="flex items-center gap-2"><span>🔒</span><div><p className="text-xs font-semibold text-gray-800">個人情報の取扱いについて</p><p className="text-[10px] text-gray-500">プライバシーポリシー</p></div></div>
-                      <span className="text-gray-400">›</span>
+                      <div className="flex items-center gap-2"><span>🔒</span><div><p className="text-xs font-semibold text-gray-800">個人情報の取扱いについて</p><p className="text-[10px] text-gray-700">プライバシーポリシー</p></div></div>
+                      <span className="text-gray-600">›</span>
                     </Link>
                     <label className="flex items-start gap-3 cursor-pointer rounded-xl border-2 border-green-200 bg-green-50 p-3">
                       <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="mt-0.5 w-5 h-5 rounded text-green-600" />
@@ -816,7 +816,7 @@ export default function VpPhoneClient({
                     style={{ background: voiceSelected && dataSelected ? "linear-gradient(135deg,#0f4c81,#43a047)" : voiceSelected ? "linear-gradient(135deg,#16a34a,#4ade80)" : "linear-gradient(135deg,#7c3aed,#a78bfa)" }}>
                     {saving ? "送信中..." : "📱 VP未来phone を申し込む"}
                   </button>
-                  <p className="text-center text-xs text-gray-500 pb-4">申し込み後、担当者より順次ご連絡いたします</p>
+                  <p className="text-center text-xs text-gray-700 pb-4">申し込み後、担当者より順次ご連絡いたします</p>
                 </>
               )}
             </form>

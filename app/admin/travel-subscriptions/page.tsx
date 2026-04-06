@@ -159,7 +159,7 @@ export default async function AdminTravelSubsPage({
             <div className="text-2xl mb-1">💤</div>
             <div className="text-xs font-semibold text-gray-600 mb-1">未登録</div>
             <div className="text-2xl font-bold text-gray-700">{unregisteredCount}</div>
-            <div className="text-xs text-gray-400">名</div>
+            <div className="text-xs text-gray-600">名</div>
           </div>
         </div>
 

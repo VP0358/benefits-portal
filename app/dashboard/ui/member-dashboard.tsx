@@ -82,7 +82,7 @@ function VpPhoneButton() {
         <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center text-xl">📱</div>
         <div className="flex-1">
           <p className="font-bold text-gray-800 text-sm">VP未来phone</p>
-          <p className="text-xs text-gray-400 animate-pulse mt-0.5">読み込み中...</p>
+          <p className="text-xs text-gray-600 animate-pulse mt-0.5">読み込み中...</p>
         </div>
       </div>
     );
@@ -98,7 +98,7 @@ function VpPhoneButton() {
             style={{ background: "linear-gradient(135deg,#16a34a,#4ade80)" }}>📱</div>
           <div>
             <p className="font-bold text-sm text-gray-800">VP未来phone</p>
-            <p className="text-[10px] text-gray-500 mt-0.5">お得なスマートフォン回線</p>
+            <p className="text-[10px] text-gray-700 mt-0.5">お得なスマートフォン回線</p>
           </div>
         </div>
         <span className="rounded-full bg-gray-400 text-white px-3 py-1 text-xs font-bold shadow">
@@ -124,7 +124,7 @@ function VpPhoneButton() {
           <div>
             <p className="font-bold text-sm text-gray-800">{cardTitle}</p>
             {contractTypeLabel && (
-              <p className="text-[10px] text-gray-500 mt-0.5">{contractTypeLabel}</p>
+              <p className="text-[10px] text-gray-700 mt-0.5">{contractTypeLabel}</p>
             )}
           </div>
         </div>
@@ -133,7 +133,7 @@ function VpPhoneButton() {
             <span>{info.icon}</span>
             <span>{info.label}</span>
           </span>
-          <span className="text-gray-400 text-xs">タップして確認 →</span>
+          <span className="text-gray-600 text-xs">タップして確認 →</span>
         </div>
       </div>
       {appData.status === "contracted" && (
@@ -143,7 +143,7 @@ function VpPhoneButton() {
       )}
       {(appData.status === "pending" || appData.status === "reviewing") && (
         <div className="mt-2">
-          <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
+          <div className="flex items-center justify-between text-[10px] text-gray-700 mb-1">
             <span>申込完了</span><span>審査中</span><span>契約完了</span>
           </div>
           <div className="w-full bg-white/60 rounded-full h-1.5">
@@ -258,7 +258,7 @@ function TravelSubButton() {
         <span className="text-2xl">✈️</span>
         <div className="flex-1">
           <p className="font-bold text-gray-800 text-sm">旅行サブスク</p>
-          <p className="text-xs text-gray-400 animate-pulse mt-0.5">読み込み中...</p>
+          <p className="text-xs text-gray-600 animate-pulse mt-0.5">読み込み中...</p>
         </div>
       </div>
     );
@@ -309,9 +309,9 @@ function TravelSubButton() {
             <div>
               <p className="font-bold text-gray-800 text-sm">旅行サブスク</p>
               {sub ? (
-                <p className="text-xs text-gray-500 mt-0.5">{sub.planName} · ¥{sub.monthlyFee.toLocaleString()}/月</p>
+                <p className="text-xs text-gray-700 mt-0.5">{sub.planName} · ¥{sub.monthlyFee.toLocaleString()}/月</p>
               ) : (
-                <p className="text-xs text-gray-400 mt-0.5">タップして詳細・申込</p>
+                <p className="text-xs text-gray-600 mt-0.5">タップして詳細・申込</p>
               )}
             </div>
           </div>
@@ -342,7 +342,7 @@ function TravelSubButton() {
                 <h2 className="font-bold text-gray-800 text-sm">旅行サブスク</h2>
               </div>
               <button onClick={() => { setShowApplyModal(false); setApplyDone(false); setApplyError(""); }}
-                className="text-gray-400 text-2xl hover:text-gray-600 leading-none">✕</button>
+                className="text-gray-600 text-2xl hover:text-gray-600 leading-none">✕</button>
             </div>
 
             {/* スクロール可能なコンテンツ */}
@@ -353,7 +353,7 @@ function TravelSubButton() {
                 <div className={`rounded-2xl border-2 p-4 ${cardBg} ${cardBorder}`}>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-gray-500">現在のプラン</p>
+                      <p className="text-xs text-gray-700">現在のプラン</p>
                       <p className="font-bold text-gray-800">{sub.planName}</p>
                       <p className="text-sm font-bold text-gray-600 mt-0.5">¥{sub.monthlyFee.toLocaleString()}/月</p>
                     </div>
@@ -363,7 +363,7 @@ function TravelSubButton() {
                     </div>
                   </div>
                   {sub.confirmedAt && (
-                    <p className="text-xs text-gray-400 mt-2">確定日: {new Date(sub.confirmedAt).toLocaleDateString("ja-JP")}</p>
+                    <p className="text-xs text-gray-600 mt-2">確定日: {new Date(sub.confirmedAt).toLocaleDateString("ja-JP")}</p>
                   )}
                 </div>
               )}
@@ -466,7 +466,7 @@ function TravelSubButton() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-600 mb-1">現在の自身のレベル<span className="text-red-500 ml-1">*</span></label>
-                      <p className="text-[10px] text-gray-500 mb-2">自身の現在実績レベルを選択してください</p>
+                      <p className="text-[10px] text-gray-700 mb-2">自身の現在実績レベルを選択してください</p>
                       <div className="grid grid-cols-5 gap-1.5">
                         {[1,2,3,4,5].map(l => (
                           <button
@@ -486,7 +486,7 @@ function TravelSubButton() {
                           </button>
                         ))}
                       </div>
-                      <p className="text-[10px] text-gray-400 mt-1">※先着50名料金表示。実際の料金は担当者よりご案内します。</p>
+                      <p className="text-[10px] text-gray-600 mt-1">※先着50名料金表示。実際の料金は担当者よりご案内します。</p>
                     </div>
 
                     {/* 選択プレビュー */}
@@ -630,7 +630,7 @@ export default function MemberDashboard({
           <span className="font-bold text-green-800 text-sm">VIOLA Pure</span>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/announcements" className="relative text-gray-500 text-xl">
+          <Link href="/announcements" className="relative text-gray-700 text-xl">
             🔔
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
@@ -650,7 +650,7 @@ export default function MemberDashboard({
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <span className="font-bold text-green-800">メニュー</span>
-              <button onClick={() => setMenuOpen(false)} className="text-gray-400 text-xl">✕</button>
+              <button onClick={() => setMenuOpen(false)} className="text-gray-600 text-xl">✕</button>
             </div>
             <nav className="flex flex-col gap-1 flex-1 px-3 py-3 overflow-y-auto">
               {[
@@ -761,14 +761,14 @@ export default function MemberDashboard({
           </div>
           <div className="flex items-center gap-2">
             {contractCount === null ? (
-              <span className="text-sm text-gray-400 animate-pulse">...</span>
+              <span className="text-sm text-gray-600 animate-pulse">...</span>
             ) : (
               <span className="text-2xl font-black text-green-600">
                 {contractCount}
-                <span className="text-xs font-semibold text-gray-500 ml-0.5">件</span>
+                <span className="text-xs font-semibold text-gray-700 ml-0.5">件</span>
               </span>
             )}
-            <span className="text-gray-400 text-lg">›</span>
+            <span className="text-gray-600 text-lg">›</span>
           </div>
         </Link>
 

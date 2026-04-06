@@ -11,7 +11,7 @@ export default function OrderHistoryPage() {
 
       <main className="max-w-md mx-auto px-4 pt-5">
         {/* 説明文 */}
-        <p className="text-xs text-gray-500 mb-4 px-1">
+        <p className="text-xs text-gray-700 mb-4 px-1">
           福利厚生サービスのご利用履歴です。タップすると詳細をご確認いただけます。
         </p>
         <OrderHistoryList />

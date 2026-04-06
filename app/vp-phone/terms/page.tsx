@@ -178,12 +178,12 @@ export default function VpPhoneTermsPage() {
     <div className="min-h-screen bg-[#e6f2dc] pb-16">
       {/* ヘッダー */}
       <header className="sticky top-0 z-30 bg-white shadow-sm flex items-center gap-3 px-4 py-3">
-        <Link href="/vp-phone" className="text-gray-500 text-lg hover:text-gray-700">←</Link>
+        <Link href="/vp-phone" className="text-gray-700 text-lg hover:text-gray-700">←</Link>
         <div className="flex items-center gap-2">
           <span className="text-xl">📄</span>
           <div>
             <h1 className="font-bold text-green-800 text-sm leading-none">利用規約・重要事項説明</h1>
-            <p className="text-[10px] text-gray-500 mt-0.5">VP未来phone / VP未来Wi-Fi</p>
+            <p className="text-[10px] text-gray-700 mt-0.5">VP未来phone / VP未来Wi-Fi</p>
           </div>
         </div>
       </header>
@@ -197,7 +197,7 @@ export default function VpPhoneTermsPage() {
               <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center text-xl">📱</div>
               <div>
                 <h2 className="text-base font-bold text-gray-800">VP未来phone 利用規約</h2>
-                <p className="text-xs text-gray-500">音声回線契約・大容量データ回線契約 共通</p>
+                <p className="text-xs text-gray-700">音声回線契約・大容量データ回線契約 共通</p>
               </div>
             </div>
 
@@ -216,7 +216,7 @@ export default function VpPhoneTermsPage() {
               <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-xl">📞</div>
               <div>
                 <h2 className="text-base font-bold text-gray-800">音声通話かけ放題オプション 利用規約</h2>
-                <p className="text-xs text-gray-500">VP未来phone かけ放題オプション</p>
+                <p className="text-xs text-gray-700">VP未来phone かけ放題オプション</p>
               </div>
             </div>
 
@@ -235,7 +235,7 @@ export default function VpPhoneTermsPage() {
               <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-xl">📶</div>
               <div>
                 <h2 className="text-base font-bold text-gray-800">VP未来Wi-Fi 契約約款・重要事項説明</h2>
-                <p className="text-xs text-gray-500">モバイルWi-Fiサービス</p>
+                <p className="text-xs text-gray-700">モバイルWi-Fiサービス</p>
               </div>
             </div>
 
@@ -254,7 +254,7 @@ export default function VpPhoneTermsPage() {
               <div className="w-10 h-10 rounded-xl bg-yellow-100 flex items-center justify-center text-xl">⚠️</div>
               <div>
                 <h2 className="text-base font-bold text-gray-800">重要事項説明</h2>
-                <p className="text-xs text-gray-500">VP未来phone・VP未来Wi-Fi 共通</p>
+                <p className="text-xs text-gray-700">VP未来phone・VP未来Wi-Fi 共通</p>
               </div>
             </div>
 

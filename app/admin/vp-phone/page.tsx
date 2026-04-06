@@ -207,7 +207,7 @@ export default async function AdminVpPhonePage({
             >
               {opt.label}
               {opt.value && (countByStatus[opt.value] ?? 0) > 0 && (
-                <span className="ml-1.5 text-xs font-bold opacity-70">
+                <span className="ml-1.5 text-xs font-bold">
                   {countByStatus[opt.value]}
                 </span>
               )}
@@ -259,7 +259,7 @@ export default async function AdminVpPhonePage({
                 <div className="flex items-center gap-2">
                   <span className="text-base">{st.icon}</span>
                   <span className="text-sm font-bold">{st.label}</span>
-                  <span className="text-xs opacity-70 ml-2">
+                  <span className="text-xs font-medium ml-2">
                     申込日: {new Date(a.createdAt).toLocaleDateString("ja-JP")}
                   </span>
                 </div>

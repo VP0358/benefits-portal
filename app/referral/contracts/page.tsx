@@ -24,7 +24,7 @@ interface Summary {
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   scheduled: { label: "予定",       color: "bg-yellow-100 text-yellow-700" },
   granted:   { label: "付与済",     color: "bg-green-100 text-green-700" },
-  canceled:  { label: "キャンセル", color: "bg-gray-100 text-gray-500" },
+  canceled:  { label: "キャンセル", color: "bg-gray-100 text-gray-700" },
   reversed:  { label: "取消",       color: "bg-red-100 text-red-700" },
 };
 
@@ -79,9 +79,9 @@ export default function ReferralContractsPage() {
             <p className="text-xs font-semibold text-gray-600 mb-1">合計契約人数</p>
             <p className="text-3xl font-black text-gray-800">
               {data?.totalCount ?? 0}
-              <span className="text-sm ml-1 text-gray-500">件</span>
+              <span className="text-sm ml-1 text-gray-700">件</span>
             </p>
-            <p className="text-[10px] text-gray-500 mt-1">累計（継続保持）</p>
+            <p className="text-[10px] text-gray-700 mt-1">累計（継続保持）</p>
           </div>
           <div className="bg-white rounded-2xl shadow p-4 text-center">
             <p className="text-xs font-semibold text-gray-600 mb-1">合計予定ポイント</p>
@@ -89,7 +89,7 @@ export default function ReferralContractsPage() {
               {(data?.totalPoints ?? 0).toLocaleString()}
               <span className="text-sm ml-1 text-green-600">pt</span>
             </p>
-            <p className="text-[10px] text-gray-500 mt-1">報酬額の1/4を自動算出</p>
+            <p className="text-[10px] text-gray-700 mt-1">報酬額の1/4を自動算出</p>
           </div>
         </div>
 
@@ -106,7 +106,7 @@ export default function ReferralContractsPage() {
           {!data?.rewards.length ? (
             <div className="bg-white rounded-2xl shadow p-8 text-center">
               <p className="text-4xl mb-2">📭</p>
-              <p className="text-sm font-medium text-gray-500">まだ契約実績がありません</p>
+              <p className="text-sm font-medium text-gray-700">まだ契約実績がありません</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -116,7 +116,7 @@ export default function ReferralContractsPage() {
                 return (
                   <div key={r.id} className="bg-white rounded-2xl shadow p-4 flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-semibold text-gray-500">{ry}年{rm}月</p>
+                      <p className="text-xs font-semibold text-gray-700">{ry}年{rm}月</p>
                       <p className="font-bold text-gray-800 text-sm mt-0.5">
                         月額 {Number(r.baseMonthlyFee).toLocaleString()}円
                         <span className="text-gray-600 font-normal ml-1">
@@ -128,7 +128,7 @@ export default function ReferralContractsPage() {
                       </span>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs font-semibold text-gray-500">予定ポイント</p>
+                      <p className="text-xs font-semibold text-gray-700">予定ポイント</p>
                       <p className="text-xl font-black text-green-700">
                         +{r.rewardPoints.toLocaleString()}
                         <span className="text-xs ml-0.5">pt</span>

@@ -69,7 +69,7 @@ export default function OrderHistoryList() {
     return (
       <div className="text-center py-12">
         <div className="text-4xl mb-3">📦</div>
-        <p className="text-gray-500 text-sm">使用履歴がありません</p>
+        <p className="text-gray-700 text-sm">使用履歴がありません</p>
       </div>
     );
   }
@@ -77,7 +77,7 @@ export default function OrderHistoryList() {
   return (
     <div className="space-y-3">
       {/* ヘッダー行（テーブル風） */}
-      <div className="hidden md:grid grid-cols-[1fr_140px_100px_80px] gap-2 px-4 py-2 text-xs font-bold text-gray-500 border-b border-gray-200">
+      <div className="hidden md:grid grid-cols-[1fr_140px_100px_80px] gap-2 px-4 py-2 text-xs font-bold text-gray-700 border-b border-gray-200">
         <span>使用科目（商品）</span>
         <span>使用日時</span>
         <span className="text-right">支払金額</span>
@@ -108,14 +108,14 @@ export default function OrderHistoryList() {
                           {item.productName}
                         </span>
                         {item.quantity > 1 && (
-                          <span className="text-xs text-gray-500 flex-shrink-0">× {item.quantity}</span>
+                          <span className="text-xs text-gray-700 flex-shrink-0">× {item.quantity}</span>
                         )}
                       </div>
                     ))}
                   </div>
                   {/* 使用日時 */}
                   <div className="flex items-center gap-2 mt-1.5">
-                    <span className="text-[11px] text-gray-500">
+                    <span className="text-[11px] text-gray-700">
                       🕐 {new Date(row.orderedAt).toLocaleString("ja-JP", {
                         year: "numeric",
                         month: "2-digit",
@@ -124,7 +124,7 @@ export default function OrderHistoryList() {
                         minute: "2-digit",
                       })}
                     </span>
-                    <span className="text-[10px] text-gray-400">{row.orderNumber}</span>
+                    <span className="text-[10px] text-gray-600">{row.orderNumber}</span>
                   </div>
                 </div>
 
@@ -147,7 +147,7 @@ export default function OrderHistoryList() {
 
               {/* 展開インジケーター */}
               <div className="flex justify-center mt-2">
-                <span className="text-gray-300 text-xs">{isExpanded ? "▲ 閉じる" : "▼ 詳細"}</span>
+                <span className="text-gray-600 text-xs font-medium">{isExpanded ? "▲ 閉じる" : "▼ 詳細"}</span>
               </div>
             </button>
 
@@ -162,7 +162,7 @@ export default function OrderHistoryList() {
                       <div key={item.id} className="flex items-center justify-between rounded-xl bg-white border border-gray-100 px-3 py-2.5">
                         <div>
                           <p className="text-sm font-semibold text-gray-800">{item.productName}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">
+                          <p className="text-xs text-gray-700 mt-0.5">
                             {item.unitPrice.toLocaleString()}円 × {item.quantity}個
                           </p>
                         </div>

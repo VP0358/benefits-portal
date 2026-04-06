@@ -106,7 +106,7 @@ export default function AnnouncementsAdminPage() {
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">タイトル</label>
               <input
-              className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm text-gray-900 placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-300"
               placeholder="タイトルを入力"
                 value={editing.title ?? ""}
                 onChange={(e) => setEditing({ ...editing, title: e.target.value })}
@@ -128,7 +128,7 @@ export default function AnnouncementsAdminPage() {
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">内容</label>
               <textarea
-              className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm text-gray-900 placeholder:text-gray-400 h-32 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm text-gray-900 placeholder:text-gray-600 h-32 focus:outline-none focus:ring-2 focus:ring-indigo-300"
               placeholder="お知らせの内容を入力"
                 value={editing.content ?? ""}
                 onChange={(e) => setEditing({ ...editing, content: e.target.value })}
@@ -165,9 +165,9 @@ export default function AnnouncementsAdminPage() {
 
       {/* 一覧 */}
       {loading ? (
-        <div className="text-center text-gray-400 py-12">読み込み中...</div>
+        <div className="text-center text-gray-600 py-12">読み込み中...</div>
       ) : list.length === 0 ? (
-        <div className="text-center text-gray-400 py-12">
+        <div className="text-center text-gray-600 py-12">
           <p className="text-4xl mb-3">📭</p>
           <p>お知らせがありません</p>
           <p className="text-sm mt-1">「＋ 新規作成」から追加してください</p>
@@ -189,11 +189,11 @@ export default function AnnouncementsAdminPage() {
                     <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
                       a.isPublished
                         ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-500"
+                        : "bg-gray-100 text-gray-700"
                     }`}>
                       {a.isPublished ? "✅ 公開中" : "🔒 非公開"}
                     </span>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-gray-600">
                       {new Date(a.createdAt).toLocaleDateString("ja-JP")}
                     </span>
                   </div>

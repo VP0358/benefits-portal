@@ -5,12 +5,12 @@ export default function VpPhonePrivacyPage() {
     <div className="min-h-screen bg-[#e6f2dc] pb-16">
       {/* ヘッダー */}
       <header className="sticky top-0 z-30 bg-white shadow-sm flex items-center gap-3 px-4 py-3">
-        <Link href="/vp-phone" className="text-gray-500 text-lg hover:text-gray-700">←</Link>
+        <Link href="/vp-phone" className="text-gray-700 text-lg hover:text-gray-700">←</Link>
         <div className="flex items-center gap-2">
           <span className="text-xl">🔒</span>
           <div>
             <h1 className="font-bold text-green-800 text-sm leading-none">個人情報の取扱いについて</h1>
-            <p className="text-[10px] text-gray-500 mt-0.5">VP未来phone 申し込みに係る個人情報保護方針</p>
+            <p className="text-[10px] text-gray-700 mt-0.5">VP未来phone 申し込みに係る個人情報保護方針</p>
           </div>
         </div>
       </header>
