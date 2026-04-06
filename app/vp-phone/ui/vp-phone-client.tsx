@@ -340,7 +340,11 @@ export default function VpPhoneClient({
   const hasActiveApp = app && !["rejected", "canceled"].includes(app.status);
 
   // ── 申込フォーム用 state ──
-  const [contractType,  setContractType]  = useState<"voice" | "data" | "">("");
+  // 音声・データは複数選択可（両方同時申込も可）
+  const [voiceSelected, setVoiceSelected] = useState(false);
+  const [dataSelected,  setDataSelected]  = useState(false);
+  // 後方互換：contractTypeはAPI送信用（両方選択時は"both"）
+  const contractType = voiceSelected && dataSelected ? "both" : voiceSelected ? "voice" : dataSelected ? "data" : "";
   const [voiceDataPlan, setVoiceDataPlan] = useState("1gb");
   const [kakehoudai,    setKakehoudai]    = useState("none");
   const [voiceOpts,     setVoiceOpts]     = useState<string[]>([]);
@@ -364,18 +368,23 @@ export default function VpPhoneClient({
   const voiceTotal = calcVoiceTotal(voiceDataPlan, kakehoudai, voiceOpts);
   const dataTotals = calcDataMonthly(dataCapacity, dataType);
 
+  // 総合計（月額）と一括費用
+  const grandMonthly  = (voiceSelected ? voiceTotal : 0) + (dataSelected ? dataTotals.total : 0);
+  const grandOnetime  = dataSelected ? dataTotals.typeOnetime : 0;
+
   function buildDesiredPlan(): string {
-    if (contractType === "voice") {
+    const parts: string[] = [];
+    if (voiceSelected) {
       const data = VOICE_DATA_PLANS.find(p => p.id === voiceDataPlan);
       const kake = KAKEHOUDAI_PLANS.find(p => p.id === kakehoudai);
       const opts = voiceOpts.map(id => VOICE_OPTIONS.find(o => o.id === id)?.label).filter(Boolean).join("・");
       let s = `[音声回線] ${data?.label}（¥${fmt(data?.price ?? 0)}）`;
       if (kake && kake.id !== "none") s += ` ／ ${kake.label}（¥${fmt(kake.price ?? 0)}）`;
       if (opts) s += ` ／ オプション:${opts}`;
-      s += ` ／ 月額合計 ¥${fmt(voiceTotal)}`;
-      return s;
+      s += ` ／ 月額小計 ¥${fmt(voiceTotal)}`;
+      parts.push(s);
     }
-    if (contractType === "data") {
+    if (dataSelected) {
       const cap = DATA_CAPACITY_PLANS.find(p => p.id === dataCapacity);
       const tp  = DATA_TYPE_PLANS.find(p => p.id === dataType);
       let s = `[大容量データ回線] ${cap?.label}（¥${fmt(cap?.price ?? 0)}/月）`;
@@ -384,18 +393,21 @@ export default function VpPhoneClient({
         else if (tp.priceType === "onetime") s += ` ／ ${tp.label}（買取¥${fmt(tp.price ?? 0)}）`;
         else s += ` ／ ${tp.label}`;
       }
-      s += ` ／ 月額合計 ¥${fmt(dataTotals.total)}`;
+      s += ` ／ 月額小計 ¥${fmt(dataTotals.total)}`;
       if (dataTotals.typeOnetime > 0) s += `（端末¥${fmt(dataTotals.typeOnetime)} 別途）`;
-      return s;
+      parts.push(s);
     }
-    return "";
+    if (parts.length > 1) {
+      parts.push(`月額総合計 ¥${fmt(grandMonthly)}`);
+    }
+    return parts.join(" ／ ");
   }
   function formatCardNumber(v: string) { return v.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim(); }
   function formatExpiry(v: string) { const d = v.replace(/\D/g, "").slice(0, 4); return d.length >= 3 ? d.slice(0, 2) + "/" + d.slice(2) : d; }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!contractType) { setError("契約種別を選択してください"); return; }
+    if (!voiceSelected && !dataSelected) { setError("契約種別を1つ以上選択してください"); return; }
     if (!agreed) { setError("個人情報の取扱いへの同意が必要です"); return; }
     if (form.password && form.password !== form.passwordConfirm) { setError("パスワードが一致しません"); return; }
     if (!form.referrerCode || !form.referrerName) { setError("紹介者コードと紹介者名は必須項目です"); return; }
@@ -603,33 +615,44 @@ export default function VpPhoneClient({
                 </div>
               </div>
 
-              {/* 契約種別選択 */}
+              {/* 契約種別選択（複数選択可） */}
               <div className="rounded-2xl bg-white p-5 shadow-sm">
-                <h3 className="font-bold text-gray-800 text-sm mb-4 pb-2 border-b border-gray-100">📋 契約種別の選択<span className="text-red-500 ml-1">*</span></h3>
+                <h3 className="font-bold text-gray-800 text-sm mb-1 pb-2 border-b border-gray-100">📋 契約種別の選択<span className="text-red-500 ml-1">*</span></h3>
+                <p className="text-[10px] text-gray-500 mb-3">※複数同時申込可能です</p>
                 <div className="grid grid-cols-1 gap-3">
-                  <button type="button" onClick={() => setContractType("voice")}
-                    className={`rounded-2xl border-2 p-4 text-left transition-all ${contractType === "voice" ? "border-green-500 bg-green-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
+                  {/* 音声回線 */}
+                  <button type="button" onClick={() => setVoiceSelected(v => !v)}
+                    className={`rounded-2xl border-2 p-4 text-left transition-all ${voiceSelected ? "border-green-500 bg-green-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${contractType === "voice" ? "bg-green-200" : "bg-gray-100"}`}>📱</div>
+                      <div className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all ${voiceSelected ? "border-green-500 bg-green-500" : "border-gray-300 bg-white"}`}>
+                        {voiceSelected && <span className="text-white text-[11px] font-black leading-none">✓</span>}
+                      </div>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${voiceSelected ? "bg-green-200" : "bg-gray-100"}`}>📱</div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-bold text-gray-800">音声回線契約</p>
-                          {contractType === "voice" && <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">選択中</span>}
+                          {voiceSelected && <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full">選択中</span>}
                         </div>
                         <p className="text-xs text-gray-500 mt-0.5">通話・SMS・データ通信（docomo回線）</p>
+                        {voiceSelected && <p className="text-xs font-bold text-green-700 mt-1">月額小計: ¥{fmt(voiceTotal)}</p>}
                       </div>
                     </div>
                   </button>
-                  <button type="button" onClick={() => setContractType("data")}
-                    className={`rounded-2xl border-2 p-4 text-left transition-all ${contractType === "data" ? "border-purple-500 bg-purple-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
+                  {/* 大容量データ回線 */}
+                  <button type="button" onClick={() => setDataSelected(v => !v)}
+                    className={`rounded-2xl border-2 p-4 text-left transition-all ${dataSelected ? "border-purple-500 bg-purple-50" : "border-gray-200 bg-white hover:border-gray-300"}`}>
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${contractType === "data" ? "bg-purple-200" : "bg-gray-100"}`}>📶</div>
+                      <div className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-all ${dataSelected ? "border-purple-500 bg-purple-500" : "border-gray-300 bg-white"}`}>
+                        {dataSelected && <span className="text-white text-[11px] font-black leading-none">✓</span>}
+                      </div>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${dataSelected ? "bg-purple-200" : "bg-gray-100"}`}>📶</div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-bold text-gray-800">大容量データ回線契約</p>
-                          {contractType === "data" && <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded-full">選択中</span>}
+                          {dataSelected && <span className="text-xs bg-purple-500 text-white px-2 py-0.5 rounded-full">選択中</span>}
                         </div>
                         <p className="text-xs text-gray-500 mt-0.5">VP未来Wi-Fi（楽天回線）</p>
+                        {dataSelected && <p className="text-xs font-bold text-purple-700 mt-1">月額小計: ¥{fmt(dataTotals.total)}{dataTotals.typeOnetime > 0 ? ` ＋端末 ¥${fmt(dataTotals.typeOnetime)}` : ""}</p>}
                       </div>
                     </div>
                   </button>
@@ -637,10 +660,10 @@ export default function VpPhoneClient({
               </div>
 
               {/* 音声回線プラン */}
-              {contractType === "voice" && (
+              {voiceSelected && (
                 <>
                   <div className="rounded-2xl bg-green-600 text-white p-4 shadow-sm flex items-center justify-between">
-                    <div><p className="text-xs font-semibold opacity-90">現在の月額合計（税込）</p><p className="text-2xl font-black mt-0.5">¥{fmt(voiceTotal)}<span className="text-sm font-semibold">/月</span></p></div>
+                    <div><p className="text-xs font-semibold opacity-90">📱 音声回線 月額小計（税込）</p><p className="text-2xl font-black mt-0.5">¥{fmt(voiceTotal)}<span className="text-sm font-semibold">/月</span></p></div>
                     <span className="text-3xl">📱</span>
                   </div>
                   <div className="rounded-2xl bg-white p-5 shadow-sm">
@@ -660,10 +683,10 @@ export default function VpPhoneClient({
               )}
 
               {/* 大容量データ回線プラン */}
-              {contractType === "data" && (
+              {dataSelected && (
                 <>
                   <div className="rounded-2xl p-4 shadow-sm flex items-center justify-between text-white" style={{ background: "linear-gradient(135deg,#7c3aed,#a78bfa)" }}>
-                    <div><p className="text-xs font-semibold opacity-90">現在の月額合計（税込）</p><p className="text-2xl font-black mt-0.5">¥{fmt(dataTotals.total)}<span className="text-sm font-semibold">/月</span></p>{dataTotals.typeOnetime > 0 && <p className="text-xs opacity-80 mt-0.5">+ 端末代 ¥{fmt(dataTotals.typeOnetime)}（一括）</p>}</div>
+                    <div><p className="text-xs font-semibold opacity-90">📶 データ回線 月額小計（税込）</p><p className="text-2xl font-black mt-0.5">¥{fmt(dataTotals.total)}<span className="text-sm font-semibold">/月</span></p>{dataTotals.typeOnetime > 0 && <p className="text-xs opacity-80 mt-0.5">+ 端末代 ¥{fmt(dataTotals.typeOnetime)}（一括）</p>}</div>
                     <span className="text-3xl">📶</span>
                   </div>
                   <div className="rounded-2xl bg-white p-5 shadow-sm">
@@ -680,27 +703,60 @@ export default function VpPhoneClient({
               )}
 
               {/* 合計・カード・同意 */}
-              {contractType && (
+              {(voiceSelected || dataSelected) && (
                 <>
-                  {/* 合計まとめ */}
-                  <div className={`rounded-2xl border-2 p-5 shadow-sm ${contractType === "voice" ? "bg-green-50 border-green-300" : "bg-purple-50 border-purple-300"}`}>
-                    <h3 className={`font-bold text-sm mb-4 pb-2 border-b ${contractType === "voice" ? "text-green-800 border-green-200" : "text-purple-800 border-purple-200"}`}>💴 お支払い金額のまとめ</h3>
-                    {contractType === "voice" ? (
+                  {/* ── 各プラン明細 ── */}
+                  {voiceSelected && (
+                    <div className="rounded-2xl border-2 bg-green-50 border-green-200 p-4 shadow-sm">
+                      <h3 className="font-bold text-xs text-green-800 mb-3 pb-2 border-b border-green-200">📱 音声回線 内訳</h3>
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between"><span className="text-gray-700">データプラン</span><span className="font-semibold">¥{fmt(VOICE_DATA_PLANS.find(p => p.id === voiceDataPlan)?.price ?? 0)}/月</span></div>
                         {kakehoudai !== "none" && <div className="flex justify-between"><span className="text-gray-700">かけ放題</span><span className="font-semibold">¥{fmt(KAKEHOUDAI_PLANS.find(p => p.id === kakehoudai)?.price ?? 0)}/月</span></div>}
                         {voiceOpts.map(id => { const opt = VOICE_OPTIONS.find(o => o.id === id); return opt ? <div key={id} className="flex justify-between"><span className="text-gray-700">{opt.label}</span><span className="font-semibold">¥{fmt(opt.price)}/月</span></div> : null; })}
-                        <div className="flex justify-between pt-2 border-t border-green-300"><span className="font-bold text-green-800">月額合計（税込）</span><span className="text-xl font-black text-green-700">¥{fmt(voiceTotal)}<span className="text-sm">/月</span></span></div>
+                        <div className="flex justify-between pt-2 border-t border-green-300"><span className="font-bold text-green-800">音声回線 小計</span><span className="font-black text-green-700">¥{fmt(voiceTotal)}<span className="text-xs">/月</span></span></div>
                       </div>
-                    ) : (
+                    </div>
+                  )}
+                  {dataSelected && (
+                    <div className="rounded-2xl border-2 bg-purple-50 border-purple-200 p-4 shadow-sm">
+                      <h3 className="font-bold text-xs text-purple-800 mb-3 pb-2 border-b border-purple-200">📶 データ回線 内訳</h3>
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between"><span className="text-gray-700">データ容量</span><span className="font-semibold">¥{fmt(DATA_CAPACITY_PLANS.find(p => p.id === dataCapacity)?.price ?? 0)}/月</span></div>
                         {(() => { const tp = DATA_TYPE_PLANS.find(p => p.id === dataType); if (!tp) return null; if (tp.priceType === "monthly") return <div className="flex justify-between"><span className="text-gray-700">{tp.label}</span><span className="font-semibold">+¥{fmt(tp.price ?? 0)}/月</span></div>; if (tp.priceType === "onetime") return <div className="flex justify-between"><span className="text-gray-700">{tp.label}</span><span className="font-semibold text-orange-600">¥{fmt(tp.price ?? 0)}（一括）</span></div>; return <div className="flex justify-between"><span className="text-gray-700">{tp.label}</span><span className="text-gray-500">追加料金なし</span></div>; })()}
-                        <div className="flex justify-between pt-2 border-t border-purple-300"><span className="font-bold text-purple-800">月額合計（税込）</span><span className="text-xl font-black text-purple-700">¥{fmt(dataTotals.total)}<span className="text-sm">/月</span></span></div>
+                        <div className="flex justify-between pt-2 border-t border-purple-300"><span className="font-bold text-purple-800">データ回線 小計</span><span className="font-black text-purple-700">¥{fmt(dataTotals.total)}<span className="text-xs">/月</span></span></div>
                         {dataTotals.typeOnetime > 0 && <div className="flex justify-between text-xs text-orange-600"><span>端末代（別途一括）</span><span className="font-bold">¥{fmt(dataTotals.typeOnetime)}</span></div>}
                       </div>
+                    </div>
+                  )}
+
+                  {/* ━━━ 総合計カード（お支払い情報の直上）━━━ */}
+                  <div className="rounded-2xl p-5 shadow-lg text-white" style={{ background: "linear-gradient(135deg, #0f4c81, #1e88e5, #43a047)" }}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xl">💴</span>
+                      <p className="text-sm font-bold opacity-90">お支払い総合計（税込）</p>
+                    </div>
+                    {/* 内訳行 */}
+                    {voiceSelected && dataSelected && (
+                      <div className="bg-white/15 rounded-xl px-4 py-3 mb-3 space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="opacity-80">📱 音声回線</span>
+                          <span className="font-semibold">¥{fmt(voiceTotal)}/月</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="opacity-80">📶 データ回線</span>
+                          <span className="font-semibold">¥{fmt(dataTotals.total)}/月{dataTotals.typeOnetime > 0 ? ` ＋端末¥${fmt(dataTotals.typeOnetime)}` : ""}</span>
+                        </div>
+                      </div>
                     )}
-                    <p className={`mt-3 pt-2 border-t text-[10px] ${contractType === "voice" ? "border-green-200 text-green-700" : "border-purple-200 text-purple-700"}`}>※ 表示金額はすべて税込です。申し込み後、担当者よりご確認の連絡をいたします。</p>
+                    {/* 総合計メイン表示 */}
+                    <div className="flex items-end justify-between">
+                      <div>
+                        <p className="text-3xl font-black leading-none">¥{fmt(grandMonthly)}<span className="text-base font-semibold">/月</span></p>
+                        {grandOnetime > 0 && <p className="text-xs opacity-80 mt-1">＋端末代 ¥{fmt(grandOnetime)}（別途一括）</p>}
+                      </div>
+                      <span className="text-4xl opacity-70">{voiceSelected && dataSelected ? "📱📶" : voiceSelected ? "📱" : "📶"}</span>
+                    </div>
+                    <p className="text-[10px] opacity-70 mt-3 border-t border-white/20 pt-2">※ 表示金額はすべて税込です。申し込み後、担当者よりご確認の連絡をいたします。</p>
                   </div>
 
                   {/* カード情報 */}
@@ -757,7 +813,7 @@ export default function VpPhoneClient({
 
                   <button type="submit" disabled={saving || !agreed}
                     className="w-full rounded-2xl py-4 text-base font-bold text-white transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{ background: contractType === "voice" ? "linear-gradient(135deg,#16a34a,#4ade80)" : "linear-gradient(135deg,#7c3aed,#a78bfa)" }}>
+                    style={{ background: voiceSelected && dataSelected ? "linear-gradient(135deg,#0f4c81,#43a047)" : voiceSelected ? "linear-gradient(135deg,#16a34a,#4ade80)" : "linear-gradient(135deg,#7c3aed,#a78bfa)" }}>
                     {saving ? "送信中..." : "📱 VP未来phone を申し込む"}
                   </button>
                   <p className="text-center text-xs text-gray-500 pb-4">申し込み後、担当者より順次ご連絡いたします</p>
