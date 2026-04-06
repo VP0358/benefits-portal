@@ -18,7 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const session = await auth();
 
   if (!session?.user?.email) redirect("/admin/login");
-  if (session.user.role !== "admin") redirect("/dashboard");
+  if (session.user.role !== "admin") redirect("/admin/login");
 
   return (
     <div className="min-h-screen bg-[#f5f3ff]">

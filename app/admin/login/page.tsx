@@ -46,7 +46,7 @@ export default function AdminLoginPage() {
         return;
       }
 
-      window.location.replace("/admin");
+      window.location.replace("/admin/dashboard");
     } catch (err) {
       console.error("Admin login error:", err);
       setError("ログインに失敗しました。もう一度お試しください。");

@@ -10,12 +10,31 @@ const PUBLIC_PATHS = [
   "/register",
   "/api/auth",
   "/api/register",
+  "/api/site-settings",
   "/_next",
   "/favicon",
   "/apple-touch-icon",
 ];
 
-export default async function middleware(req: NextRequest) {
+/**
+ * JWTのペイロード部分をデコードして role を取得する
+ * Edge Runtime では Buffer が使えないため atob を使用
+ */
+function getRoleFromJwt(token: string): string | undefined {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return undefined;
+    // base64url → base64
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+    const payload = JSON.parse(atob(padded));
+    return payload?.role ?? payload?.user?.role;
+  } catch {
+    return undefined;
+  }
+}
+
+export default function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const host     = req.headers.get("host") ?? "";
   const hostname = host.replace(/^www\./, "").split(":")[0];
@@ -23,68 +42,48 @@ export default async function middleware(req: NextRequest) {
   const isMemberDomain = hostname === MEMBER_DOMAIN;
   const isAdminDomain  = hostname === ADMIN_DOMAIN;
 
-  // ① 公開パスは認証チェックをスキップ
+  // ① 公開パスは認証チェックをスキップ（必ず最初に判定）
   if (PUBLIC_PATHS.some(p => pathname.startsWith(p))) {
-    const requestHeaders = new Headers(req.headers);
-    requestHeaders.set("x-next-pathname", pathname);
-    return NextResponse.next({ request: { headers: requestHeaders } });
+    return NextResponse.next();
   }
 
   // ② セッションCookieを直接チェック（auth()は使わない）
-  // Next Auth v5 のJWTセッションCookie名
+  // NextAuth v5 のJWTセッションCookie名（複数候補）
   const sessionCookie =
     req.cookies.get("__Secure-next-auth.session-token")?.value ||
     req.cookies.get("next-auth.session-token")?.value ||
     req.cookies.get("authjs.session-token")?.value ||
     req.cookies.get("__Secure-authjs.session-token")?.value;
 
-  // セッションCookieがない = 未ログイン
+  // セッションCookieがない = 未ログイン → ログインページへ
   if (!sessionCookie) {
-    const url = req.nextUrl.clone();
-    // /admin/* へのアクセスは /admin/login へ
-    if (pathname.startsWith("/admin")) {
-      url.pathname = "/admin/login";
-    } else {
-      url.pathname = "/login";
-    }
-    return NextResponse.redirect(url);
+    const loginPath = pathname.startsWith("/admin") ? "/admin/login" : "/login";
+    return NextResponse.redirect(new URL(loginPath, req.url));
   }
 
-  // ③ セッションCookieがある場合はJWTをデコードしてroleを取得
-  let role: string | undefined;
-  try {
-    const parts = sessionCookie.split(".");
-    if (parts.length >= 2) {
-      const payload = JSON.parse(
-        Buffer.from(parts[1], "base64url").toString("utf-8")
-      );
-      role = payload?.role ?? payload?.user?.role;
-    }
-  } catch {
-    role = undefined;
-  }
+  // ③ JWTをデコードして role を取得
+  const role = getRoleFromJwt(sessionCookie);
 
   // ④ ルート "/" のリダイレクト
   if (pathname === "/") {
-    const url = req.nextUrl.clone();
+    let dest: string;
     if (isMemberDomain) {
-      url.pathname = "/dashboard";
+      dest = "/dashboard";
     } else if (isAdminDomain) {
-      url.pathname = "/admin";
+      dest = role === "admin" ? "/admin" : "/admin/login";
     } else {
-      url.pathname = role === "admin" ? "/admin" : "/dashboard";
+      dest = role === "admin" ? "/admin" : "/dashboard";
     }
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(new URL(dest, req.url));
   }
 
   // ⑤ 会員ドメインから /admin へのアクセスをブロック
   if (isMemberDomain && pathname.startsWith("/admin")) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  // ⑥ 管理ドメインから会員ページへのアクセスをブロック
+  // ⑥ 管理ドメインから会員専用ページへのアクセスをブロック
+  //    → /admin/login へ（ループしない安全な送り先）
   if (
     isAdminDomain &&
     (pathname.startsWith("/dashboard") ||
@@ -95,16 +94,13 @@ export default async function middleware(req: NextRequest) {
       pathname.startsWith("/vp-phone-referrals") ||
       pathname.startsWith("/travel-referrals"))
   ) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/admin";
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(new URL("/admin/login", req.url));
   }
 
-  // ⑦ 管理ルートはadminロールのみ
+  // ⑦ /admin/* はadminロールのみ許可
+  //    role が取れない or admin でない場合は /admin/login へ（ループしない）
   if (pathname.startsWith("/admin") && role !== "admin") {
-    const url = req.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(new URL("/admin/login", req.url));
   }
 
   return NextResponse.next();
