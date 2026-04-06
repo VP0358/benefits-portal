@@ -1,10 +1,13 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 // 送信元メールアドレス（Resendで認証済みドメインが必要）
 const FROM_ADDRESS = process.env.MAIL_FROM ?? "noreply@viola-pure.net";
 const FROM_NAME    = "VIOLA-Pure 福利厚生";
+
+// Resendインスタンスを遅延初期化（ビルド時に RESEND_API_KEY が不要になる）
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY);
+}
 
 /** 会員登録完了メール */
 export async function sendWelcomeEmail({
@@ -120,6 +123,7 @@ FAX.050-3385-7788
 `.trim();
 
   try {
+    const resend = getResend();
     const result = await resend.emails.send({
       from: `${FROM_NAME} <${FROM_ADDRESS}>`,
       to,
