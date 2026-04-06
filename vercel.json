@@ -1,1 +1,5 @@
-{"deploymentProtection": false}
+{
+  "deploymentProtection": false,
+  "framework": "nextjs",
+  "nodeVersion": "20.x"
+}
