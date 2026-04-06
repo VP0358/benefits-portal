@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { signIn } from "next-auth/react";
 import ViolaLogo from "@/app/components/viola-logo";
 
 export default function LoginPage() {
@@ -14,27 +15,27 @@ export default function LoginPage() {
     setError("");
 
     try {
-      // ① CSRFトークン取得
-      const csrfRes   = await fetch("/api/auth/csrf");
-      const csrfData  = await csrfRes.json();
-      const csrfToken = csrfData.csrfToken ?? "";
-
-      // ② credentials でログイン
-      await fetch("/api/auth/callback/credentials", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          email:       form.email,
-          password:    form.password,
-          csrfToken,
-          callbackUrl: "/",
-          json:        "true",
-        }).toString(),
-        redirect: "manual",
+      // next-auth/react の signIn を使用（CSRFトークンを自動処理）
+      const result = await signIn("credentials", {
+        email:       form.email,
+        password:    form.password,
+        redirect:    false,
       });
 
-      // ③ セッション確認
-      await new Promise((r) => setTimeout(r, 500));
+      if (result?.error) {
+        setError("メールアドレスまたはパスワードが正しくありません。");
+        setLoading(false);
+        return;
+      }
+
+      if (!result?.ok) {
+        setError("ログインに失敗しました。もう一度お試しください。");
+        setLoading(false);
+        return;
+      }
+
+      // セッション確認してロール判定
+      await new Promise((r) => setTimeout(r, 300));
       const sessionRes = await fetch("/api/auth/session", { cache: "no-store" });
       const session    = await sessionRes.json();
 
@@ -44,12 +45,13 @@ export default function LoginPage() {
         return;
       }
 
-      // ④ ロールで振り分け（管理者は管理者ログインページへ誘導）
+      // ロールで振り分け（管理者は管理者ログインページへ誘導）
       if (session.user.role === "admin") {
         setError("管理者アカウントです。管理者ログインページをご利用ください。");
         setLoading(false);
         return;
       }
+
       window.location.replace("/dashboard");
     } catch (err) {
       console.error("Login error:", err);
@@ -68,7 +70,7 @@ export default function LoginPage() {
             <ViolaLogo size="lg" />
           </div>
           <h1 className="text-xl font-bold text-green-700">会員ログイン</h1>
-          <p className="mt-1 text-slate-500 text-sm">福利厚生ポータルへようこそ</p>
+          <p className="mt-1 text-slate-600 text-sm">福利厚生ポータルへようこそ</p>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4">
@@ -127,7 +129,7 @@ export default function LoginPage() {
 
         {/* 新規登録 */}
         <div className="mt-6 text-center">
-          <p className="text-sm text-slate-500">アカウントをお持ちでない方は</p>
+          <p className="text-sm text-slate-600">アカウントをお持ちでない方は</p>
           <a
             href="/register"
             className="mt-2 block w-full rounded-xl border-2 border-green-600 px-4 py-3
@@ -139,7 +141,7 @@ export default function LoginPage() {
 
         {/* 管理者リンク */}
         <div className="mt-4 text-center">
-          <a href="/admin/login" className="text-xs text-slate-400 hover:text-slate-600 transition">
+          <a href="/admin/login" className="text-xs text-slate-600 hover:text-slate-700 transition">
             管理者の方はこちら →
           </a>
         </div>

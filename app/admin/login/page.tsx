@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { signIn } from "next-auth/react";
 
 export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
@@ -13,24 +14,27 @@ export default function AdminLoginPage() {
     setError("");
 
     try {
-      const csrfRes   = await fetch("/api/auth/csrf");
-      const csrfData  = await csrfRes.json();
-      const csrfToken = csrfData.csrfToken ?? "";
-
-      await fetch("/api/auth/callback/credentials", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          email:       form.email,
-          password:    form.password,
-          csrfToken,
-          callbackUrl: "/",
-          json:        "true",
-        }).toString(),
-        redirect: "manual",
+      // next-auth/react の signIn を使用（CSRFトークンを自動処理）
+      const result = await signIn("credentials", {
+        email:    form.email,
+        password: form.password,
+        redirect: false,
       });
 
-      await new Promise((r) => setTimeout(r, 500));
+      if (result?.error) {
+        setError("メールアドレスまたはパスワードが正しくありません。");
+        setLoading(false);
+        return;
+      }
+
+      if (!result?.ok) {
+        setError("ログインに失敗しました。もう一度お試しください。");
+        setLoading(false);
+        return;
+      }
+
+      // セッション確認してロール判定
+      await new Promise((r) => setTimeout(r, 300));
       const sessionRes = await fetch("/api/auth/session", { cache: "no-store" });
       const session    = await sessionRes.json();
 
@@ -71,7 +75,7 @@ export default function AdminLoginPage() {
           <h1 className="text-xl font-bold" style={{ color: "#312e81" }}>
             管理者ログイン
           </h1>
-          <p className="mt-1 text-slate-500 text-sm">福利厚生ポータル 管理画面</p>
+          <p className="mt-1 text-slate-700 text-sm">福利厚生ポータル 管理画面</p>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4">
@@ -132,7 +136,7 @@ export default function AdminLoginPage() {
 
         {/* 会員ログインへ戻る */}
         <div className="mt-6 text-center">
-          <a href="/login" className="text-xs text-slate-400 hover:text-slate-600 transition">
+          <a href="/login" className="text-xs text-slate-600 hover:text-slate-700 transition">
             ← 会員ログインページへ戻る
           </a>
         </div>
