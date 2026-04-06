@@ -35,33 +35,21 @@ const TRAVEL_FEES: Record<"early"|"standard", Record<number, number>> = {
   standard: { 1: 3000, 2: 2700, 3: 2500, 4: 2000, 5: 1500 },
 };
 
-// ────────── VpPhoneButton（契約詳細・変更・解約モーダル付き） ──────────
+// ────────── VpPhoneButton（ダッシュボード用・/vp-phoneへ直遷移） ──────────
 type VpAppData = {
   id: string;
   status: string;
   contractType?: string;
-  desiredPlan?: string;
-  nameKanji?: string;
-  email?: string;
-  phone?: string;
-  birthDate?: string;
-  gender?: string;
   adminNote?: string;
   contractedAt?: string | null;
   createdAt?: string;
 };
 
-function VpPhoneButton({ onModalClose }: { onModalClose?: () => void }) {
+function VpPhoneButton() {
   const [appData, setAppData] = useState<VpAppData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [cancelConfirm, setCancelConfirm] = useState(false);
-  const [canceling, setCanceling] = useState(false);
-  const [cancelMsg, setCancelMsg] = useState("");
-  const [actionType, setActionType] = useState<string>("");
 
-  const loadData = () => {
-    setLoading(true);
+  useEffect(() => {
     fetch("/api/my/vp-phone")
       .then(r => r.json())
       .then(d => {
@@ -69,12 +57,6 @@ function VpPhoneButton({ onModalClose }: { onModalClose?: () => void }) {
           id:           d.application.id,
           status:       d.application.status,
           contractType: d.application.contractType ?? "",
-          desiredPlan:  d.application.desiredPlan ?? "",
-          nameKanji:    d.application.nameKanji ?? "",
-          email:        d.application.email ?? "",
-          phone:        d.application.phone ?? "",
-          birthDate:    d.application.birthDate ?? "",
-          gender:       d.application.gender ?? "",
           adminNote:    d.application.adminNote ?? "",
           contractedAt: d.application.contractedAt ?? null,
           createdAt:    d.application.createdAt ?? "",
@@ -82,9 +64,7 @@ function VpPhoneButton({ onModalClose }: { onModalClose?: () => void }) {
         setLoading(false);
       })
       .catch(() => { setLoading(false); });
-  };
-
-  useEffect(() => { loadData(); }, []);
+  }, []);
 
   // ステータス別スタイル定義
   type SInfo = { label: string; icon: string; cardBg: string; cardBorder: string; badgeBg: string; badgeText: string; pulse?: boolean };
@@ -96,41 +76,12 @@ function VpPhoneButton({ onModalClose }: { onModalClose?: () => void }) {
     canceled:   { label: "取消済み",  icon: "🚫", cardBg: "bg-gray-50",   cardBorder: "border-gray-300",   badgeBg: "bg-gray-400",    badgeText: "text-white" },
   };
 
-  const info = appData ? STATUS_INFO[appData.status] : null;
-
-  // 解約・キャンセル・プラン変更申請
-  async function handleCancel() {
-    if (!appData) return;
-    setCanceling(true);
-    setCancelMsg("");
-    const cancelType = actionType || (appData.status === "contracted" ? "contract_cancel" : "cancel_apply");
-    try {
-      const res = await fetch(`/api/my/vp-phone/${appData.id}/cancel`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cancelType }),
-      });
-      if (res.ok) {
-        const d = await res.json().catch(() => null);
-        setCancelMsg(d?.message || "解約申請を受け付けました。担当者よりご連絡いたします。");
-        setCancelConfirm(false);
-        loadData();
-      } else {
-        const d = await res.json().catch(() => null);
-        setCancelMsg(d?.error || "解約申請に失敗しました。");
-      }
-    } catch {
-      setCancelMsg("通信エラーが発生しました。");
-    }
-    setCanceling(false);
-  }
-
   if (loading) {
     return (
       <div className="bg-white rounded-2xl p-4 shadow border-2 border-gray-100 flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center text-xl">📱</div>
         <div className="flex-1">
-          <p className="font-bold text-gray-800 text-sm">VP未来phone 申し込み</p>
+          <p className="font-bold text-gray-800 text-sm">VP未来phone</p>
           <p className="text-xs text-gray-400 animate-pulse mt-0.5">読み込み中...</p>
         </div>
       </div>
@@ -138,7 +89,7 @@ function VpPhoneButton({ onModalClose }: { onModalClose?: () => void }) {
   }
 
   // 未申し込み
-  if (!info) {
+  if (!appData) {
     return (
       <Link href="/vp-phone"
         className="block rounded-2xl p-4 shadow border-2 border-dashed border-green-300 bg-white hover:shadow-md hover:border-green-400 transition flex items-center justify-between">
@@ -146,253 +97,63 @@ function VpPhoneButton({ onModalClose }: { onModalClose?: () => void }) {
           <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
             style={{ background: "linear-gradient(135deg,#16a34a,#4ade80)" }}>📱</div>
           <div>
-            <p className="font-bold text-sm text-gray-800">VP未来phone 申し込み</p>
+            <p className="font-bold text-sm text-gray-800">VP未来phone</p>
             <p className="text-[10px] text-gray-500 mt-0.5">お得なスマートフォン回線</p>
           </div>
         </div>
-        <span className="rounded-full bg-green-500 text-white px-3 py-1 text-xs font-bold shadow">
-          申し込む →
+        <span className="rounded-full bg-gray-400 text-white px-3 py-1 text-xs font-bold shadow">
+          未申込
         </span>
       </Link>
     );
   }
 
-  const contractTypeLabel = appData?.contractType === "voice" ? "音声回線" : appData?.contractType === "data" ? "データ回線" : "";
+  const info = STATUS_INFO[appData.status] ?? STATUS_INFO.pending;
+  const contractTypeLabel = appData.contractType === "voice" ? "音声回線" : appData.contractType === "data" ? "データ回線" : "";
+  // 申込済みかつ有効（再申込でない）なら「申し込み内容変更」
+  const hasActiveApp = !["rejected", "canceled"].includes(appData.status);
+  const cardTitle = hasActiveApp ? "申し込み内容変更" : "VP未来phone 再申し込み";
 
   return (
-    <>
-      {/* カード（タップでモーダル開く） */}
-      <button type="button"
-        onClick={() => setShowModal(true)}
-        className={`w-full text-left rounded-2xl p-4 shadow border-2 hover:shadow-md transition ${info.cardBg} ${info.cardBorder}`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-              style={{ background: "linear-gradient(135deg,#16a34a,#4ade80)" }}>📱</div>
-            <div>
-              <p className="font-bold text-sm text-gray-800">VP未来phone 申し込み</p>
-              {contractTypeLabel && (
-                <p className="text-[10px] text-gray-500 mt-0.5">{contractTypeLabel}</p>
-              )}
-            </div>
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            <span className={`rounded-full px-3 py-1 text-xs font-bold flex items-center gap-1 ${info.badgeBg} ${info.badgeText} ${info.pulse ? "animate-pulse" : ""}`}>
-              <span>{info.icon}</span>
-              <span>{info.label}</span>
-            </span>
-            <span className="text-gray-400 text-xs">タップして確認 →</span>
+    <Link href="/vp-phone"
+      className={`block rounded-2xl p-4 shadow border-2 hover:shadow-md transition ${info.cardBg} ${info.cardBorder}`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+            style={{ background: "linear-gradient(135deg,#16a34a,#4ade80)" }}>📱</div>
+          <div>
+            <p className="font-bold text-sm text-gray-800">{cardTitle}</p>
+            {contractTypeLabel && (
+              <p className="text-[10px] text-gray-500 mt-0.5">{contractTypeLabel}</p>
+            )}
           </div>
         </div>
-        {appData?.status === "contracted" && (
-          <div className="mt-2 bg-emerald-100 rounded-xl px-3 py-2 text-xs font-semibold text-emerald-800">
-            🎉 VP未来phone の契約が完了しています！
+        <div className="flex flex-col items-end gap-1">
+          <span className={`rounded-full px-3 py-1 text-xs font-bold flex items-center gap-1 ${info.badgeBg} ${info.badgeText} ${info.pulse ? "animate-pulse" : ""}`}>
+            <span>{info.icon}</span>
+            <span>{info.label}</span>
+          </span>
+          <span className="text-gray-400 text-xs">タップして確認 →</span>
+        </div>
+      </div>
+      {appData.status === "contracted" && (
+        <div className="mt-2 bg-emerald-100 rounded-xl px-3 py-2 text-xs font-semibold text-emerald-800">
+          🎉 VP未来phone の契約が完了しています！
+        </div>
+      )}
+      {(appData.status === "pending" || appData.status === "reviewing") && (
+        <div className="mt-2">
+          <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
+            <span>申込完了</span><span>審査中</span><span>契約完了</span>
           </div>
-        )}
-        {(appData?.status === "pending" || appData?.status === "reviewing") && (
-          <div className="mt-2">
-            <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
-              <span>申込完了</span><span>審査中</span><span>契約完了</span>
-            </div>
-            <div className="w-full bg-white/60 rounded-full h-1.5">
-              <div className={`h-1.5 rounded-full transition-all ${
-                appData.status === "reviewing" ? "bg-blue-500 w-2/3" : "bg-yellow-400 w-1/3"
-              }`} />
-            </div>
-          </div>
-        )}
-      </button>
-
-      {/* 契約詳細モーダル */}
-      {showModal && appData && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-6" onClick={() => { setShowModal(false); onModalClose?.(); }}>
-          <div className="w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col"
-            style={{ maxHeight: "90vh" }}
-            onClick={e => e.stopPropagation()}>
-            {/* モーダルヘッダー（固定） */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">📱</span>
-                <h2 className="font-bold text-gray-800 text-sm">VP未来phone 申し込み状況</h2>
-              </div>
-              <button onClick={() => { setShowModal(false); onModalClose?.(); }} className="text-gray-400 text-2xl hover:text-gray-600 leading-none">✕</button>
-            </div>
-
-            <div className="overflow-y-auto flex-1">
-            <div className="px-5 py-4 space-y-4 sm:px-7 sm:py-5">
-              {/* ステータスバッジ */}
-              <div className={`rounded-2xl border-2 p-4 ${info.cardBg} ${info.cardBorder}`}>
-                <div className="flex items-center gap-3">
-                  <span className="text-3xl">{info.icon}</span>
-                  <div>
-                    <p className="text-xs text-gray-500">現在のステータス</p>
-                    <p className="font-bold text-base text-gray-800">{info.label}</p>
-                  </div>
-                  <span className={`ml-auto rounded-full px-3 py-1 text-xs font-bold ${info.badgeBg} ${info.badgeText}`}>
-                    {info.label}
-                  </span>
-                </div>
-                {(appData.status === "pending" || appData.status === "reviewing") && (
-                  <div className="mt-3">
-                    <div className="flex justify-between text-[10px] text-gray-500 mb-1">
-                      <span>申込完了</span><span>審査中</span><span>契約完了</span>
-                    </div>
-                    <div className="w-full bg-white/60 rounded-full h-2">
-                      <div className={`h-2 rounded-full ${appData.status === "reviewing" ? "bg-blue-500 w-2/3" : "bg-yellow-400 w-1/3"}`} />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 申込詳細 */}
-              <div className="rounded-2xl bg-gray-50 p-4 space-y-2 text-sm">
-                <p className="font-bold text-gray-700 text-xs mb-2">📋 申込内容</p>
-                {[
-                  { label: "申込日", value: appData.createdAt ? new Date(appData.createdAt).toLocaleDateString("ja-JP") : "—" },
-                  { label: "お名前", value: appData.nameKanji || "—" },
-                  { label: "メール", value: appData.email || "—" },
-                  { label: "電話番号", value: appData.phone || "—" },
-                  { label: "契約種別", value: appData.contractType === "voice" ? "音声回線契約" : appData.contractType === "data" ? "大容量データ回線契約" : "—" },
-                ].map(row => (
-                  <div key={row.label} className="flex justify-between items-start gap-2">
-                    <span className="text-gray-500 text-xs whitespace-nowrap">{row.label}</span>
-                    <span className="font-medium text-gray-800 text-xs text-right break-all">{row.value}</span>
-                  </div>
-                ))}
-                {appData.desiredPlan && (
-                  <div className="pt-2 border-t border-gray-200">
-                    <p className="text-gray-500 text-xs mb-1">希望プラン</p>
-                    <p className="text-xs font-medium text-gray-800 break-all">{appData.desiredPlan}</p>
-                  </div>
-                )}
-                {appData.contractedAt && (
-                  <div className="flex justify-between pt-2 border-t border-gray-200">
-                    <span className="text-gray-500 text-xs">契約完了日</span>
-                    <span className="font-bold text-emerald-700 text-xs">{new Date(appData.contractedAt).toLocaleDateString("ja-JP")}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* 担当者メモ */}
-              {appData.adminNote && (
-                <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4">
-                  <p className="text-xs font-bold text-amber-700 mb-1">📝 担当者からのメモ</p>
-                  <p className="text-xs text-gray-800">{appData.adminNote}</p>
-                </div>
-              )}
-
-              {/* 契約完了メッセージ */}
-              {appData.status === "contracted" && (
-                <div className="rounded-2xl bg-emerald-50 border-2 border-emerald-200 p-4 text-center">
-                  <div className="text-3xl mb-2">🎉</div>
-                  <p className="font-bold text-emerald-800 text-sm">VP未来phone の契約が完了しています！</p>
-                  <p className="text-xs text-emerald-600 mt-1">ご契約ありがとうございます。</p>
-                </div>
-              )}
-
-              {/* アクションボタン */}
-              <div className="space-y-2 pt-2">
-
-                {/* ── 契約済み：プラン変更申請 ── */}
-                {appData.status === "contracted" && (
-                  <>
-                    {!cancelConfirm ? (
-                      <div className="space-y-2">
-                        <button
-                          type="button"
-                          onClick={() => { setCancelConfirm(true); setActionType("plan_change"); }}
-                          className="w-full rounded-xl border-2 border-blue-200 text-blue-700 py-3 text-sm font-semibold hover:bg-blue-50 transition">
-                          🔄 プラン変更を申請する
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setCancelConfirm(true); setActionType("contract_cancel"); }}
-                          className="w-full rounded-xl border-2 border-red-200 text-red-600 py-3 text-sm font-semibold hover:bg-red-50 transition">
-                          🚫 解約を申請する
-                        </button>
-                      </div>
-                    ) : (
-                      <div className={`rounded-xl border-2 p-4 space-y-3 ${actionType === "plan_change" ? "bg-blue-50 border-blue-200" : "bg-red-50 border-red-200"}`}>
-                        <p className={`text-sm font-bold ${actionType === "plan_change" ? "text-blue-700" : "text-red-700"}`}>
-                          {actionType === "plan_change" ? "🔄 プラン変更を申請しますか？" : "🚫 本当に解約を申請しますか？"}
-                        </p>
-                        <p className={`text-xs ${actionType === "plan_change" ? "text-blue-600" : "text-red-600"}`}>
-                          申請後、担当者よりご連絡いたします。
-                        </p>
-                        {cancelMsg && <p className="text-xs text-gray-700 font-semibold">{cancelMsg}</p>}
-                        <div className="flex gap-2">
-                          <button type="button"
-                            onClick={() => { setCancelConfirm(false); setCancelMsg(""); setActionType(""); }}
-                            className="flex-1 rounded-xl border border-gray-300 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition">
-                            やめる
-                          </button>
-                          <button type="button"
-                            onClick={handleCancel}
-                            disabled={canceling}
-                            className={`flex-1 rounded-xl text-white py-2.5 text-sm font-bold transition disabled:opacity-50 ${actionType === "plan_change" ? "bg-blue-500 hover:bg-blue-600" : "bg-red-500 hover:bg-red-600"}`}>
-                            {canceling ? "申請中..." : "はい、申請する"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* ── 審査待ち・審査中：申込キャンセル ── */}
-                {(appData.status === "pending" || appData.status === "reviewing") && (
-                  <>
-                    {!cancelConfirm ? (
-                      <button
-                        type="button"
-                        onClick={() => { setCancelConfirm(true); setActionType("cancel_apply"); }}
-                        className="w-full rounded-xl border-2 border-red-200 text-red-600 py-3 text-sm font-semibold hover:bg-red-50 transition">
-                        ✋ 申し込みをキャンセルする
-                      </button>
-                    ) : (
-                      <div className="rounded-xl bg-red-50 border-2 border-red-200 p-4 space-y-3">
-                        <p className="text-sm font-bold text-red-700">申し込みをキャンセルしますか？</p>
-                        <p className="text-xs text-red-600">キャンセル後、担当者よりご連絡いたします。</p>
-                        {cancelMsg && <p className="text-xs text-red-700 font-semibold">{cancelMsg}</p>}
-                        <div className="flex gap-2">
-                          <button type="button"
-                            onClick={() => { setCancelConfirm(false); setCancelMsg(""); setActionType(""); }}
-                            className="flex-1 rounded-xl border border-gray-300 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition">
-                            やめる
-                          </button>
-                          <button type="button"
-                            onClick={handleCancel}
-                            disabled={canceling}
-                            className="flex-1 rounded-xl bg-red-500 text-white py-2.5 text-sm font-bold hover:bg-red-600 transition disabled:opacity-50">
-                            {canceling ? "申請中..." : "はい、キャンセルする"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* ── 審査不可・キャンセル済み：再申し込み ── */}
-                {(appData.status === "rejected" || appData.status === "canceled") && (
-                  <Link href="/vp-phone"
-                    className="block w-full rounded-xl bg-green-600 text-white py-3 text-sm font-bold text-center hover:bg-green-700 transition"
-                    onClick={() => setShowModal(false)}>
-                    📱 再申し込みする
-                  </Link>
-                )}
-              </div>
-
-              {/* 申込ページへのリンク */}
-              <Link href="/vp-phone"
-                className="block text-center text-xs text-gray-400 hover:text-gray-600 underline pb-2"
-                onClick={() => setShowModal(false)}>
-                申し込みページで詳細を確認する →
-              </Link>
-            </div>
-            </div>
+          <div className="w-full bg-white/60 rounded-full h-1.5">
+            <div className={`h-1.5 rounded-full transition-all ${
+              appData.status === "reviewing" ? "bg-blue-500 w-2/3" : "bg-yellow-400 w-1/3"
+            }`} />
           </div>
         </div>
       )}
-    </>
+    </Link>
   );
 }
 
