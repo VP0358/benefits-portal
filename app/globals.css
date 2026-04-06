@@ -1,23 +1,39 @@
 @import "tailwindcss";
 
+/* ダークモード完全無効化 - Tailwind v4のベーススタイルより後に書く */
+@layer base {
+  html, body {
+    color-scheme: light !important;
+    background-color: #ffffff !important;
+    color: #171717 !important;
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
 }
 
-/* ダークモード強制無効化（スマホ等でダークモード設定でも常に白背景） */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #ffffff;
-    --foreground: #171717;
-  }
+html {
+  color-scheme: light !important;
+  background-color: #ffffff !important;
 }
 
-html,
 body {
-  background: #ffffff !important;
-  color: #171717;
+  background-color: #ffffff !important;
+  color: #171717 !important;
   font-family: system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
-  /* スマホのダークモードで黒背景になるのを防止 */
-  color-scheme: light only;
+}
+
+/* Tailwind v4のダークモード自動適用を完全に上書き */
+@media (prefers-color-scheme: dark) {
+  html, body {
+    color-scheme: light !important;
+    background-color: #ffffff !important;
+    color: #171717 !important;
+  }
+  :root {
+    --background: #ffffff !important;
+    --foreground: #171717 !important;
+  }
 }

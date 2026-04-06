@@ -16,6 +16,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  colorScheme: "light",
 };
 
 export default function RootLayout({
@@ -24,8 +25,27 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ja">
-      <body className="antialiased" style={{ fontFamily: "system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif" }}>
+    <html
+      lang="ja"
+      style={{
+        colorScheme: "light",
+        backgroundColor: "#ffffff",
+      }}
+    >
+      <head>
+        {/* iPhoneダークモードで黒くなるのを完全に防止 */}
+        <meta name="color-scheme" content="light" />
+        <meta name="supported-color-schemes" content="light" />
+      </head>
+      <body
+        className="antialiased"
+        style={{
+          fontFamily: "system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif",
+          backgroundColor: "#ffffff",
+          color: "#171717",
+          colorScheme: "light",
+        }}
+      >
         <Providers>
           {children}
         </Providers>
