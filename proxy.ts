@@ -88,7 +88,9 @@ export default async function middleware(req: NextRequest) {
       pathname.startsWith("/points") ||
       pathname.startsWith("/orders") ||
       pathname === "/referral" ||
-      pathname.startsWith("/referral/"))
+      pathname.startsWith("/referral/") ||
+      pathname.startsWith("/vp-phone-referrals") ||
+      pathname.startsWith("/travel-referrals"))
   ) {
     const url = req.nextUrl.clone();
     url.pathname = "/admin";
@@ -117,5 +119,9 @@ export const config = {
     "/orders/:path*",
     "/referral",
     "/referral/:path*",
+    "/vp-phone-referrals/:path*",
+    "/travel-referrals/:path*",
+    "/org-chart/:path*",
+    "/vp-phone/:path*",
   ],
 };

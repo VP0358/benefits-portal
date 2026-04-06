@@ -668,8 +668,10 @@ export default function MemberDashboard({
                 { href: "/announcements",   label: "🔔 お知らせ" },
                 { href: "/orders/history",  label: "📦 福利厚生使用履歴" },
                 { href: "/profile",         label: "👤 マイアカウント" },
-                { href: "/referral",        label: "🎁 友達を紹介する" },
-                { href: "/org-chart",       label: "🌳 直紹介 組織図" },
+                { href: "/referral",            label: "🎁 友達を紹介する" },
+                { href: "/org-chart",           label: "🌳 直紹介 組織図" },
+                { href: "/vp-phone-referrals",  label: "📱 VP紹介ツリー" },
+                { href: "/travel-referrals",    label: "✈️ 旅行サブスク紹介ツリー" },
               ].map(item => (
                 <Link key={item.href} href={item.href}
                   onClick={() => setMenuOpen(false)}
@@ -870,7 +872,9 @@ export default function MemberDashboard({
               { href: "/points/history", icon: "📊", label: "ポイント履歴" },
               { href: "/profile",        icon: "👤", label: "マイアカウント" },
               { href: "/referral",       icon: "🎁", label: "友達を紹介する" },
-              { href: "/org-chart",     icon: "🌳", label: "直紹介 組織図" },
+              { href: "/org-chart",          icon: "🌳", label: "直紹介 組織図" },
+              { href: "/vp-phone-referrals",   icon: "📱", label: "VP紹介ツリー" },
+              { href: "/travel-referrals",     icon: "✈️", label: "旅行サブスク紹介ツリー" },
             ].map(item => (
               <Link key={item.href} href={item.href}
                 className="bg-white rounded-2xl p-4 shadow text-center hover:shadow-md transition active:scale-95">
