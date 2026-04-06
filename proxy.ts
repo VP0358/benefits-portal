@@ -1,51 +1,67 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 
 const MEMBER_DOMAIN = "viola-pure.net";
 const ADMIN_DOMAIN  = "viola-pure.xyz";
 
-// 認証不要なパス
-const PUBLIC_PATHS = ["/login", "/admin/login", "/register", "/api/auth", "/api/register", "/_next", "/favicon"];
+// 認証不要なパス（これらはセッションチェックをスキップ）
+const PUBLIC_PATHS = [
+  "/login",
+  "/admin/login",
+  "/register",
+  "/api/auth",
+  "/api/register",
+  "/_next",
+  "/favicon",
+  "/apple-touch-icon",
+];
 
-export default auth(function middleware(req: NextRequest) {
+export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const host     = req.headers.get("host") ?? "";
-  // www. を除去して比較
   const hostname = host.replace(/^www\./, "").split(":")[0];
-  const session  = (req as NextRequest & { auth: unknown }).auth as
-    { user?: { role?: string } } | null;
 
   const isMemberDomain = hostname === MEMBER_DOMAIN;
   const isAdminDomain  = hostname === ADMIN_DOMAIN;
 
-  // ① 公開パスはスキップ
+  // ① 公開パスは認証チェックをスキップ
   if (PUBLIC_PATHS.some(p => pathname.startsWith(p))) {
-    // ログイン済みで /login → リダイレクト
-    if (pathname === "/login" && session?.user) {
-      const url = req.nextUrl.clone();
-      url.pathname = session.user.role === "admin" ? "/admin" : "/dashboard";
-      return NextResponse.redirect(url);
-    }
-    // ログイン済みで /admin/login → /admin へリダイレクト
-    if (pathname === "/admin/login" && session?.user?.role === "admin") {
-      const url = req.nextUrl.clone();
-      url.pathname = "/admin";
-      return NextResponse.redirect(url);
-    }
-    // パスをリクエストヘッダーに付与（layout側での判定用）
     const requestHeaders = new Headers(req.headers);
     requestHeaders.set("x-next-pathname", pathname);
     return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
-  // ② 未ログイン → /login
-  if (!session?.user) {
+  // ② セッションCookieを直接チェック（auth()は使わない）
+  // Next Auth v5 のJWTセッションCookie名
+  const sessionCookie =
+    req.cookies.get("__Secure-next-auth.session-token")?.value ||
+    req.cookies.get("next-auth.session-token")?.value ||
+    req.cookies.get("authjs.session-token")?.value ||
+    req.cookies.get("__Secure-authjs.session-token")?.value;
+
+  // セッションCookieがない = 未ログイン → /login へ
+  if (!sessionCookie) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  // ③ ルート "/" のリダイレクト
+  // ③ セッションCookieがある場合はJWTをデコードしてroleを取得
+  // セッションAPIに問い合わせず、JWTのペイロードを直接読む（base64デコード）
+  let role: string | undefined;
+  try {
+    const parts = sessionCookie.split(".");
+    if (parts.length >= 2) {
+      const payload = JSON.parse(
+        Buffer.from(parts[1], "base64url").toString("utf-8")
+      );
+      role = payload?.role ?? payload?.user?.role;
+    }
+  } catch {
+    // デコード失敗時はそのまま通す（サーバー側で再検証される）
+    role = undefined;
+  }
+
+  // ④ ルート "/" のリダイレクト
   if (pathname === "/") {
     const url = req.nextUrl.clone();
     if (isMemberDomain) {
@@ -53,19 +69,19 @@ export default auth(function middleware(req: NextRequest) {
     } else if (isAdminDomain) {
       url.pathname = "/admin";
     } else {
-      url.pathname = session.user.role === "admin" ? "/admin" : "/dashboard";
+      url.pathname = role === "admin" ? "/admin" : "/dashboard";
     }
     return NextResponse.redirect(url);
   }
 
-  // ④ 会員ドメインから /admin へのアクセスをブロック
+  // ⑤ 会員ドメインから /admin へのアクセスをブロック
   if (isMemberDomain && pathname.startsWith("/admin")) {
     const url = req.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
-  // ⑤ 管理ドメインから会員ページへのアクセスをブロック
+  // ⑥ 管理ドメインから会員ページへのアクセスをブロック
   if (
     isAdminDomain &&
     (pathname.startsWith("/dashboard") ||
@@ -79,15 +95,15 @@ export default auth(function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // ⑥ ロールチェック：管理ルートはadminのみ
-  if (pathname.startsWith("/admin") && session.user.role !== "admin") {
+  // ⑦ 管理ルートはadminロールのみ
+  if (pathname.startsWith("/admin") && role !== "admin") {
     const url = req.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: [
