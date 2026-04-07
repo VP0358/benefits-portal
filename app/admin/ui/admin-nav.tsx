@@ -18,9 +18,10 @@ const navItems = [
   { href: "/admin/vp-phone",         label: "📲 VP未来phone申し込み" },
   { href: "/admin/travel-subscriptions", label: "✈️ 旅行サブスク一覧" },
   { href: "/admin/referral-rewards", label: "💰 紹介者報酬計算" },
-  // ── 商品 / 注文
+  // ── 商品 / 注文 / 発送
   { href: "/admin/products",         label: "📦 商品管理" },
   { href: "/admin/orders",           label: "🛒 注文管理" },
+  { href: "/admin/shipping-labels",  label: "🚚 発送伝票管理" },
   // ── ポイント
   { href: "/admin/points/monthly",   label: "🗓️ 月次ポイント計算" },
   { href: "/admin/points/expire",    label: "⏰ ポイント失効処理" },

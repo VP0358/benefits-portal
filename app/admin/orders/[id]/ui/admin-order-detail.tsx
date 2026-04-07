@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 type OrderDetail = {
   id: string; orderNumber: string; status: string; subtotalAmount: number; usedPoints: number; totalAmount: number; orderedAt: string;
@@ -14,6 +15,8 @@ export default function AdminOrderDetail({ orderId }: { orderId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [hasLabel, setHasLabel] = useState<boolean | null>(null);
+  const [creatingLabel, setCreatingLabel] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -24,9 +27,34 @@ export default function AdminOrderDetail({ orderId }: { orderId: string }) {
     const result = await res.json();
     setData(result);
     setStatus(result.status);
+    // 発送伝票の有無を確認
+    fetch(`/api/admin/shipping-labels?orderId=${orderId}`)
+      .then(r => r.ok ? r.json() : [])
+      .then((labels: { orderId: string }[]) => {
+        setHasLabel(labels.some(l => l.orderId === orderId));
+      })
+      .catch(() => setHasLabel(false));
   }
 
   useEffect(() => { void fetchOrder(); }, [orderId]);
+
+  async function createShippingLabel() {
+    if (!data) return;
+    setCreatingLabel(true); setError(""); setMessage("");
+    const res = await fetch("/api/admin/shipping-labels", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId }),
+    });
+    setCreatingLabel(false);
+    if (!res.ok) {
+      const r = await res.json().catch(() => null);
+      setError(r?.error || "発送伝票の作成に失敗しました");
+      return;
+    }
+    setMessage("発送伝票を作成しました。「発送伝票管理」ページで確認・印刷できます。");
+    setHasLabel(true);
+  }
 
   async function saveStatus() {
     setSaving(true); setError(""); setMessage("");
@@ -88,6 +116,36 @@ export default function AdminOrderDetail({ orderId }: { orderId: string }) {
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
         {message && <p className="text-sm text-emerald-600">{message}</p>}
+      </div>
+
+      {/* 発送伝票セクション */}
+      <div className="rounded-2xl border p-4 space-y-3">
+        <label className="block text-sm font-medium">発送伝票</label>
+        {hasLabel === null ? (
+          <div className="text-sm text-slate-400">確認中...</div>
+        ) : hasLabel ? (
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-emerald-600 font-medium">✅ 発送伝票が作成済みです</span>
+            <Link
+              href="/admin/shipping-labels"
+              className="rounded-xl bg-slate-100 px-4 py-2 text-sm text-slate-700 hover:bg-slate-200 transition-colors"
+            >
+              伝票管理ページへ →
+            </Link>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => void createShippingLabel()}
+              disabled={creatingLabel || data?.status === "canceled"}
+              className="rounded-xl bg-blue-600 px-5 py-3 text-sm text-white hover:bg-blue-500 disabled:opacity-50 whitespace-nowrap"
+            >
+              {creatingLabel ? "作成中..." : "📦 発送伝票を作成"}
+            </button>
+            <span className="text-xs text-slate-400">注文者の住所・氏名が自動でセットされます</span>
+          </div>
+        )}
       </div>
     </div>
   );

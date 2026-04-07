@@ -8,9 +8,11 @@ export default function ReferralPage() {
   const [referralCode, setReferralCode] = useState("");
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [copiedMlm, setCopiedMlm] = useState(false);
 
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
   const referralUrl = referralCode ? `${baseUrl}/register?ref=${referralCode}` : "";
+  const mlmReferralUrl = referralCode ? `${baseUrl}/mlm-register?ref=${referralCode}` : "";
 
   useEffect(() => {
     fetch("/api/member/referral")
@@ -29,7 +31,6 @@ export default function ReferralPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // フォールバック
       const el = document.createElement("textarea");
       el.value = referralUrl;
       document.body.appendChild(el);
@@ -38,6 +39,24 @@ export default function ReferralPage() {
       document.body.removeChild(el);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
+  async function copyMlmUrl() {
+    if (!mlmReferralUrl) return;
+    try {
+      await navigator.clipboard.writeText(mlmReferralUrl);
+      setCopiedMlm(true);
+      setTimeout(() => setCopiedMlm(false), 2000);
+    } catch {
+      const el = document.createElement("textarea");
+      el.value = mlmReferralUrl;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      setCopiedMlm(true);
+      setTimeout(() => setCopiedMlm(false), 2000);
     }
   }
 
@@ -116,6 +135,70 @@ export default function ReferralPage() {
                 >
                   <span>✉️</span> メールで送る
                 </a>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* MLM紹介カード */}
+        <div className="rounded-3xl bg-white p-6 shadow-sm space-y-5 border-2 border-emerald-200">
+          <div className="text-center space-y-2">
+            <div className="text-4xl">🤝</div>
+            <h2 className="text-lg font-bold text-slate-800">MLMビジネス会員 紹介URL</h2>
+            <p className="text-sm text-slate-500">
+              MLMビジネス会員として勧誘する場合はこちらのURLを使用してください。<br />
+              登録者はあなたの直紹介として自動で配置されます。
+            </p>
+          </div>
+
+          {loading ? (
+            <div className="text-center text-sm text-slate-400 py-4">読み込み中...</div>
+          ) : (
+            <>
+              {/* MLM紹介URL */}
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-emerald-700">MLMビジネス会員登録URL</div>
+                <div className="flex gap-2">
+                  <input
+                    readOnly
+                    value={mlmReferralUrl}
+                    className="flex-1 rounded-xl border bg-emerald-50 px-3 py-3 text-xs text-slate-700 select-all"
+                    onClick={e => (e.target as HTMLInputElement).select()}
+                  />
+                  <button
+                    onClick={copyMlmUrl}
+                    className={`rounded-xl px-4 py-3 text-sm font-semibold transition-colors whitespace-nowrap ${
+                      copiedMlm
+                        ? "bg-emerald-500 text-white"
+                        : "bg-emerald-700 text-white hover:bg-emerald-600"
+                    }`}
+                  >
+                    {copiedMlm ? "✅ コピー済" : "コピー"}
+                  </button>
+                </div>
+              </div>
+
+              {/* MLMシェアボタン */}
+              <div className="grid grid-cols-2 gap-3">
+                <a
+                  href={`https://line.me/R/msg/text/?${encodeURIComponent(`CLAIRホールディングスMLMビジネス会員に招待します！\n${mlmReferralUrl}`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 rounded-2xl bg-[#06C755] py-3 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+                >
+                  <span>💬</span> LINEで送る
+                </a>
+                <a
+                  href={`mailto:?subject=${encodeURIComponent("CLAIRホールディングス MLMビジネス会員へのご招待")}&body=${encodeURIComponent(`CLAIRホールディングスのMLMビジネス会員にご招待します。\n以下のURLから登録してください。\n\n${mlmReferralUrl}`)}`}
+                  className="flex items-center justify-center gap-2 rounded-2xl bg-slate-700 py-3 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+                >
+                  <span>✉️</span> メールで送る
+                </a>
+              </div>
+
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-700">
+                ⚠️ MLM（連鎖販売取引）の勧誘は特定商取引法の規制を受けます。
+                概要書面を必ず事前に交付し、適切な説明を行ってください。
               </div>
             </>
           )}

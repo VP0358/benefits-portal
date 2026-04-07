@@ -100,7 +100,9 @@ export async function GET() {
       children: NodeData[];
     };
 
-    async function buildNode(m: typeof me.downlines[0], depth: number): Promise<NodeData> {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const meNonNull = me!;
+    async function buildNode(m: typeof meNonNull.downlines[0], depth: number): Promise<NodeData> {
       const purchases = await prisma.mlmPurchase.findMany({
         where: { mlmMemberId: m.id, purchaseMonth: currentMonth },
       });
@@ -109,9 +111,9 @@ export async function GET() {
         ACTIVE_REQUIRED_PRODUCTS.includes(p.productCode)
       );
       const isActive =
-        (m as typeof me).forceActive ||
+        (m as typeof meNonNull).forceActive ||
         (m.memberType === "business" &&
-          (m as typeof me).contractDate != null &&
+          (m as typeof meNonNull).contractDate != null &&
           selfPoints >= 150 &&
           hasRequired);
 
@@ -120,9 +122,9 @@ export async function GET() {
 
       // 子ノード（最大3段）
       let children: NodeData[] = [];
-      if (depth < 3 && (m as typeof me).downlines) {
+      if (depth < 3 && (m as typeof meNonNull).downlines) {
         children = await Promise.all(
-          (m as typeof me).downlines.map((child: typeof me.downlines[0]) =>
+          (m as typeof meNonNull).downlines.map((child: typeof meNonNull.downlines[0]) =>
             buildNode(child, depth + 1)
           )
         );
@@ -147,7 +149,7 @@ export async function GET() {
     }
 
     const downlineNodes = await Promise.all(
-      me.downlines.map((d) => buildNode(d, 1))
+      meNonNull.downlines.map((d) => buildNode(d, 1))
     );
 
     return NextResponse.json({

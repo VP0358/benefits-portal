@@ -77,7 +77,8 @@ model User {
   orders        Order[]
   contactInquiries ContactInquiry[]
   vpPhoneApplications VpPhoneApplication[]
-  mlmMember     MlmMember?
+  mlmMember       MlmMember?
+  mlmRegistration MlmRegistration?
 }
 
 model Admin {
@@ -279,9 +280,10 @@ model Order {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items      OrderItem[]
-  pointUsages PointUsage[]
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items         OrderItem[]
+  pointUsages   PointUsage[]
+  shippingLabel ShippingLabel?
 
   @@index([userId])
 }
@@ -428,8 +430,94 @@ model MobileContract {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 発送伝票モデル
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+enum ShippingCarrier {
+  yamato   // ヤマト運輸
+  sagawa   // 佐川急便
+  japan_post // 日本郵便
+}
+
+enum ShippingLabelStatus {
+  pending   // 未印刷
+  printed   // 印刷済み
+  shipped   // 発送済み
+  canceled  // キャンセル
+}
+
+/// 発送伝票（注文ごとに生成）
+model ShippingLabel {
+  id              BigInt              @id @default(autoincrement())
+  orderId         BigInt              @unique
+  orderNumber     String              @db.VarChar(100)
+  carrier         ShippingCarrier     @default(yamato)
+  trackingNumber  String?             @db.VarChar(100)
+  status          ShippingLabelStatus @default(pending)
+  // 送り先情報（注文時点のスナップショット）
+  recipientName   String              @db.VarChar(255)
+  recipientPhone  String              @db.VarChar(30)
+  recipientPostal String              @db.VarChar(10)
+  recipientAddress String             @db.VarChar(500)
+  // 差出人（会社固定）
+  senderName      String              @default("CLAIRホールディングス株式会社") @db.VarChar(255)
+  senderPostal    String              @default("020-0026") @db.VarChar(10)
+  senderAddress   String              @default("岩手県盛岡市開運橋通5-6 第五菱和ビル5F") @db.VarChar(500)
+  senderPhone     String              @default("019-681-3667") @db.VarChar(30)
+  // 品名・重量
+  itemDescription String              @default("VIOLA Pure 翠彩-SUMISAI-") @db.VarChar(255)
+  itemCount       Int                 @default(1)
+  // 印刷・発送管理
+  printedAt       DateTime?
+  shippedAt       DateTime?
+  printedByAdminId BigInt?
+  note            String?             @db.VarChar(500)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  order           Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([carrier])
+  @@map("shipping_labels")
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MLM（CLAIR仕様）専用モデル
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/// MLM専用登録情報（Userと1:1）
+model MlmRegistration {
+  id                  BigInt    @id @default(autoincrement())
+  userId              BigInt    @unique
+  // 基本情報
+  nickname            String?   @db.VarChar(100)
+  birthDate           String?   @db.VarChar(20)   // "YYYY-MM-DD"
+  // 概要書面番号
+  disclosureDocNumber String?   @db.VarChar(100)
+  // 報酬受取り口座情報
+  bankName            String?   @db.VarChar(100)
+  bankBranch          String?   @db.VarChar(100)
+  bankAccountType     String?   @default("普通") @db.VarChar(20)  // 普通/当座
+  bankAccountNumber   String?   @db.VarChar(20)
+  bankAccountHolder   String?   @db.VarChar(100)
+  // 配送先住所（登録住所と異なる場合）
+  deliveryPostalCode  String?   @db.VarChar(10)
+  deliveryAddress     String?   @db.VarChar(500)
+  deliveryName        String?   @db.VarChar(255)  // 宛名（法人名など）
+  // 同意・確認
+  agreedToTerms       Boolean   @default(false)
+  agreedAt            DateTime?
+  // 紹介URL経由での登録かどうか
+  registeredViaMLM    Boolean   @default(false)
+  mlmReferrerId       BigInt?   // 紹介したMLM会員のID
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("mlm_registrations")
+}
 
 /// 会員タイプ（ビジネス会員 / 愛用会員）
 enum MlmMemberType {
