@@ -13,6 +13,7 @@ const navItems = [
   // ── MLM（CLAIR仕様）
   { href: "/admin/mlm-members",      label: "🌲 MLM会員管理" },
   { href: "/admin/bonus-run",        label: "🧮 MLMボーナス計算" },
+  { href: "/admin/autoship",         label: "🔄 オートシップ管理" },
   // ── VP未来phone / 旅行
   { href: "/admin/contracts",        label: "📱 携帯契約一覧" },
   { href: "/admin/vp-phone",         label: "📲 VP未来phone申し込み" },

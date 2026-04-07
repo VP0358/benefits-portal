@@ -586,6 +586,7 @@ model MlmMember {
   referrals         MlmMember[]     @relation("UniLevelReferrals")
   purchases         MlmPurchase[]
   bonusResults      BonusResult[]   @relation("BonusRecipient")
+  autoShipOrders    AutoShipOrder[] @relation("AutoShipOrders")
 
   @@index([uplineId])
   @@index([referrerId])
@@ -671,5 +672,141 @@ model BonusResult {
   @@index([bonusMonth])
   @@index([mlmMemberId])
   @@map("bonus_results")
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// オートシップ管理モデル
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/// 支払い方法
+enum AutoShipPaymentMethod {
+  credit_card   // クレジットカード（クレディックス）
+  bank_transfer // 口座振替（三菱UFJファクター）
+}
+
+/// オートシップ実行ステータス
+enum AutoShipRunStatus {
+  draft      // 下書き（伝票作成済み・未決済）
+  exported   // CSV出力済み（決済会社へ送付済み）
+  importing  // 決済結果取込中
+  completed  // 決済完了・アクティブ反映済み
+  canceled   // キャンセル
+}
+
+/// オートシップ注文ステータス
+enum AutoShipOrderStatus {
+  pending        // 未決済
+  paid           // 決済完了
+  failed         // 決済失敗
+  canceled       // キャンセル
+  delivered      // 発送済み
+}
+
+/// 月次オートシップ実行（月ごと・支払い方法ごと）
+model AutoShipRun {
+  id              BigInt              @id @default(autoincrement())
+  targetMonth     String              @db.Char(7)       // "YYYY-MM"
+  paymentMethod   AutoShipPaymentMethod
+  status          AutoShipRunStatus   @default(draft)
+  // 集計
+  totalCount      Int                 @default(0)
+  paidCount       Int                 @default(0)
+  failedCount     Int                 @default(0)
+  totalAmount     Int                 @default(0)       // 合計金額（円）
+  // 実行情報
+  exportedAt      DateTime?
+  importedAt      DateTime?
+  completedAt     DateTime?
+  executedByAdminId BigInt?
+  note            String?             @db.VarChar(500)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  orders          AutoShipOrder[]
+
+  @@unique([targetMonth, paymentMethod])
+  @@index([targetMonth])
+  @@map("autoship_runs")
+}
+
+/// オートシップ注文（会員ごとの月次決済伝票）
+model AutoShipOrder {
+  id              BigInt              @id @default(autoincrement())
+  autoShipRunId   BigInt
+  mlmMemberId     BigInt
+  targetMonth     String              @db.Char(7)       // "YYYY-MM"
+  paymentMethod   AutoShipPaymentMethod
+  // 会員情報スナップショット（出力時点）
+  memberCode      String              @db.VarChar(50)
+  memberName      String              @db.VarChar(255)
+  memberNameKana  String?             @db.VarChar(255)
+  memberPhone     String?             @db.VarChar(30)
+  memberEmail     String?             @db.VarChar(255)
+  memberPostal    String?             @db.VarChar(10)
+  memberAddress   String?             @db.VarChar(500)
+  // 商品情報
+  productCode     String              @default("2000") @db.VarChar(20)
+  productName     String              @default("VIOLA Pure 翠彩-SUMISAI-") @db.VarChar(255)
+  quantity        Int                 @default(1)
+  unitPrice       Int                 @default(16500)   // 税込
+  totalAmount     Int                 @default(16500)
+  points          Int                 @default(150)
+  // 決済情報
+  status          AutoShipOrderStatus @default(pending)
+  paidAt          DateTime?
+  failReason      String?             @db.VarChar(255)
+  // クレジットカード用
+  creditCardId    String?             @db.VarChar(100)  // クレディックス顧客ID
+  // 口座振替用
+  bankCode        String?             @db.VarChar(10)
+  bankName        String?             @db.VarChar(100)
+  branchCode      String?             @db.VarChar(10)
+  branchName      String?             @db.VarChar(100)
+  accountType     String?             @db.VarChar(10)   // 普通/当座
+  accountNumber   String?             @db.VarChar(20)
+  accountHolder   String?             @db.VarChar(100)
+  // 納品書
+  deliveryNoteId  BigInt?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  autoShipRun     AutoShipRun         @relation(fields: [autoShipRunId], references: [id], onDelete: Cascade)
+  mlmMember       MlmMember           @relation("AutoShipOrders", fields: [mlmMemberId], references: [id], onDelete: Cascade)
+  deliveryNote    DeliveryNote?       @relation(fields: [deliveryNoteId], references: [id])
+
+  @@unique([autoShipRunId, mlmMemberId])
+  @@index([targetMonth])
+  @@index([status])
+  @@index([mlmMemberId])
+  @@map("autoship_orders")
+}
+
+/// 納品書
+model DeliveryNote {
+  id              BigInt              @id @default(autoincrement())
+  noteNumber      String              @unique @db.VarChar(50)  // 納品書番号 DN-YYYYMM-0001
+  targetMonth     String              @db.Char(7)
+  // 宛先
+  recipientName   String              @db.VarChar(255)
+  recipientPostal String?             @db.VarChar(10)
+  recipientAddress String?            @db.VarChar(500)
+  // 商品
+  productCode     String              @db.VarChar(20)
+  productName     String              @db.VarChar(255)
+  quantity        Int                 @default(1)
+  unitPrice       Int
+  totalAmount     Int
+  // 差出人（会社固定）
+  senderName      String              @default("CLAIRホールディングス株式会社") @db.VarChar(255)
+  senderPostal    String              @default("020-0026") @db.VarChar(10)
+  senderAddress   String              @default("岩手県盛岡市開運橋通5-6 第五菱和ビル5F") @db.VarChar(500)
+  senderPhone     String              @default("019-681-3667") @db.VarChar(30)
+  issuedAt        DateTime            @default(now())
+  createdAt       DateTime            @default(now())
+
+  autoShipOrders  AutoShipOrder[]
+
+  @@index([targetMonth])
+  @@map("delivery_notes")
 }
 
