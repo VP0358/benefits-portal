@@ -77,6 +77,7 @@ model User {
   orders        Order[]
   contactInquiries ContactInquiry[]
   vpPhoneApplications VpPhoneApplication[]
+  mlmMember     MlmMember?
 }
 
 model Admin {
@@ -424,5 +425,163 @@ model MobileContract {
   @@index([status])
   @@index([referrerId])
   @@map("mobile_contracts")
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// MLM（CLAIR仕様）専用モデル
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/// 会員タイプ（ビジネス会員 / 愛用会員）
+enum MlmMemberType {
+  business   // ビジネス会員（ボーナス取得権あり）
+  preferred  // 愛用会員（ボーナス取得権なし）
+}
+
+/// 会員ステータス
+enum MlmMemberStatus {
+  active      // 活動中
+  autoship    // オートシップのみ
+  lapsed      // 失効
+  suspended   // 停止
+  withdrawn   // 退会
+  midCancel   // 中途解約
+}
+
+/// ボーナス計算実行ステータス
+enum BonusRunStatus {
+  draft      // 下書き（計算中）
+  confirmed  // 確定（結果公開済み）
+  canceled   // 取消
+}
+
+/// ボーナス種別
+enum BonusType {
+  direct       // ダイレクトボーナス
+  unilevel     // ユニレベルボーナス
+  structure    // 組織構築ボーナス
+  savings      // 貯金ボーナス
+}
+
+/// MLM会員情報（CLAIRホールディングス仕様）
+model MlmMember {
+  id                BigInt          @id @default(autoincrement())
+  userId            BigInt          @unique
+  memberCode        String          @unique @db.VarChar(50)  // 6桁-枝番（例: 123456-01）
+  memberType        MlmMemberType   @default(business)
+  status            MlmMemberStatus @default(active)
+  // 組織構造
+  uplineId          BigInt?                                  // 直上者（マトリックス）
+  referrerId        BigInt?                                  // 紹介者（ユニレベル）
+  matrixPosition    Int             @default(0)              // 直下での位置（1〜6）
+  // レベル関連
+  currentLevel      Int             @default(0)              // 0=なし, 1〜5
+  titleLevel        Int             @default(0)              // 称号レベル（過去最高）
+  conditionAchieved Boolean         @default(false)          // 条件達成フラグ
+  forceActive       Boolean         @default(false)          // 強制アクティブ
+  forceLevel        Int?                                     // 強制レベル
+  // 契約日
+  contractDate      DateTime?                                // 契約締結日（アクティブ判定①）
+  // オートシップ
+  autoshipEnabled   Boolean         @default(false)
+  autoshipStopDate  DateTime?
+  autoshipSuspendMonths String?     @db.VarChar(100)         // カンマ区切り "2025-01,2025-02"
+  // 貯金ポイント累計
+  savingsPoints     Int             @default(0)
+  note              String?         @db.VarChar(500)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  upline            MlmMember?      @relation("MatrixDownline", fields: [uplineId], references: [id])
+  downlines         MlmMember[]     @relation("MatrixDownline")
+  referrer          MlmMember?      @relation("UniLevelReferrals", fields: [referrerId], references: [id])
+  referrals         MlmMember[]     @relation("UniLevelReferrals")
+  purchases         MlmPurchase[]
+  bonusResults      BonusResult[]   @relation("BonusRecipient")
+
+  @@index([uplineId])
+  @@index([referrerId])
+  @@index([status])
+  @@map("mlm_members")
+}
+
+/// MLM購入記録（ポイント計算用）
+model MlmPurchase {
+  id              BigInt      @id @default(autoincrement())
+  mlmMemberId     BigInt
+  productCode     String      @db.VarChar(20)   // 商品コード (s1000, 1000, 1002, 2000 等)
+  productName     String      @db.VarChar(255)
+  quantity        Int         @default(1)
+  unitPrice       Int                            // 税込金額（円）
+  points          Int         @default(0)        // 商品ポイント
+  totalPoints     Int         @default(0)        // quantity × points
+  purchaseMonth   String      @db.Char(7)        // "YYYY-MM"
+  purchasedAt     DateTime
+  createdAt       DateTime    @default(now())
+
+  mlmMember       MlmMember   @relation(fields: [mlmMemberId], references: [id], onDelete: Cascade)
+
+  @@index([mlmMemberId])
+  @@index([purchaseMonth])
+  @@map("mlm_purchases")
+}
+
+/// ボーナス計算実行記録（月次）
+model BonusRun {
+  id                  BigInt          @id @default(autoincrement())
+  bonusMonth          String          @db.Char(7)       // "YYYY-MM"
+  closingDate         DateTime                          // 締め日
+  status              BonusRunStatus  @default(draft)
+  // 集計結果
+  totalMembers        Int             @default(0)
+  totalActiveMembers  Int             @default(0)
+  totalBonusAmount    Int             @default(0)       // 総ボーナス支払額（円）
+  // 実行情報
+  executedByAdminId   BigInt?
+  confirmedAt         DateTime?
+  note                String?         @db.VarChar(500)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  results             BonusResult[]
+
+  @@unique([bonusMonth])
+  @@map("bonus_runs")
+}
+
+/// ボーナス計算結果（会員ごと）
+model BonusResult {
+  id                  BigInt      @id @default(autoincrement())
+  bonusRunId          BigInt
+  mlmMemberId         BigInt
+  bonusMonth          String      @db.Char(7)       // "YYYY-MM"
+  // アクティブ判定
+  isActive            Boolean     @default(false)
+  selfPurchasePoints  Int         @default(0)       // 自己購入pt
+  groupPoints         Int         @default(0)       // グループpt（7段合計）
+  directActiveCount   Int         @default(0)       // 直接紹介アクティブ数
+  // レベル
+  achievedLevel       Int         @default(0)       // 当月実績レベル (0〜5)
+  previousTitleLevel  Int         @default(0)       // 旧レベル（計算前の称号）
+  newTitleLevel       Int         @default(0)       // 新称号レベル（計算後）
+  // ボーナス金額（円）
+  directBonus         Int         @default(0)       // ダイレクトボーナス
+  unilevelBonus       Int         @default(0)       // ユニレベルボーナス
+  structureBonus      Int         @default(0)       // 組織構築ボーナス
+  savingsBonus        Int         @default(0)       // 貯金ボーナス
+  totalBonus          Int         @default(0)       // 合計
+  // ユニレベルボーナス段数内訳（JSON）
+  unilevelDetail      Json?                         // { "1": pt, "2": pt, ... }
+  savingsPointsAdded  Int         @default(0)       // 今月追加貯金pt
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  bonusRun            BonusRun    @relation(fields: [bonusRunId], references: [id], onDelete: Cascade)
+  mlmMember           MlmMember   @relation("BonusRecipient", fields: [mlmMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([bonusRunId, mlmMemberId])
+  @@index([bonusMonth])
+  @@index([mlmMemberId])
+  @@map("bonus_results")
 }
 

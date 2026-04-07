@@ -670,6 +670,8 @@ export default function MemberDashboard({
                 { href: "/profile",         label: "👤 マイアカウント" },
                 { href: "/referral",            label: "🎁 友達を紹介する" },
                 { href: "/org-chart",           label: "🌳 直紹介 組織図" },
+                { href: "/mlm-org-chart",       label: "🌲 MLMマトリックス組織図" },
+                { href: "/mlm-bonus",           label: "💎 MLMボーナス履歴" },
                 { href: "/vp-phone-referrals",  label: "📱 VP紹介ツリー" },
                 { href: "/travel-referrals",    label: "✈️ 旅行サブスク紹介ツリー" },
               ].map(item => (
@@ -873,6 +875,8 @@ export default function MemberDashboard({
               { href: "/profile",        icon: "👤", label: "マイアカウント" },
               { href: "/referral",       icon: "🎁", label: "友達を紹介する" },
               { href: "/org-chart",          icon: "🌳", label: "直紹介 組織図" },
+              { href: "/mlm-org-chart",      icon: "🌲", label: "MLM組織図" },
+              { href: "/mlm-bonus",          icon: "💎", label: "MLMボーナス" },
               { href: "/vp-phone-referrals",   icon: "📱", label: "VP紹介ツリー" },
               { href: "/travel-referrals",     icon: "✈️", label: "旅行サブスク紹介ツリー" },
             ].map(item => (

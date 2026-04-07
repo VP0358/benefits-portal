@@ -9,22 +9,29 @@ const navItems = [
   { href: "/admin",                  label: "🏠 ダッシュボード" },
   { href: "/admin/dashboard",        label: "📊 売上 / ポイント" },
   { href: "/admin/menus",            label: "📋 メニュー管理" },
-  { href: "/admin/members",           label: "👥 会員管理" },
+  { href: "/admin/members",          label: "👥 会員管理" },
+  // ── MLM（CLAIR仕様）
+  { href: "/admin/mlm-members",      label: "🌲 MLM会員管理" },
+  { href: "/admin/bonus-run",        label: "🧮 MLMボーナス計算" },
+  // ── VP未来phone / 旅行
   { href: "/admin/contracts",        label: "📱 携帯契約一覧" },
   { href: "/admin/vp-phone",         label: "📲 VP未来phone申し込み" },
   { href: "/admin/travel-subscriptions", label: "✈️ 旅行サブスク一覧" },
   { href: "/admin/referral-rewards", label: "💰 紹介者報酬計算" },
+  // ── 商品 / 注文
   { href: "/admin/products",         label: "📦 商品管理" },
   { href: "/admin/orders",           label: "🛒 注文管理" },
+  // ── ポイント
   { href: "/admin/points/monthly",   label: "🗓️ 月次ポイント計算" },
   { href: "/admin/points/expire",    label: "⏰ ポイント失効処理" },
   { href: "/admin/monthly-runs",     label: "📅 月次実行履歴" },
+  // ── その他
   { href: "/admin/referral-history", label: "🔗 紹介者変更履歴" },
   { href: "/admin/audit",            label: "🔍 監査ログ" },
   { href: "/admin/export",           label: "📥 CSV エクスポート" },
   { href: "/admin/site-settings",    label: "⚙️ サイト設定" },
-  { href: "/admin/account",          label: "🔐 ログイン情報変更" },  
-  { href: "/admin/announcements", label: "📢 お知らせ管理" },
+  { href: "/admin/account",          label: "🔐 ログイン情報変更" },
+  { href: "/admin/announcements",    label: "📢 お知らせ管理" },
 ];
 
 // 相談窓口は特別扱い（未読バッジを付ける）

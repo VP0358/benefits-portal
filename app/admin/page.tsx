@@ -118,6 +118,26 @@ export default async function AdminPage() {
         ))}
       </div>
 
+      {/* ━━━ MLM管理 ━━━ */}
+      <div className="rounded-3xl bg-white p-6 shadow-sm">
+        <h2 className="text-sm font-bold text-slate-700 mb-4">🌲 MLM管理（CLAIR仕様）</h2>
+        <div className="grid gap-2 md:grid-cols-2">
+          {[
+            { href: "/admin/mlm-members", label: "👥 MLM会員管理", desc: "会員タイプ・レベル・条件設定" },
+            { href: "/admin/bonus-run",   label: "🧮 ボーナス計算", desc: "月次ボーナス自動計算・確定" },
+          ].map(item => (
+            <Link key={item.href} href={item.href}
+              className="flex items-center gap-3 rounded-2xl border-2 border-violet-200 bg-violet-50 px-4 py-3 hover:bg-violet-100 transition">
+              <div className="flex-1">
+                <div className="text-sm font-bold text-violet-800">{item.label}</div>
+                <div className="text-xs text-violet-600">{item.desc}</div>
+              </div>
+              <span className="text-violet-400">›</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+
       {/* ━━━ クイックリンク ━━━ */}
       <div className="rounded-3xl bg-white p-6 shadow-sm">
         <h2 className="text-sm font-bold text-slate-700 mb-4">🔗 クイックリンク</h2>
