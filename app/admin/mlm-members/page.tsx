@@ -449,12 +449,23 @@ export default function MlmMembersPage() {
                     {m.savingsPoints.toLocaleString()}pt
                   </td>
                   <td className="py-3 px-4 text-center">
-                    <button
-                      onClick={() => setEditTarget(m)}
-                      className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-violet-100 hover:text-violet-700 transition"
-                    >
-                      編集
-                    </button>
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={() => setEditTarget(m)}
+                        className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-violet-100 hover:text-violet-700 transition"
+                      >
+                        編集
+                      </button>
+                      <a
+                        href={`/api/admin/pdf/registration-complete?memberId=${m.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-lg bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-200 transition"
+                      >
+                        <i className="fas fa-file-pdf mr-1"></i>
+                        登録PDF
+                      </a>
+                    </div>
                   </td>
                 </tr>
               ))
