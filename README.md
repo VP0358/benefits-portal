@@ -210,13 +210,13 @@ npx prisma migrate dev --name migration_name
 
 ## 📊 最新コミット履歴
 
+- `a18c61a` 🔧 Critical Fix: PrismaClient共通インスタンス使用に修正
+- `3608436` 📝 DEPLOYMENT_GUIDE更新: Prisma migrate説明を修正
+- `51be401` 🔧 Fix: vercel-buildコマンドを削除（Prisma migrate問題修正）
+- `b97f001` 📝 Vercelデプロイメント完全ガイド追加
+- `4b52740` 🔧 Ultimate Fix: revalidate設定追加 & Vercel最適化
 - `93522e0` 🔧 Critical Fix: dynamic設定の位置修正 & Next.js 15.1.8にアップグレード
-- `b0c07c4` 📝 README更新 & ビルドエラー詳細レポート追加
-- `b0f9a88` 🔧 Fix: 全APIルートにdynamic設定を追加 & Next.js 15にダウングレード
 - `c248376` 💳 MLM新規登録: 支払い方法に銀行振込を追加
-- `8cbb25a` 🔧 Fix: すべてのadmin APIルートにdynamic='force-dynamic'を追加
-- `79c9710` 🛒 商品購入管理システム実装
-- `d6d11ac` 📦 受注・発送状況ページ実装
 
 ## 🔧 環境変数
 
