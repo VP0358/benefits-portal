@@ -5,36 +5,62 @@ import { useState, useTransition, useEffect, useCallback } from "react";
 import SignOutButton from "@/app/components/sign-out-button";
 import ViolaLogo from "@/app/components/viola-logo";
 
-const navItems = [
-  { href: "/admin",                  label: "🏠 ダッシュボード" },
-  { href: "/admin/dashboard",        label: "📊 売上 / ポイント" },
-  { href: "/admin/menus",            label: "📋 メニュー管理" },
-  { href: "/admin/members",          label: "👥 会員管理" },
-  // ── MLM（CLAIR仕様）
-  { href: "/admin/mlm-members",      label: "🌲 MLM会員管理" },
-  { href: "/admin/bonus-run",        label: "🧮 MLMボーナス計算" },
-  { href: "/admin/autoship",         label: "🔄 オートシップ管理" },
-  // ── VP未来phone / 旅行
-  { href: "/admin/contracts",        label: "📱 携帯契約一覧" },
-  { href: "/admin/vp-phone",         label: "📲 VP未来phone申し込み" },
-  { href: "/admin/travel-subscriptions", label: "✈️ 旅行サブスク一覧" },
-  { href: "/admin/referral-rewards", label: "💰 紹介者報酬計算" },
-  // ── 商品 / 注文 / 発送
-  { href: "/admin/products",         label: "📦 商品管理" },
-  { href: "/admin/orders",           label: "🛒 注文管理" },
-  { href: "/admin/shipping-labels",  label: "🚚 発送伝票管理" },
-  // ── ポイント
-  { href: "/admin/points/monthly",   label: "🗓️ 月次ポイント計算" },
-  { href: "/admin/points/expire",    label: "⏰ ポイント失効処理" },
-  { href: "/admin/monthly-runs",     label: "📅 月次実行履歴" },
-  // ── その他
-  { href: "/admin/referral-history", label: "🔗 紹介者変更履歴" },
-  { href: "/admin/audit",            label: "🔍 監査ログ" },
-  { href: "/admin/export",           label: "📥 CSV エクスポート" },
-  { href: "/admin/mail-settings",    label: "📧 送信メール編集" },
-  { href: "/admin/site-settings",    label: "⚙️ サイト設定" },
-  { href: "/admin/account",          label: "🔐 ログイン情報変更" },
-  { href: "/admin/announcements",    label: "📢 お知らせ管理" },
+// メニュー項目をグループ化
+const menuGroups = [
+  {
+    title: "メイン",
+    items: [
+      { href: "/admin", label: "ダッシュボード", icon: "fas fa-home" },
+    ]
+  },
+  {
+    title: "MLM関連",
+    items: [
+      { href: "/admin/mlm-members", label: "MLM会員管理", icon: "fas fa-users" },
+      { href: "/admin/bonus-run", label: "MLMボーナス計算", icon: "fas fa-coins" },
+      { href: "/admin/autoship", label: "オートシップ管理", icon: "fas fa-sync" },
+      { href: "/admin/products", label: "商品管理", icon: "fas fa-box" },
+      { href: "/admin/orders", label: "注文管理", icon: "fas fa-shopping-cart" },
+      { href: "/admin/shipping-labels", label: "発送伝票管理", icon: "fas fa-truck" },
+    ]
+  },
+  {
+    title: "携帯契約関連",
+    items: [
+      { href: "/admin/vp-phone", label: "VP未来phone申し込み", icon: "fas fa-mobile-alt" },
+      { href: "/admin/contracts", label: "携帯契約一覧", icon: "fas fa-file-contract" },
+      { href: "/admin/referral-rewards", label: "紹介者報酬計算", icon: "fas fa-gift" },
+      { href: "/admin/referral-history", label: "紹介者変更履歴", icon: "fas fa-history" },
+    ]
+  },
+  {
+    title: "旅行サブスク関連",
+    items: [
+      { href: "/admin/travel-subscriptions", label: "旅行サブスク一覧", icon: "fas fa-plane" },
+    ]
+  },
+  {
+    title: "データエクスポート",
+    items: [
+      { href: "/admin/export", label: "CSV/振込データ出力", icon: "fas fa-download" },
+    ]
+  },
+  {
+    title: "その他",
+    items: [
+      { href: "/admin/dashboard", label: "売上/ポイント", icon: "fas fa-chart-line" },
+      { href: "/admin/menus", label: "メニュー管理", icon: "fas fa-list" },
+      { href: "/admin/members", label: "会員管理", icon: "fas fa-user" },
+      { href: "/admin/points/monthly", label: "月次ポイント計算", icon: "fas fa-calendar-check" },
+      { href: "/admin/points/expire", label: "ポイント失効処理", icon: "fas fa-clock" },
+      { href: "/admin/monthly-runs", label: "月次実行履歴", icon: "fas fa-calendar-alt" },
+      { href: "/admin/audit", label: "監査ログ", icon: "fas fa-search" },
+      { href: "/admin/mail-settings", label: "送信メール編集", icon: "fas fa-envelope" },
+      { href: "/admin/site-settings", label: "サイト設定", icon: "fas fa-cog" },
+      { href: "/admin/account", label: "ログイン情報変更", icon: "fas fa-key" },
+      { href: "/admin/announcements", label: "お知らせ管理", icon: "fas fa-bullhorn" },
+    ]
+  },
 ];
 
 // 相談窓口は特別扱い（未読バッジを付ける）
@@ -85,73 +111,84 @@ export default function AdminNav() {
   }
 
   const itemClass = (href: string) =>
-    `w-full text-left flex items-center justify-between rounded-xl px-4 py-2.5 text-sm transition-colors disabled:opacity-60 ${
+    `w-full text-left flex items-center justify-between rounded px-4 py-2 text-sm transition-colors disabled:opacity-60 ${
       isActive(href)
-        ? "bg-slate-900 text-white font-semibold"
+        ? "bg-blue-600 text-white font-semibold"
         : loadingHref === href
-        ? "bg-slate-200 text-slate-700"
-        : "text-slate-700 hover:bg-slate-100"
+        ? "bg-gray-700 text-gray-300"
+        : "text-gray-300 hover:bg-gray-700"
     }`;
 
   return (
-    <aside className="rounded-3xl bg-white p-5 shadow-sm lg:sticky lg:top-6 lg:h-fit">
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-3">
-          <ViolaLogo size="md" />
-        </div>
-        <div className="text-xs text-slate-700 border-t border-slate-100 pt-2">管理画面</div>
+    <aside className="bg-gray-800 text-white p-4 lg:sticky lg:top-0 lg:h-screen overflow-y-auto" style={{ width: '250px', minHeight: '100vh' }}>
+      {/* ヘッダー */}
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <i className="fas fa-tasks"></i>
+          統合管理
+        </h1>
       </div>
 
+      {/* ローディング表示 */}
       {isPending && (
-        <div className="mb-3 rounded-xl bg-blue-50 px-4 py-2 text-xs text-blue-600 text-center animate-pulse">
+        <div className="mb-3 rounded bg-blue-600 px-4 py-2 text-xs text-white text-center animate-pulse">
           読み込み中...
         </div>
       )}
 
-      <nav className="space-y-1">
-        {/* 相談窓口（未読バッジ付き） */}
-        <button
-          onClick={() => handleNav(CONTACT_HREF)}
-          disabled={isPending}
-          className={itemClass(CONTACT_HREF)}
-        >
-          <span className="flex items-center gap-2">
-            {CONTACT_LABEL}
-            {loadingHref === CONTACT_HREF && isPending && (
-              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
-            )}
-          </span>
-          {unreadCount > 0 && (
-            <span className={`rounded-full text-xs font-bold px-1.5 py-0.5 leading-none min-w-[20px] text-center ${
-              isActive(CONTACT_HREF)
-                ? "bg-red-500 text-white"
-                : "bg-red-500 text-white animate-pulse"
-            }`}>
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </span>
-          )}
-        </button>
-
-        {/* 通常メニュー */}
-        {navItems.map(item => (
+      <nav className="space-y-6">
+        {/* 相談窓口（未読バッジ付き） - 特別扱い */}
+        <div>
+          <h2 className="text-xs font-semibold text-gray-400 mb-2 uppercase">相談窓口</h2>
           <button
-            key={item.href}
-            onClick={() => handleNav(item.href)}
+            onClick={() => handleNav(CONTACT_HREF)}
             disabled={isPending}
-            className={itemClass(item.href)}
+            className={itemClass(CONTACT_HREF)}
           >
-            <span>
-              {item.label}
-              {loadingHref === item.href && isPending && (
-                <span className="ml-2 inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
+            <span className="flex items-center gap-2">
+              <i className="fas fa-comments"></i>
+              相談窓口
+              {loadingHref === CONTACT_HREF && isPending && (
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
               )}
             </span>
+            {unreadCount > 0 && (
+              <span className="rounded-full text-xs font-bold px-1.5 py-0.5 leading-none min-w-[20px] text-center bg-red-500 text-white animate-pulse">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
           </button>
+        </div>
+
+        {/* グループ化されたメニュー */}
+        {menuGroups.map((group) => (
+          <div key={group.title}>
+            <h2 className="text-xs font-semibold text-gray-400 mb-2 uppercase">{group.title}</h2>
+            <div className="space-y-1">
+              {group.items.map((item) => (
+                <button
+                  key={item.href}
+                  onClick={() => handleNav(item.href)}
+                  disabled={isPending}
+                  className={itemClass(item.href)}
+                >
+                  <span className="flex items-center gap-2">
+                    <i className={item.icon}></i>
+                    {item.label}
+                    {loadingHref === item.href && isPending && (
+                      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
 
-      <div className="mt-6 border-t pt-4">
-        <SignOutButton className="block w-full rounded-xl px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-100 transition-colors" />
+      {/* サインアウト */}
+      <div className="mt-8 pt-4 border-t border-gray-700">
+        <SignOutButton className="block w-full rounded px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 transition-colors" />
       </div>
     </aside>
   );
