@@ -73,8 +73,8 @@ export default async function DashboardPage() {
         availablePoints: user.pointWallet?.availablePointsBalance ?? 0,
       }}
       mlmStatus={mlmMember?.status ?? null}
-      vpPhoneStatus={vpPhoneApp?.status ?? null}
-      travelSubStatus={travelSub?.status ?? null}
+      vpPhoneStatus={vpPhoneApp?.status ? String(vpPhoneApp.status) : null}
+      travelSubStatus={travelSub?.status ? String(travelSub.status) : null}
       announcements={announcements}
       menus={menus.map((m) => ({
         id: m.id.toString(),
