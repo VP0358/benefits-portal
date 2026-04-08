@@ -1,177 +1,212 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 
-/** MLM会員一覧取得 */
+// GET: MLM会員一覧取得
 export async function GET(req: NextRequest) {
   const session = await auth();
-  if (!session?.user || session.user.role !== "admin") {
+  if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { searchParams } = new URL(req.url);
-  const page = parseInt(searchParams.get("page") ?? "1");
-  const limit = parseInt(searchParams.get("limit") ?? "50");
-  const search = searchParams.get("search") ?? "";
-  const memberType = searchParams.get("memberType");
-  const status = searchParams.get("status");
-
-  const where: Record<string, unknown> = {};
-  if (memberType) where.memberType = memberType;
-  if (status) where.status = status;
-  if (search) {
-    where.OR = [
-      { memberCode: { contains: search } },
-      { user: { name: { contains: search } } },
-      { user: { email: { contains: search } } },
-    ];
-  }
-
   try {
-    const [total, members] = await Promise.all([
-      prisma.mlmMember.count({ where }),
-      prisma.mlmMember.findMany({
-        where,
-        include: {
-          user: { select: { name: true, email: true, avatarUrl: true } },
-          _count: { select: { downlines: true, referrals: true } },
+    const members = await prisma.mlmMember.findMany({
+      include: {
+        user: {
+          select: {
+            id: true,
+            memberCode: true,
+            name: true,
+            email: true,
+          },
         },
-        orderBy: { createdAt: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
-
-    return NextResponse.json({
-      total,
-      page,
-      limit,
-      members: members.map((m) => ({
-        id: m.id.toString(),
-        userId: m.userId.toString(),
-        memberCode: m.memberCode,
-        memberType: m.memberType,
-        status: m.status,
-        currentLevel: m.currentLevel,
-        titleLevel: m.titleLevel,
-        conditionAchieved: m.conditionAchieved,
-        forceActive: m.forceActive,
-        forceLevel: m.forceLevel,
-        contractDate: m.contractDate?.toISOString() ?? null,
-        autoshipEnabled: m.autoshipEnabled,
-        autoshipStartDate: m.autoshipStartDate?.toISOString() ?? null,
-        autoshipStopDate: m.autoshipStopDate?.toISOString() ?? null,
-        autoshipSuspendMonths: m.autoshipSuspendMonths,
-        paymentMethod: m.paymentMethod,
-        savingsPoints: m.savingsPoints,
-        userName: m.user.name,
-        userEmail: m.user.email,
-        avatarUrl: m.user.avatarUrl,
-        downlineCount: m._count.downlines,
-        referralCount: m._count.referrals,
-        createdAt: m.createdAt.toISOString(),
-      })),
-    });
-  } catch (e) {
-    console.error("mlm-members GET error:", e);
-    return NextResponse.json({ error: "取得に失敗しました" }, { status: 500 });
-  }
-}
-
-/** MLM会員作成 */
-export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user || session.user.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  try {
-    const body = await req.json();
-    const {
-      userId,
-      memberCode,
-      memberType = "business",
-      uplineId,
-      referrerId,
-      matrixPosition = 0,
-      contractDate,
-    } = body;
-
-    if (!userId || !memberCode) {
-      return NextResponse.json({ error: "userId と memberCode は必須です" }, { status: 400 });
-    }
-
-    // 既存チェック
-    const existing = await prisma.mlmMember.findFirst({
-      where: { OR: [{ userId: BigInt(userId) }, { memberCode }] },
-    });
-    if (existing) {
-      return NextResponse.json({ error: "既にMLM会員として登録されています" }, { status: 409 });
-    }
-
-    const member = await prisma.mlmMember.create({
-      data: {
-        userId: BigInt(userId),
-        memberCode,
-        memberType,
-        uplineId: uplineId ? BigInt(uplineId) : null,
-        referrerId: referrerId ? BigInt(referrerId) : null,
-        matrixPosition,
-        contractDate: contractDate ? new Date(contractDate) : null,
-        updatedAt: new Date(),
+        upline: {
+          select: {
+            memberCode: true,
+            user: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+        referrer: {
+          select: {
+            memberCode: true,
+            user: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
       },
     });
 
-    return NextResponse.json({ success: true, id: member.id.toString() });
-  } catch (e) {
-    console.error("mlm-members POST error:", e);
-    return NextResponse.json({ error: "作成に失敗しました" }, { status: 500 });
+    return NextResponse.json({ members }, { status: 200 });
+  } catch (error) {
+    console.error("Error fetching MLM members:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-/** MLM会員更新 */
-export async function PATCH(req: NextRequest) {
+// POST: MLM会員新規登録
+export async function POST(req: NextRequest) {
   const session = await auth();
-  if (!session?.user || session.user.role !== "admin") {
+  if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const body = await req.json();
-    const { id, ...updates } = body;
-    if (!id) return NextResponse.json({ error: "id は必須です" }, { status: 400 });
+    const data = await req.json();
 
-    const data: Record<string, unknown> = { updatedAt: new Date() };
-    if (updates.memberType !== undefined) data.memberType = updates.memberType;
-    if (updates.status !== undefined) data.status = updates.status;
-    if (updates.conditionAchieved !== undefined) data.conditionAchieved = updates.conditionAchieved;
-    if (updates.forceActive !== undefined) data.forceActive = updates.forceActive;
-    if (updates.forceLevel !== undefined) data.forceLevel = updates.forceLevel;
-    if (updates.contractDate !== undefined) {
-      data.contractDate = updates.contractDate ? new Date(updates.contractDate) : null;
+    // バリデーション
+    if (!data.memberCode || !data.name || !data.email) {
+      return NextResponse.json(
+        { error: "必須項目が入力されていません" },
+        { status: 400 }
+      );
     }
-    if (updates.autoshipEnabled !== undefined) data.autoshipEnabled = updates.autoshipEnabled;
-    if (updates.autoshipStartDate !== undefined) {
-      data.autoshipStartDate = updates.autoshipStartDate ? new Date(updates.autoshipStartDate) : null;
-    }
-    if (updates.autoshipStopDate !== undefined) {
-      data.autoshipStopDate = updates.autoshipStopDate ? new Date(updates.autoshipStopDate) : null;
-    }
-    if (updates.autoshipSuspendMonths !== undefined) data.autoshipSuspendMonths = updates.autoshipSuspendMonths;
-    if (updates.paymentMethod !== undefined) data.paymentMethod = updates.paymentMethod;
-    if (updates.titleLevel !== undefined) data.titleLevel = updates.titleLevel;
-    if (updates.currentLevel !== undefined) data.currentLevel = updates.currentLevel;
-    if (updates.savingsPoints !== undefined) data.savingsPoints = updates.savingsPoints;
-    if (updates.note !== undefined) data.note = updates.note;
 
-    await prisma.mlmMember.update({
-      where: { id: BigInt(id) },
-      data,
+    // 会員コードの重複チェック
+    const existingMember = await prisma.mlmMember.findUnique({
+      where: { memberCode: data.memberCode },
     });
 
-    return NextResponse.json({ success: true });
-  } catch (e) {
-    console.error("mlm-members PATCH error:", e);
-    return NextResponse.json({ error: "更新に失敗しました" }, { status: 500 });
+    if (existingMember) {
+      return NextResponse.json(
+        { error: "この会員コードは既に使用されています" },
+        { status: 400 }
+      );
+    }
+
+    // メールアドレスの重複チェック
+    const existingUser = await prisma.user.findUnique({
+      where: { email: data.email },
+    });
+
+    if (existingUser) {
+      return NextResponse.json(
+        { error: "このメールアドレスは既に使用されています" },
+        { status: 400 }
+      );
+    }
+
+    // 直上者・紹介者の確認
+    let uplineId: bigint | null = null;
+    let referrerId: bigint | null = null;
+
+    if (data.uplineMemberCode) {
+      const upline = await prisma.mlmMember.findUnique({
+        where: { memberCode: data.uplineMemberCode },
+      });
+      if (!upline) {
+        return NextResponse.json(
+          { error: "直上者の会員コードが見つかりません" },
+          { status: 400 }
+        );
+      }
+      uplineId = upline.id;
+    }
+
+    if (data.referrerMemberCode) {
+      const referrer = await prisma.mlmMember.findUnique({
+        where: { memberCode: data.referrerMemberCode },
+      });
+      if (!referrer) {
+        return NextResponse.json(
+          { error: "紹介者の会員コードが見つかりません" },
+          { status: 400 }
+        );
+      }
+      referrerId = referrer.id;
+    }
+
+    // トランザクションで User と MlmMember を作成
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. User作成
+      const user = await tx.user.create({
+        data: {
+          memberCode: data.memberCode,
+          name: data.name,
+          nameKana: data.nameKana || null,
+          email: data.email,
+          passwordHash: "$2a$10$dummyhashforadmincreateduser", // 仮パスワード
+          phone: data.phone || null,
+          postalCode: data.postalCode || null,
+          address: [
+            data.prefecture,
+            data.city,
+            data.address1,
+            data.address2,
+          ]
+            .filter(Boolean)
+            .join(" ") || null,
+          status: data.status === "inactive" ? "suspended" : "active",
+        },
+      });
+
+      // 2. MlmMember作成
+      const mlmMember = await tx.mlmMember.create({
+        data: {
+          userId: user.id,
+          memberCode: data.memberCode,
+          memberType: data.memberType || "business",
+          status: data.status || "active",
+          uplineId,
+          referrerId,
+          matrixPosition: data.matrixPosition || 1,
+          currentLevel: data.currentLevel || 0,
+          titleLevel: data.titleLevel || 0,
+          forceActive: data.forceActive || false,
+          forceLevel: data.forceLevel || null,
+          contractDate: data.contractDate ? new Date(data.contractDate) : null,
+          autoshipEnabled: data.autoshipEnabled || false,
+          autoshipStartDate: data.autoshipStartDate
+            ? new Date(data.autoshipStartDate)
+            : null,
+          paymentMethod: data.paymentMethod || "credit_card",
+          note: data.note || null,
+          // 銀行情報
+          bankCode: data.bankCode || null,
+          bankName: data.bankName || null,
+          branchCode: data.branchCode || null,
+          branchName: data.branchName || null,
+          accountType: data.accountType || null,
+          accountNumber: data.accountNumber || null,
+          accountHolder: data.accountHolder || null,
+          // 法人情報
+          companyName: data.companyName || null,
+          companyNameKana: data.companyNameKana || null,
+          // 追加の個人情報
+          birthDate: data.birthDate ? new Date(data.birthDate) : null,
+          gender: data.gender || null,
+          mobile: data.mobile || null,
+          prefecture: data.prefecture || null,
+          city: data.city || null,
+          address1: data.address1 || null,
+          address2: data.address2 || null,
+        },
+      });
+
+      return { user, mlmMember };
+    });
+
+    return NextResponse.json(
+      {
+        message: "MLM会員を登録しました",
+        member: result.mlmMember,
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("Error creating MLM member:", error);
+    return NextResponse.json(
+      { error: "登録に失敗しました" },
+      { status: 500 }
+    );
   }
 }

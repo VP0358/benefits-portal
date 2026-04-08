@@ -599,6 +599,25 @@ model MlmMember {
   paymentMethod     PaymentMethod   @default(credit_card)    // 支払い方法
   // 貯金ポイント累計
   savingsPoints     Int             @default(0)
+  // 銀行情報
+  bankCode          String?         @db.VarChar(10)
+  bankName          String?         @db.VarChar(100)
+  branchCode        String?         @db.VarChar(10)
+  branchName        String?         @db.VarChar(100)
+  accountType       String?         @db.VarChar(10)   // 普通/当座
+  accountNumber     String?         @db.VarChar(20)
+  accountHolder     String?         @db.VarChar(100)
+  // 法人情報
+  companyName       String?         @db.VarChar(255)
+  companyNameKana   String?         @db.VarChar(255)
+  // 個人情報追加
+  birthDate         DateTime?
+  gender            String?         @db.VarChar(10)   // male/female/other
+  mobile            String?         @db.VarChar(30)
+  prefecture        String?         @db.VarChar(50)
+  city              String?         @db.VarChar(100)
+  address1          String?         @db.VarChar(255)
+  address2          String?         @db.VarChar(255)
   note              String?         @db.VarChar(500)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
