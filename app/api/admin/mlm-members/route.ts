@@ -59,6 +59,10 @@ export async function GET(req: NextRequest) {
         forceLevel: m.forceLevel,
         contractDate: m.contractDate?.toISOString() ?? null,
         autoshipEnabled: m.autoshipEnabled,
+        autoshipStartDate: m.autoshipStartDate?.toISOString() ?? null,
+        autoshipStopDate: m.autoshipStopDate?.toISOString() ?? null,
+        autoshipSuspendMonths: m.autoshipSuspendMonths,
+        paymentMethod: m.paymentMethod,
         savingsPoints: m.savingsPoints,
         userName: m.user.name,
         userEmail: m.user.email,
@@ -147,6 +151,14 @@ export async function PATCH(req: NextRequest) {
       data.contractDate = updates.contractDate ? new Date(updates.contractDate) : null;
     }
     if (updates.autoshipEnabled !== undefined) data.autoshipEnabled = updates.autoshipEnabled;
+    if (updates.autoshipStartDate !== undefined) {
+      data.autoshipStartDate = updates.autoshipStartDate ? new Date(updates.autoshipStartDate) : null;
+    }
+    if (updates.autoshipStopDate !== undefined) {
+      data.autoshipStopDate = updates.autoshipStopDate ? new Date(updates.autoshipStopDate) : null;
+    }
+    if (updates.autoshipSuspendMonths !== undefined) data.autoshipSuspendMonths = updates.autoshipSuspendMonths;
+    if (updates.paymentMethod !== undefined) data.paymentMethod = updates.paymentMethod;
     if (updates.titleLevel !== undefined) data.titleLevel = updates.titleLevel;
     if (updates.currentLevel !== undefined) data.currentLevel = updates.currentLevel;
     if (updates.savingsPoints !== undefined) data.savingsPoints = updates.savingsPoints;

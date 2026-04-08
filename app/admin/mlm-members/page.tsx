@@ -18,6 +18,10 @@ type MlmMemberRow = {
   forceLevel: number | null;
   contractDate: string | null;
   autoshipEnabled: boolean;
+  autoshipStartDate: string | null;
+  autoshipStopDate: string | null;
+  autoshipSuspendMonths: string | null;
+  paymentMethod: "credit_card" | "bank_transfer" | "bank_payment";
   savingsPoints: number;
   userName: string;
   userEmail: string;
@@ -63,6 +67,10 @@ function EditModal({
     forceLevel: member.forceLevel?.toString() ?? "",
     contractDate: member.contractDate ? member.contractDate.slice(0, 10) : "",
     autoshipEnabled: member.autoshipEnabled,
+    autoshipStartDate: member.autoshipStartDate ? member.autoshipStartDate.slice(0, 10) : "",
+    autoshipStopDate: member.autoshipStopDate ? member.autoshipStopDate.slice(0, 10) : "",
+    autoshipSuspendMonths: member.autoshipSuspendMonths ?? "",
+    paymentMethod: member.paymentMethod,
     titleLevel: member.titleLevel.toString(),
     savingsPoints: member.savingsPoints.toString(),
   });
@@ -79,6 +87,10 @@ function EditModal({
         forceLevel: form.forceLevel !== "" ? parseInt(form.forceLevel) : null,
         contractDate: form.contractDate || null,
         autoshipEnabled: form.autoshipEnabled,
+        autoshipStartDate: form.autoshipStartDate || null,
+        autoshipStopDate: form.autoshipStopDate || null,
+        autoshipSuspendMonths: form.autoshipSuspendMonths || null,
+        paymentMethod: form.paymentMethod,
         titleLevel: parseInt(form.titleLevel),
         savingsPoints: parseInt(form.savingsPoints),
       });
@@ -161,6 +173,57 @@ function EditModal({
               {[0, 1, 2, 3, 4, 5].map((lv) => (
                 <option key={lv} value={lv}>{LEVEL_LABELS[lv]}</option>
               ))}
+            </select>
+          </div>
+
+          {/* オートシップ開始日 */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">オートシップ開始日</label>
+            <input
+              type="date"
+              value={form.autoshipStartDate}
+              onChange={(e) => setForm({ ...form, autoshipStartDate: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800"
+            />
+          </div>
+
+          {/* オートシップ停止日 */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">オートシップ停止日</label>
+            <input
+              type="date"
+              value={form.autoshipStopDate}
+              onChange={(e) => setForm({ ...form, autoshipStopDate: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800"
+            />
+          </div>
+
+          {/* オートシップ休止月 */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">
+              オートシップ休止月（カンマ区切り: 2026-04,2026-05）
+            </label>
+            <input
+              type="text"
+              value={form.autoshipSuspendMonths}
+              onChange={(e) => setForm({ ...form, autoshipSuspendMonths: e.target.value })}
+              placeholder="例: 2026-04,2026-05"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800"
+            />
+            <p className="text-xs text-slate-500 mt-1">休止月を過ぎると自動で再開されます</p>
+          </div>
+
+          {/* 支払い方法 */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">支払い方法</label>
+            <select
+              value={form.paymentMethod}
+              onChange={(e) => setForm({ ...form, paymentMethod: e.target.value as "credit_card" | "bank_transfer" | "bank_payment" })}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800"
+            >
+              <option value="credit_card">💳 クレジットカード（クレディックス）</option>
+              <option value="bank_transfer">🏦 口座振替（三菱UFJファクター）</option>
+              <option value="bank_payment">💵 銀行振込</option>
             </select>
           </div>
 
