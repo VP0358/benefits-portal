@@ -18,6 +18,8 @@ const menuGroups = [
     items: [
       { href: "/admin/mlm-members", label: "MLM会員管理", icon: "fas fa-users" },
       { href: "/admin/bonus-run", label: "MLMボーナス計算", icon: "fas fa-coins" },
+      { href: "/admin/bonus-process", label: "ボーナス計算処理", icon: "fas fa-calculator" },
+      { href: "/admin/bonus-results", label: "ボーナス計算結果", icon: "fas fa-file-invoice-dollar" },
       { href: "/admin/autoship", label: "オートシップ管理", icon: "fas fa-sync" },
       { href: "/admin/products", label: "商品管理", icon: "fas fa-box" },
       { href: "/admin/orders", label: "注文管理", icon: "fas fa-shopping-cart" },
