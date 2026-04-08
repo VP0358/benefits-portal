@@ -465,6 +465,8 @@ model ShippingLabel {
   recipientPhone  String              @db.VarChar(30)
   recipientPostal String              @db.VarChar(10)
   recipientAddress String             @db.VarChar(500)
+  recipientFax    String?             @db.VarChar(30)
+  recipientCompany String?            @db.VarChar(255)
   // 差出人（会社固定）
   senderName      String              @default("CLAIRホールディングス株式会社") @db.VarChar(255)
   senderPostal    String              @default("020-0026") @db.VarChar(10)
@@ -473,6 +475,15 @@ model ShippingLabel {
   // 品名・重量
   itemDescription String              @default("VIOLA Pure 翠彩-SUMISAI-") @db.VarChar(255)
   itemCount       Int                 @default(1)
+  // 配送オプション
+  deliveryType    String?             @db.VarChar(50)  // 金券/手渡し/オートシップ/クーリング・オフ等
+  deliveryTime    String?             @db.VarChar(50)  // 配達希望時間帯
+  shippingFee     Int                 @default(0)      // 送料
+  shippingFeeType String              @default("free") @db.VarChar(20) // free/paid/cod
+  customerRank    String?             @db.VarChar(50)  // 顧客ランク
+  autoshipNo      String?             @db.VarChar(50)  // オートシップ番号
+  memberJoinDate  DateTime?                           // 入会日
+  birthDate       DateTime?                           // 生年月日
   // 印刷・発送管理
   printedAt       DateTime?
   shippedAt       DateTime?
@@ -485,6 +496,7 @@ model ShippingLabel {
 
   @@index([status])
   @@index([carrier])
+  @@index([deliveryType])
   @@map("shipping_labels")
 }
 
