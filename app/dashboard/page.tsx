@@ -10,7 +10,10 @@ export default async function DashboardPage() {
 
   const userId = BigInt(session.user.id ?? "0");
   
-  const [user, menus, mlmMember, vpPhoneApp, travelSub] = await Promise.all([
+  let vpPhoneApp = null;
+  let travelSub = null;
+  
+  const [user, menus, mlmMember] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       include: { pointWallet: true },
@@ -22,15 +25,26 @@ export default async function DashboardPage() {
     prisma.mlmMember.findFirst({
       where: { userId },
     }),
-    prisma.vpPhoneApplication.findFirst({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.travelSubscription.findFirst({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-    }),
   ]);
+  
+  // VpPhoneとTravelSubは個別に取得（エラーがあっても続行）
+  try {
+    vpPhoneApp = await prisma.vpPhoneApplication.findFirst({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (e) {
+    console.error("VpPhoneApplication fetch error:", e);
+  }
+  
+  try {
+    travelSub = await prisma.travelSubscription.findFirst({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (e) {
+    console.error("TravelSubscription fetch error:", e);
+  }
 
   if (!user) redirect("/login");
 
