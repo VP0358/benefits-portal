@@ -1,4 +1,8 @@
 import { prisma } from "@/lib/prisma";
+
+// 動的レンダリングを強制（ビルド時にこのルートを実行しない）
+export const dynamic = 'force-dynamic'
+
 import { requireAdmin } from "@/app/api/admin/route-guard";
 
 function csvEscape(value: unknown) {
