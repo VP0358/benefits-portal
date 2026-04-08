@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-type ExportType = "members" | "orders" | "audit" | "mlm" | "mobile" | "travel" | "webfricom";
+type ExportType = "members" | "orders" | "audit" | "mlm" | "mobile" | "travel" | "webfricom" | "credix" | "mufg";
 
 export default function CsvExportPanel() {
   const [activeTab, setActiveTab] = useState<ExportType>("members");
@@ -46,6 +46,14 @@ export default function CsvExportPanel() {
       const params = new URLSearchParams();
       if (filters.bonusMonth) params.set("month", filters.bonusMonth);
       url = `/api/admin/export/webfricom?${params}`;
+    } else if (type === "credix") {
+      const params = new URLSearchParams();
+      if (filters.bonusMonth) params.set("month", filters.bonusMonth);
+      url = `/api/admin/export/credix-payment?${params}`;
+    } else if (type === "mufg") {
+      const params = new URLSearchParams();
+      if (filters.bonusMonth) params.set("month", filters.bonusMonth);
+      url = `/api/admin/export/mufg-payment?${params}`;
     }
 
     try {
@@ -73,6 +81,8 @@ export default function CsvExportPanel() {
     { key: "mobile", label: "携帯契約", icon: "📱" },
     { key: "travel", label: "旅行サブスク", icon: "✈️" },
     { key: "webfricom", label: "振込データ", icon: "💰" },
+    { key: "credix", label: "クレディックス", icon: "💳" },
+    { key: "mufg", label: "三菱UFJ", icon: "🏦" },
   ];
 
   return (
@@ -304,6 +314,69 @@ export default function CsvExportPanel() {
             className="rounded-xl bg-orange-600 px-6 py-3 text-sm text-white hover:bg-orange-700 disabled:opacity-50"
           >
             {downloading ? "ダウンロード中..." : "💰 ウェブフリコム振込データ をダウンロード"}
+          </button>
+        </div>
+      )}
+
+      {/* クレディックス決済 */}
+      {activeTab === "credix" && (
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-semibold text-slate-800 mb-3">クレディックス決済 CSV ダウンロード</h3>
+            <p className="text-sm text-slate-700 mb-4">
+              オートシップ有効＆クレジットカード支払いの会員データをCSVで出力します。
+            </p>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">対象月（YYYY-MM）</label>
+              <input
+                type="month"
+                className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 w-64"
+                value={filters.bonusMonth}
+                onChange={e => setFilters({ ...filters, bonusMonth: e.target.value })}
+              />
+            </div>
+            <div className="rounded-xl bg-blue-50 border border-blue-200 p-4 text-sm text-blue-800 mt-4">
+              <strong>対象条件:</strong> オートシップ有効 AND 支払い方法がクレジットカード AND 休止月ではない会員
+            </div>
+          </div>
+          <button
+            onClick={() => download("credix")}
+            disabled={downloading || !filters.bonusMonth}
+            className="rounded-xl bg-blue-600 px-6 py-3 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {downloading ? "ダウンロード中..." : "💳 クレディックス決済 CSV をダウンロード"}
+          </button>
+        </div>
+      )}
+
+      {/* 三菱UFJファクター口座振替 */}
+      {activeTab === "mufg" && (
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-semibold text-slate-800 mb-3">三菱UFJファクター口座振替 CSV ダウンロード</h3>
+            <p className="text-sm text-slate-700 mb-4">
+              オートシップ有効＆口座振替支払いの会員データをCSVで出力します。
+            </p>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">対象月（YYYY-MM）</label>
+              <input
+                type="month"
+                className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 w-64"
+                value={filters.bonusMonth}
+                onChange={e => setFilters({ ...filters, bonusMonth: e.target.value })}
+              />
+            </div>
+            <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-sm text-green-800 mt-4">
+              <strong>対象条件:</strong> オートシップ有効 AND 支払い方法が口座振替 AND 休止月ではない会員
+              <br/><strong>含まれる情報:</strong> 口座情報（銀行名、支店名、口座種別、口座番号、口座名義）
+            </div>
+          </div>
+          <button
+            onClick={() => download("mufg")}
+            disabled={downloading || !filters.bonusMonth}
+            className="rounded-xl bg-green-600 px-6 py-3 text-sm text-white hover:bg-green-700 disabled:opacity-50"
+          >
+            {downloading ? "ダウンロード中..." : "🏦 三菱UFJファクター CSV をダウンロード"}
           </button>
         </div>
       )}

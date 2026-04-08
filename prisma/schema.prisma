@@ -555,6 +555,22 @@ enum BonusType {
   savings      // 貯金ボーナス
 }
 
+/// 支払い方法
+enum PaymentMethod {
+  credit_card    // クレジットカード（クレディックス）
+  bank_transfer  // 口座振替（三菱UFJファクター）
+  bank_payment   // 銀行振込
+}
+
+/// 購入ステータス
+enum PurchaseStatus {
+  autoship       // オートシップ
+  one_time       // 都度購入
+  new_member     // 新規登録者
+  cooling_off    // クーリングオフ
+  canceled       // キャンセル
+}
+
 /// MLM会員情報（CLAIRホールディングス仕様）
 model MlmMember {
   id                BigInt          @id @default(autoincrement())
@@ -576,8 +592,11 @@ model MlmMember {
   contractDate      DateTime?                                // 契約締結日（アクティブ判定①）
   // オートシップ
   autoshipEnabled   Boolean         @default(false)
-  autoshipStopDate  DateTime?
+  autoshipStartDate DateTime?                                // オートシップ開始日
+  autoshipStopDate  DateTime?                                // オートシップ停止日
   autoshipSuspendMonths String?     @db.VarChar(100)         // カンマ区切り "2025-01,2025-02"
+  // 支払い方法
+  paymentMethod     PaymentMethod   @default(credit_card)    // 支払い方法
   // 貯金ポイント累計
   savingsPoints     Int             @default(0)
   note              String?         @db.VarChar(500)
@@ -601,22 +620,24 @@ model MlmMember {
 
 /// MLM購入記録（ポイント計算用）
 model MlmPurchase {
-  id              BigInt      @id @default(autoincrement())
+  id              BigInt         @id @default(autoincrement())
   mlmMemberId     BigInt
-  productCode     String      @db.VarChar(20)   // 商品コード (s1000, 1000, 1002, 2000 等)
-  productName     String      @db.VarChar(255)
-  quantity        Int         @default(1)
-  unitPrice       Int                            // 税込金額（円）
-  points          Int         @default(0)        // 商品ポイント
-  totalPoints     Int         @default(0)        // quantity × points
-  purchaseMonth   String      @db.Char(7)        // "YYYY-MM"
+  productCode     String         @db.VarChar(20)   // 商品コード (s1000, 1000, 1002, 2000 等)
+  productName     String         @db.VarChar(255)
+  quantity        Int            @default(1)
+  unitPrice       Int                              // 税込金額（円）
+  points          Int            @default(0)       // 商品ポイント
+  totalPoints     Int            @default(0)       // quantity × points
+  purchaseStatus  PurchaseStatus @default(one_time) // 購入ステータス
+  purchaseMonth   String         @db.Char(7)       // "YYYY-MM"
   purchasedAt     DateTime
-  createdAt       DateTime    @default(now())
+  createdAt       DateTime       @default(now())
 
-  mlmMember       MlmMember   @relation(fields: [mlmMemberId], references: [id], onDelete: Cascade)
+  mlmMember       MlmMember      @relation(fields: [mlmMemberId], references: [id], onDelete: Cascade)
 
   @@index([mlmMemberId])
   @@index([purchaseMonth])
+  @@index([purchaseStatus])
   @@map("mlm_purchases")
 }
 
