@@ -5,11 +5,14 @@ import { requireAdmin } from "@/app/api/admin/route-guard";
 const REWARD_RATE = 0.25;
 
 /**
- * 紹介者報酬計算一覧
+ * 紹介者報酬計算一覧（初回ショット配当方式）
  * GET /api/admin/referral-rewards?year=2026&month=4
  *
- * - year / month 指定 → その月に confirmedAt がある契約のみ対象
- * - 省略 → 全期間（active + confirmedAt あり）
+ * - year / month 指定 → その月に confirmedAt がある契約（初回確定時のみ）を対象
+ * - 省略 → 全期間（confirmedAt あり）
+ *
+ * ショット配当：契約確定時（confirmedAt設定時）に1回だけ発生
+ * 毎月繰り返しではなく、初回のみ配当
  *
  * レスポンス:
  *   rewardRate, year, month, totalReferrers, totalContracts,
@@ -29,7 +32,7 @@ export async function GET(req: NextRequest) {
   const yearParam  = searchParams.get("year");
   const monthParam = searchParams.get("month");
 
-  // 月フィルター範囲を計算
+  // 月フィルター範囲を計算（confirmedAt ベース）
   let dateFilter: { gte: Date; lt: Date } | undefined;
   if (yearParam && monthParam) {
     const y = parseInt(yearParam);
@@ -39,10 +42,10 @@ export async function GET(req: NextRequest) {
     dateFilter = { gte: from, lt: to };
   }
 
-  // 有効な携帯契約を取得
+  // 携帯契約を取得（ショット配当：confirmedAt が設定された契約が対象）
+  // ステータスに関わらず confirmedAt がある契約をすべて対象とする
   const contracts = await prisma.mobileContract.findMany({
     where: {
-      status: "active",
       confirmedAt: dateFilter ? dateFilter : { not: null },
     },
     include: {
@@ -159,6 +162,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     rewardRate:     REWARD_RATE,
+    rewardType:     "shot",  // ショット配当（初回のみ）
     year:           yearParam  ? parseInt(yearParam)  : null,
     month:          monthParam ? parseInt(monthParam) : null,
     totalReferrers: referrers.length,

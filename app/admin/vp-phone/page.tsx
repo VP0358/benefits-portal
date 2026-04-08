@@ -242,11 +242,30 @@ export default async function AdminVpPhonePage({
             isCancelApply    ? { label: "✋ 申込取消申請",   cls: "bg-orange-500 text-white" } :
             null;
 
-          // 申請種別バナーが有効かつ、管理者が対応済み（ステータスが rejected/canceled で adminNote にタグがある場合は対応済みの可能性）
-          // バナーは常時表示して管理者が認識できるようにする
+          // 2026年4月末区分（2026-04-30 23:59:59 まで）
+          const DEADLINE = new Date("2026-05-01T00:00:00+09:00");
+          const isBeforeDeadline = new Date(a.createdAt) < DEADLINE;
+
+          // 申請済みステータス
+          const appSubmitted = (a as typeof a & { applicationSubmitted?: boolean }).applicationSubmitted ?? false;
+          const appSubmittedAt = (a as typeof a & { applicationSubmittedAt?: Date | null }).applicationSubmittedAt;
+          const officeEmail = (a as typeof a & { officeEmail?: string | null }).officeEmail ?? "";
 
           return (
-            <div key={a.id.toString()} className="rounded-3xl bg-white shadow-sm overflow-hidden">
+            <div key={a.id.toString()} className={`rounded-3xl bg-white shadow-sm overflow-hidden ${isBeforeDeadline ? "ring-2 ring-blue-200" : ""}`}>
+
+              {/* 2026年4月末区分バナー */}
+              {isBeforeDeadline ? (
+                <div className="px-5 py-1.5 bg-blue-600 text-white text-xs font-bold flex items-center gap-2">
+                  <span>🗓 2026年4月末までの申請</span>
+                  <span className="text-xs opacity-80">（早期申請者）</span>
+                </div>
+              ) : (
+                <div className="px-5 py-1.5 bg-slate-400 text-white text-xs font-bold flex items-center gap-2">
+                  <span>🗓 2026年5月以降の申請</span>
+                </div>
+              )}
+
               {/* 変更・解約・取消申請バナー（ステータス問わず常時表示） */}
               {cancelBadge && (
                 <div className={`px-5 py-2.5 flex items-center gap-2 ${cancelBadge.cls}`}>
@@ -254,14 +273,25 @@ export default async function AdminVpPhonePage({
                   <span className="text-xs opacity-90">（会員より申請 ・要対応）</span>
                 </div>
               )}
+
               {/* カードヘッダー */}
-              <div className={`px-5 py-3 border-b flex items-center justify-between ${st.cls}`}>
-                <div className="flex items-center gap-2">
+              <div className={`px-5 py-3 border-b flex items-center justify-between flex-wrap gap-2 ${st.cls}`}>
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-base">{st.icon}</span>
                   <span className="text-sm font-bold">{st.label}</span>
                   <span className="text-xs font-medium ml-2">
                     申込日: {new Date(a.createdAt).toLocaleDateString("ja-JP")}
                   </span>
+                  {/* 手動申請ステータスバッジ */}
+                  {appSubmitted ? (
+                    <span className="rounded-full bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 ml-1">
+                      ✅ 事務局申請済み
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 ml-1 animate-pulse">
+                      ⏳ 未申請
+                    </span>
+                  )}
                 </div>
                 <VpPhoneAdminActions
                   applicationId={a.id.toString()}
@@ -269,6 +299,8 @@ export default async function AdminVpPhonePage({
                   adminNote={a.adminNote ?? ""}
                   userName={a.nameKanji}
                   userId={a.user.id.toString()}
+                  applicationSubmitted={appSubmitted}
+                  officeEmail={officeEmail}
                 />
               </div>
 
@@ -287,7 +319,23 @@ export default async function AdminVpPhonePage({
                     <InfoRow label="生年月日" value={birthDate} />
                     <InfoRow label="性別" value={GENDER_LABEL[a.gender] ?? a.gender} />
                     <InfoRow label="電話番号" value={a.phone} highlight copyable />
-                    <InfoRow label="メールアドレス" value={a.email} highlight copyable />
+                    <InfoRow
+                      label="登録メール"
+                      value={a.email}
+                      highlight
+                      copyable
+                      badge="登録"
+                    />
+                    {officeEmail && (
+                      <InfoRow
+                        label="事務局申請メール"
+                        value={officeEmail}
+                        highlight
+                        copyable
+                        badge="事務局"
+                        badgeCls="bg-purple-100 text-purple-700"
+                      />
+                    )}
                     <InfoRow
                       label="パスワード"
                       value={hasPassword ? "●●●●●●●● (設定あり)" : "未設定"}
@@ -322,6 +370,28 @@ export default async function AdminVpPhonePage({
                     />
                   </div>
                 </div>
+
+                {/* 事務局申請ステータス詳細 */}
+                {appSubmitted && appSubmittedAt && (
+                  <div className="mt-4 rounded-xl bg-emerald-50 border border-emerald-200 p-3 flex items-center gap-2">
+                    <span className="text-emerald-600 text-lg">✅</span>
+                    <div>
+                      <p className="text-xs font-bold text-emerald-800">事務局への申請完了</p>
+                      <p className="text-[10px] text-emerald-600">
+                        申請日時: {new Date(appSubmittedAt).toLocaleString("ja-JP")}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {!appSubmitted && (
+                  <div className="mt-4 rounded-xl bg-orange-50 border border-orange-200 p-3 flex items-center gap-2">
+                    <span className="text-orange-500 text-lg">⚠️</span>
+                    <div>
+                      <p className="text-xs font-bold text-orange-800">事務局への申請が未完了です</p>
+                      <p className="text-[10px] text-orange-600">「対応する」ボタンから申請済みに変更してください</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* 会員情報 */}
                 <div className="mt-4 pt-4 border-t border-slate-100">
@@ -397,22 +467,35 @@ function InfoRow({
   highlight = false,
   copyable = false,
   valueClass,
+  badge,
+  badgeCls,
 }: {
   label: string;
   value: string;
   highlight?: boolean;
   copyable?: boolean;
   valueClass?: string;
+  badge?: string;
+  badgeCls?: string;
 }) {
   return (
     <div className="flex items-start gap-2">
       <span className="text-xs text-slate-500 min-w-[100px] shrink-0 mt-0.5">{label}</span>
-      <span className={`text-xs ${highlight ? "font-semibold text-slate-800" : "text-slate-700"} ${valueClass ?? ""} break-all`}>
-        {value}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {badge && (
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${badgeCls ?? "bg-blue-100 text-blue-700"}`}>
+              {badge}
+            </span>
+          )}
+          <span className={`text-xs ${highlight ? "font-semibold text-slate-800" : "text-slate-700"} ${valueClass ?? ""} break-all`}>
+            {value}
+          </span>
+        </div>
         {copyable && (
-          <span className="ml-1 text-[10px] text-slate-400">（コピー可）</span>
+          <span className="text-[10px] text-slate-400">（コピー可）</span>
         )}
-      </span>
+      </div>
     </div>
   );
 }

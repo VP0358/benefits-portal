@@ -392,6 +392,11 @@ model VpPhoneApplication {
   contractedAt    DateTime?
   // 紐づく携帯契約（審査完了後に設定）
   mobileContractId BigInt?                   @unique
+  // 手動申請ステータス管理
+  applicationSubmitted Boolean               @default(false)  // 事務局側での申請済みフラグ
+  applicationSubmittedAt DateTime?                            // 申請日時
+  applicationSubmittedByAdminId BigInt?                       // 申請した管理者ID
+  officeEmail     String?                    @db.VarChar(255) // 事務局側申請メールアドレス
   createdAt       DateTime                   @default(now())
   updatedAt       DateTime                   @updatedAt
 

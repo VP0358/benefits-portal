@@ -7,6 +7,8 @@ const updateSchema = z.object({
   status:    z.enum(["pending", "reviewing", "contracted", "rejected", "canceled"]).optional(),
   adminNote: z.string().max(500).optional().nullable(),
   mobileContractId: z.string().optional().nullable(),
+  applicationSubmitted: z.boolean().optional(),
+  officeEmail: z.string().max(255).optional().nullable(),
 });
 
 function parseId(id: string) {
@@ -53,6 +55,17 @@ export async function PATCH(
   if (d.mobileContractId !== undefined) {
     updateData.mobileContractId = d.mobileContractId ? BigInt(d.mobileContractId) : null;
   }
+  if (d.applicationSubmitted !== undefined) {
+    updateData.applicationSubmitted = d.applicationSubmitted;
+    if (d.applicationSubmitted) {
+      updateData.applicationSubmittedAt = now;
+      updateData.applicationSubmittedByAdminId = guard.session?.user?.id ? BigInt(guard.session.user.id) : null;
+    } else {
+      updateData.applicationSubmittedAt = null;
+      updateData.applicationSubmittedByAdminId = null;
+    }
+  }
+  if (d.officeEmail !== undefined) updateData.officeEmail = d.officeEmail;
 
   const updated = await prisma.vpPhoneApplication.update({
     where: { id: appId },
@@ -76,10 +89,13 @@ export async function PATCH(
   }).catch(() => {});
 
   return NextResponse.json({
-    id:           updated.id.toString(),
-    status:       updated.status,
-    adminNote:    updated.adminNote,
-    reviewedAt:   updated.reviewedAt?.toISOString() ?? null,
-    contractedAt: updated.contractedAt?.toISOString() ?? null,
+    id:                    updated.id.toString(),
+    status:                updated.status,
+    adminNote:             updated.adminNote,
+    reviewedAt:            updated.reviewedAt?.toISOString() ?? null,
+    contractedAt:          updated.contractedAt?.toISOString() ?? null,
+    applicationSubmitted:  updated.applicationSubmitted,
+    applicationSubmittedAt: updated.applicationSubmittedAt?.toISOString() ?? null,
+    officeEmail:           updated.officeEmail,
   });
 }

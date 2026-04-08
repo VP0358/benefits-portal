@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { sendVpPhoneApplicationEmail } from "@/lib/mailer";
 
 const schema = z.object({
   nameKanji:       z.string().min(1).max(100),
@@ -108,6 +109,26 @@ export async function POST(req: NextRequest) {
       desiredPlan:     d.desiredPlan ?? null,
     },
   });
+
+  // 申し込み完了メール送信（SiteSettingからテンプレートを取得）
+  try {
+    const [subjectSetting, htmlSetting, textSetting] = await Promise.all([
+      prisma.siteSetting.findUnique({ where: { settingKey: "vpPhoneMailSubject" } }),
+      prisma.siteSetting.findUnique({ where: { settingKey: "vpPhoneMailHtml" } }),
+      prisma.siteSetting.findUnique({ where: { settingKey: "vpPhoneMailText" } }),
+    ]);
+
+    await sendVpPhoneApplicationEmail({
+      to: d.email,
+      name: d.nameKanji,
+      subject: subjectSetting?.settingValue ?? undefined,
+      htmlBody: htmlSetting?.settingValue ?? undefined,
+      textBody: textSetting?.settingValue ?? undefined,
+    });
+  } catch (mailErr) {
+    console.error("[vp-phone POST] メール送信エラー:", mailErr);
+    // メール送信失敗でも申し込みは成功扱い
+  }
 
   return NextResponse.json({
     id: application.id.toString(),

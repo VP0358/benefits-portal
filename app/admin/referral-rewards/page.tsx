@@ -13,6 +13,9 @@ export default async function AdminReferralRewardsPage() {
         <p className="text-sm text-slate-700">
           直紹介者が契約した携帯プランの月額料金 × 1/4（25%）を紹介者ごとに個別集計します。
         </p>
+        <div className="mt-2 rounded-xl bg-amber-50 border border-amber-200 px-4 py-2 text-xs text-amber-800 font-semibold">
+          ⚡ ショット配当（初回のみ）：契約確定日（confirmedAt）に1回だけ発生します。毎月繰り返しの配当は行いません。
+        </div>
       </div>
       <ReferralRewardsPanel />
     </main>

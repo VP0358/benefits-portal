@@ -9,6 +9,9 @@ const SETTING_KEYS = [
   "btnBuyImageUrl",       // 商品購入ボタン画像
   "btnPointsImageUrl",    // ポイントを使うボタン画像
   "btnReferralImageUrl",  // 紹介ボタン画像
+  "vpPhoneMailSubject",   // VP未来phone申込完了メール件名
+  "vpPhoneMailText",      // VP未来phone申込完了メール本文（テキスト）
+  "vpPhoneMailHtml",      // VP未来phone申込完了メール本文（HTML）
 ] as const;
 
 const schema = z.object({
@@ -17,6 +20,9 @@ const schema = z.object({
   btnBuyImageUrl: z.string().max(1000).nullable().optional().or(z.literal("")),
   btnPointsImageUrl: z.string().max(1000).nullable().optional().or(z.literal("")),
   btnReferralImageUrl: z.string().max(1000).nullable().optional().or(z.literal("")),
+  vpPhoneMailSubject: z.string().max(255).nullable().optional(),
+  vpPhoneMailText: z.string().max(5000).nullable().optional(),
+  vpPhoneMailHtml: z.string().max(20000).nullable().optional(),
 });
 
 export async function GET() {
@@ -34,6 +40,9 @@ export async function GET() {
     btnBuyImageUrl: settings.btnBuyImageUrl ?? null,
     btnPointsImageUrl: settings.btnPointsImageUrl ?? null,
     btnReferralImageUrl: settings.btnReferralImageUrl ?? null,
+    vpPhoneMailSubject: settings.vpPhoneMailSubject ?? null,
+    vpPhoneMailText: settings.vpPhoneMailText ?? null,
+    vpPhoneMailHtml: settings.vpPhoneMailHtml ?? null,
   });
 }
 

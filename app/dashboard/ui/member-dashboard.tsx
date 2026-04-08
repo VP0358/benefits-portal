@@ -549,7 +549,7 @@ export default function MemberDashboard({
   const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const slideRef = useRef(0);
-  const [contractCount, setContractCount] = useState<number | null>(null);
+
   const travelSubRef = useRef<{ openModal: () => void }>(null);
 
   // アバター読み込み（DB画像 > localStorage絵文字）
@@ -598,14 +598,6 @@ export default function MemberDashboard({
     document.addEventListener("click", close);
     return () => document.removeEventListener("click", close);
   }, [menuOpen]);
-
-  // 今月の携帯契約件数を取得
-  useEffect(() => {
-    fetch("/api/referral/contracts")
-      .then(r => r.json())
-      .then(d => setContractCount(d.thisMonthCount ?? 0))
-      .catch(() => setContractCount(0));
-  }, []);
 
   // 未読カウント管理
   useEffect(() => {
@@ -672,7 +664,6 @@ export default function MemberDashboard({
                 { href: "/org-chart",           label: "🌳 直紹介 組織図" },
                 { href: "/mlm-org-chart",       label: "🌲 MLMマトリックス組織図" },
                 { href: "/mlm-bonus",           label: "💎 MLMボーナス履歴" },
-                { href: "/vp-phone-referrals",  label: "📱 VP紹介ツリー" },
                 { href: "/travel-referrals",    label: "✈️ 旅行サブスク紹介ツリー" },
               ].map(item => (
                 <Link key={item.href} href={item.href}
@@ -755,29 +746,6 @@ export default function MemberDashboard({
 
         {/* VP未来phone申し込みボタン（モーダル付き） */}
         <VpPhoneButton />
-
-        {/* 携帯契約ボタン */}
-        <Link href="/referral/contracts"
-          className="block bg-white rounded-2xl p-4 shadow flex items-center justify-between hover:shadow-md transition">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">📱</span>
-            <div>
-              <p className="font-bold text-gray-800 text-sm">今月の直紹介 携帯契約</p>
-              <p className="text-xs text-gray-600 mt-0.5">直紹介した会員の今月の契約件数</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {contractCount === null ? (
-              <span className="text-sm text-gray-600 animate-pulse">...</span>
-            ) : (
-              <span className="text-2xl font-black text-green-600">
-                {contractCount}
-                <span className="text-xs font-semibold text-gray-700 ml-0.5">件</span>
-              </span>
-            )}
-            <span className="text-gray-600 text-lg">›</span>
-          </div>
-        </Link>
 
         {/* 旅行サブスクボタン（申込モーダル付き） */}
         <TravelSubButton ref={travelSubRef} />
@@ -877,7 +845,6 @@ export default function MemberDashboard({
               { href: "/org-chart",          icon: "🌳", label: "直紹介 組織図" },
               { href: "/mlm-org-chart",      icon: "🌲", label: "MLM組織図" },
               { href: "/mlm-bonus",          icon: "💎", label: "MLMボーナス" },
-              { href: "/vp-phone-referrals",   icon: "📱", label: "VP紹介ツリー" },
               { href: "/travel-referrals",     icon: "✈️", label: "旅行サブスク紹介ツリー" },
             ].map(item => (
               <Link key={item.href} href={item.href}

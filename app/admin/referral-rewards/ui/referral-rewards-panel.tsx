@@ -317,8 +317,9 @@ export default function ReferralRewardsPanel() {
 
       {/* 注記 */}
       <div className="rounded-2xl bg-slate-50 p-4 text-xs text-slate-700 space-y-1">
-        <div>※ 対象：ステータスが「有効」かつ「確定日」が設定された携帯契約のみ</div>
-        <div>※ 報酬額 = 合計契約プラン額 × {(REWARD_RATE * 100).toFixed(0)}%（月額の1/4、小数点以下切り捨て）</div>
+        <div>※ ショット配当（初回のみ）：契約確定日（confirmedAt）が設定された時点で1回だけ発生</div>
+        <div>※ 対象：「確定日（confirmedAt）」が設定された携帯契約（ステータス問わず）</div>
+        <div>※ 報酬額 = 契約プラン月額 × {(REWARD_RATE * 100).toFixed(0)}%（月額の1/4、小数点以下切り捨て）・1契約につき1回のみ</div>
         <div>※ 紹介関係は直紹介（isActive = true）のみ対象</div>
       </div>
     </div>
