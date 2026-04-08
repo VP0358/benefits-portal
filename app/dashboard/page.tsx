@@ -13,8 +13,9 @@ export default async function DashboardPage() {
   
   let vpPhoneApp = null;
   let travelSub = null;
+  let mlmMember = null;
   
-  const [user, menus, mlmMember] = await Promise.all([
+  const [user, menus] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       include: { pointWallet: true },
@@ -23,10 +24,16 @@ export default async function DashboardPage() {
       where: { isActive: true },
       orderBy: { sortOrder: "asc" },
     }),
-    prisma.mlmMember.findFirst({
-      where: { userId },
-    }),
   ]);
+  
+  // MLM会員情報を個別に取得（エラーがあっても続行）
+  try {
+    mlmMember = await prisma.mlmMember.findFirst({
+      where: { userId },
+    });
+  } catch (e) {
+    console.error("MlmMember fetch error:", e);
+  }
   
   // VpPhoneとTravelSubは個別に取得（エラーがあっても続行）
   try {
