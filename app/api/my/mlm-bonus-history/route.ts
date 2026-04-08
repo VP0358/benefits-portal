@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
-
 // 動的レンダリングを強制（ビルド時にこのルートを実行しない）
 export const dynamic = 'force-dynamic'
+
+import { NextResponse } from "next/server";
+
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { LEVEL_LABELS, UNILEVEL_RATES } from "@/lib/mlm-bonus";

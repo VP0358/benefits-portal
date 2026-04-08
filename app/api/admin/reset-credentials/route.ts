@@ -1,7 +1,8 @@
-/**
-
 // 動的レンダリングを強制（ビルド時にこのルートを実行しない）
 export const dynamic = 'force-dynamic'
+
+/**
+
 
  * 緊急用：ログイン情報を指定の値にリセットするAPI（使用後即削除）
  * POST /api/admin/reset-credentials

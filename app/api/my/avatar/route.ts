@@ -1,7 +1,8 @@
-/**
-
 // 動的レンダリングを強制（ビルド時にこのルートを実行しない）
 export const dynamic = 'force-dynamic'
+
+/**
+
  * POST /api/my/avatar  – プロフィール画像アップロード
  * GET  /api/my/avatar  – 現在のアバターURL取得
  */

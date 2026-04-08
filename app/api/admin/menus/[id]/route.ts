@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-
 // 動的レンダリングを強制（ビルド時にこのルートを実行しない）
 export const dynamic = 'force-dynamic'
+
+import { NextRequest, NextResponse } from "next/server";
+
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";

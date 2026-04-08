@@ -1,1 +1,9 @@
-{}
+{
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "regions": ["hnd1"]
+}

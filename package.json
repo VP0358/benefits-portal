@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && NODE_OPTIONS='--max-old-space-size=512' next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "seed": "tsx prisma/seed.ts",
@@ -23,7 +23,7 @@
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
     "lucide-react": "^1.7.0",
-    "next": "15.1.6",
+    "next": "15.1.8",
     "next-auth": "^5.0.0-beta.30",
     "pdfkit": "^0.15.0",
     "pg": "^8.20.0",
