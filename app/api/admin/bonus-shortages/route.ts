@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
  * 指定月の過不足金一覧を取得
  */
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   if (!session?.user || session.user.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
  * 過不足金を新規登録
  */
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   if (!session?.user || session.user.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
  * 過不足金を更新
  */
 export async function PUT(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   if (!session?.user || session.user.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -139,7 +139,7 @@ export async function PUT(req: NextRequest) {
  * 過不足金を削除
  */
 export async function DELETE(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   if (!session?.user || session.user.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
