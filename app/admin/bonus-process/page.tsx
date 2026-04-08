@@ -98,16 +98,12 @@ export default function BonusProcessPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // ボーナス実行情報を取得（ダミー）
-      // 実際のAPIに置き換える
-      setBonusRun({
-        id: "1",
-        bonusMonth: selectedMonth,
-        status: "draft",
-        paymentAdjustmentRate: 2.0,
-        totalBonusAmount: 1500000,
-        totalMembers: 25,
-      });
+      // ボーナス実行情報を取得
+      const runRes = await fetch(`/api/admin/bonus-run?bonusMonth=${selectedMonth}`);
+      if (runRes.ok) {
+        const runData = await runRes.json();
+        setBonusRun(runData.bonusRun);
+      }
 
       // 調整金を取得
       const adjRes = await fetch(`/api/admin/bonus-adjustments?bonusMonth=${selectedMonth}`);
@@ -307,6 +303,64 @@ export default function BonusProcessPage() {
     }
   };
 
+  // ボーナス計算実行
+  const handleExecuteBonus = async () => {
+    if (!confirm(`${selectedMonth.replace("-", "年")}月度のボーナス計算を実行しますか？`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/admin/bonus-run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bonusMonth: selectedMonth,
+          paymentAdjustmentRate: bonusRun?.paymentAdjustmentRate || 0,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        alert(data.message || "ボーナス計算を実行しました");
+        fetchData();
+      } else {
+        const error = await res.json();
+        alert(error.error || "ボーナス計算の実行に失敗しました");
+      }
+    } catch (error) {
+      console.error("Error executing bonus:", error);
+      alert("エラーが発生しました");
+    }
+  };
+
+  // ボーナス計算削除
+  const handleDeleteBonus = async () => {
+    if (
+      !confirm(
+        `${selectedMonth.replace("-", "年")}月度のボーナス計算を削除しますか？\n※この操作は取り消せません`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/admin/bonus-run?bonusMonth=${selectedMonth}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        alert("ボーナス計算を削除しました");
+        fetchData();
+      } else {
+        const error = await res.json();
+        alert(error.error || "ボーナス計算の削除に失敗しました");
+      }
+    } catch (error) {
+      console.error("Error deleting bonus:", error);
+      alert("エラーが発生しました");
+    }
+  };
+
   // 削除処理
   const handleDeleteAdjustment = async (id: string) => {
     if (!confirm("この調整金を削除しますか？")) return;
@@ -379,37 +433,65 @@ export default function BonusProcessPage() {
         </select>
 
         {bonusRun && (
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-blue-50 rounded-lg p-4">
-              <p className="text-xs text-blue-600 font-semibold">計算状況</p>
-              <p className="text-lg font-bold text-blue-900">
-                {bonusRun.status === "draft" ? "未計算" : "計算済み"}
-              </p>
+          <div className="mt-4 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 rounded-lg p-4">
+                <p className="text-xs text-blue-600 font-semibold">計算状況</p>
+                <p className="text-lg font-bold text-blue-900">
+                  {bonusRun.status === "draft" ? "未確定" : bonusRun.status === "confirmed" ? "確定済み" : "計算済み"}
+                </p>
+              </div>
+              <div className="bg-green-50 rounded-lg p-4">
+                <p className="text-xs text-green-600 font-semibold">対象会員数</p>
+                <p className="text-lg font-bold text-green-900">
+                  {bonusRun.totalMembers}人
+                </p>
+              </div>
+              <div className="bg-purple-50 rounded-lg p-4">
+                <p className="text-xs text-purple-600 font-semibold">
+                  ボーナス総額
+                </p>
+                <p className="text-lg font-bold text-purple-900">
+                  ¥{bonusRun.totalBonusAmount.toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-orange-50 rounded-lg p-4">
+                <p className="text-xs text-orange-600 font-semibold">
+                  支払調整率
+                </p>
+                <p className="text-lg font-bold text-orange-900">
+                  {bonusRun.paymentAdjustmentRate != null
+                    ? `${bonusRun.paymentAdjustmentRate}%`
+                    : "未設定"}
+                </p>
+              </div>
             </div>
-            <div className="bg-green-50 rounded-lg p-4">
-              <p className="text-xs text-green-600 font-semibold">対象会員数</p>
-              <p className="text-lg font-bold text-green-900">
-                {bonusRun.totalMembers}人
-              </p>
+
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={handleDeleteBonus}
+                disabled={bonusRun.status === "confirmed"}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <i className="fas fa-trash mr-1"></i>
+                ボーナス計算を削除
+              </button>
             </div>
-            <div className="bg-purple-50 rounded-lg p-4">
-              <p className="text-xs text-purple-600 font-semibold">
-                ボーナス総額
-              </p>
-              <p className="text-lg font-bold text-purple-900">
-                ¥{bonusRun.totalBonusAmount.toLocaleString()}
-              </p>
-            </div>
-            <div className="bg-orange-50 rounded-lg p-4">
-              <p className="text-xs text-orange-600 font-semibold">
-                支払調整率
-              </p>
-              <p className="text-lg font-bold text-orange-900">
-                {bonusRun.paymentAdjustmentRate != null
-                  ? `${bonusRun.paymentAdjustmentRate}%`
-                  : "未設定"}
-              </p>
-            </div>
+          </div>
+        )}
+
+        {!bonusRun && (
+          <div className="mt-4">
+            <button
+              onClick={handleExecuteBonus}
+              className="px-6 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-lg hover:from-violet-700 hover:to-purple-700 transition font-semibold"
+            >
+              <i className="fas fa-play mr-2"></i>
+              {selectedMonth.replace("-", "年")}月度のボーナス計算を実行
+            </button>
+            <p className="mt-2 text-sm text-gray-500">
+              ※ ボーナス計算を実行すると、会員ごとのボーナス額が計算されます
+            </p>
           </div>
         )}
       </div>

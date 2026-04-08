@@ -66,6 +66,13 @@ export default function BonusUtilitiesPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
+      // 備考を取得
+      const noteRes = await fetch(`/api/admin/bonus-notes?bonusMonth=${selectedMonth}`);
+      if (noteRes.ok) {
+        const noteData = await noteRes.json();
+        setBonusNote(noteData.note || "");
+      }
+
       // ダミーデータ（実際のAPIに置き換え）
       setPaymentRecords([
         {
