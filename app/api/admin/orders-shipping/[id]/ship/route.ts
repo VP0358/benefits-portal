@@ -6,10 +6,11 @@ const prisma = new PrismaClient()
 // 発送済みに更新
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const orderId = BigInt(params.id)
+    const { id } = await params
+    const orderId = BigInt(id)
 
     // 注文の存在確認
     const order = await prisma.order.findUnique({

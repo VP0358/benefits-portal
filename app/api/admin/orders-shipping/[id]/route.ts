@@ -6,10 +6,11 @@ const prisma = new PrismaClient()
 // 注文更新
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const orderId = BigInt(params.id)
+    const { id } = await params
+    const orderId = BigInt(id)
     const body = await request.json()
     const { status, carrier, trackingNumber, shippingStatus } = body
 
@@ -99,10 +100,11 @@ export async function PATCH(
 // 注文削除
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const orderId = BigInt(params.id)
+    const { id } = await params
+    const orderId = BigInt(id)
 
     // 注文の存在確認
     const order = await prisma.order.findUnique({

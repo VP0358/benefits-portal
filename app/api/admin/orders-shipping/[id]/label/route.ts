@@ -7,10 +7,11 @@ const prisma = new PrismaClient()
 // 発送ラベル印刷（PDF生成）
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const orderId = BigInt(params.id)
+    const { id } = await params
+    const orderId = BigInt(id)
 
     // 注文と配送情報を取得
     const order = await prisma.order.findUnique({
