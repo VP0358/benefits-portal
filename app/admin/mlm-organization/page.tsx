@@ -12,6 +12,8 @@ type MemberNode = {
   level: number;
   status: string;
   directDownlines?: MemberNode[];
+  lastMonthPoints?: number;
+  currentMonthPoints?: number;
 };
 
 export default function MlmOrganizationPage() {
@@ -171,17 +173,33 @@ export default function MlmOrganizationPage() {
             <div className="font-semibold text-gray-800">
               {node.memberCode} - {node.name}
             </div>
-            <div className="text-xs text-gray-500">
-              ステータス:{" "}
-              <span
-                className={
-                  node.status === "active"
-                    ? "text-green-600 font-semibold"
-                    : "text-red-600"
-                }
-              >
-                {node.status === "active" ? "アクティブ" : "非アクティブ"}
-              </span>
+            <div className="text-xs text-gray-500 space-y-1">
+              <div>
+                ステータス:{" "}
+                <span
+                  className={
+                    node.status === "active"
+                      ? "text-green-600 font-semibold"
+                      : "text-red-600"
+                  }
+                >
+                  {node.status === "active" ? "アクティブ" : "非アクティブ"}
+                </span>
+              </div>
+              {(node.lastMonthPoints !== undefined || node.currentMonthPoints !== undefined) && (
+                <div className="flex gap-3 mt-1">
+                  {node.lastMonthPoints !== undefined && (
+                    <span className="text-purple-600 font-medium">
+                      先月: {node.lastMonthPoints.toLocaleString()}pt
+                    </span>
+                  )}
+                  {node.currentMonthPoints !== undefined && (
+                    <span className="text-pink-600 font-medium">
+                      今月: {node.currentMonthPoints.toLocaleString()}pt
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           {hasChildren && (

@@ -43,6 +43,14 @@ export default function ProfilePage() {
   // 紹介者URL関連
   const [copySuccess, setCopySuccess] = useState(false);
 
+  // MLMポイント関連
+  const [mlmPoints, setMlmPoints] = useState<{
+    lastMonthPoints: number;
+    currentMonthPoints: number;
+    lastMonthPurchaseAmount: number;
+    currentMonthPurchaseAmount: number;
+  } | null>(null);
+
   // 紹介者URLを生成
   const getReferralUrl = () => {
     if (!profile?.mlmMemberCode) return "";
@@ -75,6 +83,16 @@ export default function ProfilePage() {
         setPostalCode(data.postalCode ?? "");
         setAddress(data.address ?? "");
         setNewEmail(data.email ?? "");
+        
+        // MLM会員の場合、ポイント情報を取得
+        if (data.mlmMemberCode) {
+          fetch("/api/my/mlm-points")
+            .then(r => r.json())
+            .then(pointsData => {
+              setMlmPoints(pointsData);
+            })
+            .catch(() => {});
+        }
       })
       .finally(() => setLoading(false));
 
@@ -193,6 +211,41 @@ export default function ProfilePage() {
           <span className="text-xs text-slate-400">会員番号</span>
           <span className="font-bold text-slate-700">{profile?.memberCode}</span>
         </div>
+
+        {/* MLMポイント表示 */}
+        {profile?.mlmMemberCode && mlmPoints && (
+          <div className="rounded-2xl bg-gradient-to-r from-purple-50 to-pink-50 px-5 py-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <i className="fas fa-star text-purple-600"></i>
+              <span className="text-sm font-bold text-slate-800">MLM購入ポイント</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white rounded-lg p-3">
+                <div className="text-xs text-slate-500 mb-1">先月のポイント</div>
+                <div className="text-2xl font-bold text-purple-600">
+                  {mlmPoints.lastMonthPoints.toLocaleString()}
+                  <span className="text-sm font-normal text-slate-500 ml-1">pt</span>
+                </div>
+                <div className="text-xs text-slate-400 mt-1">
+                  ¥{mlmPoints.lastMonthPurchaseAmount.toLocaleString()}
+                </div>
+              </div>
+              <div className="bg-white rounded-lg p-3">
+                <div className="text-xs text-slate-500 mb-1">今月のポイント</div>
+                <div className="text-2xl font-bold text-pink-600">
+                  {mlmPoints.currentMonthPoints.toLocaleString()}
+                  <span className="text-sm font-normal text-slate-500 ml-1">pt</span>
+                </div>
+                <div className="text-xs text-slate-400 mt-1">
+                  ¥{mlmPoints.currentMonthPurchaseAmount.toLocaleString()}
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 mt-3">
+              ※ 1ポイント = 100円換算。今月は昨日までの集計です。
+            </p>
+          </div>
+        )}
 
         {/* 紹介者URL */}
         {profile?.mlmMemberCode && (
