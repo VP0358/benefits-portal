@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 // 過去15ヶ月分の月リストを生成
 function generateMonthOptions() {
@@ -59,12 +59,19 @@ export default function BonusProcessPage() {
   const [savingsConfig, setSavingsConfig] = useState<SavingsBonusConfig | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // ページネーション状態
+  const [adjustmentPage, setAdjustmentPage] = useState(1);
+  const [shortagePage, setShortagePage] = useState(1);
+  const itemsPerPage = 100;
+
+  // ファイルアップロード用ref
+  const adjustmentFileRef = useRef<HTMLInputElement>(null);
+  const shortageFileRef = useRef<HTMLInputElement>(null);
+
   // モーダル制御
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
   const [showShortageModal, setShowShortageModal] = useState(false);
   const [showSavingsConfigModal, setShowSavingsConfigModal] = useState(false);
-  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
-  const [bulkUploadType, setBulkUploadType] = useState<"adjustment" | "shortage">("adjustment");
 
   // フォーム状態
   const [newAdjustment, setNewAdjustment] = useState({
@@ -85,8 +92,6 @@ export default function BonusProcessPage() {
     autoshipRate: 5,
     bonusRate: 3,
   });
-
-  const [bulkData, setBulkData] = useState("");
 
   // データ取得
   useEffect(() => {
@@ -144,7 +149,6 @@ export default function BonusProcessPage() {
     }
 
     try {
-      // 会員コードからmlmMemberIdを検索
       const memberRes = await fetch(`/api/admin/mlm-members/search?code=${newAdjustment.memberCode}`);
       if (!memberRes.ok) {
         alert("会員が見つかりません");
@@ -187,7 +191,6 @@ export default function BonusProcessPage() {
     }
 
     try {
-      // 会員コードからmlmMemberIdを検索
       const memberRes = await fetch(`/api/admin/mlm-members/search?code=${newShortage.memberCode}`);
       if (!memberRes.ok) {
         alert("会員が見つかりません");
@@ -242,126 +245,75 @@ export default function BonusProcessPage() {
     }
   };
 
-  // 一括アップロード処理
-  const handleBulkUpload = async () => {
-    if (!bulkData.trim()) {
-      alert("データを入力してください");
-      return;
-    }
+  // ファイルアップロード処理（調整金）
+  const handleAdjustmentFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("bonusMonth", selectedMonth);
 
     try {
-      // CSVパース（簡易版）
-      const lines = bulkData.trim().split("\n");
-      const items = [];
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        const [memberCode, amount, comment] = line.split(",").map((s) => s.trim());
-        if (memberCode && amount) {
-          items.push({
-            memberCode,
-            amount: Number(amount),
-            comment: comment || "",
-            isTaxable: bulkUploadType === "adjustment" ? true : undefined,
-          });
-        }
-      }
-
-      if (items.length === 0) {
-        alert("有効なデータがありません");
-        return;
-      }
-
-      const endpoint =
-        bulkUploadType === "adjustment"
-          ? "/api/admin/bonus-adjustments/bulk-upload"
-          : "/api/admin/bonus-shortages/bulk-upload";
-
-      const res = await fetch(endpoint, {
+      const res = await fetch("/api/admin/bonus-adjustments/bulk-upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bonusMonth: selectedMonth,
-          items,
-        }),
-      });
-
-      if (res.ok) {
-        const result = await res.json();
-        alert(
-          `一括登録完了\n成功: ${result.results.success}件\n失敗: ${result.results.failed}件`
-        );
-        setShowBulkUploadModal(false);
-        setBulkData("");
-        fetchData();
-      } else {
-        alert("一括登録に失敗しました");
-      }
-    } catch (error) {
-      console.error("Error bulk uploading:", error);
-      alert("エラーが発生しました");
-    }
-  };
-
-  // ボーナス計算実行
-  const handleExecuteBonus = async () => {
-    if (!confirm(`${selectedMonth.replace("-", "年")}月度のボーナス計算を実行しますか？`)) {
-      return;
-    }
-
-    try {
-      const res = await fetch("/api/admin/bonus-run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bonusMonth: selectedMonth,
-          paymentAdjustmentRate: bonusRun?.paymentAdjustmentRate || 0,
-        }),
+        body: formData,
       });
 
       if (res.ok) {
         const data = await res.json();
-        alert(data.message || "ボーナス計算を実行しました");
+        alert(`${data.count}件の調整金をアップロードしました`);
         fetchData();
       } else {
         const error = await res.json();
-        alert(error.error || "ボーナス計算の実行に失敗しました");
+        alert(`アップロード失敗: ${error.error || "不明なエラー"}`);
       }
     } catch (error) {
-      console.error("Error executing bonus:", error);
+      console.error("Error uploading file:", error);
       alert("エラーが発生しました");
+    }
+
+    // リセット
+    if (adjustmentFileRef.current) {
+      adjustmentFileRef.current.value = "";
     }
   };
 
-  // ボーナス計算削除
-  const handleDeleteBonus = async () => {
-    if (
-      !confirm(
-        `${selectedMonth.replace("-", "年")}月度のボーナス計算を削除しますか？\n※この操作は取り消せません`
-      )
-    ) {
-      return;
-    }
+  // ファイルアップロード処理（過不足金）
+  const handleShortageFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("bonusMonth", selectedMonth);
 
     try {
-      const res = await fetch(`/api/admin/bonus-run?bonusMonth=${selectedMonth}`, {
-        method: "DELETE",
+      const res = await fetch("/api/admin/bonus-shortages/bulk-upload", {
+        method: "POST",
+        body: formData,
       });
 
       if (res.ok) {
-        alert("ボーナス計算を削除しました");
+        const data = await res.json();
+        alert(`${data.count}件の過不足金をアップロードしました`);
         fetchData();
       } else {
         const error = await res.json();
-        alert(error.error || "ボーナス計算の削除に失敗しました");
+        alert(`アップロード失敗: ${error.error || "不明なエラー"}`);
       }
     } catch (error) {
-      console.error("Error deleting bonus:", error);
+      console.error("Error uploading file:", error);
       alert("エラーが発生しました");
+    }
+
+    // リセット
+    if (shortageFileRef.current) {
+      shortageFileRef.current.value = "";
     }
   };
 
-  // 削除処理
+  // 削除処理（調整金）
   const handleDeleteAdjustment = async (id: string) => {
     if (!confirm("この調整金を削除しますか？")) return;
 
@@ -382,6 +334,7 @@ export default function BonusProcessPage() {
     }
   };
 
+  // 削除処理（過不足金）
   const handleDeleteShortage = async (id: string) => {
     if (!confirm("この過不足金を削除しますか？")) return;
 
@@ -402,6 +355,68 @@ export default function BonusProcessPage() {
     }
   };
 
+  // ボーナス計算実行
+  const handleExecuteBonus = async () => {
+    if (!confirm(`${selectedMonth}のボーナス計算を実行しますか？`)) return;
+
+    try {
+      const res = await fetch("/api/admin/bonus-run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bonusMonth: selectedMonth }),
+      });
+
+      if (res.ok) {
+        alert("ボーナス計算を実行しました");
+        fetchData();
+      } else {
+        const error = await res.json();
+        alert(`実行失敗: ${error.error || "不明なエラー"}`);
+      }
+    } catch (error) {
+      console.error("Error executing bonus:", error);
+      alert("エラーが発生しました");
+    }
+  };
+
+  // ボーナス計算削除
+  const handleDeleteBonus = async () => {
+    if (!confirm(`${selectedMonth}のボーナス計算を削除しますか？`)) return;
+
+    try {
+      const res = await fetch(`/api/admin/bonus-run?bonusMonth=${selectedMonth}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        alert("ボーナス計算を削除しました");
+        fetchData();
+      } else {
+        const error = await res.json();
+        alert(`削除失敗: ${error.error || "不明なエラー"}`);
+      }
+    } catch (error) {
+      console.error("Error deleting bonus:", error);
+      alert("エラーが発生しました");
+    }
+  };
+
+  // ページネーション計算
+  const getPagedData = (data: any[], page: number) => {
+    const start = (page - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return data.slice(start, end);
+  };
+
+  const getTotalPages = (data: any[]) => {
+    return Math.ceil(data.length / itemsPerPage);
+  };
+
+  const pagedAdjustments = getPagedData(adjustments, adjustmentPage);
+  const pagedShortages = getPagedData(shortages, shortagePage);
+  const adjustmentTotalPages = getTotalPages(adjustments);
+  const shortageTotalPages = getTotalPages(shortages);
+
   return (
     <main className="space-y-6">
       {/* ヘッダー */}
@@ -410,20 +425,20 @@ export default function BonusProcessPage() {
           <i className="fas fa-calculator mr-2"></i>
           ボーナス計算処理
         </h1>
-        <p className="mt-2 text-gray-600">
-          対象月を選択して、調整金・過不足金・貯金ボーナス設定を管理
-        </p>
+        <p className="mt-2 text-gray-600">対象月を選択してボーナス計算を実行します</p>
       </div>
 
       {/* 対象月選択 */}
       <div className="bg-white rounded-lg shadow p-6">
-        <label className="block text-sm font-semibold text-gray-700 mb-2">
-          対象月
-        </label>
+        <label className="block text-sm font-semibold text-gray-700 mb-2">対象月</label>
         <select
           value={selectedMonth}
-          onChange={(e) => setSelectedMonth(e.target.value)}
-          className="w-full md:w-64 rounded-lg border-gray-300 shadow-sm focus:border-violet-500 focus:ring-violet-500"
+          onChange={(e) => {
+            setSelectedMonth(e.target.value);
+            setAdjustmentPage(1);
+            setShortagePage(1);
+          }}
+          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         >
           {monthOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -431,396 +446,407 @@ export default function BonusProcessPage() {
             </option>
           ))}
         </select>
-
-        {bonusRun && (
-          <div className="mt-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-blue-50 rounded-lg p-4">
-                <p className="text-xs text-blue-600 font-semibold">計算状況</p>
-                <p className="text-lg font-bold text-blue-900">
-                  {bonusRun.status === "draft" ? "未確定" : bonusRun.status === "confirmed" ? "確定済み" : "計算済み"}
-                </p>
-              </div>
-              <div className="bg-green-50 rounded-lg p-4">
-                <p className="text-xs text-green-600 font-semibold">対象会員数</p>
-                <p className="text-lg font-bold text-green-900">
-                  {bonusRun.totalMembers}人
-                </p>
-              </div>
-              <div className="bg-purple-50 rounded-lg p-4">
-                <p className="text-xs text-purple-600 font-semibold">
-                  ボーナス総額
-                </p>
-                <p className="text-lg font-bold text-purple-900">
-                  ¥{bonusRun.totalBonusAmount.toLocaleString()}
-                </p>
-              </div>
-              <div className="bg-orange-50 rounded-lg p-4">
-                <p className="text-xs text-orange-600 font-semibold">
-                  支払調整率
-                </p>
-                <p className="text-lg font-bold text-orange-900">
-                  {bonusRun.paymentAdjustmentRate != null
-                    ? `${bonusRun.paymentAdjustmentRate}%`
-                    : "未設定"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-2">
-              <button
-                onClick={handleDeleteBonus}
-                disabled={bonusRun.status === "confirmed"}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <i className="fas fa-trash mr-1"></i>
-                ボーナス計算を削除
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!bonusRun && (
-          <div className="mt-4">
-            <button
-              onClick={handleExecuteBonus}
-              className="px-6 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-lg hover:from-violet-700 hover:to-purple-700 transition font-semibold"
-            >
-              <i className="fas fa-play mr-2"></i>
-              {selectedMonth.replace("-", "年")}月度のボーナス計算を実行
-            </button>
-            <p className="mt-2 text-sm text-gray-500">
-              ※ ボーナス計算を実行すると、会員ごとのボーナス額が計算されます
-            </p>
-          </div>
-        )}
       </div>
 
-      {loading && (
-        <div className="bg-blue-50 rounded-lg p-4 text-center text-blue-700">
-          読み込み中...
+      {/* ボーナス実行情報 */}
+      {bonusRun && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">
+            <i className="fas fa-info-circle mr-2"></i>
+            ボーナス実行情報
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <div className="text-sm text-gray-600">ステータス</div>
+              <div className="text-lg font-bold text-blue-900">
+                {bonusRun.status === "confirmed" ? "確定済み" : "未確定"}
+              </div>
+            </div>
+            <div className="bg-green-50 p-4 rounded-lg">
+              <div className="text-sm text-gray-600">対象会員数</div>
+              <div className="text-lg font-bold text-green-900">{bonusRun.totalMembers}名</div>
+            </div>
+            <div className="bg-purple-50 p-4 rounded-lg">
+              <div className="text-sm text-gray-600">総ボーナス額</div>
+              <div className="text-lg font-bold text-purple-900">
+                ¥{bonusRun.totalBonusAmount.toLocaleString()}
+              </div>
+            </div>
+            {bonusRun.paymentAdjustmentRate !== null && (
+              <div className="bg-orange-50 p-4 rounded-lg">
+                <div className="text-sm text-gray-600">支払調整率</div>
+                <div className="text-lg font-bold text-orange-900">
+                  {bonusRun.paymentAdjustmentRate}%
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="mt-4 flex gap-2">
+            <button
+              onClick={handleExecuteBonus}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            >
+              <i className="fas fa-play mr-2"></i>
+              ボーナス計算実行
+            </button>
+            <button
+              onClick={handleDeleteBonus}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+            >
+              <i className="fas fa-trash mr-2"></i>
+              ボーナス計算削除
+            </button>
+          </div>
         </div>
       )}
 
-      {/* 調整金セクション */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-800">
-            <i className="fas fa-edit mr-2 text-violet-600"></i>
-            調整金入力
-          </h2>
-          <div className="space-x-2">
-            <button
-              onClick={() => setShowAdjustmentModal(true)}
-              className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition text-sm"
-            >
-              <i className="fas fa-plus mr-1"></i>
-              手動追加
-            </button>
-            <button
-              onClick={() => {
-                setBulkUploadType("adjustment");
-                setShowBulkUploadModal(true);
-              }}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm"
-            >
-              <i className="fas fa-upload mr-1"></i>
-              一括アップロード
-            </button>
-          </div>
-        </div>
+      {/* 調整金入力 */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-xl font-bold text-gray-800 mb-4">
+          <i className="fas fa-edit mr-2"></i>
+          調整金入力
+        </h2>
 
-        <div className="p-6">
-          {adjustments.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
-              調整金データがありません
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                      会員コード
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                      会員名
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                      法人名
-                    </th>
-                    <th className="px-4 py-3 text-right font-semibold text-gray-700">
-                      金額
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                      コメント
-                    </th>
-                    <th className="px-4 py-3 text-center font-semibold text-gray-700">
-                      課税
-                    </th>
-                    <th className="px-4 py-3 text-center font-semibold text-gray-700">
-                      操作
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {adjustments.map((adj) => (
-                    <tr key={adj.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">{adj.memberCode}</td>
-                      <td className="px-4 py-3">{adj.memberName}</td>
-                      <td className="px-4 py-3">
-                        {adj.companyName || <span className="text-gray-400">-</span>}
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold">
-                        ¥{adj.amount.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {adj.comment || <span className="text-gray-400">-</span>}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {adj.isTaxable ? (
-                          <span className="text-green-600">対象</span>
-                        ) : (
-                          <span className="text-gray-400">対象外</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => handleDeleteAdjustment(adj.id)}
-                          className="text-red-600 hover:text-red-800 text-xs"
-                        >
-                          <i className="fas fa-trash"></i>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 過不足金セクション */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-800">
-            <i className="fas fa-balance-scale mr-2 text-blue-600"></i>
-            過不足金入力（源泉対象外）
-          </h2>
-          <div className="space-x-2">
+        {/* 一括アップロード */}
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">
+            <i className="fas fa-upload mr-2"></i>
+            一括アップロード
+          </h3>
+          <div className="flex items-center gap-3">
+            <input
+              type="file"
+              ref={adjustmentFileRef}
+              onChange={handleAdjustmentFileUpload}
+              accept=".csv,.xlsx,.xls"
+              className="hidden"
+            />
             <button
-              onClick={() => setShowShortageModal(true)}
+              onClick={() => adjustmentFileRef.current?.click()}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
             >
-              <i className="fas fa-plus mr-1"></i>
-              手動追加
+              <i className="fas fa-folder-open mr-2"></i>
+              ファイルを選択
             </button>
-            <button
-              onClick={() => {
-                setBulkUploadType("shortage");
-                setShowBulkUploadModal(true);
-              }}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm"
-            >
-              <i className="fas fa-upload mr-1"></i>
-              一括アップロード
-            </button>
+            <span className="text-sm text-gray-600">
+              データ（CSV形式）をアップロード
+            </span>
+          </div>
+          <div className="mt-2 text-xs text-gray-500">
+            <i className="fas fa-info-circle mr-1"></i>
+            形式: 会員コード,金額,コメント
           </div>
         </div>
 
-        <div className="p-6">
-          {shortages.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
-              過不足金データがありません
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                      会員コード
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                      会員名
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                      法人名
-                    </th>
-                    <th className="px-4 py-3 text-right font-semibold text-gray-700">
-                      金額
-                    </th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                      コメント
-                    </th>
-                    <th className="px-4 py-3 text-center font-semibold text-gray-700">
-                      操作
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {shortages.map((s) => (
-                    <tr key={s.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">{s.memberCode}</td>
-                      <td className="px-4 py-3">{s.memberName}</td>
-                      <td className="px-4 py-3">
-                        {s.companyName || <span className="text-gray-400">-</span>}
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold">
-                        ¥{s.amount.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {s.comment || <span className="text-gray-400">-</span>}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => handleDeleteShortage(s.id)}
-                          className="text-red-600 hover:text-red-800 text-xs"
-                        >
-                          <i className="fas fa-trash"></i>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+        {/* 手動追加 */}
+        <button
+          onClick={() => setShowAdjustmentModal(true)}
+          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition mb-4"
+        >
+          <i className="fas fa-plus mr-2"></i>
+          手動追加
+        </button>
+
+        {/* 調整金リスト */}
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">
+            調整金リスト（全{adjustments.length}件）
+          </h3>
         </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-800 text-white">
+              <tr>
+                <th className="px-4 py-3 text-left">会員ID</th>
+                <th className="px-4 py-3 text-left">法人名</th>
+                <th className="px-4 py-3 text-left">名前</th>
+                <th className="px-4 py-3 text-right">金額</th>
+                <th className="px-4 py-3 text-left">コメント</th>
+                <th className="px-4 py-3 text-center">処理</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {pagedAdjustments.length > 0 ? (
+                pagedAdjustments.map((adj) => (
+                  <tr key={adj.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">{adj.memberCode}</td>
+                    <td className="px-4 py-3">{adj.companyName || "-"}</td>
+                    <td className="px-4 py-3">{adj.memberName}</td>
+                    <td className="px-4 py-3 text-right font-semibold">
+                      ¥{adj.amount.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3">{adj.comment || "-"}</td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => handleDeleteAdjustment(adj.id)}
+                        className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
+                      >
+                        <i className="fas fa-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                    データがありません
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ページネーション（調整金） */}
+        {adjustmentTotalPages > 1 && (
+          <div className="mt-4 flex justify-center items-center gap-2">
+            <button
+              onClick={() => setAdjustmentPage((p) => Math.max(1, p - 1))}
+              disabled={adjustmentPage === 1}
+              className="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              <i className="fas fa-chevron-left"></i>
+            </button>
+            <span className="text-sm text-gray-700">
+              {adjustmentPage} / {adjustmentTotalPages}
+            </span>
+            <button
+              onClick={() => setAdjustmentPage((p) => Math.min(adjustmentTotalPages, p + 1))}
+              disabled={adjustmentPage === adjustmentTotalPages}
+              className="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              <i className="fas fa-chevron-right"></i>
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* 貯金ボーナス設定セクション */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-800">
-            <i className="fas fa-piggy-bank mr-2 text-pink-600"></i>
-            貯金ボーナス設定
-          </h2>
-          <button
-            onClick={() => setShowSavingsConfigModal(true)}
-            className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition text-sm"
-          >
-            <i className="fas fa-cog mr-1"></i>
-            設定を編集
-          </button>
+      {/* 過不足金入力（源泉対象外） */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-xl font-bold text-gray-800 mb-4">
+          <i className="fas fa-balance-scale mr-2"></i>
+          過不足金入力（源泉対象外）
+        </h2>
+
+        {/* 一括アップロード */}
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">
+            <i className="fas fa-upload mr-2"></i>
+            一括アップロード
+          </h3>
+          <div className="flex items-center gap-3">
+            <input
+              type="file"
+              ref={shortageFileRef}
+              onChange={handleShortageFileUpload}
+              accept=".csv,.xlsx,.xls"
+              className="hidden"
+            />
+            <button
+              onClick={() => shortageFileRef.current?.click()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
+            >
+              <i className="fas fa-folder-open mr-2"></i>
+              ファイルを選択
+            </button>
+            <span className="text-sm text-gray-600">
+              データ（CSV形式）をアップロード
+            </span>
+          </div>
+          <div className="mt-2 text-xs text-gray-500">
+            <i className="fas fa-info-circle mr-1"></i>
+            形式: 会員コード,金額,コメント
+          </div>
         </div>
 
-        <div className="p-6">
-          {savingsConfig ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-6">
-                <p className="text-sm text-blue-600 font-semibold mb-2">
-                  登録時
-                </p>
-                <p className="text-3xl font-bold text-blue-900">
-                  {savingsConfig.registrationRate}%
-                </p>
-              </div>
-              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-6">
-                <p className="text-sm text-green-600 font-semibold mb-2">
-                  オートシップ
-                </p>
-                <p className="text-3xl font-bold text-green-900">
-                  {savingsConfig.autoshipRate}%
-                </p>
-              </div>
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-6">
-                <p className="text-sm text-purple-600 font-semibold mb-2">
-                  ボーナス
-                </p>
-                <p className="text-3xl font-bold text-purple-900">
-                  {savingsConfig.bonusRate}%
-                </p>
+        {/* 手動追加 */}
+        <button
+          onClick={() => setShowShortageModal(true)}
+          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition mb-4"
+        >
+          <i className="fas fa-plus mr-2"></i>
+          手動追加
+        </button>
+
+        {/* 過不足金リスト */}
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">
+            過不足金リスト（全{shortages.length}件）
+          </h3>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-800 text-white">
+              <tr>
+                <th className="px-4 py-3 text-left">会員ID</th>
+                <th className="px-4 py-3 text-left">法人名</th>
+                <th className="px-4 py-3 text-left">名前</th>
+                <th className="px-4 py-3 text-right">金額</th>
+                <th className="px-4 py-3 text-left">コメント</th>
+                <th className="px-4 py-3 text-center">処理</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {pagedShortages.length > 0 ? (
+                pagedShortages.map((shortage) => (
+                  <tr key={shortage.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">{shortage.memberCode}</td>
+                    <td className="px-4 py-3">{shortage.companyName || "-"}</td>
+                    <td className="px-4 py-3">{shortage.memberName}</td>
+                    <td className="px-4 py-3 text-right font-semibold">
+                      ¥{shortage.amount.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3">{shortage.comment || "-"}</td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => handleDeleteShortage(shortage.id)}
+                        className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
+                      >
+                        <i className="fas fa-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                    データがありません
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ページネーション（過不足金） */}
+        {shortageTotalPages > 1 && (
+          <div className="mt-4 flex justify-center items-center gap-2">
+            <button
+              onClick={() => setShortagePage((p) => Math.max(1, p - 1))}
+              disabled={shortagePage === 1}
+              className="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              <i className="fas fa-chevron-left"></i>
+            </button>
+            <span className="text-sm text-gray-700">
+              {shortagePage} / {shortageTotalPages}
+            </span>
+            <button
+              onClick={() => setShortagePage((p) => Math.min(shortageTotalPages, p + 1))}
+              disabled={shortagePage === shortageTotalPages}
+              className="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              <i className="fas fa-chevron-right"></i>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 貯金ボーナス設定 */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-xl font-bold text-gray-800 mb-4">
+          <i className="fas fa-piggy-bank mr-2"></i>
+          貯金ボーナス設定
+        </h2>
+        {savingsConfig && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <div className="text-sm text-gray-600">登録時ポイント率</div>
+              <div className="text-lg font-bold text-blue-900">
+                {savingsConfig.registrationRate}%
               </div>
             </div>
-          ) : (
-            <p className="text-gray-500 text-center py-8">
-              設定データがありません
-            </p>
-          )}
-        </div>
+            <div className="bg-green-50 p-4 rounded-lg">
+              <div className="text-sm text-gray-600">オートシップ率</div>
+              <div className="text-lg font-bold text-green-900">
+                {savingsConfig.autoshipRate}%
+              </div>
+            </div>
+            <div className="bg-purple-50 p-4 rounded-lg">
+              <div className="text-sm text-gray-600">ボーナス率</div>
+              <div className="text-lg font-bold text-purple-900">
+                {savingsConfig.bonusRate}%
+              </div>
+            </div>
+          </div>
+        )}
+        <button
+          onClick={() => setShowSavingsConfigModal(true)}
+          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+        >
+          <i className="fas fa-cog mr-2"></i>
+          設定を編集
+        </button>
       </div>
 
       {/* 調整金追加モーダル */}
       {showAdjustmentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-bold text-gray-800">調整金を追加</h3>
-            </div>
-            <div className="p-6 space-y-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">調整金を追加</h3>
+            <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  会員コード
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">会員コード</label>
                 <input
                   type="text"
                   value={newAdjustment.memberCode}
                   onChange={(e) =>
                     setNewAdjustment({ ...newAdjustment, memberCode: e.target.value })
                   }
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-violet-500 focus:ring-violet-500"
-                  placeholder="例: M001"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  金額（円）
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">金額</label>
                 <input
                   type="number"
                   value={newAdjustment.amount}
                   onChange={(e) =>
                     setNewAdjustment({ ...newAdjustment, amount: e.target.value })
                   }
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-violet-500 focus:ring-violet-500"
-                  placeholder="10000"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  コメント
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">コメント</label>
                 <textarea
                   value={newAdjustment.comment}
                   onChange={(e) =>
                     setNewAdjustment({ ...newAdjustment, comment: e.target.value })
                   }
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-violet-500 focus:ring-violet-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   rows={3}
-                  placeholder="調整理由など"
                 />
               </div>
-              <div className="flex items-center">
+              <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   checked={newAdjustment.isTaxable}
                   onChange={(e) =>
                     setNewAdjustment({ ...newAdjustment, isTaxable: e.target.checked })
                   }
-                  className="rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                  className="w-4 h-4"
                 />
-                <label className="ml-2 text-sm text-gray-700">
-                  源泉徴収対象とする
-                </label>
+                <label className="text-sm text-gray-700">源泉課税対象</label>
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-2">
+            <div className="mt-6 flex gap-2">
+              <button
+                onClick={handleAddAdjustment}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+              >
+                追加
+              </button>
               <button
                 onClick={() => {
                   setShowAdjustmentModal(false);
                   setNewAdjustment({ memberCode: "", amount: "", comment: "", isTaxable: true });
                 }}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition"
               >
                 キャンセル
-              </button>
-              <button
-                onClick={handleAddAdjustment}
-                className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition"
-              >
-                追加
               </button>
             </div>
           </div>
@@ -829,96 +855,77 @@ export default function BonusProcessPage() {
 
       {/* 過不足金追加モーダル */}
       {showShortageModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-bold text-gray-800">過不足金を追加</h3>
-            </div>
-            <div className="p-6 space-y-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">過不足金を追加</h3>
+            <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  会員コード
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">会員コード</label>
                 <input
                   type="text"
                   value={newShortage.memberCode}
                   onChange={(e) =>
                     setNewShortage({ ...newShortage, memberCode: e.target.value })
                   }
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="例: M001"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  金額（円）
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">金額</label>
                 <input
                   type="number"
                   value={newShortage.amount}
                   onChange={(e) =>
                     setNewShortage({ ...newShortage, amount: e.target.value })
                   }
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="-5000"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
-                <p className="mt-1 text-xs text-gray-500">
-                  ※ マイナス値で過払い、プラス値で不足
-                </p>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  コメント
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">コメント</label>
                 <textarea
                   value={newShortage.comment}
                   onChange={(e) =>
                     setNewShortage({ ...newShortage, comment: e.target.value })
                   }
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   rows={3}
-                  placeholder="調整理由など"
                 />
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-2">
+            <div className="mt-6 flex gap-2">
+              <button
+                onClick={handleAddShortage}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+              >
+                追加
+              </button>
               <button
                 onClick={() => {
                   setShowShortageModal(false);
                   setNewShortage({ memberCode: "", amount: "", comment: "" });
                 }}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition"
               >
                 キャンセル
-              </button>
-              <button
-                onClick={handleAddShortage}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-              >
-                追加
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 貯金ボーナス設定編集モーダル */}
+      {/* 貯金ボーナス設定モーダル */}
       {showSavingsConfigModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-bold text-gray-800">
-                貯金ボーナス設定を編集
-              </h3>
-            </div>
-            <div className="p-6 space-y-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">貯金ボーナス設定を編集</h3>
+            <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  登録時（%）
+                  登録時ポイント率 (%)
                 </label>
                 <input
                   type="number"
-                  step="0.1"
                   value={newSavingsConfig.registrationRate}
                   onChange={(e) =>
                     setNewSavingsConfig({
@@ -926,16 +933,15 @@ export default function BonusProcessPage() {
                       registrationRate: Number(e.target.value),
                     })
                   }
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  オートシップ（%）
+                  オートシップ率 (%)
                 </label>
                 <input
                   type="number"
-                  step="0.1"
                   value={newSavingsConfig.autoshipRate}
                   onChange={(e) =>
                     setNewSavingsConfig({
@@ -943,16 +949,15 @@ export default function BonusProcessPage() {
                       autoshipRate: Number(e.target.value),
                     })
                   }
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  ボーナス（%）
+                  ボーナス率 (%)
                 </label>
                 <input
                   type="number"
-                  step="0.1"
                   value={newSavingsConfig.bonusRate}
                   onChange={(e) =>
                     setNewSavingsConfig({
@@ -960,70 +965,22 @@ export default function BonusProcessPage() {
                       bonusRate: Number(e.target.value),
                     })
                   }
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-2">
-              <button
-                onClick={() => setShowSavingsConfigModal(false)}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
-              >
-                キャンセル
-              </button>
+            <div className="mt-6 flex gap-2">
               <button
                 onClick={handleUpdateSavingsConfig}
-                className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition"
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
               >
                 更新
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 一括アップロードモーダル */}
-      {showBulkUploadModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-bold text-gray-800">
-                {bulkUploadType === "adjustment" ? "調整金" : "過不足金"}
-                一括アップロード
-              </h3>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  データ（CSV形式）
-                </label>
-                <textarea
-                  value={bulkData}
-                  onChange={(e) => setBulkData(e.target.value)}
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 font-mono text-sm"
-                  rows={12}
-                  placeholder={`例:\nM001,10000,特別調整\nM002,-5000,過払い\nM003,3000,追加報酬`}
-                />
-                <p className="mt-2 text-xs text-gray-500">
-                  形式: 会員コード,金額,コメント（1行1件）
-                </p>
-              </div>
-            </div>
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-2">
               <button
-                onClick={() => {
-                  setShowBulkUploadModal(false);
-                  setBulkData("");
-                }}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+                onClick={() => setShowSavingsConfigModal(false)}
+                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition"
               >
                 キャンセル
-              </button>
-              <button
-                onClick={handleBulkUpload}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-              >
-                アップロード
               </button>
             </div>
           </div>
