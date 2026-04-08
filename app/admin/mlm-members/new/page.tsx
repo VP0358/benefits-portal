@@ -58,7 +58,7 @@ export default function MlmMemberNewPage() {
     // オートシップ
     autoshipEnabled: false,
     autoshipStartDate: "",
-    paymentMethod: "credit_card" as "credit_card" | "bank_transfer",
+    paymentMethod: "credit_card" as "credit_card" | "bank_transfer" | "bank_payment",
     
     // その他
     note: "",
@@ -641,8 +641,9 @@ export default function MlmMemberNewPage() {
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
-                <option value="credit_card">クレジットカード</option>
-                <option value="bank_transfer">銀行振込</option>
+                <option value="credit_card">クレジットカード（クレディックス）</option>
+                <option value="bank_transfer">口座振替（三菱UFJファクター）</option>
+                <option value="bank_payment">銀行振込</option>
               </select>
             </div>
           </div>
