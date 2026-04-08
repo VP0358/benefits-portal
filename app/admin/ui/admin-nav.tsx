@@ -18,6 +18,7 @@ const menuGroups = [
     items: [
       { href: "/admin/mlm-members", label: "MLM会員管理", icon: "fas fa-users" },
       { href: "/admin/mlm-members/new", label: "MLM会員新規登録", icon: "fas fa-user-plus" },
+      { href: "/admin/mlm-members/stats", label: "MLM会員統計", icon: "fas fa-chart-bar" },
       { href: "/admin/mlm-organization", label: "組織図・リスト", icon: "fas fa-sitemap" },
       { href: "/admin/bonus-run", label: "MLMボーナス計算", icon: "fas fa-coins" },
       { href: "/admin/bonus-summary", label: "ボーナス一覧", icon: "fas fa-chart-line" },
@@ -37,6 +38,7 @@ const menuGroups = [
     title: "携帯契約関連",
     items: [
       { href: "/admin/vp-phone", label: "VP未来phone申し込み", icon: "fas fa-mobile-alt" },
+      { href: "/admin/vp-phone/stats", label: "携帯契約統計", icon: "fas fa-chart-bar" },
       { href: "/admin/contracts", label: "携帯契約一覧", icon: "fas fa-file-contract" },
       { href: "/admin/referral-rewards", label: "紹介者報酬計算", icon: "fas fa-gift" },
       { href: "/admin/referral-history", label: "紹介者変更履歴", icon: "fas fa-history" },
@@ -46,6 +48,7 @@ const menuGroups = [
     title: "旅行サブスク関連",
     items: [
       { href: "/admin/travel-subscriptions", label: "旅行サブスク一覧", icon: "fas fa-plane" },
+      { href: "/admin/travel-subscriptions/stats", label: "旅行サブスク統計", icon: "fas fa-chart-bar" },
     ]
   },
   {

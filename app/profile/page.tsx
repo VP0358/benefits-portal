@@ -76,6 +76,7 @@ export default function ProfilePage() {
     fetch("/api/my/profile")
       .then(r => r.json())
       .then(data => {
+        console.log('プロフィールデータ:', data);
         setProfile(data);
         setName(data.name ?? "");
         setNameKana(data.nameKana ?? "");
@@ -85,13 +86,27 @@ export default function ProfilePage() {
         setNewEmail(data.email ?? "");
         
         // MLM会員の場合、ポイント情報を取得
+        console.log('MLM会員コード:', data.mlmMemberCode);
         if (data.mlmMemberCode) {
+          console.log('MLMポイント取得開始...');
           fetch("/api/my/mlm-points")
-            .then(r => r.json())
-            .then(pointsData => {
-              setMlmPoints(pointsData);
+            .then(r => {
+              console.log('MLMポイントAPI レスポンスステータス:', r.status);
+              return r.json();
             })
-            .catch(() => {});
+            .then(pointsData => {
+              console.log('MLMポイントデータ:', pointsData);
+              if (!pointsData.error) {
+                setMlmPoints(pointsData);
+              } else {
+                console.error('MLMポイント取得エラー:', pointsData.error);
+              }
+            })
+            .catch((err) => {
+              console.error('MLMポイント取得失敗:', err);
+            });
+        } else {
+          console.log('MLM会員ではありません');
         }
       })
       .finally(() => setLoading(false));
