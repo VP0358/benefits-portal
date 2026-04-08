@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-type ExportType = "members" | "orders" | "audit";
+type ExportType = "members" | "orders" | "audit" | "mlm" | "mobile" | "travel" | "webfricom";
 
 export default function CsvExportPanel() {
   const [activeTab, setActiveTab] = useState<ExportType>("members");
@@ -10,6 +10,9 @@ export default function CsvExportPanel() {
     memberStatus: "",
     orderFrom: "",
     orderTo: "",
+    bonusMonth: "",
+    contractStatus: "",
+    travelStatus: "",
   });
   const [downloading, setDownloading] = useState(false);
 
@@ -27,6 +30,22 @@ export default function CsvExportPanel() {
       url = `/api/admin/export/orders?${params}`;
     } else if (type === "audit") {
       url = `/api/admin/export/audit`;
+    } else if (type === "mlm") {
+      const params = new URLSearchParams();
+      if (filters.bonusMonth) params.set("month", filters.bonusMonth);
+      url = `/api/admin/export/mlm-bonuses?${params}`;
+    } else if (type === "mobile") {
+      const params = new URLSearchParams();
+      if (filters.contractStatus) params.set("status", filters.contractStatus);
+      url = `/api/admin/export/mobile-contracts?${params}`;
+    } else if (type === "travel") {
+      const params = new URLSearchParams();
+      if (filters.travelStatus) params.set("status", filters.travelStatus);
+      url = `/api/admin/export/travel-subscriptions?${params}`;
+    } else if (type === "webfricom") {
+      const params = new URLSearchParams();
+      if (filters.bonusMonth) params.set("month", filters.bonusMonth);
+      url = `/api/admin/export/webfricom?${params}`;
     }
 
     try {
@@ -50,6 +69,10 @@ export default function CsvExportPanel() {
     { key: "members", label: "会員一覧", icon: "👥" },
     { key: "orders", label: "注文一覧", icon: "🛒" },
     { key: "audit", label: "監査ログ", icon: "📋" },
+    { key: "mlm", label: "MLMボーナス", icon: "🌲" },
+    { key: "mobile", label: "携帯契約", icon: "📱" },
+    { key: "travel", label: "旅行サブスク", icon: "✈️" },
+    { key: "webfricom", label: "振込データ", icon: "💰" },
   ];
 
   return (
@@ -157,6 +180,130 @@ export default function CsvExportPanel() {
             className="rounded-xl bg-slate-700 px-6 py-3 text-sm text-white hover:bg-slate-800 disabled:opacity-50"
           >
             {downloading ? "ダウンロード中..." : "⬇️ 監査ログ CSV をダウンロード"}
+          </button>
+        </div>
+      )}
+
+      {/* MLMボーナス */}
+      {activeTab === "mlm" && (
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-semibold text-slate-800 mb-3">MLMボーナス CSV ダウンロード</h3>
+            <p className="text-sm text-slate-700 mb-4">
+              会員コード・氏名・口座情報・ボーナス金額を含むCSVをダウンロードします。
+            </p>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">対象月（YYYY-MM）</label>
+              <input
+                type="month"
+                className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 w-64"
+                value={filters.bonusMonth}
+                onChange={e => setFilters({ ...filters, bonusMonth: e.target.value })}
+              />
+            </div>
+          </div>
+          <button
+            onClick={() => download("mlm")}
+            disabled={downloading || !filters.bonusMonth}
+            className="rounded-xl bg-green-600 px-6 py-3 text-sm text-white hover:bg-green-700 disabled:opacity-50"
+          >
+            {downloading ? "ダウンロード中..." : "⬇️ MLMボーナス CSV をダウンロード"}
+          </button>
+        </div>
+      )}
+
+      {/* 携帯契約 */}
+      {activeTab === "mobile" && (
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-semibold text-slate-800 mb-3">携帯契約 CSV ダウンロード</h3>
+            <p className="text-sm text-slate-700 mb-4">
+              契約番号・会員情報・プラン・月額料金・紹介者を含むCSVをダウンロードします。
+            </p>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">契約ステータス（任意）</label>
+              <select
+                className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 w-64"
+                value={filters.contractStatus}
+                onChange={e => setFilters({ ...filters, contractStatus: e.target.value })}
+              >
+                <option value="">すべて</option>
+                <option value="active">有効</option>
+                <option value="pending">保留中</option>
+                <option value="canceled">キャンセル</option>
+              </select>
+            </div>
+          </div>
+          <button
+            onClick={() => download("mobile")}
+            disabled={downloading}
+            className="rounded-xl bg-blue-600 px-6 py-3 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {downloading ? "ダウンロード中..." : "⬇️ 携帯契約 CSV をダウンロード"}
+          </button>
+        </div>
+      )}
+
+      {/* 旅行サブスク */}
+      {activeTab === "travel" && (
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-semibold text-slate-800 mb-3">旅行サブスク CSV ダウンロード</h3>
+            <p className="text-sm text-slate-700 mb-4">
+              会員情報・プラン名・レベル・月額料金・ステータスを含むCSVをダウンロードします。
+            </p>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">契約ステータス（任意）</label>
+              <select
+                className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 w-64"
+                value={filters.travelStatus}
+                onChange={e => setFilters({ ...filters, travelStatus: e.target.value })}
+              >
+                <option value="">すべて</option>
+                <option value="active">有効</option>
+                <option value="pending">保留中</option>
+                <option value="canceled">キャンセル</option>
+              </select>
+            </div>
+          </div>
+          <button
+            onClick={() => download("travel")}
+            disabled={downloading}
+            className="rounded-xl bg-purple-600 px-6 py-3 text-sm text-white hover:bg-purple-700 disabled:opacity-50"
+          >
+            {downloading ? "ダウンロード中..." : "⬇️ 旅行サブスク CSV をダウンロード"}
+          </button>
+        </div>
+      )}
+
+      {/* ウェブフリコム振込データ */}
+      {activeTab === "webfricom" && (
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-semibold text-slate-800 mb-3">ウェブフリコム振込データ ダウンロード</h3>
+            <p className="text-sm text-slate-700 mb-4">
+              MLMボーナス支払い用の総合振込データ（固定長120文字/行）を出力します。
+            </p>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">対象月（YYYY-MM）</label>
+              <input
+                type="month"
+                className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800 w-64"
+                value={filters.bonusMonth}
+                onChange={e => setFilters({ ...filters, bonusMonth: e.target.value })}
+              />
+            </div>
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
+              <strong>注意:</strong> ウェブフリコム指定の固定長フォーマット（120文字/行）で出力されます。
+              <br/>出力後、ウェブフリコムの総合振込画面からアップロードしてください。
+            </div>
+          </div>
+          <button
+            onClick={() => download("webfricom")}
+            disabled={downloading || !filters.bonusMonth}
+            className="rounded-xl bg-orange-600 px-6 py-3 text-sm text-white hover:bg-orange-700 disabled:opacity-50"
+          >
+            {downloading ? "ダウンロード中..." : "💰 ウェブフリコム振込データ をダウンロード"}
           </button>
         </div>
       )}
