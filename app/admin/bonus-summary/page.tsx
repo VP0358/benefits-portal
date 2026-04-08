@@ -171,22 +171,22 @@ export default function BonusSummaryPage() {
   return (
     <main className="space-y-6">
       {/* ヘッダー */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div>
+        <div className="flex items-center gap-4">
           <h1 className="text-3xl font-bold text-gray-800">
             <i className="fas fa-chart-line mr-2"></i>
             ボーナス一覧
           </h1>
-          <p className="mt-2 text-gray-600">月別ボーナス合計・支払率・売上データ</p>
+          <button
+            onClick={handleExportCSV}
+            disabled={data.length === 0}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 text-sm"
+          >
+            <i className="fas fa-download mr-2"></i>
+            CSVエクスポート
+          </button>
         </div>
-        <button
-          onClick={handleExportCSV}
-          disabled={data.length === 0}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-        >
-          <i className="fas fa-download mr-2"></i>
-          CSVエクスポート
-        </button>
+        <p className="mt-2 text-gray-600">月別ボーナス合計・支払率・売上データ</p>
       </div>
 
       {loading && (
@@ -199,7 +199,7 @@ export default function BonusSummaryPage() {
       {data.length > 0 && (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs min-w-[2500px]">
+            <table className="w-full text-xs min-w-[1800px]">
               <thead className="bg-gray-800 text-white">
                 <tr>
                   <th className="px-3 py-3 text-left font-semibold sticky left-0 bg-gray-800 z-10">
