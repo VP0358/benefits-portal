@@ -18,6 +18,7 @@ export default function MlmOrganizationPage() {
   const [orgType, setOrgType] = useState<OrgType>("matrix");
   const [viewMode, setViewMode] = useState<ViewMode>("tree");
   const [searchCode, setSearchCode] = useState("");
+  const [searchType, setSearchType] = useState<"memberCode" | "name" | "email" | "phone">("memberCode");
   const [loading, setLoading] = useState(false);
   const [rootMember, setRootMember] = useState<MemberNode | null>(null);
   const [listData, setListData] = useState<MemberNode[]>([]);
@@ -39,14 +40,19 @@ export default function MlmOrganizationPage() {
 
   const handleSearch = async () => {
     if (!searchCode) {
-      alert("会員コードを入力してください");
+      alert("検索キーワードを入力してください");
       return;
     }
 
     setLoading(true);
     try {
+      const params = new URLSearchParams({
+        [searchType]: searchCode,
+        type: orgType
+      });
+      
       const res = await fetch(
-        `/api/admin/mlm-organization/tree?memberCode=${searchCode}&type=${orgType}`
+        `/api/admin/mlm-organization/tree?${params.toString()}`
       );
       if (res.ok) {
         const data = await res.json();
@@ -214,16 +220,36 @@ export default function MlmOrganizationPage() {
           組織図表示
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">
-              会員コード
+              検索タイプ
+            </label>
+            <select
+              value={searchType}
+              onChange={(e) => setSearchType(e.target.value as typeof searchType)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="memberCode">会員コード</option>
+              <option value="name">氏名</option>
+              <option value="email">メールアドレス</option>
+              <option value="phone">電話番号</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              検索キーワード
             </label>
             <input
               type="text"
               value={searchCode}
               onChange={(e) => setSearchCode(e.target.value)}
-              placeholder="例: 123456-01"
+              placeholder={
+                searchType === "memberCode" ? "例: 123456-01" :
+                searchType === "name" ? "例: 山田太郎" :
+                searchType === "email" ? "例: user@example.com" :
+                "例: 090-1234-5678"
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
           </div>

@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/app/api/admin/route-guard";
 
 const schema = z.object({
+  code: z.string().max(50).optional().nullable(),
   name: z.string().min(1).max(255),
   description: z.string().max(500).optional().nullable(),
   price: z.number().int().nonnegative(),
@@ -41,7 +42,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const json = await req.json();
   const parsed = schema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  const data = { ...parsed.data, imageUrl: parsed.data.imageUrl || null };
+  const data = { 
+    ...parsed.data, 
+    code: parsed.data.code || null,
+    imageUrl: parsed.data.imageUrl || null 
+  };
   const updated = await prisma.product.update({ where: { id: pid }, data });
   return NextResponse.json({ ...updated, id: updated.id.toString() });
 }

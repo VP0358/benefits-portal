@@ -20,26 +20,71 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const memberCode = searchParams.get("memberCode");
+    const name = searchParams.get("name");
+    const email = searchParams.get("email");
+    const phone = searchParams.get("phone");
     const type = (searchParams.get("type") as OrgType) || "matrix";
 
-    if (!memberCode) {
+    // 検索条件の構築
+    let targetMember;
+    
+    if (memberCode) {
+      targetMember = await prisma.mlmMember.findUnique({
+        where: { memberCode },
+        include: {
+          user: { select: { name: true } },
+        },
+      });
+    } else if (name) {
+      // 氏名で検索（部分一致）
+      const users = await prisma.user.findMany({
+        where: { name: { contains: name } },
+        take: 1,
+      });
+      if (users.length > 0) {
+        targetMember = await prisma.mlmMember.findUnique({
+          where: { userId: users[0].id },
+          include: {
+            user: { select: { name: true } },
+          },
+        });
+      }
+    } else if (email) {
+      // メールアドレスで検索
+      const user = await prisma.user.findUnique({
+        where: { email },
+      });
+      if (user) {
+        targetMember = await prisma.mlmMember.findUnique({
+          where: { userId: user.id },
+          include: {
+            user: { select: { name: true } },
+          },
+        });
+      }
+    } else if (phone) {
+      // 電話番号で検索（mobile or phone）
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { phone: { contains: phone } },
+          ],
+        },
+      });
+      if (user) {
+        targetMember = await prisma.mlmMember.findUnique({
+          where: { userId: user.id },
+          include: {
+            user: { select: { name: true } },
+          },
+        });
+      }
+    } else {
       return NextResponse.json(
-        { error: "会員コードが必要です" },
+        { error: "検索条件を指定してください" },
         { status: 400 }
       );
     }
-
-    // 対象会員を検索
-    const targetMember = await prisma.mlmMember.findUnique({
-      where: { memberCode },
-      include: {
-        user: {
-          select: {
-            name: true,
-          },
-        },
-      },
-    });
 
     if (!targetMember) {
       return NextResponse.json(

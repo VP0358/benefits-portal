@@ -8,6 +8,7 @@ export default function EditProductPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [data, setData] = useState<{
+    code: string;
     name: string;
     description: string;
     price: number;
@@ -23,6 +24,7 @@ export default function EditProductPage() {
       .then(r => r.json())
       .then((p: {
         id: string;
+        code: string | null;
         name: string;
         description: string | null;
         price: number;
@@ -30,6 +32,7 @@ export default function EditProductPage() {
         isActive: boolean;
       }) => {
         if (p?.id) setData({
+          code: p.code || "",
           name: p.name,
           description: p.description || "",
           price: p.price,
@@ -48,6 +51,7 @@ export default function EditProductPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...data,
+        code: data.code || null,
         description: data.description || null,
         imageUrl: data.imageUrl || null,
       }),
@@ -73,6 +77,17 @@ export default function EditProductPage() {
   return (
     <main className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
       <h1 className="text-2xl font-bold text-slate-800">商品編集</h1>
+
+      <div>
+        <label className="mb-1 block text-sm font-semibold text-slate-700">商品コード</label>
+        <input
+          placeholder="例: 1000, s1000"
+          className="w-full rounded-xl border px-4 py-3 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
+          value={data.code}
+          onChange={e => setData({ ...data, code: e.target.value })}
+        />
+        <p className="mt-1 text-xs text-slate-500">数字や英数字で商品を識別するコード（例: 1000, 2000, s1000）</p>
+      </div>
 
       <div>
         <label className="mb-1 block text-sm font-semibold text-slate-700">商品名</label>

@@ -6,7 +6,7 @@ import ImageUpload from "../ui/product-image-upload";
 
 export default function NewProductPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ name: "", description: "", price: 0, imageUrl: "", isActive: true });
+  const [form, setForm] = useState({ code: "", name: "", description: "", price: 0, imageUrl: "", isActive: true });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -16,7 +16,12 @@ export default function NewProductPage() {
     const res = await fetch("/api/admin/products", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, description: form.description || null, imageUrl: form.imageUrl || null }),
+      body: JSON.stringify({ 
+        ...form, 
+        code: form.code || null,
+        description: form.description || null, 
+        imageUrl: form.imageUrl || null 
+      }),
     });
     setSaving(false);
     if (!res.ok) { const d = await res.json().catch(()=>null); setError(d?.error || "保存に失敗しました。"); return; }
@@ -27,6 +32,16 @@ export default function NewProductPage() {
   return (
     <main className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
       <h1 className="text-2xl font-bold text-slate-800">商品新規追加</h1>
+      <div>
+        <label className="mb-1 block text-sm font-medium">商品コード</label>
+        <input 
+          placeholder="例: 1000, s1000" 
+          className="w-full rounded-xl border px-4 py-3 text-sm font-mono text-slate-800" 
+          value={form.code} 
+          onChange={e => setForm({ ...form, code: e.target.value })} 
+        />
+        <p className="mt-1 text-xs text-slate-500">数字や英数字で商品を識別するコード（例: 1000, 2000, s1000）</p>
+      </div>
       <div>
         <label className="mb-1 block text-sm font-medium">商品名 <span className="text-red-500">*</span></label>
         <input required className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />

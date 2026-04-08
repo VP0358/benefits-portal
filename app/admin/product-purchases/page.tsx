@@ -63,17 +63,10 @@ const statusLabels: Record<PurchaseStatus, string> = {
   other: "その他"
 }
 
-const products: Product[] = [
-  { code: "1000", name: "VIOLA Pure 翠彩-SUMISAI-" },
-  { code: "2000", name: "ぬか酵素ぱっぷ" },
-  { code: "4000", name: "山宇開発食材等" },
-  { code: "2001", name: "岩盤美楽ぱっぷ" },
-  { code: "15000", name: "記念商品" }
-]
-
 export default function ProductPurchasesPage() {
   const [activeTab, setActiveTab] = useState<"input" | "list" | "status" | "product" | "member">("input")
   const [loading, setLoading] = useState(false)
+  const [products, setProducts] = useState<Product[]>([])
   
   // 購入入力用状態
   const [inputData, setInputData] = useState({
@@ -110,6 +103,20 @@ export default function ProductPurchasesPage() {
     endMonth: ""
   })
   const [memberPurchases, setMemberPurchases] = useState<PurchaseRecord[]>([])
+
+  // 商品リストを取得
+  useEffect(() => {
+    fetch("/api/admin/products")
+      .then(res => res.json())
+      .then(data => {
+        const productList = data.map((p: any) => ({
+          code: p.code || p.id.toString(),
+          name: p.name
+        })).filter((p: Product) => p.code);
+        setProducts(productList);
+      })
+      .catch(err => console.error("Failed to load products:", err));
+  }, []);
 
   // 商品コードから商品名を取得
   const getProductName = (code: string) => {
