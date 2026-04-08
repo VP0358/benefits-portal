@@ -2,6 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { 
+  BANKS, 
+  BRANCHES,
+  getBankNameByCode,
+  getBankCodeByName,
+  getBranchNameByCode,
+  getBranchCodeByName,
+  getBranchesByBankCode 
+} from "@/lib/bank-data";
 
 export default function MlmMemberNewPage() {
   const router = useRouter();
@@ -83,6 +92,60 @@ export default function MlmMemberNewPage() {
       setFormData((prev) => ({ ...prev, [name]: checked }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+  };
+
+  // 銀行コード入力時の処理
+  const handleBankCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const code = e.target.value;
+    setFormData((prev) => ({ ...prev, bankCode: code }));
+    
+    // 4桁入力時に自動で銀行名を検索
+    if (code.length === 4) {
+      const bankName = getBankNameByCode(code);
+      if (bankName) {
+        setFormData((prev) => ({ ...prev, bankCode: code, bankName }));
+      }
+    }
+  };
+
+  // 銀行名入力時の処理
+  const handleBankNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const name = e.target.value;
+    setFormData((prev) => ({ ...prev, bankName: name }));
+    
+    // 完全一致時に銀行コードを自動入力
+    const bankCode = getBankCodeByName(name);
+    if (bankCode) {
+      setFormData((prev) => ({ ...prev, bankName: name, bankCode }));
+    }
+  };
+
+  // 支店コード入力時の処理
+  const handleBranchCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const code = e.target.value;
+    setFormData((prev) => ({ ...prev, branchCode: code }));
+    
+    // 3桁入力時に自動で支店名を検索
+    if (code.length === 3 && formData.bankCode) {
+      const branchName = getBranchNameByCode(formData.bankCode, code);
+      if (branchName) {
+        setFormData((prev) => ({ ...prev, branchCode: code, branchName }));
+      }
+    }
+  };
+
+  // 支店名入力時の処理
+  const handleBranchNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const name = e.target.value;
+    setFormData((prev) => ({ ...prev, branchName: name }));
+    
+    // 完全一致時に支店コードを自動入力
+    if (formData.bankCode) {
+      const branchCode = getBranchCodeByName(formData.bankCode, name);
+      if (branchCode) {
+        setFormData((prev) => ({ ...prev, branchName: name, branchCode }));
+      }
     }
   };
 
@@ -179,18 +242,21 @@ export default function MlmMemberNewPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                <span className="text-red-600">*</span> 会員コード
+                会員コード
+                <span className="text-xs text-gray-500 ml-2">（未入力の場合は自動生成されます）</span>
               </label>
               <input
                 type="text"
                 name="memberCode"
                 value={formData.memberCode}
                 onChange={handleInputChange}
-                placeholder="例: 123456-01"
+                placeholder="例: 123456-01 または空欄で自動生成"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                required
               />
-              <p className="text-xs text-gray-500 mt-1">6桁-枝番形式（例: 123456-01）</p>
+              <p className="text-xs text-gray-500 mt-1">
+                <i className="fas fa-info-circle mr-1"></i>
+                6桁ランダム番号＋ポジション番号が自動生成されます
+              </p>
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">会員区分</label>
@@ -436,50 +502,78 @@ export default function MlmMemberNewPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">銀行コード</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                銀行コード
+                <span className="text-xs text-gray-500 ml-2">（4桁入力で自動検索）</span>
+              </label>
               <input
                 type="text"
                 name="bankCode"
                 value={formData.bankCode}
-                onChange={handleInputChange}
+                onChange={handleBankCodeChange}
                 placeholder="0001"
                 maxLength={4}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">銀行名</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                銀行名
+                <span className="text-xs text-gray-500 ml-2">（候補から選択可能）</span>
+              </label>
               <input
                 type="text"
                 name="bankName"
                 value={formData.bankName}
-                onChange={handleInputChange}
+                onChange={handleBankNameChange}
+                list="bank-list"
                 placeholder="みずほ銀行"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
+              <datalist id="bank-list">
+                {BANKS.map(bank => (
+                  <option key={bank.code} value={bank.name}>
+                    {bank.code} - {bank.name}
+                  </option>
+                ))}
+              </datalist>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">支店コード</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                支店コード
+                <span className="text-xs text-gray-500 ml-2">（3桁入力で自動検索）</span>
+              </label>
               <input
                 type="text"
                 name="branchCode"
                 value={formData.branchCode}
-                onChange={handleInputChange}
+                onChange={handleBranchCodeChange}
                 placeholder="001"
                 maxLength={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">支店名</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                支店名
+                <span className="text-xs text-gray-500 ml-2">（候補から選択可能）</span>
+              </label>
               <input
                 type="text"
                 name="branchName"
                 value={formData.branchName}
-                onChange={handleInputChange}
+                onChange={handleBranchNameChange}
+                list="branch-list"
                 placeholder="東京支店"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
+              <datalist id="branch-list">
+                {formData.bankCode && getBranchesByBankCode(formData.bankCode).map(branch => (
+                  <option key={branch.code} value={branch.name}>
+                    {branch.code} - {branch.name}
+                  </option>
+                ))}
+              </datalist>
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">口座種別</label>

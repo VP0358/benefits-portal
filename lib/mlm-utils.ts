@@ -15,14 +15,27 @@ export function generateRandomSixDigits(): string {
  * 会員コードを生成（6桁-ポジション番号）
  * 例: 123456-01, 123456-02
  * 
- * @param baseCode 基準コード（6桁）。未指定の場合は新規生成
+ * @param uplineId 上流会員ID。指定すると、上流会員の基準コードを継承
  * @param position ポジション番号。未指定の場合は自動採番
  * @returns 会員コード（例: "123456-01"）
  */
 export async function generateMemberCode(
-  baseCode?: string,
+  uplineId?: bigint | null,
   position?: number
 ): Promise<string> {
+  let baseCode: string | undefined = undefined
+  
+  // 上流会員が指定されている場合、その会員コードから基準コードを取得
+  if (uplineId) {
+    const upline = await prisma.mlmMember.findUnique({
+      where: { id: uplineId },
+      select: { memberCode: true }
+    })
+    if (upline && upline.memberCode) {
+      const parsed = parseMemberCode(upline.memberCode)
+      baseCode = parsed.baseCode
+    }
+  }
   // 基準コードが未指定の場合は新規生成
   if (!baseCode) {
     let newBaseCode: string

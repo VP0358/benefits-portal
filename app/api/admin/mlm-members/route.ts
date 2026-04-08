@@ -3,10 +3,9 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 import { NextRequest, NextResponse } from "next/server";
-
-
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
+import { generateMemberCode } from "@/lib/mlm-utils";
 
 // GET: MLM会員一覧取得
 export async function GET(req: NextRequest) {
@@ -70,16 +69,32 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
 
     // バリデーション
-    if (!data.memberCode || !data.name || !data.email) {
+    if (!data.name || !data.email) {
       return NextResponse.json(
         { error: "必須項目が入力されていません" },
         { status: 400 }
       );
     }
 
+    // 会員コード生成（指定がない場合）
+    let memberCode = data.memberCode;
+    if (!memberCode) {
+      // 上流者が指定されている場合、その配下に追加
+      let uplineId: bigint | null = null;
+      if (data.uplineMemberCode) {
+        const upline = await prisma.mlmMember.findUnique({
+          where: { memberCode: data.uplineMemberCode },
+        });
+        if (upline) {
+          uplineId = upline.id;
+        }
+      }
+      memberCode = await generateMemberCode(uplineId);
+    }
+
     // 会員コードの重複チェック
     const existingMember = await prisma.mlmMember.findUnique({
-      where: { memberCode: data.memberCode },
+      where: { memberCode: memberCode },
     });
 
     if (existingMember) {
