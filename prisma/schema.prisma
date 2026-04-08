@@ -257,6 +257,7 @@ model PointUsage {
 
 model Product {
   id          BigInt   @id @default(autoincrement())
+  code        String?  @db.VarChar(50)
   name        String   @unique @db.VarChar(255)
   description String?  @db.VarChar(500)
   price       Int

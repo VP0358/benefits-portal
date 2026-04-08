@@ -28,6 +28,7 @@ const menuGroups = [
       { href: "/admin/autoship", label: "オートシップ管理", icon: "fas fa-sync" },
       { href: "/admin/products", label: "商品管理", icon: "fas fa-box" },
       { href: "/admin/orders", label: "注文管理", icon: "fas fa-shopping-cart" },
+      { href: "/admin/orders-shipping", label: "受注・発送状況", icon: "fas fa-shipping-fast" },
       { href: "/admin/shipping-labels", label: "発送伝票管理", icon: "fas fa-truck" },
     ]
   },
