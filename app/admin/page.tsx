@@ -147,6 +147,7 @@ export default async function AdminPage() {
             { href: "/admin/contracts",             label: "📋 携帯契約管理" },
             { href: "/admin/travel-subscriptions", label: "✈️ 旅行サブスク管理" },
             { href: "/admin/members",              label: "👥 会員管理" },
+            { href: "/admin/mail-settings",        label: "📧 送信メール編集・一括送信" },
             { href: "/admin/announcements",        label: "🔔 お知らせ管理" },
             { href: "/admin/points/monthly",       label: "💎 ポイント付与" },
           ].map(item => (

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/app/api/admin/route-guard";
+import { sendMobileContractEmail } from "@/lib/mailer";
 
 const contractSchema = z.object({
   userId: z.union([z.string(), z.number()]),
@@ -42,6 +43,26 @@ export async function POST(req: NextRequest) {
       confirmedAt: parsed.data.confirmedAt ? new Date(parsed.data.confirmedAt) : null,
     },
   });
+
+  // 契約完了メール送信（SiteSettingからテンプレート取得）
+  try {
+    const [subjectSetting, htmlSetting, textSetting] = await Promise.all([
+      prisma.siteSetting.findUnique({ where: { settingKey: "mobileContractMailSubject" } }),
+      prisma.siteSetting.findUnique({ where: { settingKey: "mobileContractMailHtml" } }),
+      prisma.siteSetting.findUnique({ where: { settingKey: "mobileContractMailText" } }),
+    ]);
+    await sendMobileContractEmail({
+      to: user.email,
+      name: user.name,
+      planName: parsed.data.planName,
+      contractNumber: parsed.data.contractNumber,
+      subject: subjectSetting?.settingValue ?? undefined,
+      htmlBody: htmlSetting?.settingValue ?? undefined,
+      textBody: textSetting?.settingValue ?? undefined,
+    });
+  } catch (mailErr) {
+    console.error("[contracts POST] メール送信エラー:", mailErr);
+  }
 
   return NextResponse.json({
     ...contract,

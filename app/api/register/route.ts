@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { sendWelcomeEmail } from "@/lib/mailer";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -71,6 +72,24 @@ export async function POST(request: Request) {
 
     return newUser;
   });
+
+  // 登録完了メール送信（SiteSettingからテンプレート取得）
+  try {
+    const [subjectSetting, htmlSetting, textSetting] = await Promise.all([
+      prisma.siteSetting.findUnique({ where: { settingKey: "memberMailSubject" } }),
+      prisma.siteSetting.findUnique({ where: { settingKey: "memberMailHtml" } }),
+      prisma.siteSetting.findUnique({ where: { settingKey: "memberMailText" } }),
+    ]);
+    await sendWelcomeEmail({
+      to: email,
+      name,
+      subject: subjectSetting?.settingValue ?? undefined,
+      htmlBody: htmlSetting?.settingValue ?? undefined,
+      textBody: textSetting?.settingValue ?? undefined,
+    });
+  } catch (mailErr) {
+    console.error("[register POST] メール送信エラー:", mailErr);
+  }
 
   return NextResponse.json(
     { id: user.id.toString(), memberCode: user.memberCode },

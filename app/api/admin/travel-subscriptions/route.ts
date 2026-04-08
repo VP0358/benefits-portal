@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/app/api/admin/route-guard";
 import { getTravelFee, getTravelPlanName } from "@/lib/travel-pricing";
+import { sendTravelSubscriptionEmail } from "@/lib/mailer";
 
 // 一覧取得
 export async function GET(req: NextRequest) {
@@ -129,6 +130,25 @@ export async function POST(req: NextRequest) {
       afterJson: { planName: sub.planName, level, pricingTier, monthlyFee, userId: userId.toString() },
     },
   }).catch(() => {});
+
+  // 契約完了メール送信（SiteSettingからテンプレート取得）
+  try {
+    const [subjectSetting, htmlSetting, textSetting] = await Promise.all([
+      prisma.siteSetting.findUnique({ where: { settingKey: "travelMailSubject" } }),
+      prisma.siteSetting.findUnique({ where: { settingKey: "travelMailHtml" } }),
+      prisma.siteSetting.findUnique({ where: { settingKey: "travelMailText" } }),
+    ]);
+    await sendTravelSubscriptionEmail({
+      to: user.email,
+      name: user.name,
+      planName,
+      subject: subjectSetting?.settingValue ?? undefined,
+      htmlBody: htmlSetting?.settingValue ?? undefined,
+      textBody: textSetting?.settingValue ?? undefined,
+    });
+  } catch (mailErr) {
+    console.error("[travel-subscriptions POST] メール送信エラー:", mailErr);
+  }
 
   return NextResponse.json({
     id: sub.id.toString(),

@@ -148,10 +148,24 @@ export async function POST(request: Request) {
       return newUser;
     });
 
-    // 5. 登録完了メールを送信（失敗してもエラーにしない）
-    await sendMlmWelcomeEmail({ to: email, name, memberCode }).catch(err => {
+    // 5. 登録完了メールを送信（SiteSettingからテンプレート取得、失敗してもエラーにしない）
+    try {
+      const [subjectSetting, htmlSetting, textSetting] = await Promise.all([
+        prisma.siteSetting.findUnique({ where: { settingKey: "mlmMailSubject" } }),
+        prisma.siteSetting.findUnique({ where: { settingKey: "mlmMailHtml" } }),
+        prisma.siteSetting.findUnique({ where: { settingKey: "mlmMailText" } }),
+      ]);
+      await sendMlmWelcomeEmail({
+        to: email,
+        name,
+        memberCode,
+        subject: subjectSetting?.settingValue ?? undefined,
+        htmlBody: htmlSetting?.settingValue ?? undefined,
+        textBody: textSetting?.settingValue ?? undefined,
+      });
+    } catch (err) {
       console.error("[mlm-register] メール送信エラー:", err);
-    });
+    }
 
     return NextResponse.json(
       { id: user.id.toString(), memberCode: user.memberCode },

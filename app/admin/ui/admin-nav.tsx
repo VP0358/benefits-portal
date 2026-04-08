@@ -31,6 +31,7 @@ const navItems = [
   { href: "/admin/referral-history", label: "🔗 紹介者変更履歴" },
   { href: "/admin/audit",            label: "🔍 監査ログ" },
   { href: "/admin/export",           label: "📥 CSV エクスポート" },
+  { href: "/admin/mail-settings",    label: "📧 送信メール編集" },
   { href: "/admin/site-settings",    label: "⚙️ サイト設定" },
   { href: "/admin/account",          label: "🔐 ログイン情報変更" },
   { href: "/admin/announcements",    label: "📢 お知らせ管理" },
