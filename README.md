@@ -21,6 +21,14 @@ VIOLA Pure株式会社の福利厚生・MLM管理システム
   - ダウンライン一覧レポート（CSV出力）
   - 購入履歴集計レポート（CSV出力）
   - 紹介実績積算レポート（期間・ソートタイプ選択、CSV出力）
+- **商品購入管理**:
+  - 5つの主要機能タブ（購入入力、購入一覧、ステータス別検索、商品別一覧、購入者別一覧）
+  - 商品購入入力（商品コード選択、年月・数量・金額・ポイント入力）
+  - 購入一覧（商品コード別・月別集計、数量/金額/ポイント表示）
+  - ステータス別検索（オートシップ/定期購入/入会時等/キャンセル/欠品/欠品欠1/社販/その他）
+  - 商品別購入一覧（商品ID・期間指定、注文ID・氏名・会員コード・数量・金額・ポイント）
+  - 購入者別記録一覧（会員ID・期間指定、注文確認日・商品・数量・金額）
+  - CSV一括出力（各タブ別、Excel対応BOM付きUTF-8）
 - **受注・発送状況管理**:
   - 検索フィルター（注文日範囲、会員コード、ステータス、配送方法、商品検索）
   - 一覧表示（注文情報、会員情報、商品明細、配送情報）
@@ -89,11 +97,12 @@ VIOLA Pure株式会社の福利厚生・MLM管理システム
 - `bonus_shortage_payments`: 過不足金管理
 - `savings_bonus_config`: 貯金ボーナス設定履歴
 
-### 拡張テーブル
+### 拡張テーブル・Enum
 - `bonus_runs`: CAP調整額追加
 - `bonus_results`: 30+項目追加（強制レベル、条件、貯金ポイント等）
 - `mlm_members`: 調整金・過不足金リレーション、銀行情報、法人情報、個人情報拡張
 - `Product`: 商品コード（code）追加
+- `PurchaseStatus`: ステータス拡張（out_of_stock, out_of_stock_minus_1, company_sale, other追加）
 
 ## 🛠️ 技術スタック
 
@@ -119,6 +128,7 @@ app/
 │   ├── mlm-members/new/        # MLM会員新規登録
 │   ├── mlm-organization/       # MLM組織図・リスト
 │   ├── products/               # 商品管理
+│   ├── product-purchases/      # 商品購入管理
 │   ├── orders/                 # 注文管理
 │   ├── orders-shipping/        # 受注・発送状況
 │   ├── contracts/              # 携帯契約管理
@@ -133,6 +143,7 @@ app/
 │       ├── savings-bonus-config/ # 貯金B設定API
 │       ├── mlm-members/        # MLM会員管理API
 │       ├── mlm-organization/   # 組織ツリー・レポートAPI
+│       ├── product-purchases/  # 商品購入管理API（入力、検索、CSV出力）
 │       ├── orders-shipping/    # 受注・発送管理API（CRUD、CSV、PDF）
 │       ├── pdf/                # PDF生成API
 │       └── export/             # CSV/振込データ出力API
@@ -188,13 +199,13 @@ npx prisma migrate dev --name migration_name
 
 ## 📊 最新コミット履歴
 
+- `79c9710` 🛒 商品購入管理システム実装
+- `78f484d` 📝 READMEを更新: 受注・発送状況、組織図、新規登録機能を追記
 - `d6d11ac` 📦 受注・発送状況ページ実装
 - `43fcea3` 🌳 MLM組織図・リストページ実装
 - `d9b10f7` ✨ MLM会員新規登録ページ実装
 - `1fb75ac` ✨ ボーナス計算処理画面改善（ファイルアップロード＆ページネーション）
 - `66ba0da` 🎨 ボーナス一覧の横幅縮小（2500px→1800px）
-- `c3a1ea9` 🛠️ ボーナスユーティリティ統合画面実装
-- `739d6dd` 💰 ボーナス管理フル機能実装
 
 ## 🔧 環境変数
 
