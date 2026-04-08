@@ -117,13 +117,13 @@ VIOLA Pure株式会社の福利厚生・MLM管理システム
 
 ## 🛠️ 技術スタック
 
-- **フレームワーク**: Next.js 15.1.6 (App Router)
+- **フレームワーク**: Next.js 15.1.8 (App Router)
 - **UI**: TailwindCSS, FontAwesome, Lucide React
 - **認証**: NextAuth.js v5
 - **データベース**: PostgreSQL (Neon)
 - **ORM**: Prisma 7.6.0
 - **PDF生成**: jsPDF, jspdf-autotable, PDFKit
-- **デプロイ**: Vercel
+- **デプロイ**: Vercel (hnd1リージョン)
 
 ## 📁 ディレクトリ構成
 
@@ -210,12 +210,12 @@ npx prisma migrate dev --name migration_name
 
 ## 📊 最新コミット履歴
 
+- `93522e0` 🔧 Critical Fix: dynamic設定の位置修正 & Next.js 15.1.8にアップグレード
+- `b0c07c4` 📝 README更新 & ビルドエラー詳細レポート追加
 - `b0f9a88` 🔧 Fix: 全APIルートにdynamic設定を追加 & Next.js 15にダウングレード
 - `c248376` 💳 MLM新規登録: 支払い方法に銀行振込を追加
 - `8cbb25a` 🔧 Fix: すべてのadmin APIルートにdynamic='force-dynamic'を追加
-- `d08e611` 🔧 Fix: ビルド時のAPIルート実行を防ぐためdynamic='force-dynamic'を追加
 - `79c9710` 🛒 商品購入管理システム実装
-- `78f484d` 📝 READMEを更新: 受注・発送状況、組織図、新規登録機能を追記
 - `d6d11ac` 📦 受注・発送状況ページ実装
 
 ## 🔧 環境変数
