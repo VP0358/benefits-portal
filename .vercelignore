@@ -1,0 +1,6 @@
+# Vercelでのビルド時に無視するファイル
+node_modules
+.next
+.git
+*.log
+.env*.local
