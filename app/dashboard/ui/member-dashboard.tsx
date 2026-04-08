@@ -819,8 +819,6 @@ export default function MemberDashboard({
 
   const activeAnn = announcements[slide];
   const slideBg = SLIDE_BG[slide % SLIDE_BG.length];
-  const maxPt = 100000;
-  const barPct = Math.min((user.availablePoints / maxPt) * 100, 100);
 
   return (
     <div className="min-h-screen bg-[#e6f2dc] pb-28 relative">
