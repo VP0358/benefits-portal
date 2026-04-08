@@ -8,9 +8,11 @@ export default async function DashboardPage() {
   if (!session?.user) redirect("/login");
   if (session.user.role === "admin") redirect("/admin");
 
-  const [user, menus, mlmMember] = await Promise.all([
+  const userId = BigInt(session.user.id ?? "0");
+  
+  const [user, menus, mlmMember, vpPhoneApp, travelSub] = await Promise.all([
     prisma.user.findUnique({
-      where: { id: BigInt(session.user.id ?? "0") },
+      where: { id: userId },
       include: { pointWallet: true },
     }),
     prisma.menu.findMany({
@@ -18,7 +20,15 @@ export default async function DashboardPage() {
       orderBy: { sortOrder: "asc" },
     }),
     prisma.mlmMember.findFirst({
-      where: { userId: BigInt(session.user.id ?? "0") },
+      where: { userId },
+    }),
+    prisma.vpPhoneApplication.findFirst({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.travelSubscription.findFirst({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
     }),
   ]);
 
@@ -63,6 +73,8 @@ export default async function DashboardPage() {
         availablePoints: user.pointWallet?.availablePointsBalance ?? 0,
       }}
       mlmStatus={mlmMember?.status ?? null}
+      vpPhoneStatus={vpPhoneApp?.status ?? null}
+      travelSubStatus={travelSub?.status ?? null}
       announcements={announcements}
       menus={menus.map((m) => ({
         id: m.id.toString(),

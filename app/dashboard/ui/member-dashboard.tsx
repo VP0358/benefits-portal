@@ -610,12 +610,122 @@ function MlmStatusButton({ status }: { status: string | null }) {
   );
 }
 
+// ────────── 携帯契約状況ボタン ──────────
+function VpPhoneStatusButton({ status }: { status: string | null }) {
+  const statusConfig: Record<string, { label: string; emoji: string; color: string; bgColor: string }> = {
+    contracted: { 
+      label: "契約中", 
+      emoji: "📱", 
+      color: "text-green-700", 
+      bgColor: "bg-green-50 border-green-300" 
+    },
+    pending: { 
+      label: "支払い待ち", 
+      emoji: "⏳", 
+      color: "text-yellow-700", 
+      bgColor: "bg-yellow-50 border-yellow-300" 
+    },
+    reviewing: { 
+      label: "審査中", 
+      emoji: "🔍", 
+      color: "text-blue-700", 
+      bgColor: "bg-blue-50 border-blue-300" 
+    },
+  };
+
+  if (!status || status === 'canceled' || status === 'rejected') {
+    return (
+      <div className="bg-white rounded-2xl p-4 shadow border-2 border-gray-200">
+        <div className="flex items-center gap-3">
+          <div className="text-3xl">📵</div>
+          <div className="flex-1">
+            <p className="text-xs font-medium text-gray-500 mb-0.5">携帯契約状況</p>
+            <p className="text-sm font-bold text-gray-800">未契約</p>
+          </div>
+          <Link href="/vp-phone"
+            className="px-4 py-2 bg-blue-500 text-white text-xs font-bold rounded-lg hover:bg-blue-600 transition">
+            申し込む
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const config = statusConfig[status] ?? statusConfig.pending;
+
+  return (
+    <Link href="/vp-phone"
+      className={`block rounded-2xl p-4 shadow border-2 ${config.bgColor} hover:shadow-md transition active:scale-98`}>
+      <div className="flex items-center gap-3">
+        <div className="text-3xl">{config.emoji}</div>
+        <div className="flex-1">
+          <p className="text-xs font-medium text-gray-600 mb-0.5">携帯契約状況</p>
+          <p className={`text-base font-bold ${config.color}`}>{config.label}</p>
+        </div>
+        <div className="text-gray-400 text-xl">→</div>
+      </div>
+    </Link>
+  );
+}
+
+// ────────── 旅行サブスク状況ボタン ──────────
+function TravelSubStatusButton({ status }: { status: string | null }) {
+  const statusConfig: Record<string, { label: string; emoji: string; color: string; bgColor: string }> = {
+    active: { 
+      label: "契約中", 
+      emoji: "✈️", 
+      color: "text-green-700", 
+      bgColor: "bg-green-50 border-green-300" 
+    },
+    pending: { 
+      label: "支払い待ち", 
+      emoji: "⏳", 
+      color: "text-yellow-700", 
+      bgColor: "bg-yellow-50 border-yellow-300" 
+    },
+  };
+
+  if (!status || status === 'canceled') {
+    return (
+      <div className="bg-white rounded-2xl p-4 shadow border-2 border-gray-200">
+        <div className="flex items-center gap-3">
+          <div className="text-3xl">🌴</div>
+          <div className="flex-1">
+            <p className="text-xs font-medium text-gray-500 mb-0.5">旅行サブスク</p>
+            <p className="text-sm font-bold text-gray-800">未契約</p>
+          </div>
+          <button
+            className="px-4 py-2 bg-purple-500 text-white text-xs font-bold rounded-lg hover:bg-purple-600 transition">
+            申し込む
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const config = statusConfig[status] ?? statusConfig.pending;
+
+  return (
+    <div className={`rounded-2xl p-4 shadow border-2 ${config.bgColor}`}>
+      <div className="flex items-center gap-3">
+        <div className="text-3xl">{config.emoji}</div>
+        <div className="flex-1">
+          <p className="text-xs font-medium text-gray-600 mb-0.5">旅行サブスク</p>
+          <p className={`text-base font-bold ${config.color}`}>{config.label}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ──────────── メインダッシュボード ────────────
 export default function MemberDashboard({
-  user, mlmStatus, announcements, menus
+  user, mlmStatus, vpPhoneStatus, travelSubStatus, announcements, menus
 }: {
   user: User;
   mlmStatus: string | null;
+  vpPhoneStatus: string | null;
+  travelSubStatus: string | null;
   announcements: Announcement[];
   menus: Menu[];
 }) {
@@ -895,8 +1005,12 @@ export default function MemberDashboard({
           </div>
         </div>
 
-        {/* MLM会員状況ボタン */}
-        <MlmStatusButton status={mlmStatus} />
+        {/* 各種ステータスボタン */}
+        <div className="space-y-3">
+          <MlmStatusButton status={mlmStatus} />
+          <VpPhoneStatusButton status={vpPhoneStatus} />
+          <TravelSubStatusButton status={travelSubStatus} />
+        </div>
 
         {/* お知らせスライダー */}
         <section id="news">
