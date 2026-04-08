@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { 
   BANKS, 
   BRANCHES,
@@ -14,7 +14,9 @@ import {
 
 export default function MlmMemberNewPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [referrerInfo, setReferrerInfo] = useState<{ name: string; memberCode: string } | null>(null);
 
   // 基本情報
   const [formData, setFormData] = useState({
@@ -149,6 +151,34 @@ export default function MlmMemberNewPage() {
     }
   };
 
+  // URLパラメータから紹介者コードを取得して自動入力
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref) {
+      // 紹介者コードをフォームに自動入力
+      setFormData((prev) => ({
+        ...prev,
+        uplineMemberCode: ref,
+        referrerMemberCode: ref,
+      }));
+
+      // 紹介者情報を取得
+      fetch(`/api/admin/mlm-members/search?memberCode=${encodeURIComponent(ref)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.member) {
+            setReferrerInfo({
+              name: data.member.user?.name || '不明',
+              memberCode: data.member.memberCode
+            });
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching referrer info:', err);
+        });
+    }
+  }, [searchParams]);
+
   const handlePostalCodeSearch = async () => {
     if (!formData.postalCode || formData.postalCode.length < 7) {
       alert("7桁の郵便番号を入力してください");
@@ -231,6 +261,23 @@ export default function MlmMemberNewPage() {
         </h1>
         <p className="mt-2 text-gray-600">新しいMLM会員を登録します</p>
       </div>
+
+      {/* 紹介者情報表示 */}
+      {referrerInfo && (
+        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+          <div className="flex items-center">
+            <i className="fas fa-info-circle text-blue-500 text-xl mr-3"></i>
+            <div>
+              <p className="text-sm font-semibold text-blue-800">
+                紹介者: {referrerInfo.name} ({referrerInfo.memberCode})
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                この紹介者の配下として自動的に登録されます
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 基本情報 */}

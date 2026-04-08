@@ -10,7 +10,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 /**
- * GET /api/admin/mlm-members/search?code=M001
+ * GET /api/admin/mlm-members/search?code=M001&memberCode=123456-01
  * 会員コードでMLMメンバーを検索
  */
 export async function GET(req: NextRequest) {
@@ -20,10 +20,10 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
-  const code = searchParams.get("code");
+  const code = searchParams.get("code") || searchParams.get("memberCode");
 
   if (!code) {
-    return NextResponse.json({ error: "code required" }, { status: 400 });
+    return NextResponse.json({ error: "code or memberCode required" }, { status: 400 });
   }
 
   try {
@@ -45,6 +45,10 @@ export async function GET(req: NextRequest) {
         userName: member.user.name,
         userEmail: member.user.email,
         companyName: member.companyName,
+        user: {
+          name: member.user.name,
+          email: member.user.email,
+        },
       },
     });
   } catch (error) {

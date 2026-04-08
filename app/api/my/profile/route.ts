@@ -24,9 +24,18 @@ export async function GET() {
   });
   if (!user) return NextResponse.json({ error: "not found" }, { status: 404 });
 
+  // MLM会員情報も取得
+  const mlmMember = await prisma.mlmMember.findUnique({
+    where: { userId: user.id },
+    select: {
+      memberCode: true,
+    },
+  });
+
   return NextResponse.json({
     ...user,
     id: user.id.toString(),
+    mlmMemberCode: mlmMember?.memberCode || null,
   });
 }
 

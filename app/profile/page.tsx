@@ -12,6 +12,7 @@ type Profile = {
   phone: string;
   postalCode: string;
   address: string;
+  mlmMemberCode?: string | null;
 };
 
 export default function ProfilePage() {
@@ -38,6 +39,30 @@ export default function ProfilePage() {
   const [currentPw,  setCurrentPw]  = useState("");
   const [newPw,      setNewPw]      = useState("");
   const [confirmPw,  setConfirmPw]  = useState("");
+
+  // 紹介者URL関連
+  const [copySuccess, setCopySuccess] = useState(false);
+
+  // 紹介者URLを生成
+  const getReferralUrl = () => {
+    if (!profile?.mlmMemberCode) return "";
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/admin/mlm-members/new?ref=${encodeURIComponent(profile.mlmMemberCode)}`;
+  };
+
+  // URLをクリップボードにコピー
+  const handleCopyUrl = async () => {
+    const url = getReferralUrl();
+    if (!url) return;
+    
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   useEffect(() => {
     fetch("/api/my/profile")
@@ -168,6 +193,30 @@ export default function ProfilePage() {
           <span className="text-xs text-slate-400">会員番号</span>
           <span className="font-bold text-slate-700">{profile?.memberCode}</span>
         </div>
+
+        {/* 紹介者URL */}
+        {profile?.mlmMemberCode && (
+          <div className="rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 px-5 py-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <i className="fas fa-share-alt text-blue-600"></i>
+              <span className="text-sm font-bold text-slate-800">あなたの紹介URL</span>
+            </div>
+            <div className="bg-white rounded-lg px-3 py-2 mb-3 break-all text-xs text-slate-600">
+              {getReferralUrl()}
+            </div>
+            <button
+              type="button"
+              onClick={handleCopyUrl}
+              className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              <i className="fas fa-copy"></i>
+              {copySuccess ? 'コピーしました！' : 'URLをコピー'}
+            </button>
+            <p className="text-xs text-slate-500 mt-2">
+              このURLを新規会員に共有すると、あなたの紹介者として自動登録されます
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
 
