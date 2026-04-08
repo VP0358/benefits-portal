@@ -452,6 +452,48 @@ enum ShippingLabelStatus {
   canceled  // キャンセル
 }
 
+enum DeliveryType {
+  voucher           // 金券
+  hand_delivery     // 手渡し
+  autoship          // オートシップ
+  cooling_off       // クーリング・オフ
+  exchange          // 交換
+  cancel            // キャンセル
+  other_order       // 他発注
+  combined_reserve  // 合わせ予約
+  additional        // 追加
+  staff_delivery    // 社員配達
+  staff_list        // 社員配達リスト
+  web               // Web
+  present           // プレゼント
+  mid_cancel        // 中途解約
+}
+
+enum CustomerRank {
+  sequential        // 連続
+  regular           // 定期
+  other             // その他
+  member            // 会員
+  card              // カード
+  associate         // 準会員
+  convenience       // コンビニ
+  other_delivery    // その他配達
+}
+
+enum OrderMethod {
+  handwritten       // 手書
+  postcard          // ハガキ
+  normal            // 通常
+  overseas          // 海外
+}
+
+enum DeliveryCenter {
+  hand_delivery     // 手渡し
+  big14_center      // 第14Bigセンター
+  big2_center       // 第2Bigセンター
+  other             // その他
+}
+
 /// 発送伝票（注文ごとに生成）
 model ShippingLabel {
   id              BigInt              @id @default(autoincrement())
@@ -480,10 +522,25 @@ model ShippingLabel {
   deliveryTime    String?             @db.VarChar(50)  // 配達希望時間帯
   shippingFee     Int                 @default(0)      // 送料
   shippingFeeType String              @default("free") @db.VarChar(20) // free/paid/cod
-  customerRank    String?             @db.VarChar(50)  // 顧客ランク
+  customerRank    String?             @db.VarChar(50)  // 顧客ランク(連続/定期/その他/会員/カード/準会員/コンビニ/その他配達)
   autoshipNo      String?             @db.VarChar(50)  // オートシップ番号
   memberJoinDate  DateTime?                           // 入会日
   birthDate       DateTime?                           // 生年月日
+  // 注文者・法人情報
+  ordererName     String?             @db.VarChar(255) // 注文者名
+  legalEntityName String?             @db.VarChar(255) // 法人名
+  representative  String?             @db.VarChar(255) // 法人代表者
+  ordererPhone    String?             @db.VarChar(30)  // 注文者電話番号
+  ordererFax      String?             @db.VarChar(30)  // 注文者FAX
+  ordererBirthDate DateTime?                          // 注文者生年月日
+  initialContact  String?             @db.VarChar(100) // 初回接触方法
+  // 配送センター・記録
+  deliveryCenter  String?             @db.VarChar(100) // 配送センター(手渡し/第14Bigセンター/第2Bigセンター)
+  voucherNumber   String?             @db.VarChar(100) // 金券番号
+  recordNumber    String?             @db.VarChar(100) // 記録(伝票)番号
+  desiredDeliveryDate DateTime?                       // 配送希望日
+  // 受注方法
+  orderMethod     String?             @db.VarChar(50)  // 手書/ハガキ/通常/海外
   // 印刷・発送管理
   printedAt       DateTime?
   shippedAt       DateTime?

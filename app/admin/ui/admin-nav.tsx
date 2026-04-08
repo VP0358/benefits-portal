@@ -30,8 +30,7 @@ const menuGroups = [
       { href: "/admin/product-purchases", label: "商品購入管理", icon: "fas fa-shopping-bag" },
       { href: "/admin/orders", label: "注文管理", icon: "fas fa-shopping-cart" },
       { href: "/admin/orders-shipping", label: "受注・発送状況", icon: "fas fa-shipping-fast" },
-      { href: "/admin/shipping-labels", label: "発送伝票管理（旧）", icon: "fas fa-truck" },
-      { href: "/admin/shipping-labels-advanced", label: "伝票作成", icon: "fas fa-file-invoice" },
+      { href: "/admin/shipping-labels", label: "発送伝票管理", icon: "fas fa-file-invoice" },
     ]
   },
   {
