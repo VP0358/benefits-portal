@@ -611,6 +611,8 @@ model MlmMember {
   purchases         MlmPurchase[]
   bonusResults      BonusResult[]   @relation("BonusRecipient")
   autoShipOrders    AutoShipOrder[] @relation("AutoShipOrders")
+  bonusAdjustments  BonusAdjustment[]
+  bonusShortagePayments BonusShortagePayment[]
 
   @@index([uplineId])
   @@index([referrerId])
@@ -651,6 +653,7 @@ model BonusRun {
   totalMembers        Int             @default(0)
   totalActiveMembers  Int             @default(0)
   totalBonusAmount    Int             @default(0)       // 総ボーナス支払額（円）
+  paymentAdjustmentRate Float?                          // 支払い調整率（%）
   // 実行情報
   executedByAdminId   BigInt?
   confirmedAt         DateTime?
@@ -659,6 +662,8 @@ model BonusRun {
   updatedAt           DateTime        @updatedAt
 
   results             BonusResult[]
+  adjustments         BonusAdjustment[]
+  shortagePayments    BonusShortagePayment[]
 
   @@unique([bonusMonth])
   @@map("bonus_runs")
@@ -682,9 +687,33 @@ model BonusResult {
   // ボーナス金額（円）
   directBonus         Int         @default(0)       // ダイレクトボーナス
   unilevelBonus       Int         @default(0)       // ユニレベルボーナス
+  rankUpBonus         Int         @default(0)       // ランクアップボーナス
+  shareBonus          Int         @default(0)       // シェアボーナス
   structureBonus      Int         @default(0)       // 組織構築ボーナス
   savingsBonus        Int         @default(0)       // 貯金ボーナス
-  totalBonus          Int         @default(0)       // 合計
+  carryoverAmount     Int         @default(0)       // 繰越金
+  adjustmentAmount    Int         @default(0)       // 調整金
+  otherPositionAmount Int         @default(0)       // 他ポジション
+  // 支払い計算
+  amountBeforeAdjustment Int      @default(0)       // 支払調整前取得額
+  paymentAdjustmentRate  Float?                     // 支払調整率（%）
+  paymentAdjustmentAmount Int     @default(0)       // 支払調整額
+  finalAmount         Int         @default(0)       // 取得額（調整後）
+  consumptionTax      Int         @default(0)       // 10%消費税（内税）
+  withholdingTax      Int         @default(0)       // 源泉所得税
+  shortageAmount      Int         @default(0)       // 過不足金
+  otherPositionShortage Int       @default(0)       // 他ポジション過不足金
+  serviceFee          Int         @default(0)       // 事務手数料
+  paymentAmount       Int         @default(0)       // 支払額
+  // 組織データ
+  groupActiveCount    Int         @default(0)       // グループACT
+  minLinePoints       Int         @default(0)       // 最小系列pt
+  lineCount           Int         @default(0)       // 系列数
+  level1Lines         Int         @default(0)       // LV.1達成系列数
+  level2Lines         Int         @default(0)       // LV.2達成系列数
+  level3Lines         Int         @default(0)       // LV.3達成系列数
+  forceLevel          Int?                          // 強制レベル
+  conditionMet        Boolean     @default(false)   // 条件達成
   // ユニレベルボーナス段数内訳（JSON）
   unilevelDetail      Json?                         // { "1": pt, "2": pt, ... }
   savingsPointsAdded  Int         @default(0)       // 今月追加貯金pt
@@ -834,5 +863,53 @@ model DeliveryNote {
 
   @@index([targetMonth])
   @@map("delivery_notes")
+}
+
+// ボーナス調整金（手動入力）
+model BonusAdjustment {
+  id              BigInt   @id @default(autoincrement())
+  bonusRunId      BigInt
+  mlmMemberId     BigInt
+  amount          Int                      // 調整金額（円）
+  comment         String?  @db.VarChar(500)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  bonusRun        BonusRun  @relation(fields: [bonusRunId], references: [id], onDelete: Cascade)
+  mlmMember       MlmMember @relation(fields: [mlmMemberId], references: [id], onDelete: Cascade)
+
+  @@index([bonusRunId])
+  @@index([mlmMemberId])
+  @@map("bonus_adjustments")
+}
+
+// ボーナス過不足金（源泉対象外）
+model BonusShortagePayment {
+  id              BigInt   @id @default(autoincrement())
+  bonusRunId      BigInt
+  mlmMemberId     BigInt
+  amount          Int                      // 過不足金額（円）
+  comment         String?  @db.VarChar(500)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  bonusRun        BonusRun  @relation(fields: [bonusRunId], references: [id], onDelete: Cascade)
+  mlmMember       MlmMember @relation(fields: [mlmMemberId], references: [id], onDelete: Cascade)
+
+  @@index([bonusRunId])
+  @@index([mlmMemberId])
+  @@map("bonus_shortage_payments")
+}
+
+// 貯金ボーナス設定
+model SavingsBonusConfig {
+  id                      Int      @id @default(autoincrement())
+  registrationRate        Float    @default(20.0)    // 登録時（デフォルト20%）
+  autoshipRate            Float    @default(5.0)     // オートシップ（デフォルト5%）
+  bonusRate               Float    @default(3.0)     // ボーナス（デフォルト3%）
+  updatedAt               DateTime @updatedAt
+  createdAt               DateTime @default(now())
+
+  @@map("savings_bonus_config")
 }
 
