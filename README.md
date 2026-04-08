@@ -13,6 +13,22 @@ VIOLA Pure株式会社の福利厚生・MLM管理システム
 
 ### ✅ MLM管理機能（完全実装）
 - **MLM会員管理**: 会員一覧、詳細編集、オートシップ設定、支払方法管理
+- **MLM会員新規登録**: フルスペック登録フォーム（会員区分、ステータス、個人情報、銀行情報、組織階層、オートシップ設定、郵便番号自動住所補完）
+- **MLM組織図・リスト**: 
+  - 会員コード検索、マトリックス/ユニレベル切替
+  - ツリー表示（最大5階層、循環参照対策）
+  - リスト表示（フラットテーブル、レベル・ステータスバッジ）
+  - ダウンライン一覧レポート（CSV出力）
+  - 購入履歴集計レポート（CSV出力）
+  - 紹介実績積算レポート（期間・ソートタイプ選択、CSV出力）
+- **受注・発送状況管理**:
+  - 検索フィルター（注文日範囲、会員コード、ステータス、配送方法、商品検索）
+  - 一覧表示（注文情報、会員情報、商品明細、配送情報）
+  - 編集機能（ステータス、配送業者、追跡番号、発送ステータス更新）
+  - CSV出力（検索条件対応、Excel互換BOM付き）
+  - PDF発送ラベル生成（注文番号、配送先、差出人、商品明細）
+  - 発送完了処理（ワンクリック発送済み更新）
+  - 注文削除機能（確認ダイアログ付き）
 - **ボーナス一覧**: 月別合計表示、CSV出力（2025年9月〜2026年2月）
 - **ボーナス計算処理**: 
   - 調整金・過不足金CRUD（手動入力・Excel一括アップロード）
@@ -76,16 +92,17 @@ VIOLA Pure株式会社の福利厚生・MLM管理システム
 ### 拡張テーブル
 - `bonus_runs`: CAP調整額追加
 - `bonus_results`: 30+項目追加（強制レベル、条件、貯金ポイント等）
-- `mlm_members`: 調整金・過不足金リレーション
+- `mlm_members`: 調整金・過不足金リレーション、銀行情報、法人情報、個人情報拡張
+- `Product`: 商品コード（code）追加
 
 ## 🛠️ 技術スタック
 
 - **フレームワーク**: Next.js 16 (App Router)
-- **UI**: TailwindCSS, FontAwesome
+- **UI**: TailwindCSS, FontAwesome, Lucide React
 - **認証**: NextAuth.js v5
 - **データベース**: PostgreSQL (Neon)
 - **ORM**: Prisma
-- **PDF生成**: jsPDF, jspdf-autotable
+- **PDF生成**: jsPDF, jspdf-autotable, PDFKit
 - **デプロイ**: Vercel
 
 ## 📁 ディレクトリ構成
@@ -99,8 +116,11 @@ app/
 │   ├── bonus-reports/          # ボーナス関連レポート
 │   ├── bonus-utilities/        # ボーナスユーティリティ
 │   ├── mlm-members/            # MLM会員管理
+│   ├── mlm-members/new/        # MLM会員新規登録
+│   ├── mlm-organization/       # MLM組織図・リスト
 │   ├── products/               # 商品管理
 │   ├── orders/                 # 注文管理
+│   ├── orders-shipping/        # 受注・発送状況
 │   ├── contracts/              # 携帯契約管理
 │   ├── travel-subscriptions/   # 旅行サブスク管理
 │   └── export/                 # データエクスポート
@@ -111,6 +131,9 @@ app/
 │       ├── bonus-results/      # ボーナス結果詳細API
 │       ├── bonus-reports/      # レポート生成API
 │       ├── savings-bonus-config/ # 貯金B設定API
+│       ├── mlm-members/        # MLM会員管理API
+│       ├── mlm-organization/   # 組織ツリー・レポートAPI
+│       ├── orders-shipping/    # 受注・発送管理API（CRUD、CSV、PDF）
 │       ├── pdf/                # PDF生成API
 │       └── export/             # CSV/振込データ出力API
 prisma/
@@ -165,13 +188,13 @@ npx prisma migrate dev --name migration_name
 
 ## 📊 最新コミット履歴
 
+- `d6d11ac` 📦 受注・発送状況ページ実装
+- `43fcea3` 🌳 MLM組織図・リストページ実装
+- `d9b10f7` ✨ MLM会員新規登録ページ実装
+- `1fb75ac` ✨ ボーナス計算処理画面改善（ファイルアップロード＆ページネーション）
+- `66ba0da` 🎨 ボーナス一覧の横幅縮小（2500px→1800px）
 - `c3a1ea9` 🛠️ ボーナスユーティリティ統合画面実装
 - `739d6dd` 💰 ボーナス管理フル機能実装
-- `9d9bdae` 📊 ボーナス一覧画面実装（月別合計・CSV出力）
-- `9487ee7` 🎯 ボーナス管理基本機能実装（表示のみ）
-- `cea1c11` 🗃️ ボーナス管理データベーススキーマ拡張
-- `f0b9c55` 📄 PDF生成機能実装完了
-- `c2c4da4` 🎨 統合ダッシュボード＆サイドバーデザイン刷新
 
 ## 🔧 環境変数
 
