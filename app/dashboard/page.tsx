@@ -79,19 +79,19 @@ export default async function DashboardPage() {
   return (
     <MemberDashboard
       user={{
-        id: user.id.toString(),
+        id: String(user.id),
         name: user.name ?? "",
         memberCode: user.memberCode ?? "",
         email: user.email ?? "",
         phone: user.phone ?? "",
         availablePoints: user.pointWallet?.availablePointsBalance ?? 0,
       }}
-      mlmStatus={mlmMember?.status ?? null}
+      mlmStatus={mlmMember?.status ? String(mlmMember.status) : null}
       vpPhoneStatus={vpPhoneApp?.status ? String(vpPhoneApp.status) : null}
       travelSubStatus={travelSub?.status ? String(travelSub.status) : null}
       announcements={announcements}
       menus={menus.map((m) => ({
-        id: m.id.toString(),
+        id: String(m.id),
         title: m.title,
         subtitle: m.subtitle ?? undefined,
         iconType: m.iconType ?? undefined,
