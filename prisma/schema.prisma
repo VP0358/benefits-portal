@@ -570,6 +570,10 @@ enum PurchaseStatus {
   new_member     // 新規登録者
   cooling_off    // クーリングオフ
   canceled       // キャンセル
+  out_of_stock   // 欠品
+  out_of_stock_minus_1 // 欠品欠1
+  company_sale   // 社販
+  other          // その他
 }
 
 /// MLM会員情報（CLAIRホールディングス仕様）
