@@ -2,11 +2,8 @@
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
-import { PrismaClient } from "@prisma/client"
-
-
-const prisma = new PrismaClient()
 
 // 発送済みに更新
 export async function POST(

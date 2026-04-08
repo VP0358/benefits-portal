@@ -2,13 +2,8 @@
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
-
-
-import { PrismaClient } from "@prisma/client"
-
-const prisma = new PrismaClient()
-
 const statusLabels: Record<string, string> = {
   autoship: "オートシップ",
   one_time: "定期購入",
