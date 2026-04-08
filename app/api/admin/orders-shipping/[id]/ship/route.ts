@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 
+// 動的レンダリングを強制（ビルド時にこのルートを実行しない）
+export const dynamic = 'force-dynamic'
+
 const prisma = new PrismaClient()
 
 // 発送済みに更新

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 import PDFDocument from "pdfkit"
 
+// 動的レンダリングを強制（ビルド時にこのルートを実行しない）
+export const dynamic = 'force-dynamic'
+
 const prisma = new PrismaClient()
 
 // 発送ラベル印刷（PDF生成）
