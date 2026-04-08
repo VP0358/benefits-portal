@@ -540,11 +540,82 @@ const TravelSubButton = forwardRef<{ openModal: () => void }>(function TravelSub
   );
 });
 
+// ────────── MLM会員状況ボタン ──────────
+function MlmStatusButton({ status }: { status: string | null }) {
+  const statusConfig: Record<string, { label: string; emoji: string; color: string; bgColor: string }> = {
+    active: { 
+      label: "アクティブ", 
+      emoji: "😊", 
+      color: "text-green-700", 
+      bgColor: "bg-green-50 border-green-300" 
+    },
+    inactive: { 
+      label: "非アクティブ", 
+      emoji: "😴", 
+      color: "text-gray-700", 
+      bgColor: "bg-gray-50 border-gray-300" 
+    },
+    pending: { 
+      label: "支払い待ち", 
+      emoji: "⏳", 
+      color: "text-yellow-700", 
+      bgColor: "bg-yellow-50 border-yellow-300" 
+    },
+    suspended: { 
+      label: "活動停止", 
+      emoji: "⚠️", 
+      color: "text-orange-700", 
+      bgColor: "bg-orange-50 border-orange-300" 
+    },
+    canceled: { 
+      label: "退会", 
+      emoji: "❌", 
+      color: "text-red-700", 
+      bgColor: "bg-red-50 border-red-300" 
+    },
+  };
+
+  if (!status) {
+    return (
+      <div className="bg-white rounded-2xl p-4 shadow border-2 border-gray-200">
+        <div className="flex items-center gap-3">
+          <div className="text-3xl">👤</div>
+          <div className="flex-1">
+            <p className="text-xs font-medium text-gray-500 mb-0.5">MLM会員状況</p>
+            <p className="text-sm font-bold text-gray-800">未登録</p>
+          </div>
+          <Link href="/mlm/register"
+            className="px-4 py-2 bg-green-500 text-white text-xs font-bold rounded-lg hover:bg-green-600 transition">
+            登録する
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const config = statusConfig[status] ?? statusConfig.inactive;
+
+  return (
+    <Link href="/mlm/my-status"
+      className={`block rounded-2xl p-4 shadow border-2 ${config.bgColor} hover:shadow-md transition active:scale-98`}>
+      <div className="flex items-center gap-3">
+        <div className="text-3xl">{config.emoji}</div>
+        <div className="flex-1">
+          <p className="text-xs font-medium text-gray-600 mb-0.5">MLM会員状況</p>
+          <p className={`text-base font-bold ${config.color}`}>{config.label}</p>
+        </div>
+        <div className="text-gray-400 text-xl">→</div>
+      </div>
+    </Link>
+  );
+}
+
 // ──────────── メインダッシュボード ────────────
 export default function MemberDashboard({
-  user, announcements, menus
+  user, mlmStatus, announcements, menus
 }: {
   user: User;
+  mlmStatus: string | null;
   announcements: Announcement[];
   menus: Menu[];
 }) {
@@ -753,52 +824,79 @@ export default function MemberDashboard({
               </div>
             </div>
           )}
-          <div className="bg-white/20 rounded-xl px-4 py-3 space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              {/* MLM先月ポイント */}
-              <div className="bg-white/30 rounded-lg p-2">
-                <div className="text-[10px] font-medium opacity-80 mb-1">MLM先月</div>
-                <div className="text-lg font-bold">
+          <div className="bg-white/20 rounded-xl px-4 py-3 space-y-3">
+            {/* MLM先月ポイント */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium opacity-90">MLM先月ポイント</span>
+                <span className="text-sm font-bold">
                   {dashboardPoints.mlmLastMonthPoints.toLocaleString()}
-                  <span className="text-xs ml-1 font-normal">VPpt</span>
-                </div>
+                  <span className="text-[10px] ml-1 font-normal opacity-80">VPpt</span>
+                </span>
               </div>
-              
-              {/* MLM今月ポイント */}
-              <div className="bg-white/30 rounded-lg p-2">
-                <div className="text-[10px] font-medium opacity-80 mb-1">MLM今月</div>
-                <div className="text-lg font-bold">
+              <div className="h-2 bg-white/30 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-purple-400 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min((dashboardPoints.mlmLastMonthPoints / 10000) * 100, 100)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* MLM今月ポイント */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium opacity-90">MLM今月ポイント</span>
+                <span className="text-sm font-bold">
                   {dashboardPoints.mlmCurrentMonthPoints.toLocaleString()}
-                  <span className="text-xs ml-1 font-normal">VPpt</span>
-                </div>
+                  <span className="text-[10px] ml-1 font-normal opacity-80">VPpt</span>
+                </span>
               </div>
-              
-              {/* 貯金ボーナス */}
-              <div className="bg-white/30 rounded-lg p-2">
-                <div className="text-[10px] font-medium opacity-80 mb-1">貯金ボーナス</div>
-                <div className="text-lg font-bold">
+              <div className="h-2 bg-white/30 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-pink-400 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min((dashboardPoints.mlmCurrentMonthPoints / 10000) * 100, 100)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* 貯金ボーナスポイント */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium opacity-90">貯金ボーナスポイント</span>
+                <span className="text-sm font-bold">
                   {dashboardPoints.savingsBonusPoints.toLocaleString()}
-                  <span className="text-xs ml-1 font-normal">SAVpt</span>
-                </div>
+                  <span className="text-[10px] ml-1 font-normal opacity-80">SAVpt</span>
+                </span>
               </div>
-              
-              {/* 携帯紹介 */}
-              <div className="bg-white/30 rounded-lg p-2">
-                <div className="text-[10px] font-medium opacity-80 mb-1">携帯紹介</div>
-                <div className="text-lg font-bold">
+              <div className="h-2 bg-white/30 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-blue-400 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min((dashboardPoints.savingsBonusPoints / 10000) * 100, 100)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* 携帯紹介ポイント */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium opacity-90">携帯紹介ポイント</span>
+                <span className="text-sm font-bold">
                   {dashboardPoints.mobileReferralPoints.toLocaleString()}
-                  <span className="text-xs ml-1 font-normal">MPIpt</span>
-                </div>
+                  <span className="text-[10px] ml-1 font-normal opacity-80">MPIpt</span>
+                </span>
+              </div>
+              <div className="h-2 bg-white/30 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-orange-400 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min((dashboardPoints.mobileReferralPoints / 10000) * 100, 100)}%` }}
+                />
               </div>
             </div>
           </div>
         </div>
 
-        {/* VP未来phone申し込みボタン（モーダル付き） */}
-        <VpPhoneButton />
-
-        {/* 旅行サブスクボタン（申込モーダル付き） */}
-        <TravelSubButton ref={travelSubRef} />
+        {/* MLM会員状況ボタン */}
+        <MlmStatusButton status={mlmStatus} />
 
         {/* お知らせスライダー */}
         <section id="news">
@@ -835,6 +933,12 @@ export default function MemberDashboard({
             </>
           )}
         </section>
+
+        {/* VP未来phone申し込みボタン（モーダル付き） */}
+        <VpPhoneButton />
+
+        {/* 旅行サブスクボタン（申込モーダル付き） */}
+        <TravelSubButton ref={travelSubRef} />
 
         {/* 福利厚生メニュー */}
         <section id="menu">

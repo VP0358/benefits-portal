@@ -8,7 +8,7 @@ export default async function DashboardPage() {
   if (!session?.user) redirect("/login");
   if (session.user.role === "admin") redirect("/admin");
 
-  const [user, menus] = await Promise.all([
+  const [user, menus, mlmMember] = await Promise.all([
     prisma.user.findUnique({
       where: { id: BigInt(session.user.id ?? "0") },
       include: { pointWallet: true },
@@ -16,6 +16,9 @@ export default async function DashboardPage() {
     prisma.menu.findMany({
       where: { isActive: true },
       orderBy: { sortOrder: "asc" },
+    }),
+    prisma.mlmMember.findFirst({
+      where: { userId: BigInt(session.user.id ?? "0") },
     }),
   ]);
 
@@ -59,6 +62,7 @@ export default async function DashboardPage() {
         phone: user.phone ?? "",
         availablePoints: user.pointWallet?.availablePointsBalance ?? 0,
       }}
+      mlmStatus={mlmMember?.status ?? null}
       announcements={announcements}
       menus={menus.map((m) => ({
         id: m.id.toString(),
