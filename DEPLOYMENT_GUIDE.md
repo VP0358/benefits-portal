@@ -78,7 +78,7 @@ const nextConfig: NextConfig = {
 
 ```json
 {
-  "buildCommand": "npm run vercel-build",
+  "buildCommand": "npm run build",
   "installCommand": "npm install",
   "framework": "nextjs",
   "env": {
@@ -99,10 +99,12 @@ const nextConfig: NextConfig = {
 }
 ```
 
-**新機能**:
-- `vercel-build`: Prisma migrateを含むカスタムビルドコマンド
+**設定内容**:
+- `buildCommand`: 標準的なNext.jsビルドコマンド
 - APIルートの**Cache-Control**ヘッダー設定
 - 東京リージョン（hnd1）指定
+
+**重要**: Prisma migrateはビルド時ではなく、別途実行する必要があります
 
 #### 5. ビルドスクリプト
 
@@ -112,15 +114,18 @@ const nextConfig: NextConfig = {
 {
   "scripts": {
     "build": "prisma generate && next build",
-    "vercel-build": "prisma generate && prisma migrate deploy && next build"
+    "postinstall": "prisma generate || true"
   }
 }
 ```
 
-**`vercel-build`の役割**:
+**`build`の役割**:
 1. Prisma Clientを生成
-2. データベースマイグレーションを実行
-3. Next.jsをビルド
+2. Next.jsをビルド
+
+**`postinstall`の役割**:
+- npm install後に自動的にPrisma Clientを生成
+- エラーがあっても継続（`|| true`）
 
 #### 6. .vercelignore
 
@@ -231,11 +236,27 @@ curl https://www.viola-pure.xyz/api
 **原因**: データベースマイグレーションが実行されていない
 
 **解決策**:
+
+#### 方法1: ローカルで実行（推奨）
 ```bash
-# Vercel環境で手動実行
-vercel env pull .env.local
+# 1. Vercelの環境変数をローカルに取得
+npx vercel env pull .env.local
+
+# 2. マイグレーションを本番環境に適用
 npx prisma migrate deploy
 ```
+
+#### 方法2: Vercel CLIで実行
+```bash
+# Vercel環境に直接接続して実行
+vercel env pull
+npx prisma migrate deploy
+```
+
+#### 方法3: Prisma Data Platform使用
+Prisma Data Platformを使用してマイグレーションを管理（有料プラン）
+
+**注意**: Vercelのビルド時にマイグレーションを実行すると、ビルドが失敗する可能性があります。マイグレーションは**ビルドとは別に**実行してください。
 
 ## 📝 環境変数一覧
 
