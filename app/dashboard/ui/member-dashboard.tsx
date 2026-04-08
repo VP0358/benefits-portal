@@ -4,6 +4,12 @@ import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "re
 import Link from "next/link";
 
 interface User { id:string; name:string; memberCode:string; email:string; phone:string; availablePoints:number; }
+interface DashboardPoints {
+  mlmLastMonthPoints: number;
+  mlmCurrentMonthPoints: number;
+  savingsBonusPoints: number;
+  mobileReferralPoints: number;
+}
 interface Announcement { id:string; title:string; content:string; tag:string; isPublished:boolean; publishedAt:string|null; }
 interface Menu { id:string; title:string; subtitle?:string; iconType?:string; menuType?:string; linkUrl?:string; }
 
@@ -549,8 +555,26 @@ export default function MemberDashboard({
   const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const slideRef = useRef(0);
+  const [dashboardPoints, setDashboardPoints] = useState<DashboardPoints>({
+    mlmLastMonthPoints: 0,
+    mlmCurrentMonthPoints: 0,
+    savingsBonusPoints: 0,
+    mobileReferralPoints: 0
+  });
 
   const travelSubRef = useRef<{ openModal: () => void }>(null);
+
+  // ダッシュボードポイント情報取得
+  useEffect(() => {
+    fetch("/api/my/dashboard-points")
+      .then(r => r.json())
+      .then(data => {
+        if (!data.error) {
+          setDashboardPoints(data);
+        }
+      })
+      .catch(err => console.error('ポイント取得エラー:', err));
+  }, []);
 
   // アバター読み込み（DB画像 > localStorage絵文字）
   useEffect(() => {
@@ -655,6 +679,7 @@ export default function MemberDashboard({
                 { href: "/dashboard",       label: "🏠 ホーム" },
                 { href: "#menu",            label: "📋 福利厚生メニュー" },
                 { href: "/vp-phone",        label: "📱 VP未来phone申し込み" },
+                { href: "/points/check",    label: "⭐ ポイント確認" },
                 { href: "/points/use",      label: "💎 ポイントを使う" },
                 { href: "/points/history",  label: "📊 ポイント履歴" },
                 { href: "/announcements",   label: "🔔 お知らせ" },
@@ -728,19 +753,44 @@ export default function MemberDashboard({
               </div>
             </div>
           )}
-          <div className="bg-white/20 rounded-xl px-4 py-3">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold">利用可能ポイント</span>
-              <span className="text-2xl font-black">
-                {user.availablePoints.toLocaleString()}
-                <span className="text-sm ml-1">pt</span>
-              </span>
+          <div className="bg-white/20 rounded-xl px-4 py-3 space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              {/* MLM先月ポイント */}
+              <div className="bg-white/30 rounded-lg p-2">
+                <div className="text-[10px] font-medium opacity-80 mb-1">MLM先月</div>
+                <div className="text-lg font-bold">
+                  {dashboardPoints.mlmLastMonthPoints.toLocaleString()}
+                  <span className="text-xs ml-1 font-normal">VPpt</span>
+                </div>
+              </div>
+              
+              {/* MLM今月ポイント */}
+              <div className="bg-white/30 rounded-lg p-2">
+                <div className="text-[10px] font-medium opacity-80 mb-1">MLM今月</div>
+                <div className="text-lg font-bold">
+                  {dashboardPoints.mlmCurrentMonthPoints.toLocaleString()}
+                  <span className="text-xs ml-1 font-normal">VPpt</span>
+                </div>
+              </div>
+              
+              {/* 貯金ボーナス */}
+              <div className="bg-white/30 rounded-lg p-2">
+                <div className="text-[10px] font-medium opacity-80 mb-1">貯金ボーナス</div>
+                <div className="text-lg font-bold">
+                  {dashboardPoints.savingsBonusPoints.toLocaleString()}
+                  <span className="text-xs ml-1 font-normal">SAVpt</span>
+                </div>
+              </div>
+              
+              {/* 携帯紹介 */}
+              <div className="bg-white/30 rounded-lg p-2">
+                <div className="text-[10px] font-medium opacity-80 mb-1">携帯紹介</div>
+                <div className="text-lg font-bold">
+                  {dashboardPoints.mobileReferralPoints.toLocaleString()}
+                  <span className="text-xs ml-1 font-normal">MPIpt</span>
+                </div>
+              </div>
             </div>
-            <div className="w-full bg-white/30 rounded-full h-2">
-              <div className="bg-white rounded-full h-2 transition-all duration-500"
-                style={{ width: `${barPct}%` }} />
-            </div>
-            <p className="text-[10px] opacity-70 mt-1 text-right">最大 {maxPt.toLocaleString()} pt</p>
           </div>
         </div>
 
