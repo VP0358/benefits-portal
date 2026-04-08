@@ -117,7 +117,7 @@ VIOLA Pure株式会社の福利厚生・MLM管理システム
 
 ## 🛠️ 技術スタック
 
-- **フレームワーク**: Next.js 15.1.8 (App Router)
+- **フレームワーク**: Next.js 15.2.9 (App Router)
 - **UI**: TailwindCSS, FontAwesome, Lucide React
 - **認証**: NextAuth.js v5
 - **データベース**: PostgreSQL (Neon)
@@ -210,13 +210,13 @@ npx prisma migrate dev --name migration_name
 
 ## 📊 最新コミット履歴
 
+- `3523565` 🔧 Security Fix: Next.js 15.2.9にアップグレード (CVE-2025-66478修正)
+- `3505211` 📝 README更新: 最新コミット履歴
 - `a18c61a` 🔧 Critical Fix: PrismaClient共通インスタンス使用に修正
 - `3608436` 📝 DEPLOYMENT_GUIDE更新: Prisma migrate説明を修正
 - `51be401` 🔧 Fix: vercel-buildコマンドを削除（Prisma migrate問題修正）
-- `b97f001` 📝 Vercelデプロイメント完全ガイド追加
 - `4b52740` 🔧 Ultimate Fix: revalidate設定追加 & Vercel最適化
 - `93522e0` 🔧 Critical Fix: dynamic設定の位置修正 & Next.js 15.1.8にアップグレード
-- `c248376` 💳 MLM新規登録: 支払い方法に銀行振込を追加
 
 ## 🔧 環境変数
 
