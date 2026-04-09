@@ -208,59 +208,137 @@ const TravelSubButton = forwardRef<{openModal:()=>void}>(function TravelSubButto
         </NavyCard>
       </button>
       {showApplyModal&&(
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" style={{background:"rgba(10,22,40,0.85)"}} onClick={()=>{setShowApplyModal(false);setApplyDone(false);setApplyError("");}}>
-          <div className="w-full sm:max-w-2xl rounded-t-3xl sm:rounded-3xl flex flex-col" style={{background:NAVY_CARD,border:`1px solid ${GOLD}30`,maxHeight:"90vh"}} onClick={e=>e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4" style={{borderBottom:`1px solid ${GOLD}18`}}>
-              <div className="flex items-center gap-2"><NavyIconBox color="#93c5fd" size="sm"><PlaneIcon/></NavyIconBox><h2 className="font-jp font-semibold text-white text-sm">格安旅行</h2></div>
-              <button onClick={()=>{setShowApplyModal(false);setApplyDone(false);setApplyError("");}} className="text-white/40 text-2xl hover:text-white leading-none">✕</button>
-            </div>
-            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4 pb-10">
-              {sub&&<div className="rounded-2xl border p-4" style={{background:NAVY_CARD2,borderColor:`${GOLD}25`}}>
-                <div className="flex items-center justify-between">
-                  <div><p className="text-xs mb-0.5" style={{color:`${GOLD}70`}}>現在のプラン</p><p className="font-semibold text-white font-jp">{sub.planName}</p><p className="text-sm font-bold mt-0.5" style={{color:GOLD}}>¥{sub.monthlyFee.toLocaleString()}/月</p></div>
-                  <div className="flex flex-col items-end gap-1.5"><span className="rounded-full text-xs font-bold px-2.5 py-0.5 font-label" style={{background:`${GOLD}20`,color:GOLD_LIGHT,border:`1px solid ${GOLD}40`}}>Lv{lv}</span><span className="flex items-center gap-1.5 text-xs text-white/55"><span className={`w-2 h-2 rounded-full ${statusDot}`}/>{statusLabel}</span></div>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+          style={{background:"rgba(10,22,40,0.88)",backdropFilter:"blur(4px)"}}
+          onClick={()=>{setShowApplyModal(false);setApplyDone(false);setApplyError("");}}>
+          <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl flex flex-col overflow-hidden"
+            style={{background:`linear-gradient(155deg,${NAVY_CARD} 0%,${NAVY_CARD2} 60%,${NAVY_CARD3} 100%)`,border:`1px solid ${GOLD}35`,boxShadow:`0 -8px 40px rgba(10,22,40,0.40),0 0 0 1px ${GOLD}10`,maxHeight:"92vh"}}
+            onClick={e=>e.stopPropagation()}>
+            {/* ゴールドグラデーションライン */}
+            <div className="h-0.5 flex-shrink-0" style={{background:`linear-gradient(90deg,transparent,${GOLD}90,${GOLD_LIGHT},${GOLD}90,transparent)`}}/>
+            {/* ヘッダー */}
+            <div className="flex items-center justify-between px-5 py-4 flex-shrink-0" style={{borderBottom:`1px solid ${GOLD}15`}}>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{background:"rgba(147,197,253,0.12)",border:"1px solid rgba(147,197,253,0.25)"}}>
+                  <span className="w-5 h-5 text-sky-300"><PlaneIcon/></span>
                 </div>
-              </div>}
-              <div className="rounded-2xl border p-4" style={{background:NAVY_CARD2,borderColor:`${GOLD}18`}}>
-                <p className="text-xs font-label mb-3" style={{color:GOLD}}>PRICE PLAN</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border p-3" style={{background:`${GOLD}12`,borderColor:`${GOLD}30`}}>
-                    <p className="text-[10px] font-bold mb-2" style={{color:GOLD}}>先着50名まで</p>
-                    {[1,2,3,4,5].map(l=><div key={l} className="flex justify-between text-xs py-0.5"><span className="font-label" style={{color:GOLD}}>Lv{l}</span><span className="font-semibold text-white">¥{TRAVEL_FEES.early[l].toLocaleString()}</span></div>)}
-                  </div>
-                  <div className="rounded-xl border p-3" style={{background:"rgba(20,50,100,0.5)",borderColor:"rgba(100,150,240,0.2)"}}>
-                    <p className="text-[10px] font-bold mb-2 text-sky-300">51名以降</p>
-                    {[1,2,3,4,5].map(l=><div key={l} className="flex justify-between text-xs py-0.5"><span className="font-label text-sky-300">Lv{l}</span><span className="font-semibold text-white">¥{TRAVEL_FEES.standard[l].toLocaleString()}</span></div>)}
-                  </div>
+                <div>
+                  <p className="text-[9px] font-label tracking-[0.22em]" style={{color:`${GOLD}65`}}>TRAVEL SERVICE</p>
+                  <h2 className="font-jp font-semibold text-white text-sm leading-tight">格安旅行</h2>
                 </div>
               </div>
+              <button onClick={()=>{setShowApplyModal(false);setApplyDone(false);setApplyError("");}}
+                className="w-8 h-8 rounded-xl flex items-center justify-center transition"
+                style={{background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.45)"}}>✕</button>
+            </div>
+            {/* コンテンツ */}
+            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4 pb-10">
+              {/* 現在のプラン（契約済みの場合） */}
+              {sub&&(
+                <div className="rounded-2xl p-4" style={{background:`${GOLD}10`,border:`1px solid ${GOLD}30`}}>
+                  <p className="text-[9px] font-label tracking-widest mb-2" style={{color:`${GOLD}60`}}>CURRENT PLAN</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-white font-jp text-sm">{sub.planName}</p>
+                      <p className="text-sm font-bold mt-0.5" style={{color:GOLD}}>¥{sub.monthlyFee.toLocaleString()}/月</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5">
+                      <span className="rounded-full text-xs font-bold px-2.5 py-0.5 font-label" style={{background:`${GOLD}22`,color:GOLD_LIGHT,border:`1px solid ${GOLD}45`}}>Lv{lv}</span>
+                      <span className="flex items-center gap-1.5 text-xs" style={{color:"rgba(255,255,255,0.50)"}}>
+                        <span className={`w-2 h-2 rounded-full ${statusDot}`}/>{statusLabel}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* 料金プラン一覧 */}
+              <div className="rounded-2xl p-4" style={{background:NAVY_CARD2,border:`1px solid ${GOLD}18`}}>
+                <p className="text-[9px] font-label tracking-[0.22em] mb-3 font-bold" style={{color:GOLD}}>PRICE PLAN</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl p-3" style={{background:`${GOLD}10`,border:`1px solid ${GOLD}28`}}>
+                    <p className="text-[10px] font-bold mb-2" style={{color:GOLD_LIGHT}}>🌟 先着50名まで</p>
+                    {[1,2,3,4,5].map(l=>(
+                      <div key={l} className="flex justify-between text-xs py-0.5" style={{borderBottom:l<5?`1px solid ${GOLD}10`:"none"}}>
+                        <span className="font-label font-bold" style={{color:GOLD}}>Lv{l}</span>
+                        <span className="font-semibold text-white">¥{TRAVEL_FEES.early[l].toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="rounded-xl p-3" style={{background:"rgba(20,50,100,0.55)",border:"1px solid rgba(100,150,240,0.22)"}}>
+                    <p className="text-[10px] font-bold mb-2 text-sky-300">51名以降</p>
+                    {[1,2,3,4,5].map(l=>(
+                      <div key={l} className="flex justify-between text-xs py-0.5" style={{borderBottom:l<5?"1px solid rgba(100,150,240,0.10)":"none"}}>
+                        <span className="font-label font-bold text-sky-300">Lv{l}</span>
+                        <span className="font-semibold text-white">¥{TRAVEL_FEES.standard[l].toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-[9px] mt-2" style={{color:"rgba(255,255,255,0.30)"}}>※支払日：毎月15日　※お支払い方法：銀行振込のみ</p>
+              </div>
+              {/* 申込フォーム（未契約かつ未完了） */}
               {!sub&&!applyDone&&(
-                <div className="rounded-2xl border p-4" style={{background:NAVY_CARD2,borderColor:`${GOLD}18`}}>
+                <div className="rounded-2xl p-4" style={{background:NAVY_CARD2,border:`1px solid ${GOLD}15`}}>
+                  <p className="text-[9px] font-label tracking-[0.22em] mb-3" style={{color:`${GOLD}70`}}>APPLICATION FORM</p>
                   <p className="text-sm font-jp font-semibold mb-3 text-white">格安旅行に申し込む</p>
                   <form onSubmit={handleApply} className="space-y-3">
-                    {[{label:"会員ID（任意）",type:"text",key:"memberCode",placeholder:"例: M0001",required:false},{label:"氏名",type:"text",key:"name",placeholder:"山田 太郎",required:true},{label:"電話番号",type:"tel",key:"phone",placeholder:"090-1234-5678",required:true},{label:"メールアドレス",type:"email",key:"email",placeholder:"example@email.com",required:true}].map(f=>(
+                    {[
+                      {label:"会員ID（任意）",type:"text",key:"memberCode",placeholder:"例: M0001",required:false},
+                      {label:"氏名",type:"text",key:"name",placeholder:"山田 太郎",required:true},
+                      {label:"電話番号",type:"tel",key:"phone",placeholder:"090-1234-5678",required:true},
+                      {label:"メールアドレス",type:"email",key:"email",placeholder:"example@email.com",required:true}
+                    ].map(f=>(
                       <div key={f.key}>
-                        <label className="block text-xs font-semibold mb-1" style={{color:`${GOLD}80`}}>{f.label}{f.required&&<span className="text-red-400 ml-1">*</span>}</label>
-                        <input required={f.required} type={f.type} className="w-full rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 focus:outline-none border" style={{background:"rgba(255,255,255,0.05)",borderColor:`${GOLD}22`}} placeholder={f.placeholder} value={(applyForm as Record<string,string|number>)[f.key] as string} onChange={e=>setApplyForm({...applyForm,[f.key]:e.target.value})}/>
+                        <label className="block text-xs font-semibold mb-1" style={{color:`${GOLD}80`}}>
+                          {f.label}{f.required&&<span className="text-red-400 ml-1">*</span>}
+                        </label>
+                        <input required={f.required} type={f.type}
+                          className="w-full rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 focus:outline-none border focus:ring-1"
+                          style={{background:"rgba(255,255,255,0.05)",borderColor:`${GOLD}22`}}
+                          placeholder={f.placeholder}
+                          value={(applyForm as Record<string,string|number>)[f.key] as string}
+                          onChange={e=>setApplyForm({...applyForm,[f.key]:e.target.value})}/>
                       </div>
                     ))}
                     <div>
-                      <label className="block text-xs font-semibold mb-2" style={{color:`${GOLD}80`}}>現在の自身のレベル<span className="text-red-400 ml-1">*</span></label>
+                      <label className="block text-xs font-semibold mb-2" style={{color:`${GOLD}80`}}>
+                        現在の自身のレベル<span className="text-red-400 ml-1">*</span>
+                      </label>
                       <div className="grid grid-cols-5 gap-1.5">
-                        {[1,2,3,4,5].map(l=><button key={l} type="button" onClick={()=>setApplyForm({...applyForm,level:l})} className="rounded-xl border-2 py-2 text-center transition-all" style={applyForm.level===l?{borderColor:GOLD,background:`${GOLD}22`,color:"white"}:{borderColor:"rgba(255,255,255,0.1)",background:"rgba(255,255,255,0.03)",color:"rgba(255,255,255,0.4)"}}><div className="text-xs font-bold font-label">Lv{l}</div><div className="text-[9px] mt-0.5">¥{TRAVEL_FEES.early[l].toLocaleString()}</div></button>)}
+                        {[1,2,3,4,5].map(l=>(
+                          <button key={l} type="button" onClick={()=>setApplyForm({...applyForm,level:l})}
+                            className="rounded-xl border py-2 text-center transition-all"
+                            style={applyForm.level===l
+                              ?{borderColor:GOLD,background:`${GOLD}22`,color:"white",borderWidth:"1.5px"}
+                              :{borderColor:"rgba(255,255,255,0.10)",background:"rgba(255,255,255,0.03)",color:"rgba(255,255,255,0.40)"}}>
+                            <div className="text-xs font-bold font-label">Lv{l}</div>
+                            <div className="text-[9px] mt-0.5">¥{TRAVEL_FEES.early[l].toLocaleString()}</div>
+                          </button>
+                        ))}
                       </div>
                     </div>
-                    {applyError&&<p className="text-xs text-red-300 bg-red-500/10 border border-red-400/20 rounded-xl px-3 py-2">{applyError}</p>}
-                    <button type="submit" disabled={applying} className="w-full rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-50" style={{background:`linear-gradient(135deg,${GOLD},${ORANGE})`}}>{applying?"申込中...":"格安旅行に申し込む"}</button>
+                    {applyError&&(
+                      <p className="text-xs rounded-xl px-3 py-2" style={{background:"rgba(239,68,68,0.10)",border:"1px solid rgba(239,68,68,0.25)",color:"#fca5a5"}}>{applyError}</p>
+                    )}
+                    <button type="submit" disabled={applying}
+                      className="w-full rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-50 transition-all hover:scale-[1.01] active:scale-95"
+                      style={{background:`linear-gradient(135deg,${GOLD_DARK},${GOLD},${GOLD_LIGHT})`}}>
+                      {applying?"申込中...":"✈️ 格安旅行に申し込む"}
+                    </button>
                   </form>
                 </div>
               )}
-              {applyDone&&<div className="rounded-2xl border p-5 text-center" style={{background:"rgba(16,185,129,0.08)",borderColor:"rgba(52,211,153,0.2)"}}>
-                <div className="text-3xl mb-2">🎉</div>
-                <p className="font-semibold text-emerald-300 text-sm font-jp">申し込みを受け付けました！</p>
-                <p className="text-xs text-emerald-400/80 mt-1">担当者より銀行振込先などのご案内をお送りします。</p>
-                <button onClick={()=>{setShowApplyModal(false);setApplyDone(false);}} className="mt-3 rounded-xl px-5 py-2 text-sm font-semibold text-white" style={{background:"linear-gradient(135deg,#10b981,#34d399)"}}>閉じる</button>
-              </div>}
+              {/* 申込完了 */}
+              {applyDone&&(
+                <div className="rounded-2xl p-5 text-center" style={{background:"rgba(16,185,129,0.08)",border:"1px solid rgba(52,211,153,0.22)"}}>
+                  <div className="text-3xl mb-2">🎉</div>
+                  <p className="font-semibold text-sm font-jp mb-1" style={{color:"#6ee7b7"}}>申し込みを受け付けました！</p>
+                  <p className="text-xs mb-4" style={{color:"rgba(52,211,153,0.70)"}}>担当者より銀行振込先などのご案内をお送りします。</p>
+                  <button onClick={()=>{setShowApplyModal(false);setApplyDone(false);}}
+                    className="rounded-xl px-5 py-2 text-sm font-semibold text-white"
+                    style={{background:"linear-gradient(135deg,#10b981,#34d399)"}}>閉じる</button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -752,16 +830,25 @@ export default function MemberDashboard({
                 boxShadow:`0 4px 16px rgba(10,22,40,0.18)`
               };
 
+              // VPphone判定：menuType or タイトルに「VP」「phone」が含まれる
+              const isVpPhone = m.menuType==="vp_phone"
+                || m.title.toLowerCase().includes("vp")
+                || m.title.toLowerCase().includes("phone")
+                || m.title.includes("携帯");
+              // 旅行判定：menuType or タイトルに「旅行」が含まれる
+              const isTravel = m.menuType==="travel_sub"
+                || m.title.includes("旅行");
+
               if(m.menuType==="contact") return (
                 <a key={m.id} href="/contact" className="rounded-2xl overflow-hidden transition-all hover:scale-[1.03] active:scale-95" style={cardStyle}>{cardContent}</a>
               );
               if(m.menuType==="used_car") return (
                 <a key={m.id} href="/used-cars" className="rounded-2xl overflow-hidden transition-all hover:scale-[1.03] active:scale-95" style={cardStyle}>{cardContent}</a>
               );
-              if(m.menuType==="vp_phone") return (
+              if(isVpPhone) return (
                 <a key={m.id} href="/vp-phone" className="rounded-2xl overflow-hidden transition-all hover:scale-[1.03] active:scale-95" style={cardStyle}>{cardContent}</a>
               );
-              if(m.menuType==="travel_sub"||m.title.includes("旅行")) return (
+              if(isTravel) return (
                 <button key={m.id} onClick={()=>travelSubRef.current?.openModal()} className="w-full rounded-2xl overflow-hidden transition-all hover:scale-[1.03] active:scale-95 text-left" style={cardStyle}>{cardContent}</button>
               );
               const href=m.linkUrl??"#";
