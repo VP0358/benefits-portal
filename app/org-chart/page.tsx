@@ -3,6 +3,17 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+// ── デザイントークン
+const GOLD       = "#c9a84c";
+const GOLD_LIGHT = "#e8c96a";
+const GOLD_DARK  = "#a88830";
+const ORANGE     = "#d4703a";
+const NAVY       = "#0a1628";
+const NAVY_CARD  = "#0d1e38";
+const NAVY_CARD2 = "#122444";
+const PAGE_BG    = "#eee8e0";
+const LINEN      = "#f5f0e8";
+
 /* ─── 型定義 ─── */
 type ContractInfo = {
   id: string;
@@ -36,124 +47,96 @@ type OrgChartData = {
   members: MemberNode[];
 };
 
-/* ─── ユーティリティ ─── */
 function fmtDate(iso: string | null) {
   if (!iso) return "—";
   const d = new Date(iso);
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function AvatarIcon({
-  avatarUrl,
-  name,
-  size = "md",
-}: {
-  avatarUrl: string | null;
-  name: string;
-  size?: "sm" | "md" | "lg";
-}) {
-  const sizeClass = size === "lg"
-    ? "w-16 h-16 text-3xl"
-    : size === "sm"
-    ? "w-8 h-8 text-base"
-    : "w-12 h-12 text-2xl";
-
+function AvatarIcon({ avatarUrl, name, size = "md" }: { avatarUrl: string | null; name: string; size?: "sm" | "md" | "lg" }) {
+  const sizeClass = size === "lg" ? "w-16 h-16 text-3xl" : size === "sm" ? "w-8 h-8 text-base" : "w-12 h-12 text-2xl";
   if (avatarUrl) {
-    return (
-      <img
-        src={avatarUrl}
-        alt={name}
-        className={`${sizeClass} rounded-full object-cover border-2 border-white shadow`}
-      />
-    );
+    return <img src={avatarUrl} alt={name} className={`${sizeClass} rounded-full object-cover`}
+      style={{ border: `2px solid ${GOLD}40` }} />;
   }
   return (
-    <div className={`${sizeClass} rounded-full bg-slate-200 flex items-center justify-center`}>
-      😊
+    <div className={`${sizeClass} rounded-full flex items-center justify-center`}
+      style={{ background: `linear-gradient(135deg,${NAVY_CARD},${NAVY_CARD2})`, border: `2px solid ${GOLD}30` }}>
+      <span>😊</span>
     </div>
   );
 }
 
-/* ─── 会員カード ─── */
 function MemberCard({ member, month, year }: { member: MemberNode; month: number; year: number }) {
   const [expanded, setExpanded] = useState(false);
 
-  // 支払い状態に応じた色・アイコン
   const payStatus = member.hasPaidThisMonth
-    ? { icon: "😊", label: "当月支払済", bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700" }
+    ? { dot: "#34d399", label: "当月支払済", accent: "#34d399" }
     : member.hasActiveContract
-    ? { icon: "😢", label: "当月未払い", bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700" }
-    : { icon: "💤", label: "契約なし", bg: "bg-slate-50", border: "border-slate-200", text: "text-slate-500" };
+    ? { dot: GOLD, label: "当月未払い", accent: GOLD }
+    : { dot: "rgba(255,255,255,0.2)", label: "契約なし", accent: "rgba(255,255,255,0.35)" };
 
   return (
-    <div className={`rounded-2xl border-2 ${payStatus.border} ${payStatus.bg} overflow-hidden transition-all`}>
-      {/* ヘッダー部分 */}
-      <button
-        className="w-full flex items-center gap-3 p-4 text-left"
-        onClick={() => setExpanded(!expanded)}
-      >
-        {/* アバター + 支払いアイコン */}
+    <div className="rounded-2xl overflow-hidden"
+      style={{ background: NAVY_CARD, border: `1px solid ${GOLD}18`, boxShadow: `0 4px 16px rgba(10,22,40,0.15)` }}>
+      <button className="w-full flex items-center gap-3 p-4 text-left transition"
+        style={{ background: expanded ? `${GOLD}06` : "transparent" }}
+        onClick={() => setExpanded(!expanded)}>
         <div className="relative flex-shrink-0">
           <AvatarIcon avatarUrl={member.avatarUrl} name={member.name} size="md" />
-          <span className="absolute -bottom-1 -right-1 text-lg leading-none">{payStatus.icon}</span>
+          <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2"
+            style={{ backgroundColor: payStatus.dot, borderColor: NAVY_CARD }} />
         </div>
-
-        {/* 名前・会員コード */}
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-slate-800 truncate">{member.name}</div>
-          <div className="text-xs text-slate-500">{member.memberCode}</div>
-          {/* 最初の契約プランを表示 */}
+          <p className="font-semibold font-jp text-sm" style={{ color: "rgba(255,255,255,0.88)" }}>{member.name}</p>
+          <p className="text-xs font-label mt-0.5" style={{ color: `${GOLD}50` }}># {member.memberCode}</p>
           {member.contracts[0] && (
-            <div className="text-xs text-slate-600 mt-0.5 truncate">
+            <p className="text-xs font-jp mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.40)" }}>
               📱 {member.contracts[0].planName}
-            </div>
+            </p>
           )}
         </div>
-
-        {/* 支払いバッジ */}
         <div className="flex-shrink-0 text-right">
-          <span className={`inline-block rounded-full border px-2 py-0.5 text-xs font-semibold ${payStatus.border} ${payStatus.text}`}>
-            {payStatus.icon} {payStatus.label}
+          <span className="inline-block text-xs px-2.5 py-0.5 rounded-full font-jp font-semibold"
+            style={{ background: `${payStatus.dot}18`, color: payStatus.accent, border: `1px solid ${payStatus.dot}35` }}>
+            {payStatus.label}
           </span>
-          <div className="mt-1 text-xs text-slate-400">
+          <p className="text-[10px] mt-1.5 font-label" style={{ color: `${GOLD}40` }}>
             {expanded ? "▲ 閉じる" : "▼ 詳細"}
-          </div>
+          </p>
         </div>
       </button>
 
-      {/* 展開時：契約詳細 */}
       {expanded && (
-        <div className="px-4 pb-4 border-t border-slate-100 space-y-2 bg-white/70">
+        <div className="px-4 pb-4" style={{ borderTop: `1px solid ${GOLD}10` }}>
           {member.contracts.length === 0 ? (
-            <p className="text-xs text-slate-400 py-3 text-center">有効な契約はありません</p>
+            <p className="text-xs font-jp py-3 text-center" style={{ color: "rgba(255,255,255,0.28)" }}>
+              有効な契約はありません
+            </p>
           ) : (
-            member.contracts.map((c) => (
-              <div
-                key={c.id}
-                className={`rounded-xl border p-3 ${
-                  c.isPaidThisMonth
-                    ? "border-emerald-200 bg-emerald-50"
-                    : "border-slate-200 bg-white"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="text-sm font-semibold text-slate-800">{c.planName}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      契約日: {fmtDate(c.startedAt)}
+            <div className="space-y-2 pt-3">
+              {member.contracts.map((c) => (
+                <div key={c.id} className="rounded-xl p-3"
+                  style={{ background: c.isPaidThisMonth ? "rgba(52,211,153,0.08)" : "rgba(255,255,255,0.03)", border: `1px solid ${c.isPaidThisMonth ? "rgba(52,211,153,0.25)" : `${GOLD}12`}` }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold font-jp" style={{ color: "rgba(255,255,255,0.82)" }}>{c.planName}</p>
+                      <p className="text-xs mt-0.5 font-jp" style={{ color: "rgba(255,255,255,0.30)" }}>
+                        契約日: {fmtDate(c.startedAt)}
+                      </p>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-slate-800">
-                      ¥{c.monthlyFee.toLocaleString()}<span className="text-xs font-normal">/月</span>
-                    </div>
-                    <div className={`text-xs font-semibold mt-0.5 ${c.isPaidThisMonth ? "text-emerald-600" : "text-amber-600"}`}>
-                      {c.isPaidThisMonth ? `😊 ${year}/${month}月 支払済` : `😢 ${year}/${month}月 未払い`}
+                    <div className="text-right">
+                      <p className="text-sm font-bold" style={{ color: "rgba(255,255,255,0.80)" }}>
+                        ¥{c.monthlyFee.toLocaleString()}<span className="text-xs font-normal" style={{ color: "rgba(255,255,255,0.30)" }}>/月</span>
+                      </p>
+                      <p className="text-xs font-semibold mt-0.5" style={{ color: c.isPaidThisMonth ? "#34d399" : GOLD }}>
+                        {c.isPaidThisMonth ? `✓ ${year}/${month}月 済` : `⚠ ${year}/${month}月 未払`}
+                      </p>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -161,7 +144,6 @@ function MemberCard({ member, month, year }: { member: MemberNode; month: number
   );
 }
 
-/* ─── メインページ ─── */
 export default function OrgChartPage() {
   const [data, setData] = useState<OrgChartData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -169,46 +151,63 @@ export default function OrgChartPage() {
 
   useEffect(() => {
     fetch("/api/my/org-chart")
-      .then((r) => {
-        if (!r.ok) throw new Error("取得に失敗しました");
-        return r.json();
-      })
+      .then((r) => { if (!r.ok) throw new Error("取得に失敗しました"); return r.json(); })
       .then(setData)
       .catch(() => setError("データを読み込めませんでした"))
       .finally(() => setLoading(false));
   }, []);
 
-  const paidCount = data?.members.filter((m) => m.hasPaidThisMonth).length ?? 0;
-  const unpaidCount = data?.members.filter((m) => !m.hasPaidThisMonth && m.hasActiveContract).length ?? 0;
+  const paidCount      = data?.members.filter((m) => m.hasPaidThisMonth).length ?? 0;
+  const unpaidCount    = data?.members.filter((m) => !m.hasPaidThisMonth && m.hasActiveContract).length ?? 0;
   const noContractCount = data?.members.filter((m) => !m.hasActiveContract).length ?? 0;
 
   return (
-    <div className="min-h-screen bg-[#e6f2dc] py-6 px-4">
-      <div className="mx-auto max-w-lg space-y-5">
+    <div className="min-h-screen pb-10" style={{ background: PAGE_BG }}>
 
-        {/* ヘッダー */}
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="text-slate-500 hover:text-slate-700 text-sm">
-            ← ダッシュボード
+      {/* 背景グロー */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
+        <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full opacity-[0.15]"
+          style={{ background: `radial-gradient(circle,${GOLD}55,transparent 70%)` }}/>
+        <div className="absolute bottom-20 -left-20 w-64 h-64 rounded-full opacity-[0.08]"
+          style={{ background: `radial-gradient(circle,${NAVY}33,transparent 70%)` }}/>
+      </div>
+
+      {/* ヘッダー */}
+      <header className="sticky top-0 z-20"
+        style={{ background: "rgba(245,240,232,0.96)", backdropFilter: "blur(20px) saturate(160%)", borderBottom: `1px solid rgba(201,168,76,0.22)`, boxShadow: "0 2px 16px rgba(10,22,40,0.08),0 1px 0 rgba(255,255,255,0.80) inset" }}>
+        <div className="max-w-lg mx-auto px-4 py-4 flex items-center gap-3">
+          <Link href="/dashboard" className="flex items-center gap-1.5 transition" style={{ color: "rgba(10,22,40,0.55)" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+            </svg>
+            <span className="text-sm font-jp">戻る</span>
           </Link>
-        </div>
-        <div className="rounded-3xl bg-white p-5 shadow-sm">
-          <h1 className="text-xl font-bold text-slate-800">🌳 直紹介 組織図</h1>
+          <div className="flex items-center gap-2 ml-1">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: GOLD }}>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <h1 className="text-base font-semibold font-jp" style={{ color: NAVY }}>直紹介 組織図</h1>
+          </div>
           {data && (
-            <p className="text-sm text-slate-500 mt-1">
-              {data.year}年{data.month}月 · 直紹介 {data.members.length}名
+            <p className="text-xs font-jp ml-auto" style={{ color: "rgba(10,22,40,0.40)" }}>
+              {data.year}年{data.month}月 · {data.members.length}名
             </p>
           )}
         </div>
+      </header>
+
+      <main className="max-w-lg mx-auto px-4 py-5 space-y-4 relative">
 
         {loading && (
-          <div className="rounded-3xl bg-white p-10 text-center text-slate-400 shadow-sm">
-            読み込み中...
+          <div className="rounded-2xl p-10 text-center" style={{ background: NAVY_CARD, border: `1px solid ${GOLD}18` }}>
+            <div className="w-8 h-8 border-2 rounded-full animate-spin mx-auto mb-3"
+              style={{ borderColor: `${GOLD}30`, borderTopColor: GOLD }}/>
+            <p className="text-sm font-jp" style={{ color: `${GOLD}70` }}>読み込み中...</p>
           </div>
         )}
 
         {error && (
-          <div className="rounded-3xl bg-red-50 border border-red-200 p-6 text-center text-red-600 text-sm shadow-sm">
+          <div className="rounded-2xl p-6 text-center text-sm" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.22)", color: "#f87171" }}>
             {error}
           </div>
         )}
@@ -216,111 +215,96 @@ export default function OrgChartPage() {
         {data && !loading && (
           <>
             {/* 当月サマリー */}
-            <div className="rounded-3xl bg-white p-5 shadow-sm">
-              <div className="text-xs font-semibold text-slate-500 mb-3">
-                {data.year}年{data.month}月 支払い状況まとめ
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-3 text-center">
-                  <div className="text-2xl mb-1">😊</div>
-                  <div className="text-xs text-emerald-700 font-semibold">支払済</div>
-                  <div className="text-xl font-bold text-emerald-700">{paidCount}</div>
-                  <div className="text-xs text-emerald-500">名</div>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: "支払済", count: paidCount,       dot: "#34d399", accent: "#34d399" },
+                { label: "未払い", count: unpaidCount,     dot: GOLD,      accent: GOLD },
+                { label: "契約なし",count: noContractCount, dot: "rgba(255,255,255,0.2)", accent: "rgba(255,255,255,0.45)" },
+              ].map(item => (
+                <div key={item.label} className="rounded-2xl p-3.5 text-center"
+                  style={{ background: NAVY_CARD, border: `1px solid ${item.dot}25`, boxShadow: `0 4px 12px rgba(10,22,40,0.12)` }}>
+                  <div className="w-2.5 h-2.5 rounded-full mx-auto mb-2" style={{ backgroundColor: item.dot }}/>
+                  <div className="text-2xl font-black" style={{ color: item.accent }}>{item.count}</div>
+                  <div className="text-[10px] font-jp mt-0.5" style={{ color: "rgba(255,255,255,0.38)" }}>{item.label}</div>
                 </div>
-                <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-center">
-                  <div className="text-2xl mb-1">😢</div>
-                  <div className="text-xs text-amber-700 font-semibold">未払い</div>
-                  <div className="text-xl font-bold text-amber-700">{unpaidCount}</div>
-                  <div className="text-xs text-amber-500">名</div>
-                </div>
-                <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3 text-center">
-                  <div className="text-2xl mb-1">💤</div>
-                  <div className="text-xs text-slate-500 font-semibold">契約なし</div>
-                  <div className="text-xl font-bold text-slate-600">{noContractCount}</div>
-                  <div className="text-xs text-slate-400">名</div>
-                </div>
-              </div>
+              ))}
             </div>
 
-            {/* 組織図本体 */}
-            <div className="rounded-3xl bg-white p-5 shadow-sm">
-
-              {/* 自分（頂点） */}
-              <div className="flex flex-col items-center mb-6">
+            {/* 自分（頂点）カード */}
+            <div className="rounded-3xl overflow-hidden"
+              style={{ background: `linear-gradient(150deg,${NAVY} 0%,${NAVY_CARD} 45%,${NAVY_CARD2} 100%)`, border: `1px solid ${GOLD}35`, boxShadow: `0 16px 48px rgba(10,22,40,0.28)` }}>
+              <div className="h-px" style={{ background: `linear-gradient(90deg,transparent,${GOLD}90 30%,${GOLD_LIGHT} 50%,${GOLD}90 70%,transparent)` }}/>
+              <div className="p-5 flex items-center gap-4">
                 <div className="relative">
-                  <div className="w-20 h-20 rounded-full bg-violet-100 flex items-center justify-center border-4 border-violet-300 shadow-md overflow-hidden">
-                    {data.me.avatarUrl ? (
-                      <img src={data.me.avatarUrl} alt={data.me.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-4xl">😊</span>
-                    )}
+                  <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center text-3xl"
+                    style={{ background: `linear-gradient(135deg,${GOLD}22,${ORANGE}12)`, border: `2px solid ${GOLD}45` }}>
+                    {data.me.avatarUrl
+                      ? <img src={data.me.avatarUrl} alt={data.me.name} className="w-full h-full object-cover"/>
+                      : <span>😊</span>
+                    }
                   </div>
-                  <span className="absolute -top-1 -right-1 bg-violet-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">YOU</span>
+                  <span className="absolute -top-1.5 -right-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                    style={{ background: `linear-gradient(135deg,${GOLD},${ORANGE})`, color: "white" }}>YOU</span>
                 </div>
-                <div className="mt-2 text-center">
-                  <div className="font-bold text-slate-800">{data.me.name}</div>
-                  <div className="text-xs text-slate-500">{data.me.memberCode}</div>
+                <div>
+                  <p className="font-label text-[9px] tracking-[0.22em] mb-0.5" style={{ color: `${GOLD}70` }}>ORGANIZER</p>
+                  <p className="font-jp font-bold text-white text-lg leading-tight">{data.me.name}</p>
+                  <p className="text-xs font-label mt-0.5" style={{ color: `${GOLD}50` }}># {data.me.memberCode}</p>
                 </div>
               </div>
-
-              {/* 矢印・ライン */}
-              {data.members.length > 0 && (
-                <div className="flex justify-center mb-4">
-                  <div className="flex flex-col items-center">
-                    <div className="w-0.5 h-8 bg-slate-300"></div>
-                    <div className="text-slate-400 text-sm">▼</div>
-                    <div className="text-xs text-slate-400 mb-2">直紹介メンバー</div>
-                  </div>
-                </div>
-              )}
-
-              {/* 紹介メンバー一覧 */}
-              {data.members.length === 0 ? (
-                <div className="rounded-2xl border-2 border-dashed border-slate-200 p-10 text-center">
-                  <div className="text-3xl mb-2">🌱</div>
-                  <div className="text-sm text-slate-500">まだ直紹介したメンバーがいません</div>
-                  <Link
-                    href="/referral"
-                    className="mt-3 inline-block rounded-xl bg-violet-500 text-white px-4 py-2 text-sm font-semibold"
-                  >
-                    友達を紹介する →
-                  </Link>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {data.members.map((member) => (
-                    <MemberCard
-                      key={member.id}
-                      member={member}
-                      month={data.month}
-                      year={data.year}
-                    />
-                  ))}
-                </div>
-              )}
             </div>
+
+            {/* 接続ライン */}
+            {data.members.length > 0 && (
+              <div className="flex justify-center -my-1">
+                <div className="flex flex-col items-center gap-1">
+                  <div className="w-px h-6" style={{ background: `linear-gradient(180deg,${GOLD}60,${GOLD}20)` }}/>
+                  <p className="text-[10px] font-label tracking-widest" style={{ color: `${GOLD}50` }}>DIRECT</p>
+                  <div className="w-px h-4" style={{ background: `linear-gradient(180deg,${GOLD}20,transparent)` }}/>
+                </div>
+              </div>
+            )}
+
+            {/* メンバー一覧 */}
+            {data.members.length === 0 ? (
+              <div className="rounded-2xl p-10 text-center"
+                style={{ background: NAVY_CARD, border: `2px dashed ${GOLD}18` }}>
+                <div className="text-3xl mb-3">🌱</div>
+                <p className="text-sm font-jp mb-4" style={{ color: "rgba(255,255,255,0.40)" }}>まだ直紹介したメンバーがいません</p>
+                <Link href="/referral"
+                  className="inline-block px-4 py-2 rounded-xl text-sm font-semibold font-jp transition"
+                  style={{ background: `linear-gradient(135deg,${GOLD},${ORANGE})`, color: "white" }}>
+                  友達を紹介する →
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {data.members.map((member) => (
+                  <MemberCard key={member.id} member={member} month={data.month} year={data.year} />
+                ))}
+              </div>
+            )}
 
             {/* 凡例 */}
-            <div className="rounded-3xl bg-white p-4 shadow-sm">
-              <div className="text-xs font-semibold text-slate-500 mb-2">凡例</div>
-              <div className="space-y-1.5 text-xs text-slate-600">
-                <div className="flex items-center gap-2">
-                  <span>😊</span>
-                  <span className="text-emerald-700">当月の携帯料金 支払い完了</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span>😢</span>
-                  <span className="text-amber-700">当月の携帯料金 未払い（有効契約あり）</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span>💤</span>
-                  <span className="text-slate-500">有効な携帯契約なし</span>
-                </div>
+            <div className="rounded-2xl p-4"
+              style={{ background: LINEN, border: "1px solid rgba(201,168,76,0.18)" }}>
+              <p className="text-[9px] font-label tracking-widest mb-3" style={{ color: GOLD_DARK }}>LEGEND</p>
+              <div className="space-y-2">
+                {[
+                  { dot: "#34d399",                  label: "当月の携帯料金 支払い完了" },
+                  { dot: GOLD,                       label: "当月の携帯料金 未払い（有効契約あり）" },
+                  { dot: "rgba(10,22,40,0.20)",      label: "有効な携帯契約なし" },
+                ].map(item => (
+                  <div key={item.label} className="flex items-center gap-2.5">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.dot }}/>
+                    <span className="text-xs font-jp" style={{ color: "rgba(10,22,40,0.60)" }}>{item.label}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </>
         )}
-      </div>
+      </main>
     </div>
   );
 }

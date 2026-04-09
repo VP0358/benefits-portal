@@ -3,6 +3,16 @@
 import { useState, FormEvent } from "react";
 import Link from "next/link";
 
+// ── デザイントークン
+const GOLD       = "#c9a84c";
+const GOLD_LIGHT = "#e8c96a";
+const ORANGE     = "#d4703a";
+const NAVY       = "#0a1628";
+const NAVY_CARD  = "#0d1e38";
+const NAVY_CARD2 = "#122444";
+const PAGE_BG    = "#eee8e0";
+const LINEN      = "#f5f0e8";
+
 type ApplicationData = {
   id: string;
   nameKanji: string;
@@ -438,21 +448,38 @@ export default function VpPhoneClient({
   const headerSub   = hasActiveApp ? "ご契約内容の確認・変更・解約" : "VP未来phone申し込みフォーム";
 
   return (
-    <div className="min-h-screen bg-[#e6f2dc] pb-16">
+    <div className="min-h-screen pb-16" style={{ background: PAGE_BG }}>
+
+      {/* 背景グロー */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
+        <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full opacity-[0.13]"
+          style={{ background: `radial-gradient(circle,${GOLD}55,transparent 70%)` }}/>
+      </div>
 
       {/* ヘッダー */}
-      <header className="sticky top-0 z-30 bg-white shadow-sm flex items-center gap-3 px-4 py-3">
-        <Link href="/dashboard" className="text-gray-700 text-lg hover:text-gray-700">←</Link>
-        <div className="flex items-center gap-2">
-          <span className="text-xl">📱</span>
-          <div>
-            <h1 className="font-bold text-green-800 text-sm leading-none">{headerTitle}</h1>
-            <p className="text-[10px] text-gray-700 mt-0.5">{headerSub}</p>
+      <header className="sticky top-0 z-30"
+        style={{ background: "rgba(245,240,232,0.96)", backdropFilter: "blur(20px) saturate(160%)", borderBottom: `1px solid rgba(201,168,76,0.22)`, boxShadow: "0 2px 16px rgba(10,22,40,0.08),0 1px 0 rgba(255,255,255,0.80) inset" }}>
+        <div className="max-w-md mx-auto px-4 py-4 flex items-center gap-3">
+          <Link href="/dashboard" className="flex items-center gap-1.5 transition" style={{ color: "rgba(10,22,40,0.55)" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+            </svg>
+            <span className="text-sm font-jp">戻る</span>
+          </Link>
+          <div className="flex items-center gap-2 ml-1">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: "#6ee7b7" }}>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+            </svg>
+            <div>
+              <h1 className="font-semibold font-jp text-sm leading-none" style={{ color: NAVY }}>{headerTitle}</h1>
+              <p className="text-[10px] font-jp mt-0.5" style={{ color: `${NAVY}55` }}>{headerSub}</p>
+            </div>
           </div>
+          <div className="flex-1 h-px ml-2" style={{ background: "linear-gradient(90deg,rgba(110,231,183,0.35),transparent)" }}/>
         </div>
       </header>
 
-      <main className="max-w-md mx-auto px-4 pt-5 space-y-4">
+      <main className="max-w-md mx-auto px-4 pt-5 space-y-4 relative">
 
         {/* ━━━ ① 申込済みの場合 → 内容確認・変更・解約 ━━━ */}
         {hasActiveApp && !submitted && (
@@ -461,17 +488,22 @@ export default function VpPhoneClient({
 
         {/* ━━━ ② 申込完了後のサンクス画面 ━━━ */}
         {submitted && (
-          <div className="rounded-2xl bg-emerald-50 border-2 border-emerald-300 p-6 text-center shadow">
-            <div className="text-4xl mb-3">🎉</div>
-            <h2 className="text-lg font-bold text-emerald-800 mb-2">申し込みが完了しました！</h2>
-            <p className="text-sm text-emerald-700 mb-4">
-              VP未来phone 申し込みを受け付けました。<br />
-              担当者より順次ご連絡いたします。
-            </p>
-            <Link href="/dashboard"
-              className="inline-block rounded-xl bg-green-600 text-white px-6 py-2.5 text-sm font-bold hover:bg-green-700 transition">
-              ホームに戻る
-            </Link>
+          <div className="rounded-3xl overflow-hidden"
+            style={{ background: `linear-gradient(150deg,${NAVY_CARD} 0%,${NAVY_CARD2} 100%)`, border: "1px solid rgba(52,211,153,0.35)", boxShadow: "0 12px 40px rgba(10,22,40,0.22)" }}>
+            <div className="h-0.5" style={{ background: "linear-gradient(90deg,transparent,rgba(52,211,153,0.9) 50%,transparent)" }}/>
+            <div className="p-8 text-center">
+              <div className="text-4xl mb-4">🎉</div>
+              <h2 className="text-lg font-bold font-jp mb-2" style={{ color: "#34d399" }}>申し込みが完了しました！</h2>
+              <p className="text-sm font-jp mb-5" style={{ color: "rgba(255,255,255,0.65)" }}>
+                VP未来phone 申し込みを受け付けました。<br />
+                担当者より順次ご連絡いたします。
+              </p>
+              <Link href="/dashboard"
+                className="inline-block rounded-xl px-6 py-2.5 text-sm font-bold text-white"
+                style={{ background: "linear-gradient(135deg,#10b981,#34d399)" }}>
+                ホームに戻る
+              </Link>
+            </div>
           </div>
         )}
 
