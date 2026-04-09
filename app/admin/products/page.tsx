@@ -168,10 +168,13 @@ export default function ProductsManagementPage() {
     }
   };
 
+  // 消費税額（10%）
+  const taxAmount = (price: number) => Math.floor(price * 0.1);
+
   // 税込価格計算
   const taxIncludedPrice = (price: number) => Math.floor(price * 1.1);
 
-  // ポイント表示（1pt = ¥100）
+  // ポイント表示（税抜価格から 1pt = ¥100）
   const calculatePoints = (price: number) => Math.floor(price / 100);
 
   return (
@@ -219,11 +222,12 @@ export default function ProductsManagementPage() {
                   <tr>
                     <th className="text-left p-3 font-semibold text-gray-700">商品コード</th>
                     <th className="text-left p-3 font-semibold text-gray-700">商品名</th>
-                    <th className="text-left p-3 font-semibold text-gray-700">価格（税抜）</th>
-                    <th className="text-left p-3 font-semibold text-gray-700">税込価格</th>
-                    <th className="text-left p-3 font-semibold text-gray-700">ポイント</th>
-                    <th className="text-left p-3 font-semibold text-gray-700">原価</th>
-                    <th className="text-left p-3 font-semibold text-gray-700">PV</th>
+                    <th className="text-right p-3 font-semibold text-gray-700">税抜価格</th>
+                    <th className="text-right p-3 font-semibold text-gray-700">消費税（10%）</th>
+                    <th className="text-right p-3 font-semibold text-gray-700">税込価格</th>
+                    <th className="text-right p-3 font-semibold text-gray-700">ポイント</th>
+                    <th className="text-right p-3 font-semibold text-gray-700">原価</th>
+                    <th className="text-right p-3 font-semibold text-gray-700">PV</th>
                     <th className="text-left p-3 font-semibold text-gray-700">ステータス</th>
                     <th className="text-left p-3 font-semibold text-gray-700">操作</th>
                   </tr>
@@ -231,7 +235,7 @@ export default function ProductsManagementPage() {
                 <tbody>
                   {products.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="text-center py-8 text-gray-600">
+                      <td colSpan={10} className="text-center py-8 text-gray-600">
                         商品が登録されていません
                       </td>
                     </tr>
@@ -245,17 +249,26 @@ export default function ProductsManagementPage() {
                             <p className="text-xs text-gray-500 mt-0.5">{p.description}</p>
                           )}
                         </td>
-                        <td className="p-3 text-gray-800">¥{p.price.toLocaleString()}</td>
-                        <td className="p-3 text-gray-600 text-xs">
+                        {/* 税抜価格 */}
+                        <td className="p-3 text-right text-gray-800 font-medium">
+                          ¥{p.price.toLocaleString()}
+                        </td>
+                        {/* 消費税（10%） */}
+                        <td className="p-3 text-right text-gray-500 text-xs">
+                          ¥{taxAmount(p.price).toLocaleString()}
+                        </td>
+                        {/* 税込価格 */}
+                        <td className="p-3 text-right text-gray-700 font-semibold">
                           ¥{taxIncludedPrice(p.price).toLocaleString()}
                         </td>
-                        <td className="p-3 font-semibold text-green-600">
+                        {/* ポイント（税抜から計算） */}
+                        <td className="p-3 text-right font-semibold text-green-600">
                           {calculatePoints(p.price)} pt
                         </td>
-                        <td className="p-3 text-gray-600">
+                        <td className="p-3 text-right text-gray-600">
                           {p.cost ? `¥${p.cost.toLocaleString()}` : "-"}
                         </td>
-                        <td className="p-3 text-gray-700">{p.pv}</td>
+                        <td className="p-3 text-right text-gray-700">{p.pv}</td>
                         <td className="p-3">
                           <span
                             className={`inline-block px-2 py-1 text-xs font-semibold rounded ${
@@ -369,7 +382,7 @@ export default function ProductsManagementPage() {
               {/* 価格（税抜） */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  価格（税抜） <span className="text-red-500">*</span>
+                  税抜価格 <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -379,11 +392,21 @@ export default function ProductsManagementPage() {
                   placeholder="15000"
                   min="0"
                 />
-                {formData.price && (
-                  <p className="text-xs text-gray-600 mt-1">
-                    税込価格: ¥{taxIncludedPrice(parseFloat(formData.price) || 0).toLocaleString()} / 
-                    ポイント: {calculatePoints(parseFloat(formData.price) || 0)} pt
-                  </p>
+                {formData.price && parseFloat(formData.price) > 0 && (
+                  <div className="mt-2 rounded-lg bg-gray-50 border border-gray-200 px-3 py-2 text-xs text-gray-700 space-y-1">
+                    <div className="flex justify-between">
+                      <span>消費税（10%）</span>
+                      <span>¥{taxAmount(parseFloat(formData.price) || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold">
+                      <span>税込価格</span>
+                      <span>¥{taxIncludedPrice(parseFloat(formData.price) || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-green-700 font-semibold border-t border-gray-200 pt-1">
+                      <span>ポイント（税抜から計算）</span>
+                      <span>{calculatePoints(parseFloat(formData.price) || 0)} pt</span>
+                    </div>
+                  </div>
                 )}
               </div>
 
