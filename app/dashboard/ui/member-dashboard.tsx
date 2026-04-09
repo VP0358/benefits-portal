@@ -944,7 +944,7 @@ export default function MemberDashboard({
               </div>
               <div className="h-2 bg-white/30 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-purple-400 rounded-full transition-all duration-500"
+                  className="h-full bg-orange-400 rounded-full transition-all duration-500"
                   style={{ width: `${Math.min((dashboardPoints.mlmLastMonthPoints / 10000) * 100, 100)}%` }}
                 />
               </div>
@@ -961,7 +961,7 @@ export default function MemberDashboard({
               </div>
               <div className="h-2 bg-white/30 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-pink-400 rounded-full transition-all duration-500"
+                  className="h-full bg-blue-400 rounded-full transition-all duration-500"
                   style={{ width: `${Math.min((dashboardPoints.mlmCurrentMonthPoints / 10000) * 100, 100)}%` }}
                 />
               </div>
@@ -978,7 +978,7 @@ export default function MemberDashboard({
               </div>
               <div className="h-2 bg-white/30 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-blue-400 rounded-full transition-all duration-500"
+                  className="h-full bg-green-400 rounded-full transition-all duration-500"
                   style={{ width: `${Math.min((dashboardPoints.savingsBonusPoints / 10000) * 100, 100)}%` }}
                 />
               </div>
@@ -995,7 +995,7 @@ export default function MemberDashboard({
               </div>
               <div className="h-2 bg-white/30 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-orange-400 rounded-full transition-all duration-500"
+                  className="h-full bg-purple-400 rounded-full transition-all duration-500"
                   style={{ width: `${Math.min((dashboardPoints.mobileReferralPoints / 10000) * 100, 100)}%` }}
                 />
               </div>
