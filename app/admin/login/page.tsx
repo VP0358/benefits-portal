@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { adminLoginAction } from "./actions";
 
 export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
@@ -13,40 +14,17 @@ export default function AdminLoginPage() {
     setError("");
 
     try {
-      const csrfRes   = await fetch("/api/auth/csrf");
-      const csrfData  = await csrfRes.json();
-      const csrfToken = csrfData.csrfToken ?? "";
+      const result = await adminLoginAction(form.email, form.password);
 
-      await fetch("/api/auth/callback/credentials", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          email:       form.email,
-          password:    form.password,
-          csrfToken,
-          callbackUrl: "/",
-          json:        "true",
-        }).toString(),
-        redirect: "manual",
-      });
-
-      await new Promise((r) => setTimeout(r, 500));
-      const sessionRes = await fetch("/api/auth/session", { cache: "no-store" });
-      const session    = await sessionRes.json();
-
-      if (!session?.user) {
-        setError("メールアドレスまたはパスワードが正しくありません。");
+      if (!result.success) {
+        setError(result.error ?? "ログインに失敗しました。");
         setLoading(false);
         return;
       }
 
-      if (session.user.role !== "admin") {
-        setError("管理者アカウントではありません。");
-        setLoading(false);
-        return;
-      }
-
-      window.location.replace("/admin/dashboard");
+      // ログイン成功 → ページ全体リロードでセッションCookieを確実に反映
+      // app/page.tsx がロールに応じて /admin へ振り分ける
+      window.location.href = "/";
     } catch (err) {
       console.error("Admin login error:", err);
       setError("ログインに失敗しました。もう一度お試しください。");
