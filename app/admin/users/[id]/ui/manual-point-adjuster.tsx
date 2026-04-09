@@ -6,7 +6,7 @@ export default function ManualPointAdjuster({ userId }: { userId: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [form, setForm] = useState({ pointSourceType: "manual", mode: "add", points: 0, description: "" });
+  const [form, setForm] = useState({ pointSourceType: "external", mode: "add", points: 0, description: "" });
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -25,17 +25,17 @@ export default function ManualPointAdjuster({ userId }: { userId: string }) {
       return;
     }
     setSuccess("ポイントを更新しました。ページを再読み込みすると残高に反映されます。");
-    setForm({ pointSourceType: "manual", mode: "add", points: 0, description: "" });
+    setForm({ pointSourceType: "external", mode: "add", points: 0, description: "" });
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <label className="mb-1 block text-sm font-medium">ポイント区分</label>
+          <label className="mb-1 block text-sm font-medium">SAVpt 区分</label>
           <select className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={form.pointSourceType} onChange={e => setForm({ ...form, pointSourceType: e.target.value })}>
-            <option value="manual">手動ポイント</option>
-            <option value="external">外部ポイント</option>
+            <option value="external">SAVpt（自動反映・オートシップ）</option>
+            <option value="manual">SAVpt（手動調整）</option>
           </select>
         </div>
         <div>
@@ -51,7 +51,7 @@ export default function ManualPointAdjuster({ userId }: { userId: string }) {
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">理由</label>
-          <input required placeholder="例: 外部ポイント反映" className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+          <input required placeholder="例: 貯金ボーナス付与" className="w-full rounded-xl border px-4 py-3 text-sm font-medium text-slate-800" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
         </div>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}

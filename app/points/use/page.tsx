@@ -15,67 +15,86 @@ const NAVY_CARD3 = "#162c50";
 const PAGE_BG    = "#eee8e0";
 const LINEN      = "#f5f0e8";
 
-// ポイント種別の正しい対応:
-// auto     = MPIpt（VP未来phone月次紹介ポイント） ← monthly-grant で自動付与
-// external = SAVpt（貯金ボーナス）              ← オートシップSAVボーナスで付与
-// manual   = 手動pt（管理者手動調整ポイント）    ← 管理者が手動で付与・調整
+// ── ポイント種別の定義 ──────────────────────────────────────────────
+//
+//  MPIpt  = auto           … VP未来phone月次紹介ポイント（monthly-grant で自動付与）
+//  SAVpt  = external + manual … 貯金ボーナス
+//             external: オートシップ決済時に自動付与
+//             manual  : 管理者が手動で付与・調整
+//           → フロントではこの2つを合算して「SAVpt」として表示・利用
+//
+// 利用時の消費順序: SAVpt利用 → externalPointsBalance を先に消費、
+//                  足りなければ manualPointsBalance から補充
+//
 type Wallet = {
   availablePointsBalance: number;
-  autoPointsBalance: number;     // MPIpt: VP未来phone月次紹介ポイント
-  manualPointsBalance: number;   // 手動pt: 管理者手動調整ポイント
-  externalPointsBalance: number; // SAVpt: 貯金ボーナス（オートシップ）
+  autoPointsBalance:     number; // MPIpt
+  manualPointsBalance:   number; // SAVpt の一部（手動付与分）
+  externalPointsBalance: number; // SAVpt の一部（オートシップ自動付与分）
 };
 
-// 選択できるポイント種別
-type PointType = "mpi" | "sav" | "manual";
+type PointType = "mpi" | "sav";
 
-const POINT_TYPES: Record<PointType, { label: string; sublabel: string; color: string; bg: string; border: string; checkColor: string }> = {
-  mpi:    { label: "MPIpt",  sublabel: "VP未来phone月次紹介ポイント", color: "#6ee7b7",       bg: "rgba(110,231,183,0.08)", border: "rgba(110,231,183,0.35)",    checkColor: "#6ee7b7" },
-  sav:    { label: "SAVpt",  sublabel: "貯金ボーナス（オートシップ）", color: GOLD_LIGHT,      bg: `${GOLD}12`,              border: `${GOLD}45`,                checkColor: GOLD },
-  manual: { label: "手動pt", sublabel: "管理者手動調整ポイント",      color: "#c4b5fd",       bg: "rgba(196,181,253,0.08)", border: "rgba(196,181,253,0.32)",   checkColor: "#c4b5fd" },
+const POINT_TYPES: Record<PointType, {
+  label: string; sublabel: string;
+  color: string; bg: string; border: string; checkColor: string;
+}> = {
+  mpi: {
+    label: "MPIpt",
+    sublabel: "VP未来phone 月次紹介",
+    color: "#6ee7b7",
+    bg: "rgba(110,231,183,0.08)",
+    border: "rgba(110,231,183,0.35)",
+    checkColor: "#6ee7b7",
+  },
+  sav: {
+    label: "SAVpt",
+    sublabel: "貯金ボーナス",
+    color: GOLD_LIGHT,
+    bg: `${GOLD}12`,
+    border: `${GOLD}45`,
+    checkColor: GOLD,
+  },
 };
 
 export default function UsePointsPage() {
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [loading, setLoading]     = useState(false);
+  const [message, setMessage]     = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
-  const [wallet, setWallet] = useState<Wallet | null>(null);
-
-  // 選択中ポイント種別
+  const [wallet, setWallet]       = useState<Wallet | null>(null);
   const [selectedType, setSelectedType] = useState<PointType>("mpi");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount]       = useState("");
   const [description, setDescription] = useState("");
 
   useEffect(() => {
     fetch("/api/member/wallet").then(r => r.json()).then(d => setWallet(d)).catch(() => {});
   }, []);
 
-  const mpiPt    = wallet?.autoPointsBalance     ?? 0;  // VP未来phone月次紹介
-  const savPt    = wallet?.externalPointsBalance  ?? 0;  // 貯金ボーナス
-  const manualPt = wallet?.manualPointsBalance    ?? 0;  // 管理者手動調整
-  const totalPt  = wallet?.availablePointsBalance ?? 0;
+  // MPIpt = autoPointsBalance
+  const mpiPt = wallet?.autoPointsBalance ?? 0;
+  // SAVpt = external + manual の合算
+  const savPt = (wallet?.externalPointsBalance ?? 0) + (wallet?.manualPointsBalance ?? 0);
+  const totalPt = wallet?.availablePointsBalance ?? 0;
 
-  const balanceMap: Record<PointType, number> = { mpi: mpiPt, sav: savPt, manual: manualPt };
-
+  const balanceMap: Record<PointType, number> = { mpi: mpiPt, sav: savPt };
   const currentBalance = balanceMap[selectedType];
   const inputAmt = parseInt(amount) || 0;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!inputAmt || inputAmt <= 0) { setMessage("利用ポイントを入力してください"); return; }
-    if (inputAmt > currentBalance) { setMessage("選択したポイントの残高を超えています"); return; }
+    if (inputAmt > currentBalance)  { setMessage("選択したポイントの残高を超えています"); return; }
     setLoading(true); setMessage("");
-    const defaultDesc = {
-      mpi:    "VP未来phone月次紹介ポイント利用",
-      sav:    "貯金ボーナスポイント利用",
-      manual: "手動調整ポイント利用",
-    }[selectedType];
+    const defaultDesc = selectedType === "mpi"
+      ? "VP未来phone月次紹介ポイント利用"
+      : "貯金ボーナスポイント利用";
     try {
       const res = await fetch("/api/member/points/use", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: inputAmt,
+          pointType: selectedType,          // "mpi" | "sav" をAPIに渡す
           description: description || defaultDesc,
         }),
       });
@@ -86,13 +105,23 @@ export default function UsePointsPage() {
         setAmount(""); setDescription("");
         // 残高をローカル更新
         if (wallet) {
-          setWallet({
-            ...wallet,
-            autoPointsBalance:     selectedType === "mpi"    ? Math.max(0, wallet.autoPointsBalance     - inputAmt) : wallet.autoPointsBalance,
-            externalPointsBalance: selectedType === "sav"    ? Math.max(0, wallet.externalPointsBalance - inputAmt) : wallet.externalPointsBalance,
-            manualPointsBalance:   selectedType === "manual" ? Math.max(0, wallet.manualPointsBalance   - inputAmt) : wallet.manualPointsBalance,
-            availablePointsBalance: Math.max(0, wallet.availablePointsBalance - inputAmt),
-          });
+          if (selectedType === "mpi") {
+            setWallet({
+              ...wallet,
+              autoPointsBalance: Math.max(0, wallet.autoPointsBalance - inputAmt),
+              availablePointsBalance: Math.max(0, wallet.availablePointsBalance - inputAmt),
+            });
+          } else {
+            // SAVpt: external から先に消費、不足分は manual から
+            const extUse  = Math.min(wallet.externalPointsBalance, inputAmt);
+            const manUse  = inputAmt - extUse;
+            setWallet({
+              ...wallet,
+              externalPointsBalance: Math.max(0, wallet.externalPointsBalance - extUse),
+              manualPointsBalance:   Math.max(0, wallet.manualPointsBalance   - manUse),
+              availablePointsBalance: Math.max(0, wallet.availablePointsBalance - inputAmt),
+            });
+          }
         }
       } else {
         setIsSuccess(false);
@@ -124,7 +153,7 @@ export default function UsePointsPage() {
             <span className="text-sm font-jp">戻る</span>
           </Link>
           <div className="flex items-center gap-2 ml-1">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${NAVY}` }}>
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: NAVY }}>
               <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: GOLD }}>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
               </svg>
@@ -154,76 +183,86 @@ export default function UsePointsPage() {
               <span className="font-label text-sm mb-2" style={{ color: `${GOLD}80` }}>pt</span>
             </div>
 
-            {/* MPIpt / SAVpt / 手動pt の3枠 */}
-            <div className="grid grid-cols-3 gap-2">
-              {/* MPIpt: VP未来phone月次紹介ポイント */}
-              <div className="rounded-2xl p-3 relative overflow-hidden"
+            {/* MPIpt / SAVpt の2枠 */}
+            <div className="grid grid-cols-2 gap-3">
+
+              {/* MPIpt */}
+              <div className="rounded-2xl p-3.5 relative overflow-hidden"
                 style={{ background: "rgba(110,231,183,0.08)", border: "1px solid rgba(110,231,183,0.22)" }}>
-                <div className="absolute top-0 right-0 w-12 h-12 rounded-full opacity-[0.05]"
-                  style={{ background: "#6ee7b7", transform: "translate(25%,-25%)" }}/>
-                <p className="font-label text-[7px] tracking-[0.18em] font-bold mb-0.5" style={{ color: "rgba(110,231,183,0.65)" }}>MPIpt</p>
-                <p className="font-jp text-[8px] mb-1.5 leading-tight" style={{ color: "rgba(110,231,183,0.60)" }}>携帯紹介</p>
-                <div className="flex items-end gap-0.5">
-                  <span className="text-lg font-black text-white">{wallet === null ? "—" : mpiPt.toLocaleString()}</span>
-                  <span className="text-[9px] mb-0.5 font-label" style={{ color: "rgba(110,231,183,0.55)" }}>pt</span>
+                <div className="absolute top-0 right-0 w-16 h-16 rounded-full opacity-[0.05]"
+                  style={{ background: "#6ee7b7", transform: "translate(30%,-30%)" }}/>
+                <p className="font-label text-[8px] tracking-[0.20em] font-bold mb-0.5" style={{ color: "rgba(110,231,183,0.65)" }}>MPIpt</p>
+                <p className="font-jp text-[9px] mb-2 leading-tight" style={{ color: "rgba(110,231,183,0.55)" }}>VP未来phone 月次紹介ポイント</p>
+                <div className="flex items-end gap-1">
+                  <span className="text-2xl font-black text-white">{wallet === null ? "—" : mpiPt.toLocaleString()}</span>
+                  <span className="text-[10px] mb-0.5 font-label" style={{ color: "rgba(110,231,183,0.55)" }}>pt</span>
                 </div>
               </div>
 
-              {/* SAVpt: 貯金ボーナス（オートシップ） */}
-              <div className="rounded-2xl p-3 relative overflow-hidden"
-                style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}25` }}>
-                <div className="absolute top-0 right-0 w-12 h-12 rounded-full opacity-[0.05]"
-                  style={{ background: GOLD, transform: "translate(25%,-25%)" }}/>
-                <p className="font-label text-[7px] tracking-[0.18em] font-bold mb-0.5" style={{ color: `${GOLD}65` }}>SAVpt</p>
-                <p className="font-jp text-[8px] mb-1.5 leading-tight" style={{ color: `${GOLD}60` }}>貯金ボーナス</p>
-                <div className="flex items-end gap-0.5">
-                  <span className="text-lg font-black text-white">{wallet === null ? "—" : savPt.toLocaleString()}</span>
-                  <span className="text-[9px] mb-0.5 font-label" style={{ color: `${GOLD}55` }}>pt</span>
+              {/* SAVpt（external + manual の合算） */}
+              <div className="rounded-2xl p-3.5 relative overflow-hidden"
+                style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}28` }}>
+                <div className="absolute top-0 right-0 w-16 h-16 rounded-full opacity-[0.05]"
+                  style={{ background: GOLD, transform: "translate(30%,-30%)" }}/>
+                <p className="font-label text-[8px] tracking-[0.20em] font-bold mb-0.5" style={{ color: `${GOLD}65` }}>SAVpt</p>
+                <p className="font-jp text-[9px] mb-2 leading-tight" style={{ color: `${GOLD}55` }}>貯金ボーナス</p>
+                <div className="flex items-end gap-1">
+                  <span className="text-2xl font-black text-white">{wallet === null ? "—" : savPt.toLocaleString()}</span>
+                  <span className="text-[10px] mb-0.5 font-label" style={{ color: `${GOLD}55` }}>pt</span>
                 </div>
-              </div>
-
-              {/* 手動pt: 管理者手動調整 */}
-              <div className="rounded-2xl p-3 relative overflow-hidden"
-                style={{ background: "rgba(196,181,253,0.07)", border: "1px solid rgba(196,181,253,0.20)" }}>
-                <div className="absolute top-0 right-0 w-12 h-12 rounded-full opacity-[0.04]"
-                  style={{ background: "#c4b5fd", transform: "translate(25%,-25%)" }}/>
-                <p className="font-label text-[7px] tracking-[0.18em] font-bold mb-0.5" style={{ color: "rgba(196,181,253,0.60)" }}>手動pt</p>
-                <p className="font-jp text-[8px] mb-1.5 leading-tight" style={{ color: "rgba(196,181,253,0.55)" }}>手動調整</p>
-                <div className="flex items-end gap-0.5">
-                  <span className="text-lg font-black text-white">{wallet === null ? "—" : manualPt.toLocaleString()}</span>
-                  <span className="text-[9px] mb-0.5 font-label" style={{ color: "rgba(196,181,253,0.50)" }}>pt</span>
-                </div>
+                {/* 内訳（自動+手動） */}
+                {wallet !== null && (
+                  <div className="mt-2 pt-2 flex gap-3" style={{ borderTop: `1px solid ${GOLD}15` }}>
+                    <p className="text-[8px] font-jp" style={{ color: `${GOLD}50` }}>
+                      自動: <span className="font-bold" style={{ color: `${GOLD}75` }}>{wallet.externalPointsBalance.toLocaleString()}pt</span>
+                    </p>
+                    <p className="text-[8px] font-jp" style={{ color: `${GOLD}50` }}>
+                      手動: <span className="font-bold" style={{ color: `${GOLD}75` }}>{wallet.manualPointsBalance.toLocaleString()}pt</span>
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
 
-        {/* ── ポイント種別タブ選択 ── */}
+        {/* ── ポイント種別選択（2択） ── */}
         <div className="rounded-2xl overflow-hidden"
           style={{ background: `linear-gradient(155deg,${NAVY_CARD} 0%,${NAVY_CARD2} 100%)`, border: `1px solid ${GOLD}20` }}>
           <div className="h-0.5" style={{ background: `linear-gradient(90deg,transparent,${GOLD}60,transparent)` }}/>
           <div className="p-4">
             <p className="text-[9px] font-label tracking-[0.22em] mb-3" style={{ color: `${GOLD}60` }}>USE POINT TYPE — 利用するポイントを選択</p>
-            <div className="grid grid-cols-3 gap-2">
-              {(["mpi", "sav", "manual"] as PointType[]).map(type => {
-                const cfg = POINT_TYPES[type];
-                const bal = balanceMap[type];
+            <div className="grid grid-cols-2 gap-3">
+              {(["mpi", "sav"] as PointType[]).map(type => {
+                const cfg   = POINT_TYPES[type];
+                const bal   = balanceMap[type];
                 const isSel = selectedType === type;
                 return (
                   <button key={type} type="button"
                     onClick={() => { setSelectedType(type); setAmount(""); setMessage(""); }}
-                    className="rounded-xl p-2.5 text-left transition-all"
+                    className="rounded-xl p-3.5 text-left transition-all"
                     style={isSel
                       ? { background: cfg.bg, border: `1.5px solid ${cfg.border}` }
                       : { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-label text-[10px] font-bold" style={{ color: isSel ? cfg.color : "rgba(255,255,255,0.40)" }}>{cfg.label}</span>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-label text-sm font-black" style={{ color: isSel ? cfg.color : "rgba(255,255,255,0.40)" }}>{cfg.label}</span>
                       {isSel && (
-                        <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] text-white" style={{ background: cfg.checkColor }}>✓</span>
+                        <span className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] text-white" style={{ background: cfg.checkColor }}>✓</span>
                       )}
                     </div>
-                    <p className="text-[8px] font-jp leading-tight mb-1.5" style={{ color: isSel ? cfg.color : "rgba(255,255,255,0.28)" }}>{cfg.sublabel}</p>
-                    <p className="text-sm font-black text-white">{bal.toLocaleString()}<span className="text-[8px] ml-0.5" style={{ color: isSel ? cfg.color : "rgba(255,255,255,0.30)" }}>pt</span></p>
+                    <p className="text-[9px] font-jp leading-tight mb-2" style={{ color: isSel ? cfg.color : "rgba(255,255,255,0.28)" }}>{cfg.sublabel}</p>
+                    <p className="text-lg font-black text-white">{bal.toLocaleString()}<span className="text-[9px] ml-0.5" style={{ color: isSel ? cfg.color : "rgba(255,255,255,0.30)" }}>pt</span></p>
+                    {/* SAVptの内訳を選択時に表示 */}
+                    {type === "sav" && isSel && wallet !== null && (
+                      <div className="mt-2 pt-2 flex gap-3" style={{ borderTop: `1px solid ${GOLD}20` }}>
+                        <p className="text-[8px] font-jp" style={{ color: `${GOLD}60` }}>
+                          自動: <span className="font-semibold" style={{ color: GOLD_LIGHT }}>{wallet.externalPointsBalance.toLocaleString()}pt</span>
+                        </p>
+                        <p className="text-[8px] font-jp" style={{ color: `${GOLD}60` }}>
+                          手動: <span className="font-semibold" style={{ color: GOLD_LIGHT }}>{wallet.manualPointsBalance.toLocaleString()}pt</span>
+                        </p>
+                      </div>
+                    )}
                   </button>
                 );
               })}
@@ -292,32 +331,28 @@ export default function UsePointsPage() {
                   type="text" value={description} onChange={e => setDescription(e.target.value)} maxLength={255}
                   className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none font-jp"
                   style={{ background: "rgba(10,22,40,0.05)", border: `1px solid rgba(10,22,40,0.12)`, color: NAVY }}
-                  placeholder={
-                    selectedType === "mpi" ? "例: 携帯紹介ポイント利用" :
-                    selectedType === "sav" ? "例: 貯金ボーナスポイント利用" :
-                    "例: ポイント利用"
-                  }
+                  placeholder={selectedType === "mpi" ? "例: 携帯紹介ポイント利用" : "例: 貯金ボーナスポイント利用"}
                 />
               </div>
               <button
                 type="submit"
                 disabled={loading || !amount || inputAmt <= 0 || inputAmt > currentBalance || currentBalance === 0}
                 className="w-full py-4 rounded-2xl text-white font-bold text-base disabled:opacity-50 transition-all hover:scale-[1.01] active:scale-95 disabled:hover:scale-100"
-                style={{ background:
-                  selectedType === "mpi" ? `linear-gradient(135deg,#059669,#6ee7b7)` :
-                  selectedType === "sav" ? `linear-gradient(135deg,${GOLD_DARK},${GOLD},${GOLD_LIGHT})` :
-                  `linear-gradient(135deg,#6d28d9,#c4b5fd)` }}>
+                style={{ background: selectedType === "mpi"
+                  ? `linear-gradient(135deg,#059669,#6ee7b7)`
+                  : `linear-gradient(135deg,${GOLD_DARK},${GOLD},${GOLD_LIGHT})` }}>
                 {loading ? "処理中..." : `${inputAmt > 0 ? inputAmt.toLocaleString() + "pt を" : ""}利用する`}
               </button>
             </form>
           </div>
         </div>
 
-        {/* ── ポイント説明 ── */}
+        {/* ── ポイントガイド ── */}
         <div className="rounded-2xl p-4 space-y-3"
           style={{ background: `linear-gradient(155deg,${NAVY_CARD} 0%,${NAVY_CARD2} 100%)`, border: `1px solid ${GOLD}18` }}>
           <p className="text-[9px] font-label tracking-[0.22em]" style={{ color: `${GOLD}60` }}>POINT GUIDE</p>
-          <div className="space-y-2.5">
+          <div className="space-y-3">
+
             {/* MPIpt */}
             <div className="flex items-start gap-3">
               <div className="rounded-lg px-2 py-1 flex-shrink-0" style={{ background: "rgba(110,231,183,0.10)", border: "1px solid rgba(110,231,183,0.25)" }}>
@@ -328,24 +363,28 @@ export default function UsePointsPage() {
                 <p className="text-[10px] mt-0.5" style={{ color: "rgba(255,255,255,0.45)" }}>VP未来phone を紹介した方に毎月自動付与されるポイント</p>
               </div>
             </div>
+
             {/* SAVpt */}
             <div className="flex items-start gap-3">
               <div className="rounded-lg px-2 py-1 flex-shrink-0" style={{ background: `${GOLD}15`, border: `1px solid ${GOLD}30` }}>
                 <span className="font-label text-[9px] font-bold" style={{ color: GOLD_LIGHT }}>SAVpt</span>
               </div>
-              <div>
-                <p className="text-xs font-semibold text-white font-jp">貯金ボーナス（オートシップ）</p>
-                <p className="text-[10px] mt-0.5" style={{ color: "rgba(255,255,255,0.45)" }}>オートシップ決済時に自動付与される貯金ボーナスポイント</p>
-              </div>
-            </div>
-            {/* 手動pt */}
-            <div className="flex items-start gap-3">
-              <div className="rounded-lg px-2 py-1 flex-shrink-0" style={{ background: "rgba(196,181,253,0.10)", border: "1px solid rgba(196,181,253,0.25)" }}>
-                <span className="font-label text-[9px] font-bold" style={{ color: "#c4b5fd" }}>手動pt</span>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-white font-jp">管理者手動調整ポイント</p>
-                <p className="text-[10px] mt-0.5" style={{ color: "rgba(255,255,255,0.45)" }}>管理者が手動で付与・調整したポイント</p>
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-white font-jp">貯金ボーナス</p>
+                <p className="text-[10px] mt-0.5 mb-2" style={{ color: "rgba(255,255,255,0.45)" }}>
+                  オートシップ時の自動付与 ＋ 管理者による手動調整の合計
+                </p>
+                {/* 内訳バッジ */}
+                <div className="flex flex-wrap gap-2">
+                  <span className="rounded-lg px-2 py-0.5 text-[8px] font-jp font-medium"
+                    style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}20`, color: `${GOLD}90` }}>
+                    自動反映（オートシップ）
+                  </span>
+                  <span className="rounded-lg px-2 py-0.5 text-[8px] font-jp font-medium"
+                    style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}20`, color: `${GOLD}90` }}>
+                    管理者手動調整
+                  </span>
+                </div>
               </div>
             </div>
           </div>
