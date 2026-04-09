@@ -1,8 +1,12 @@
-import "dotenv/config";
+import { config } from "dotenv";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 import { hash } from "bcryptjs";
+import { join } from "path";
+
+// .env.localを明示的に読み込み
+config({ path: join(process.cwd(), '.env.local') });
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
@@ -51,6 +55,23 @@ async function main() {
 
   for (const product of products) {
     await prisma.product.upsert({ where: { name: product.name }, update: { ...product, isActive: true }, create: { ...product, isActive: true } });
+  }
+
+  // MLM商品マスター（MlmProduct）を追加
+  const mlmProducts = [
+    { productCode: "s1000", name: "登録料", price: 3300, pv: 0, isRegistration: true },
+    { productCode: "1000", name: "[新規]VIOLA Pure 翠彩-SUMISAI-", price: 16500, pv: 150, isRegistration: true },
+    { productCode: "2000", name: "VIOLA Pure 翠彩-SUMISAI-", price: 16500, pv: 150, isRegistration: false },
+    { productCode: "4000", name: "出荷事務手数料", price: 880, pv: 0, isRegistration: false },
+    { productCode: "5000", name: "概要書面1部", price: 550, pv: 0, isRegistration: false },
+  ];
+
+  for (const mlmProduct of mlmProducts) {
+    await prisma.mlmProduct.upsert({
+      where: { productCode: mlmProduct.productCode },
+      update: mlmProduct,
+      create: mlmProduct,
+    });
   }
 
   await prisma.siteSetting.upsert({ where: { settingKey: "siteTitle" }, update: { settingValue: "福利厚生ポータル" }, create: { settingKey: "siteTitle", settingValue: "福利厚生ポータル" } });

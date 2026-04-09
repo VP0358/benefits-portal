@@ -713,6 +713,22 @@ model MlmMember {
   @@map("mlm_members")
 }
 
+/// MLM商品マスター
+model MlmProduct {
+  id              BigInt   @id @default(autoincrement())
+  productCode     String   @unique @db.VarChar(20)   // 商品コード (s1000, 1000, 2000, 4000, 5000)
+  name            String   @db.VarChar(255)          // 商品名
+  description     String?  @db.VarChar(500)          // 商品説明
+  price           Int                                 // 税込価格（円）
+  pv              Int      @default(0)                // ポイントバリュー
+  isRegistration  Boolean  @default(false)            // 新規登録用商品フラグ
+  isActive        Boolean  @default(true)             // 販売中フラグ
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("mlm_products")
+}
+
 /// MLM購入記録（ポイント計算用）
 model MlmPurchase {
   id              BigInt         @id @default(autoincrement())
