@@ -26,11 +26,13 @@ type AutoshipData = {
 };
 
 // ── カラー定数 ──
-const GOLD       = "#d4a853";
-const GOLD_LIGHT = "#f0c060";
-const ORANGE     = "#e8893a";
-const PAGE_BG    = "#060d1f";
-const CARD_BG    = "#0f2347";
+const GOLD       = "#c9a84c";
+const GOLD_LIGHT = "#e8c96a";
+const ORANGE     = "#d4703a";
+const PAGE_BG    = "#eee8e0";
+const CARD_BG    = "#0d1e38";
+const NAVY       = "#0a1628";
+const NAVY_CARD2 = "#122444";
 
 type StatusConfig = { label: string; dotColor: string; textColor: string };
 const STATUS_CONFIG: Record<string, StatusConfig> = {
@@ -77,20 +79,20 @@ export default function MlmAutoshipPage() {
     <div className="min-h-screen pb-10" style={{ background: PAGE_BG }}>
       {/* ヘッダー */}
       <header className="sticky top-0 z-20"
-        style={{ background: `rgba(6,13,31,0.97)`, backdropFilter: "blur(20px)", borderBottom: `1px solid rgba(212,168,83,0.18)`, boxShadow: `0 4px 24px rgba(0,0,0,0.4)` }}>
+        style={{ background: 'rgba(245,240,232,0.96)', backdropFilter: 'blur(20px) saturate(160%)', borderBottom: `1px solid rgba(201,168,76,0.22)`, boxShadow: `0 2px 16px rgba(10,22,40,0.08),0 1px 0 rgba(255,255,255,0.80) inset` }}>
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center gap-3">
-          <Link href="/dashboard" className="flex items-center gap-1.5 transition" style={{ color: "rgba(255,255,255,0.5)" }}>
+          <Link href="/dashboard" className="flex items-center gap-1.5 transition" style={{ color: "rgba(10,22,40,0.60)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            <span className="text-sm">戻る</span>
+            <span className="text-sm font-jp">戻る</span>
           </Link>
           <div className="flex items-center gap-2 ml-1">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
               style={{ color: GOLD }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            <h1 className="text-base font-bold text-white">オートシップ確認</h1>
+            <h1 className="text-base font-semibold font-jp" style={{ color: NAVY }}>オートシップ確認</h1>
           </div>
         </div>
       </header>

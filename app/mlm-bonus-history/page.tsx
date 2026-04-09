@@ -60,11 +60,13 @@ type BonusData = {
 };
 
 // ── カラー定数 ──
-const GOLD       = "#d4a853";
-const GOLD_LIGHT = "#f0c060";
-const ORANGE     = "#e8893a";
-const PAGE_BG    = "#060d1f";
-const CARD_BG    = "#0f2347";
+const GOLD       = "#c9a84c";
+const GOLD_LIGHT = "#e8c96a";
+const ORANGE     = "#d4703a";
+const PAGE_BG    = "#eee8e0";
+const CARD_BG    = "#0d1e38";
+const NAVY       = "#0a1628";
+const NAVY_CARD2 = "#122444";
 
 function yen(n: number) {
   return `¥${n.toLocaleString()}`;
@@ -75,7 +77,7 @@ function DataRow({ label, value, gold }: { label: string; value: React.ReactNode
     <div className={`flex items-center justify-between py-2.5 px-4 last:border-0 text-xs`}
       style={{
         borderBottom: "1px solid rgba(255,255,255,0.04)",
-        background: gold ? `${GOLD}08` : "transparent"
+        background: gold ? `${GOLD}10` : "transparent"
       }}>
       <span style={{ color: gold ? GOLD : "rgba(255,255,255,0.4)" }}>{label}</span>
       <span className="font-bold" style={{ color: gold ? GOLD_LIGHT : "rgba(255,255,255,0.75)" }}>{value}</span>
@@ -230,20 +232,20 @@ export default function MlmBonusHistoryPage() {
     <div className="min-h-screen pb-10" style={{ background: PAGE_BG }}>
       {/* ヘッダー */}
       <header className="sticky top-0 z-20"
-        style={{ background: `rgba(6,13,31,0.97)`, backdropFilter: "blur(20px)", borderBottom: `1px solid rgba(212,168,83,0.18)`, boxShadow: `0 4px 24px rgba(0,0,0,0.4)` }}>
+        style={{ background: 'rgba(245,240,232,0.96)', backdropFilter: 'blur(20px) saturate(160%)', borderBottom: `1px solid rgba(201,168,76,0.22)`, boxShadow: `0 2px 16px rgba(10,22,40,0.08),0 1px 0 rgba(255,255,255,0.80) inset` }}>
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center gap-3">
-          <Link href="/dashboard" className="flex items-center gap-1.5 transition" style={{ color: "rgba(255,255,255,0.5)" }}>
+          <Link href="/dashboard" className="flex items-center gap-1.5 transition" style={{ color: "rgba(10,22,40,0.60)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            <span className="text-sm">戻る</span>
+            <span className="text-sm font-jp">戻る</span>
           </Link>
           <div className="flex items-center gap-2 ml-1">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
               style={{ color: GOLD }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <h1 className="text-base font-bold text-white">ボーナス履歴</h1>
+            <h1 className="text-base font-semibold font-jp" style={{ color: NAVY }}>ボーナス履歴</h1>
           </div>
         </div>
       </header>

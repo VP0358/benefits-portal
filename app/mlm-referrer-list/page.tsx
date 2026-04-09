@@ -28,11 +28,13 @@ type ReferrerListData = {
 };
 
 // ── カラー定数 ──
-const GOLD       = "#d4a853";
-const GOLD_LIGHT = "#f0c060";
-const ORANGE     = "#e8893a";
-const PAGE_BG    = "#060d1f";
-const CARD_BG    = "#0f2347";
+const GOLD       = "#c9a84c";
+const GOLD_LIGHT = "#e8c96a";
+const ORANGE     = "#d4703a";
+const PAGE_BG    = "#eee8e0";
+const CARD_BG    = "#0d1e38";
+const NAVY       = "#0a1628";
+const NAVY_CARD2 = "#122444";
 
 const STATUS_LABELS: Record<string, string> = {
   active: "アクティブ", inactive: "非アクティブ", suspended: "停止中",
@@ -40,11 +42,11 @@ const STATUS_LABELS: Record<string, string> = {
 };
 type StatusTheme = { dotColor: string; textColor: string };
 const STATUS_THEME: Record<string, StatusTheme> = {
-  active:    { dotColor: "#34d399", textColor: "#34d399" },
-  inactive:  { dotColor: "#9ca3af", textColor: "rgba(255,255,255,0.4)" },
+  active:    { dotColor: "#34d399", textColor: "#6ee7b7" },
+  inactive:  { dotColor: "#6b7280", textColor: "#9ca3af" },
   suspended: { dotColor: "#f97316", textColor: "#f97316" },
   canceled:  { dotColor: "#f87171", textColor: "#f87171" },
-  pending:   { dotColor: ORANGE,    textColor: ORANGE },
+  pending:   { dotColor: GOLD, textColor: GOLD_LIGHT },
 };
 const TYPE_LABELS: Record<string, string> = {
   business: "ビジネス", favorite: "愛用",
@@ -86,20 +88,20 @@ export default function MlmReferrerListPage() {
     <div className="min-h-screen pb-10" style={{ background: PAGE_BG }}>
       {/* ヘッダー */}
       <header className="sticky top-0 z-20"
-        style={{ background: `rgba(6,13,31,0.97)`, backdropFilter: "blur(20px)", borderBottom: `1px solid rgba(212,168,83,0.18)`, boxShadow: `0 4px 24px rgba(0,0,0,0.4)` }}>
+        style={{ background: 'rgba(245,240,232,0.96)', backdropFilter: 'blur(20px) saturate(160%)', borderBottom: `1px solid rgba(201,168,76,0.22)`, boxShadow: `0 2px 16px rgba(10,22,40,0.08),0 1px 0 rgba(255,255,255,0.80) inset` }}>
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center gap-3">
-          <Link href="/dashboard" className="flex items-center gap-1.5 transition" style={{ color: "rgba(255,255,255,0.5)" }}>
+          <Link href="/dashboard" className="flex items-center gap-1.5 transition" style={{ color: "rgba(10,22,40,0.60)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            <span className="text-sm">戻る</span>
+            <span className="text-sm font-jp">戻る</span>
           </Link>
           <div className="flex items-center gap-2 ml-1">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
               style={{ color: GOLD }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
-            <h1 className="text-base font-bold text-white">紹介者一覧</h1>
+            <h1 className="text-base font-semibold font-jp" style={{ color: NAVY }}>紹介者一覧</h1>
           </div>
         </div>
       </header>
@@ -127,8 +129,8 @@ export default function MlmReferrerListPage() {
               ].map((s) => (
                 <div key={s.label} className="rounded-2xl p-3.5 text-center"
                   style={{ background: `${s.color}10`, border: `1px solid ${s.color}25` }}>
-                  <div className="text-2xl font-black" style={{ color: s.color }}>{s.value}</div>
-                  <div className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>{s.label}</div>
+                  <div className="font-display font-semibold text-2xl" style={{ color: s.color }}>{s.value}</div>
+                  <div className="text-[11px] mt-0.5 font-label tracking-wider" style={{ color: "rgba(255,255,255,0.40)" }}>{s.label}</div>
                 </div>
               ))}
             </div>
@@ -147,7 +149,7 @@ export default function MlmReferrerListPage() {
                       placeholder="名前・会員IDで検索..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      className="w-full rounded-2xl pl-10 pr-4 py-3 text-sm text-white placeholder-white/25 outline-none transition"
+                      className="w-full rounded-2xl pl-10 pr-4 py-3 text-sm text-white/90 placeholder-white/20 outline-none transition font-jp"
                       style={{
                         background: CARD_BG,
                         border: `1px solid ${GOLD}20`,
@@ -160,7 +162,7 @@ export default function MlmReferrerListPage() {
                         className="rounded-full px-3.5 py-1.5 text-xs font-semibold transition"
                         style={filter === f
                           ? { background: `linear-gradient(135deg, ${GOLD}, ${ORANGE})`, color: "white" }
-                          : { background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.5)", border: `1px solid ${GOLD}20` }
+                          : { background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.55)", border: `1px solid ${GOLD}22` }
                         }>
                         {f === "all" ? "すべて" : f === "active" ? "ACTのみ" : "非アクティブ"}
                       </button>
@@ -187,7 +189,7 @@ export default function MlmReferrerListPage() {
                             <div className="flex items-start justify-between gap-2 mb-3">
                               <div>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-bold text-base text-white">{m.name}</span>
+                                  <span className="font-jp font-semibold text-base text-white">{m.name}</span>
                                   {m.isActive && (
                                     <span className="rounded-full text-xs px-2 py-0.5 font-bold border"
                                       style={{ background: "rgba(52,211,153,0.15)", color: "#34d399", borderColor: "rgba(52,211,153,0.25)" }}>
@@ -230,7 +232,7 @@ export default function MlmReferrerListPage() {
                                 style={{ background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.06)" }}>
                                 <div className="text-[10px] font-semibold mb-1" style={{ color: "rgba(255,255,255,0.3)" }}>先月購入</div>
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs font-bold" style={{ color: "rgba(255,255,255,0.5)" }}>
+                                  <span className="text-xs font-bold" style={{ color: "rgba(10,22,40,0.60)" }}>
                                     {m.lastMonthPoints > 0 ? `${m.lastMonthPoints.toLocaleString()}pt` : "—"}
                                   </span>
                                   {m.lastMonthAmount > 0 && (

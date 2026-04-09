@@ -1,27 +1,179 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* ライトベージュ系 × 深紺ゴールド ── サロン高級UI */
+  --background: #f0ebe4;
+  --foreground: #1a1410;
+
+  /* ゴールドシステム */
+  --gold: #c9a84c;
+  --gold-light: #e8c96a;
+  --gold-pale: #f0dfa0;
+  --gold-dark: #a88830;
+
+  /* ネイビーシステム */
+  --navy-deep: #0a1628;
+  --navy-card: #0d1e38;
+  --navy-card2: #122444;
+  --navy-mid: #0f1f35;
+  --navy-accent: #162c50;
+
+  /* アクセント */
+  --orange: #d4703a;
+  --cream: #f5f0e8;
+  --linen: #ede5d8;
+  --warm-gray: #c8bfb0;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-/* iPhone/Androidのダークモードでも常に白背景を強制 */
+/* ─── ライトモードを優先（サロン系デザイン） ─── */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #ffffff;
-    --foreground: #171717;
+    --background: #f0ebe4;
+    --foreground: #1a1410;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ──────────────────────────────────────────
+   高級フォントユーティリティ
+────────────────────────────────────────── */
+
+/* セリフ体：ロゴ・見出し用（Cormorant Garamond） */
+.font-display {
+  font-family: var(--font-cormorant), 'Georgia', 'Times New Roman', serif;
+  letter-spacing: 0.03em;
+}
+
+/* 細身サンセリフ：ラベル・キャプション（Josefin Sans） */
+.font-label {
+  font-family: var(--font-josefin), 'Arial Narrow', sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* 日本語UI（Noto Sans JP） */
+.font-jp {
+  font-family: var(--font-noto), 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', sans-serif;
+}
+
+/* ──────────────────────────────────────────
+   背景テクスチャ
+────────────────────────────────────────── */
+
+/* メインページ背景：リネン調クリーム */
+.bg-linen-texture {
+  background-color: #eee8e0;
+  background-image:
+    radial-gradient(ellipse at 15% 5%, rgba(201,168,76,0.10) 0%, transparent 45%),
+    radial-gradient(ellipse at 85% 95%, rgba(212,112,58,0.07) 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 50%, rgba(240,235,228,0.9) 0%, transparent 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+/* ──────────────────────────────────────────
+   テキストグラデーション
+────────────────────────────────────────── */
+
+.text-gold-gradient {
+  background: linear-gradient(135deg, #c9a84c, #e8c96a, #a88830);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-navy-gradient {
+  background: linear-gradient(135deg, #0a1628, #162c50);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ──────────────────────────────────────────
+   カードシャドウ（深紺カード用）
+────────────────────────────────────────── */
+
+.card-navy {
+  box-shadow:
+    0 8px 32px rgba(10,22,40,0.25),
+    0 2px 8px rgba(10,22,40,0.15),
+    0 1px 0 rgba(201,168,76,0.20) inset;
+}
+
+.card-linen {
+  box-shadow:
+    0 4px 20px rgba(10,22,40,0.08),
+    0 1px 4px rgba(10,22,40,0.05),
+    0 1px 0 rgba(255,255,255,0.80) inset;
+}
+
+/* ──────────────────────────────────────────
+   スクロール・タップ設定
+────────────────────────────────────────── */
+
+html {
+  scroll-behavior: smooth;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: rgba(201,168,76,0.25);
+  color: #0a1628;
+}
+
+/* ──────────────────────────────────────────
+   アニメーション
+────────────────────────────────────────── */
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.shimmer-gold {
+  background: linear-gradient(90deg, #c9a84c 0%, #e8c96a 40%, #c9a84c 60%, #a88830 100%);
+  background-size: 200% auto;
+  animation: shimmer 3s linear infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.4s ease-out forwards;
+}
+
+/* ──────────────────────────────────────────
+   ゴールドラインアクセント
+────────────────────────────────────────── */
+
+.gold-line-top {
+  position: relative;
+}
+
+.gold-line-top::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #c9a84c 30%, #e8c96a 50%, #c9a84c 70%, transparent);
 }
