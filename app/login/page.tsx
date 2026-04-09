@@ -1,15 +1,13 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 import ViolaLogo from "@/app/components/viola-logo";
 import { loginAction } from "./actions";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
-  const [form, setForm]       = useState({ email: "", password: "" });
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({ email: "", password: "" });
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -25,25 +23,9 @@ export default function LoginPage() {
         return;
       }
 
-      // ログイン成功 → セッション確認してからリダイレクト
-      await new Promise((r) => setTimeout(r, 300));
-      const sessionRes = await fetch("/api/auth/session", { cache: "no-store" });
-      const session    = await sessionRes.json();
-
-      if (!session?.user) {
-        setError("ログインに失敗しました。もう一度お試しください。");
-        setLoading(false);
-        return;
-      }
-
-      if (session.user.role === "admin") {
-        setError("管理者アカウントです。管理者ログインページをご利用ください。");
-        setLoading(false);
-        return;
-      }
-
-      // 強制リロードでセッションを確実に反映
-      window.location.href = "/dashboard";
+      // ログイン成功 → ページ全体リロードでセッションCookieを反映させてからリダイレクト
+      // app/page.tsx がロールに応じて /admin or /dashboard へ振り分ける
+      window.location.href = "/";
     } catch (err) {
       console.error("Login error:", err);
       setError("ログインに失敗しました。もう一度お試しください。");
@@ -52,8 +34,10 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4"
-          style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 50%, #bbf7d0 100%)" }}>
+    <main
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 50%, #bbf7d0 100%)" }}
+    >
       <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-lg">
         <div className="mb-8 text-center">
           <div className="flex justify-center mb-4">
@@ -109,8 +93,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl px-4 py-3 font-semibold text-white
-                       transition disabled:opacity-50"
+            className="w-full rounded-xl px-4 py-3 font-semibold text-white transition disabled:opacity-50"
             style={{ background: "linear-gradient(135deg, #16a34a, #0d9488)" }}
           >
             {loading ? "ログイン中..." : "ログイン"}
