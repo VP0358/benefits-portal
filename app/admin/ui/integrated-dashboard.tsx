@@ -56,7 +56,8 @@ export default function IntegratedDashboard() {
 function MlmContent() {
   const items = [
     { href: "/admin/mlm-members", label: "MLM会員管理", icon: "fas fa-users", desc: "会員タイプ・レベル・条件設定" },
-    { href: "/admin/bonus-run", label: "MLMボーナス計算", icon: "fas fa-coins", desc: "月次ボーナス自動計算・確定" },
+    { href: "/admin/bonus-calculate", label: "ボーナス計算・処理", icon: "fas fa-calculator", desc: "月次ボーナス計算・調整金管理" },
+    { href: "/admin/bonus-report-center", label: "ボーナス結果・レポート", icon: "fas fa-file-invoice-dollar", desc: "計算結果・レポート・サマリー" },
     { href: "/admin/autoship", label: "オートシップ管理", icon: "fas fa-sync", desc: "自動出荷・支払方法設定" },
     { href: "/admin/products", label: "商品管理", icon: "fas fa-box", desc: "MLM商品の登録・編集" },
     { href: "/admin/orders", label: "注文管理", icon: "fas fa-shopping-cart", desc: "注文履歴・ステータス管理" },

@@ -336,7 +336,7 @@ export default function MlmMembersPage() {
           </p>
         </div>
         <Link
-          href="/admin/bonus-run"
+          href="/admin/bonus-calculate"
           className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700 transition"
         >
           🧮 ボーナス計算へ
@@ -450,6 +450,13 @@ export default function MlmMembersPage() {
                   </td>
                   <td className="py-3 px-4 text-center">
                     <div className="flex gap-2 justify-center">
+                      <Link
+                        href={`/admin/mlm-members/${m.id}`}
+                        className="rounded-lg bg-green-100 px-3 py-1 text-xs font-semibold text-green-700 hover:bg-green-200 transition"
+                      >
+                        <i className="fas fa-eye mr-1"></i>
+                        詳細
+                      </Link>
                       <button
                         onClick={() => setEditTarget(m)}
                         className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-violet-100 hover:text-violet-700 transition"

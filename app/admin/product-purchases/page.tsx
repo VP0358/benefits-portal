@@ -109,9 +109,11 @@ export default function ProductPurchasesPage() {
     fetch("/api/admin/products")
       .then(res => res.json())
       .then(data => {
-        const productList = data.map((p: any) => ({
-          code: p.code || p.id.toString(),
-          name: p.name
+        // APIレスポンスは { products: [...] } の形式
+        const productsArray = data.products || [];
+        const productList = productsArray.map((p: any) => ({
+          code: p.productCode || p.product_code || "",
+          name: p.name || ""
         })).filter((p: Product) => p.code);
         setProducts(productList);
       })

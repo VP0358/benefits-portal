@@ -58,7 +58,15 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json({ product });
+    // BigIntをstringに変換
+    const serializedProduct = {
+      ...product,
+      id: product.id.toString(),
+      createdAt: product.createdAt.toISOString(),
+      updatedAt: product.updatedAt.toISOString(),
+    };
+
+    return NextResponse.json({ product: serializedProduct });
   } catch (error: any) {
     console.error("❌ 商品更新エラー:", error);
     
