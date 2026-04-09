@@ -4,11 +4,11 @@ import { headers } from "next/headers";
 import AdminNav from "./ui/admin-nav";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  // middleware が付与する "x-pathname" でログインページかどうかを判定
+  // middleware が x-pathname をセットする
   const hdrs = await headers();
   const pathname = hdrs.get("x-pathname") ?? "";
 
-  // /admin/login はサイドバー不要・認証チェック不要でそのまま表示
+  // /admin/login はサイドバー不要・認証チェック不要
   if (pathname.startsWith("/admin/login")) {
     return <>{children}</>;
   }
