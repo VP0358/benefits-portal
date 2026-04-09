@@ -855,20 +855,21 @@ export default function MemberDashboard({
             </div>
             <nav className="flex flex-col gap-1 flex-1 px-3 py-3 overflow-y-auto">
               {[
-                { href: "/dashboard",       label: "🏠 ホーム" },
-                { href: "#menu",            label: "📋 福利厚生メニュー" },
-                { href: "/vp-phone",        label: "📱 VP未来phone申し込み" },
-                { href: "/points/check",    label: "⭐ ポイント確認" },
-                { href: "/points/use",      label: "💎 ポイントを使う" },
-                { href: "/points/history",  label: "📊 ポイント履歴" },
-                { href: "/announcements",   label: "🔔 お知らせ" },
-                { href: "/orders/history",  label: "📦 福利厚生使用履歴" },
-                { href: "/profile",         label: "👤 マイアカウント" },
-                { href: "/referral",            label: "🎁 友達を紹介する" },
-                { href: "/org-chart",           label: "🌳 直紹介 組織図" },
-                { href: "/mlm-org-chart",       label: "🌲 MLMマトリックス組織図" },
-                { href: "/mlm-bonus",           label: "💎 MLMボーナス履歴" },
-                { href: "/travel-referrals",    label: "✈️ 旅行サブスク紹介ツリー" },
+                { href: "/dashboard",        label: "🏠 ホーム" },
+                { href: "#mlm-menu",         label: "🌿 MLMメニュー" },
+                { href: "#menu",             label: "🛎️ 福利厚生メニュー" },
+                { href: "/profile",          label: "👤 登録情報" },
+                { href: "/mlm-bonus",        label: "💰 ボーナス履歴" },
+                { href: "/orders/history",   label: "📦 購入履歴" },
+                { href: "/orders/checkout",  label: "🛍️ 商品注文" },
+                { href: "/org-chart",        label: "🌳 組織図" },
+                { href: "/points/check",     label: "📊 状況" },
+                { href: "/referral",         label: "👥 紹介者一覧 / お友達紹介" },
+                { href: "/points/use",       label: "💎 ポイントを使う" },
+                { href: "/points/history",   label: "📋 ポイント履歴" },
+                { href: "/announcements",    label: "🔔 お知らせ" },
+                { href: "/mlm-org-chart",    label: "🌲 MLM組織図" },
+                { href: "/travel-referrals", label: "✈️ 旅行サブスク紹介ツリー" },
               ].map(item => (
                 <Link key={item.href} href={item.href}
                   onClick={() => setMenuOpen(false)}
@@ -1003,12 +1004,8 @@ export default function MemberDashboard({
           </div>
         </div>
 
-        {/* 各種ステータスボタン */}
-        <div className="space-y-3">
-          <MlmStatusButton status={mlmStatus} />
-          <VpPhoneStatusButton status={vpPhoneStatus} />
-          <TravelSubStatusButton status={travelSubStatus} />
-        </div>
+        {/* MLM会員状況バナー */}
+        <MlmStatusButton status={mlmStatus} />
 
         {/* お知らせスライダー */}
         <section id="news">
@@ -1046,42 +1043,66 @@ export default function MemberDashboard({
           )}
         </section>
 
-        {/* VP未来phone申し込みボタン（モーダル付き） */}
-        <VpPhoneButton />
+        {/* ② MLMメニュー */}
+        <section id="mlm-menu">
+          <div className="flex items-center gap-2 mb-3 px-1">
+            <div className="w-1 h-5 rounded-full bg-green-500"></div>
+            <h2 className="text-sm font-bold text-gray-800">🌿 MLMメニュー</h2>
+          </div>
+          <div className="grid grid-cols-3 gap-2.5">
+            {[
+              { href: "/profile",          icon: "👤", label: "登録情報",         color: "from-slate-400 to-slate-500" },
+              { href: "/mlm-bonus",        icon: "💰", label: "ボーナス履歴",     color: "from-amber-400 to-orange-500" },
+              { href: "/orders/history",   icon: "📦", label: "購入履歴",         color: "from-blue-400 to-blue-600" },
+              { href: "/mlm-bonus",        icon: "🔄", label: "オートシップ\n確認", color: "from-cyan-400 to-teal-500" },
+              { href: "/orders/checkout",  icon: "🛍️", label: "商品注文",         color: "from-rose-400 to-pink-500" },
+              { href: "/org-chart",        icon: "🌳", label: "組織図",           color: "from-emerald-400 to-green-600" },
+              { href: "/points/check",     icon: "📊", label: "状況",             color: "from-violet-400 to-purple-600" },
+              { href: "/referral",         icon: "👥", label: "紹介者一覧",       color: "from-indigo-400 to-indigo-600" },
+              { href: "/referral",         icon: "🎁", label: "お友達紹介",       color: "from-pink-400 to-fuchsia-500" },
+            ].map((item, idx) => (
+              <Link key={idx} href={item.href}
+                className="bg-white rounded-2xl shadow hover:shadow-md transition active:scale-95 overflow-hidden">
+                <div className={`h-1.5 bg-gradient-to-r ${item.color}`}></div>
+                <div className="p-3 text-center">
+                  <div className="text-2xl mb-1.5">{item.icon}</div>
+                  <p className="text-[11px] font-bold text-gray-800 leading-tight whitespace-pre-line">{item.label}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
 
-        {/* 旅行サブスクボタン（申込モーダル付き） */}
-        <TravelSubButton ref={travelSubRef} />
-
-        {/* 福利厚生メニュー */}
+        {/* ② 福利厚生メニュー */}
         <section id="menu">
-          <h2 className="text-sm font-bold text-gray-700 mb-2 px-1">🛎️ 福利厚生メニュー</h2>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="flex items-center gap-2 mb-3 px-1">
+            <div className="w-1 h-5 rounded-full bg-blue-500"></div>
+            <h2 className="text-sm font-bold text-gray-800">🛎️ 福利厚生メニュー</h2>
+          </div>
+          <div className="grid grid-cols-3 gap-2.5">
             {menus.map(m => {
               const emoji = ICON_MAP[m.iconType ?? ""] ?? "📌";
-              // contact種別は相談ページへ
               if (m.menuType === "contact") {
                 return (
                   <a key={m.id} href="/contact"
                     className="bg-white rounded-2xl p-3 text-center shadow hover:shadow-md transition active:scale-95">
-                    <div className="text-3xl mb-1">{emoji}</div>
-                    <p className="text-xs font-bold text-gray-800 leading-tight">{m.title}</p>
+                    <div className="text-2xl mb-1.5">{emoji}</div>
+                    <p className="text-[11px] font-bold text-gray-800 leading-tight">{m.title}</p>
                     {m.subtitle && <p className="text-[10px] font-medium text-gray-600 mt-0.5">{m.subtitle}</p>}
                   </a>
                 );
               }
-              // 旅行サブスク種別 → モーダルを開く（新しいタブではなく）
               if (m.menuType === "travel_sub" || m.title.includes("旅行")) {
                 return (
                   <button key={m.id}
                     onClick={() => travelSubRef.current?.openModal()}
                     className="bg-white rounded-2xl p-3 text-center shadow hover:shadow-md transition active:scale-95 w-full">
-                    <div className="text-3xl mb-1">{emoji}</div>
-                    <p className="text-xs font-bold text-gray-800 leading-tight">{m.title}</p>
+                    <div className="text-2xl mb-1.5">{emoji}</div>
+                    <p className="text-[11px] font-bold text-gray-800 leading-tight">{m.title}</p>
                     {m.subtitle && <p className="text-[10px] font-medium text-gray-600 mt-0.5">{m.subtitle}</p>}
                   </button>
                 );
               }
-              // URLリンク（内部パスはそのまま遷移、外部URLは新タブ）
               const href = m.linkUrl ?? "#";
               const isInternal = href.startsWith("/");
               return (
@@ -1090,8 +1111,8 @@ export default function MemberDashboard({
                   target={isInternal ? undefined : "_blank"}
                   rel={isInternal ? undefined : "noopener noreferrer"}
                   className="bg-white rounded-2xl p-3 text-center shadow hover:shadow-md transition active:scale-95">
-                  <div className="text-3xl mb-1">{emoji}</div>
-                  <p className="text-xs font-bold text-gray-800 leading-tight">{m.title}</p>
+                  <div className="text-2xl mb-1.5">{emoji}</div>
+                  <p className="text-[11px] font-bold text-gray-800 leading-tight">{m.title}</p>
                   {m.subtitle && <p className="text-[10px] font-medium text-gray-600 mt-0.5">{m.subtitle}</p>}
                 </a>
               );
@@ -1099,18 +1120,17 @@ export default function MemberDashboard({
           </div>
         </section>
 
-        {/* クイックアクセス */}
+        {/* ② クイックアクセス */}
         <section>
-          <h2 className="text-sm font-bold text-gray-700 mb-2 px-1">📌 クイックアクセス</h2>
+          <div className="flex items-center gap-2 mb-3 px-1">
+            <div className="w-1 h-5 rounded-full bg-purple-500"></div>
+            <h2 className="text-sm font-bold text-gray-800">📌 クイックアクセス</h2>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { href: "/orders/history",  icon: "📦", label: "福利厚生使用履歴" },
-              { href: "/points/history", icon: "📊", label: "ポイント履歴" },
-              { href: "/profile",        icon: "👤", label: "マイアカウント" },
-              { href: "/referral",       icon: "🎁", label: "友達を紹介する" },
-              { href: "/org-chart",          icon: "🌳", label: "直紹介 組織図" },
-              { href: "/mlm-org-chart",      icon: "🌲", label: "MLM組織図" },
-              { href: "/mlm-bonus",          icon: "💎", label: "MLMボーナス" },
+              { href: "/points/history",       icon: "📊", label: "ポイント履歴" },
+              { href: "/profile",              icon: "👤", label: "マイアカウント" },
+              { href: "/mlm-org-chart",        icon: "🌲", label: "MLM組織図" },
               { href: "/travel-referrals",     icon: "✈️", label: "旅行サブスク紹介ツリー" },
             ].map(item => (
               <Link key={item.href} href={item.href}
@@ -1131,8 +1151,8 @@ export default function MemberDashboard({
             <span className="text-xl">🏠</span>
             <span className="text-[10px] font-semibold text-gray-600">ホーム</span>
           </Link>
-          <Link href="#menu" className="flex flex-col items-center gap-0.5 py-2 px-3">
-            <span className="text-xl">📋</span>
+          <Link href="#mlm-menu" className="flex flex-col items-center gap-0.5 py-2 px-3">
+            <span className="text-xl">🌿</span>
             <span className="text-[10px] font-semibold text-gray-600">メニュー</span>
           </Link>
           <Link href="/points/use" className="flex flex-col items-center -mt-5">
