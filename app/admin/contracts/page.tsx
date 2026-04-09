@@ -128,6 +128,20 @@ export default async function AdminContractsPage({
             <div className="text-xs text-slate-600">2026年5月以降</div>
           </div>
         </div>
+
+        {/* VP未来phone 紹介ツリーへのリンク */}
+        <div className="mt-4 rounded-2xl bg-violet-50 border border-violet-200 p-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-bold text-violet-800">📱 VP未来phone 紹介ツリー</p>
+            <p className="text-xs text-violet-600 mt-0.5">会員の紹介ネットワークとVP申込状況をツリー形式で管理</p>
+          </div>
+          <Link
+            href="/admin/vp-phone"
+            className="shrink-0 rounded-xl bg-violet-600 text-white text-xs font-bold px-4 py-2.5 hover:bg-violet-700 transition-colors"
+          >
+            VP申込管理 →
+          </Link>
+        </div>
       </div>
 
       {/* タブ切り替え */}

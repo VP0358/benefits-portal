@@ -126,6 +126,21 @@ export default async function AdminVpPhonePage({
             </li>
           </ol>
         </div>
+
+        {/* VP未来phone 紹介ツリーリンク */}
+        <div className="mt-4 rounded-2xl bg-violet-50 border border-violet-200 p-4 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-bold text-violet-800 mb-0.5">🌳 VP未来phone 紹介ツリー</h3>
+            <p className="text-xs text-violet-600">会員の紹介ネットワークとVP申込状況をツリー形式で確認できます</p>
+          </div>
+          <Link
+            href="/admin/contracts?view=vp-tree"
+            className="shrink-0 rounded-xl bg-violet-600 text-white text-xs font-bold px-4 py-2.5 hover:bg-violet-700 transition-colors flex items-center gap-1.5"
+          >
+            <span>ツリーを見る</span>
+            <span>→</span>
+          </Link>
+        </div>
       </div>
 
       {/* 申請種別フィルター（会員からの要対応申請） */}
