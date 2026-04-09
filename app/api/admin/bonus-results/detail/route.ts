@@ -111,6 +111,10 @@ export async function GET(req: NextRequest) {
       savingsPoints: r.savingsPoints || 0,
       isActive: r.isActive,
 
+      // ユニレベル段数別詳細
+      unilevelDetail: r.unilevelDetail as Record<string, number> | null,
+      savingsPointsAdded: r.savingsPointsAdded || 0,
+
       createdAt: r.createdAt.toISOString(),
     }));
 

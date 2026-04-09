@@ -112,6 +112,51 @@ export async function POST(request: Request, { params }: Params) {
           data: { status: "active" },
         });
 
+        // Phase 8: SAVボーナス自動付与（オートシップ決済完了時）
+        // 貯金ボーナス設定を取得
+        const savingsConfig = await tx.savingsBonusConfig.findFirst();
+        if (savingsConfig) {
+          // オートシップ決済時: 伝票合計ptの5%
+          const savingsPoints = Math.floor(
+            (order.points * order.quantity) * (savingsConfig.autoshipRate / 100)
+          );
+
+          if (savingsPoints > 0) {
+            // PointWalletを取得または作成
+            let pointWallet = await tx.pointWallet.findUnique({
+              where: { mlmMemberId: order.mlmMemberId },
+            });
+
+            if (!pointWallet) {
+              pointWallet = await tx.pointWallet.create({
+                data: {
+                  mlmMemberId: order.mlmMemberId,
+                  autoPointsBalance: 0,
+                  manualPointsBalance: 0,
+                  externalPointsBalance: savingsPoints,
+                  availablePointsBalance: savingsPoints,
+                },
+              });
+            } else {
+              await tx.pointWallet.update({
+                where: { id: pointWallet.id },
+                data: {
+                  externalPointsBalance: {
+                    increment: savingsPoints,
+                  },
+                  availablePointsBalance: {
+                    increment: savingsPoints,
+                  },
+                },
+              });
+            }
+
+            console.log(
+              `💰 SAVボーナス付与: 会員${order.memberCode} +${savingsPoints}pt（AS決済 ${order.points * order.quantity}pt × ${savingsConfig.autoshipRate}%）`
+            );
+          }
+        }
+
         paidCount++;
       } else {
         // 決済失敗

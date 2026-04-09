@@ -3,11 +3,9 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 import { NextRequest, NextResponse } from "next/server";
-
-
-
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { executeBonusCalculation } from "@/lib/bonus-calculation-engine";
 
 /**
  * GET /api/admin/bonus-run?bonusMonth=2026-02
@@ -93,37 +91,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ボーナス計算実行（簡易版）
-    // 実際の計算ロジックは複雑なため、ここではスケルトンのみ作成
-    const bonusRun = await prisma.bonusRun.create({
-      data: {
-        bonusMonth,
-        closingDate: new Date(),
-        status: "draft",
-        paymentAdjustmentRate: paymentAdjustmentRate
-          ? Number(paymentAdjustmentRate)
-          : null,
-        totalMembers: 0,
-        totalActiveMembers: 0,
-        totalBonusAmount: 0,
-        capAdjustmentAmount: 0,
-      },
-    });
-
-    // TODO: 実際のボーナス計算ロジック
-    // 1. アクティブ会員を取得
-    // 2. 各会員のグループポイント、直接紹介数などを計算
-    // 3. レベル判定
-    // 4. 各種ボーナス計算（ダイレクト、ユニレベル、ランクアップ等）
-    // 5. 調整金・繰越金を適用
-    // 6. CAP調整
-    // 7. 税金・手数料計算
-    // 8. BonusResultレコード作成
+    // ボーナス計算実行（エンジン呼び出し）
+    const result = await executeBonusCalculation(
+      bonusMonth,
+      paymentAdjustmentRate ? Number(paymentAdjustmentRate) : null
+    );
 
     return NextResponse.json({
       success: true,
-      bonusRunId: bonusRun.id.toString(),
-      message: "ボーナス計算を開始しました（実際の計算ロジックは未実装）",
+      bonusRunId: result.bonusRunId.toString(),
+      totalMembers: result.totalMembers,
+      totalActiveMembers: result.totalActiveMembers,
+      totalBonusAmount: result.totalBonusAmount,
+      message: `ボーナス計算が完了しました（対象: ${result.totalMembers}名、アクティブ: ${result.totalActiveMembers}名）`,
     });
   } catch (error) {
     console.error("Error executing bonus calculation:", error);

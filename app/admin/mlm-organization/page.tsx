@@ -160,14 +160,39 @@ export default function MlmOrganizationPage() {
     const indent = depth * 40;
     const hasChildren = node.directDownlines && node.directDownlines.length > 0;
 
+    // レベル別の色設定（Phase 7: レベル別色分け）
+    const getLevelColor = (level: number) => {
+      switch (level) {
+        case 0: return "bg-gray-400"; // レベルなし
+        case 1: return "bg-blue-500"; // LV.1
+        case 2: return "bg-green-500"; // LV.2
+        case 3: return "bg-yellow-500"; // LV.3
+        case 4: return "bg-purple-500"; // LV.4
+        case 5: return "bg-red-500"; // LV.5
+        default: return "bg-gray-400";
+      }
+    };
+
+    const getLevelLabel = (level: number) => {
+      switch (level) {
+        case 0: return "未設定";
+        case 1: return "LV.1";
+        case 2: return "LV.2";
+        case 3: return "LV.3";
+        case 4: return "LV.4";
+        case 5: return "LV.5";
+        default: return `LV.${level}`;
+      }
+    };
+
     return (
       <div key={node.id} className="mb-2">
         <div
           className="flex items-center gap-3 p-3 bg-white rounded-lg shadow hover:shadow-md transition"
           style={{ marginLeft: `${indent}px` }}
         >
-          <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm">
-            {node.level}
+          <div className={`w-10 h-10 ${getLevelColor(node.level)} text-white rounded-full flex items-center justify-center font-bold text-xs`}>
+            {getLevelLabel(node.level)}
           </div>
           <div className="flex-1">
             <div className="font-semibold text-gray-800">
