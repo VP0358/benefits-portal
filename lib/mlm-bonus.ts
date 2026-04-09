@@ -15,27 +15,36 @@ export const ACTIVE_REQUIRED_PRODUCTS = ["1000", "2000"];
 export const DIRECT_BONUS_PRODUCT = "s1000";
 export const DIRECT_BONUS_AMOUNT = 2000; // 円/個
 
-// ━━━ レベル達成条件（グループポイント範囲） ━━━
-export const LEVEL_GP_RANGES = [
-  { level: 0, min: 0,       max: 299 },
-  { level: 1, min: 300,     max: 4500 },
-  { level: 2, min: 4501,    max: 15000 },
-  { level: 3, min: 15001,   max: 45000 },
-  { level: 4, min: 45001,   max: 150000 },
-  { level: 5, min: 150001,  max: Infinity },
+// ━━━ レベル達成条件（翠彩流通個数範囲）2026年3月4日版 ━━━
+export const LEVEL_ITEM_RANGES = [
+  { level: 0, min: 0,    max: 1 },
+  { level: 1, min: 2,    max: 30 },
+  { level: 2, min: 31,   max: 100 },
+  { level: 3, min: 101,  max: 300 },
+  { level: 4, min: 301,  max: 1000 },
+  { level: 5, min: 1001, max: Infinity },
 ];
 
-// ━━━ ユニレベルボーナス算出率テーブル ━━━
-// conditionAchieved=true の場合のみレベル別に適用
-// conditionAchieved=false の場合は共通（1段:15%, 2段:7%, 3段:3%）
+// ━━━ ユニレベルボーナス獲得段数制限 ━━━
+// LV.1: 3段目まで、LV.2: 5段目まで、LV.3+: 7段目まで
+export const UNILEVEL_MAX_DEPTH: Record<number, number> = {
+  0: 0, // レベルなし → 獲得なし
+  1: 3, // LV.1 → 3段目まで
+  2: 5, // LV.2 → 5段目まで
+  3: 7, // LV.3 → 7段目まで
+  4: 7, // LV.4 → 7段目まで
+  5: 7, // LV.5 → 7段目まで
+};
+
+// ━━━ ユニレベルボーナス算出率テーブル（レベル別）2026年3月4日版 ━━━
+// スクリーンショット2枚目の表に基づく
 export const UNILEVEL_RATES: Record<number, number[]> = {
-  // [条件未達成 or レベルなし or LV1]
-  0: [15, 7, 3, 0, 0, 0, 0],
-  1: [15, 7, 3, 0, 0, 0, 0],
-  2: [15, 7, 4, 3, 1, 0, 0],
-  3: [15, 8, 5, 4, 2, 2, 1],
-  4: [15, 9, 6, 5, 3, 2, 1],
-  5: [15, 10, 7, 6, 4, 3, 2],
+  0: [0, 0, 0, 0, 0, 0, 0],       // レベルなし
+  1: [15, 7, 3, 0, 0, 0, 0],      // LV.1 → 3段目まで
+  2: [15, 7, 3, 1, 1, 0, 0],      // LV.2 → 5段目まで（実際の表の値）
+  3: [15, 8, 5, 4, 2, 1, 1],      // LV.3 → 7段目まで（実際の表の値）
+  4: [15, 9, 6, 5, 3, 2, 1],      // LV.4 → 7段目まで（実際の表の値）
+  5: [15, 10, 7, 6, 4, 3, 2],     // LV.5 → 7段目まで（実際の表の値）
 };
 
 // ━━━ 組織構築ボーナス率（LV.3以上、01ポジションのみ） ━━━
@@ -50,15 +59,24 @@ export const SAVINGS_BONUS_RATE = 0.20; // s商品購入時: 自己購入ptの20
 export const AS_SAVINGS_RATE = 0.05;    // オートシップ伝票合計ptの5%
 
 /**
- * グループポイントからレベルを計算
+ * 翠彩流通個数からレベルを計算（2026年3月4日版）
+ * @param itemCount 7段目以内の総pt（翠彩流通個数）
  */
-export function calcLevelFromGP(gp: number): number {
-  for (let i = LEVEL_GP_RANGES.length - 1; i >= 0; i--) {
-    if (gp >= LEVEL_GP_RANGES[i].min) {
-      return LEVEL_GP_RANGES[i].level;
+export function calcLevelFromItemCount(itemCount: number): number {
+  for (let i = LEVEL_ITEM_RANGES.length - 1; i >= 0; i--) {
+    if (itemCount >= LEVEL_ITEM_RANGES[i].min) {
+      return LEVEL_ITEM_RANGES[i].level;
     }
   }
   return 0;
+}
+
+/**
+ * @deprecated 旧仕様（グループポイントベース）→ 新仕様は翠彩流通個数ベース
+ */
+export function calcLevelFromGP(gp: number): number {
+  // 後方互換性のため残す（1pt=1個として換算）
+  return calcLevelFromItemCount(Math.floor(gp / 150));
 }
 
 /**
@@ -93,30 +111,46 @@ export function isActiveMember(params: {
 
 /**
  * ユニレベルボーナス算出率を取得（段数ごと）
- * conditionAchieved=false の場合は0扱い（共通テーブル適用）
+ * 2026年3月4日版: レベル別に獲得段数が異なる
+ * 直接紹介2人以上が購入していることが条件
  */
 export function getUnilevelRates(
   achievedLevel: number,
-  conditionAchieved: boolean
+  directActiveCount: number
 ): number[] {
-  if (!conditionAchieved) return UNILEVEL_RATES[0];
+  // 直接紹介2人以上が購入していない場合は獲得なし
+  if (directActiveCount < 2) return UNILEVEL_RATES[0];
+  
   return UNILEVEL_RATES[achievedLevel] ?? UNILEVEL_RATES[0];
 }
 
 /**
+ * ユニレベルボーナス獲得可能な最大段数を取得
+ */
+export function getUnilevelMaxDepth(achievedLevel: number): number {
+  return UNILEVEL_MAX_DEPTH[achievedLevel] ?? 0;
+}
+
+/**
  * ユニレベルボーナス計算（1段ごとのポイント × 算出率 × ポイントレート）
+ * 2026年3月4日版: レベル別に獲得段数制限あり
  * 非アクティブポジションは圧縮（スキップ）される前提でptが渡される
+ * @param depthPoints { 1: pt, 2: pt, ... }
+ * @param achievedLevel 当月実績レベル
+ * @param directActiveCount 直接紹介アクティブ数
  */
 export function calcUnilevelBonus(
-  depthPoints: Record<number, number>, // { 1: pt, 2: pt, ... }
+  depthPoints: Record<number, number>,
   achievedLevel: number,
-  conditionAchieved: boolean
+  directActiveCount: number
 ): { total: number; detail: Record<number, number> } {
-  const rates = getUnilevelRates(achievedLevel, conditionAchieved);
+  const rates = getUnilevelRates(achievedLevel, directActiveCount);
+  const maxDepth = getUnilevelMaxDepth(achievedLevel);
   let total = 0;
   const detail: Record<number, number> = {};
 
-  for (let depth = 1; depth <= 7; depth++) {
+  // レベル別の獲得段数まで計算
+  for (let depth = 1; depth <= maxDepth; depth++) {
     const pt = depthPoints[depth] ?? 0;
     const rate = rates[depth - 1] ?? 0;
     if (rate > 0 && pt > 0) {
@@ -160,17 +194,56 @@ export function calcNewTitleLevel(
 }
 
 /**
- * レベル達成条件チェック
+ * レベル達成条件チェック（2026年3月4日版）
  * ① 当月アクティブ
- * ② 直接紹介アクティブ数 2名以上
- * ③ conditionAchieved = true
+ * ② 翠彩流通個数が条件範囲内
+ * ③ 各レベル条件達成（LV.3以降は毎月条件達成が必要）
+ * 
+ * レベル別条件:
+ * - LV.1: 系列2, 自己購入1個以上
+ * - LV.2: 系列2, 自己購入1個以上, LV.1達成者各系列1名以上
+ * - LV.3: 系列3, 自己購入2個以上, LV.1達成者各系列1名以上, 最小系列売上%付与3%
+ * - LV.4: 系列3, 自己購入3個以上, LV.2達成者各系列1名以上, 最小系列売上%付与3.5%
+ * - LV.5: 系列3, 自己購入3個以上, LV.3達成者各系列1名以上, 最小系列売上%付与4%
  */
-export function checkLevelCondition(
-  isActive: boolean,
-  directActiveCount: number,
-  conditionAchievedFlag: boolean
-): boolean {
-  return isActive && directActiveCount >= 2 && conditionAchievedFlag;
+export function checkLevelCondition(params: {
+  level: number;
+  isActive: boolean;
+  seriesCount: number;
+  selfPurchaseCount: number;
+  seriesLevelAchievers: Record<number, number>; // { 1: count, 2: count, ... }
+}): boolean {
+  const { level, isActive, seriesCount, selfPurchaseCount, seriesLevelAchievers } = params;
+  
+  if (!isActive) return false;
+
+  switch (level) {
+    case 1:
+      return seriesCount >= 2 && selfPurchaseCount >= 1;
+    
+    case 2:
+      return seriesCount >= 2 && 
+             selfPurchaseCount >= 1 && 
+             (seriesLevelAchievers[1] ?? 0) >= 1;
+    
+    case 3:
+      return seriesCount >= 3 && 
+             selfPurchaseCount >= 2 && 
+             (seriesLevelAchievers[1] ?? 0) >= 1;
+    
+    case 4:
+      return seriesCount >= 3 && 
+             selfPurchaseCount >= 3 && 
+             (seriesLevelAchievers[2] ?? 0) >= 1;
+    
+    case 5:
+      return seriesCount >= 3 && 
+             selfPurchaseCount >= 3 && 
+             (seriesLevelAchievers[3] ?? 0) >= 1;
+    
+    default:
+      return false;
+  }
 }
 
 /**
@@ -226,3 +299,73 @@ export const MLM_PRODUCTS = [
   { code: "2000",  name: "VIOLA Pure 翠彩-SUMISAI-",                   price: 16500, points: 150 },
   { code: "4000",  name: "出荷事務手数料",                               price: 880,   points: 0   },
 ];
+
+/**
+ * 貯金ボーナス（SAVpt）計算 - 登録時
+ * s商品（登録料）購入時に自己購入ptの20%を貯金ポイントとして付与
+ * 
+ * @param registrationPoints 登録時の自己購入ポイント（s1000）
+ * @param registrationRate 登録時貯金ボーナス率（デフォルト20%）
+ * @returns 貯金ポイント（SAVpt）
+ */
+export function calcRegistrationSavingsBonus(
+  registrationPoints: number,
+  registrationRate: number = 20.0
+): number {
+  return Math.floor(registrationPoints * (registrationRate / 100));
+}
+
+/**
+ * 貯金ボーナス（SAVpt）計算 - オートシップ決済時
+ * オートシップ伝票の合計ポイントの5%を貯金ポイントとして付与
+ * 
+ * @param autoshipInvoicePoints オートシップ伝票の合計ポイント
+ * @param autoshipRate オートシップ貯金ボーナス率（デフォルト5%）
+ * @returns 貯金ポイント（SAVpt）
+ */
+export function calcAutoshipSavingsBonus(
+  autoshipInvoicePoints: number,
+  autoshipRate: number = 5.0
+): number {
+  return Math.floor(autoshipInvoicePoints * (autoshipRate / 100));
+}
+
+/**
+ * 貯金ボーナス（SAVpt）計算 - 月次ボーナス計算時（毎月25日）
+ * 月次コミッション（全ボーナス合計）の3%を貯金ポイントとして付与
+ * 
+ * @param totalCommission 当月コミッション合計（円）
+ * @param bonusRate ボーナス計算時貯金ボーナス率（デフォルト3%）
+ * @returns 貯金ポイント（SAVpt）
+ */
+export function calcBonusSavingsPoints(
+  totalCommission: number,
+  bonusRate: number = 3.0
+): number {
+  // コミッション（円）をポイント換算（1pt = ¥100）してから3%適用
+  const commissionPoints = Math.floor(totalCommission / POINT_RATE);
+  return Math.floor(commissionPoints * (bonusRate / 100));
+}
+
+/**
+ * 貯金ボーナス（SAVpt）換金可能判定
+ * 10,000pt単位で換金可能（オートシップ契約者のみ）
+ * 
+ * @param savingsPoints 貯金ポイント累計
+ * @returns { cashable: boolean, cashableAmount: number, remainingPoints: number }
+ */
+export function calcCashableSavingsPoints(savingsPoints: number): {
+  cashable: boolean;
+  cashableAmount: number;
+  remainingPoints: number;
+} {
+  const cashableUnits = Math.floor(savingsPoints / 10000);
+  const cashableAmount = cashableUnits * 10000 * POINT_RATE; // 円換算
+  const remainingPoints = savingsPoints % 10000;
+
+  return {
+    cashable: cashableUnits > 0,
+    cashableAmount,
+    remainingPoints,
+  };
+}
