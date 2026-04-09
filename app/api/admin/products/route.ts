@@ -1,41 +1,94 @@
-// 動的レンダリングを強制（ビルド時にこのルートを実行しない）
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { neon } from "@neondatabase/serverless";
 
+const sql = neon(process.env.DATABASE_URL!);
 
-import { z } from "zod";
-import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/app/api/admin/route-guard";
+/**
+ * GET /api/admin/products
+ * 商品マスター一覧取得
+ */
+export async function GET(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-const schema = z.object({
-  code: z.string().max(50).optional().nullable(),
-  name: z.string().min(1).max(255),
-  description: z.string().max(500).optional().nullable(),
-  price: z.number().int().nonnegative(),
-  imageUrl: z.string().url().max(500).optional().nullable().or(z.literal("")),
-  isActive: z.boolean().default(true),
-});
+  try {
+    const products = await sql`
+      SELECT 
+        id,
+        product_code,
+        name,
+        description,
+        price,
+        cost,
+        pv,
+        status,
+        created_at,
+        updated_at
+      FROM mlm_products
+      ORDER BY product_code ASC
+    `;
 
-export async function GET() {
-  const guard = await requireAdmin();
-  if (guard.error) return guard.error;
-  const list = await prisma.product.findMany({ orderBy: { createdAt: "desc" } });
-  return NextResponse.json(list.map(p => ({ ...p, id: p.id.toString() })));
+    return NextResponse.json({ products });
+  } catch (error: any) {
+    console.error("❌ 商品一覧取得エラー:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
 
+/**
+ * POST /api/admin/products
+ * 商品追加
+ */
 export async function POST(req: NextRequest) {
-  const guard = await requireAdmin();
-  if (guard.error) return guard.error;
-  const json = await req.json();
-  const parsed = schema.safeParse(json);
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  const data = { 
-    ...parsed.data, 
-    code: parsed.data.code || null,
-    imageUrl: parsed.data.imageUrl || null 
-  };
-  const product = await prisma.product.create({ data });
-  return NextResponse.json({ ...product, id: product.id.toString() }, { status: 201 });
+  const session = await auth();
+  if (!session?.user || session.user.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+    const { product_code, name, description, price, cost, pv, status } = body;
+
+    // バリデーション
+    if (!product_code || !name || price == null) {
+      return NextResponse.json(
+        { error: "商品コード、商品名、価格は必須です" },
+        { status: 400 }
+      );
+    }
+
+    // 商品コード重複チェック
+    const existing = await sql`
+      SELECT id FROM mlm_products WHERE product_code = ${product_code}
+    `;
+    if (existing.length > 0) {
+      return NextResponse.json(
+        { error: "この商品コードは既に使用されています" },
+        { status: 400 }
+      );
+    }
+
+    // 商品追加
+    const result = await sql`
+      INSERT INTO mlm_products (product_code, name, description, price, cost, pv, status)
+      VALUES (
+        ${product_code},
+        ${name},
+        ${description || null},
+        ${price},
+        ${cost || 0},
+        ${pv || 0},
+        ${status || 'active'}
+      )
+      RETURNING *
+    `;
+
+    return NextResponse.json({ product: result[0] }, { status: 201 });
+  } catch (error: any) {
+    console.error("❌ 商品追加エラー:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }

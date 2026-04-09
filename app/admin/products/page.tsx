@@ -3,212 +3,456 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 
-type Product = {
+interface MlmProduct {
   id: string;
-  code: string | null;
+  product_code: string;
   name: string;
-  description: string | null;
+  description?: string;
   price: number;
-  isActive: boolean;
+  cost?: number;
+  pv: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ProductFormData {
+  product_code: string;
+  name: string;
+  description: string;
+  price: string;
+  cost: string;
+  pv: string;
+  status: string;
+}
+
+const INITIAL_FORM: ProductFormData = {
+  product_code: "",
+  name: "",
+  description: "",
+  price: "",
+  cost: "",
+  pv: "",
+  status: "active",
 };
 
-export default function AdminProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
+export default function ProductsManagementPage() {
+  const [products, setProducts] = useState<MlmProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editPrice, setEditPrice] = useState<number>(0);
+  const [formData, setFormData] = useState<ProductFormData>(INITIAL_FORM);
+  const [formError, setFormError] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    loadProducts();
-  }, []);
-
-  const loadProducts = async () => {
+  // 商品一覧取得
+  const fetchProducts = async () => {
+    setLoading(true);
+    setError("");
     try {
       const res = await fetch("/api/admin/products");
       const data = await res.json();
-      setProducts(data);
-    } catch (error) {
-      console.error("Failed to load products:", error);
+      if (!res.ok) throw new Error(data.error || "取得エラー");
+      setProducts(data.products || []);
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEditPrice = (product: Product) => {
-    setEditingId(product.id);
-    setEditPrice(product.price);
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  // 新規追加モーダル表示
+  const handleAddNew = () => {
+    setEditingId(null);
+    setFormData(INITIAL_FORM);
+    setFormError("");
+    setShowModal(true);
   };
 
-  const handleSavePrice = async (productId: string) => {
+  // 編集モーダル表示
+  const handleEdit = (product: MlmProduct) => {
+    setEditingId(product.id);
+    setFormData({
+      product_code: product.product_code,
+      name: product.name,
+      description: product.description || "",
+      price: product.price.toString(),
+      cost: product.cost?.toString() || "0",
+      pv: product.pv.toString(),
+      status: product.status,
+    });
+    setFormError("");
+    setShowModal(true);
+  };
+
+  // 保存（追加 or 更新）
+  const handleSave = async () => {
+    setFormError("");
+
+    // バリデーション
+    if (!formData.product_code.trim()) {
+      setFormError("商品コードを入力してください");
+      return;
+    }
+    if (!formData.name.trim()) {
+      setFormError("商品名を入力してください");
+      return;
+    }
+    if (!formData.price || parseFloat(formData.price) < 0) {
+      setFormError("正しい価格を入力してください");
+      return;
+    }
+
+    setSaving(true);
+
     try {
-      const product = products.find(p => p.id === productId);
-      if (!product) return;
+      const body = {
+        product_code: formData.product_code.trim(),
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        price: parseFloat(formData.price) || 0,
+        cost: parseFloat(formData.cost) || 0,
+        pv: parseInt(formData.pv) || 0,
+        status: formData.status,
+      };
 
-      const res = await fetch(`/api/admin/products/${productId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: product.code,
-          name: product.name,
-          description: product.description,
-          price: editPrice,
-          imageUrl: null,
-          isActive: product.isActive,
-        }),
-      });
-
-      if (res.ok) {
-        await loadProducts();
-        setEditingId(null);
-        alert("価格を更新しました");
+      let res: Response;
+      if (editingId) {
+        // 更新
+        res = await fetch(`/api/admin/products/${editingId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
       } else {
-        alert("更新に失敗しました");
+        // 追加
+        res = await fetch("/api/admin/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
       }
-    } catch (error) {
-      console.error("Failed to update price:", error);
-      alert("エラーが発生しました");
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "保存エラー");
+
+      // 成功
+      setShowModal(false);
+      fetchProducts();
+    } catch (err: any) {
+      setFormError(err.message);
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setEditPrice(0);
+  // 削除
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`商品「${name}」を削除してもよろしいですか？`)) return;
+
+    try {
+      const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "削除エラー");
+
+      alert("削除しました");
+      fetchProducts();
+    } catch (err: any) {
+      alert(`削除エラー: ${err.message}`);
+    }
   };
 
-  if (loading) {
-    return (
-      <main className="space-y-6">
-        <div className="text-center py-8 text-slate-600">読み込み中...</div>
-      </main>
-    );
-  }
+  // 税込価格計算
+  const taxIncludedPrice = (price: number) => Math.floor(price * 1.1);
+
+  // ポイント表示（1pt = ¥100）
+  const calculatePoints = (price: number) => Math.floor(price / 100);
 
   return (
-    <main className="space-y-6">
+    <div className="min-h-screen bg-gray-50">
       {/* ヘッダー */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-800">商品管理</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            商品コード・商品名・金額を管理します
-          </p>
+      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/admin/dashboard"
+              className="text-gray-600 hover:text-gray-800 transition"
+            >
+              ← 戻る
+            </Link>
+            <h1 className="text-xl font-bold text-gray-800">📦 商品マスター管理</h1>
+          </div>
+          <button
+            onClick={handleAddNew}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition"
+          >
+            ➕ 新規商品追加
+          </button>
         </div>
-        <Link 
-          href="/admin/products/new" 
-          className="rounded-xl bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-800 transition"
-        >
-          <i className="fas fa-plus mr-2"></i>
-          新規追加
-        </Link>
-      </div>
+      </header>
 
-      {/* 商品一覧テーブル */}
-      <div className="rounded-3xl bg-white shadow-sm overflow-hidden">
-        <div className="grid grid-cols-[150px_1fr_150px_80px_120px] gap-4 border-b px-6 py-4 font-semibold text-slate-700 text-sm bg-slate-50">
-          <div>商品コード</div>
-          <div>商品名</div>
-          <div>価格</div>
-          <div>状態</div>
-          <div>操作</div>
-        </div>
-
-        {products.length === 0 && (
-          <div className="px-6 py-8 text-center text-slate-700 text-sm">
-            商品がありません
+      {/* メインコンテンツ */}
+      <main className="max-w-7xl mx-auto px-4 py-6">
+        {loading && (
+          <div className="text-center py-8 text-gray-600">
+            <p className="animate-pulse">読み込み中...</p>
           </div>
         )}
 
-        {products.map((p) => (
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <p className="text-red-800 font-medium">❌ {error}</p>
+          </div>
+        )}
+
+        {!loading && !error && (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left p-3 font-semibold text-gray-700">商品コード</th>
+                    <th className="text-left p-3 font-semibold text-gray-700">商品名</th>
+                    <th className="text-left p-3 font-semibold text-gray-700">価格（税抜）</th>
+                    <th className="text-left p-3 font-semibold text-gray-700">税込価格</th>
+                    <th className="text-left p-3 font-semibold text-gray-700">ポイント</th>
+                    <th className="text-left p-3 font-semibold text-gray-700">原価</th>
+                    <th className="text-left p-3 font-semibold text-gray-700">PV</th>
+                    <th className="text-left p-3 font-semibold text-gray-700">ステータス</th>
+                    <th className="text-left p-3 font-semibold text-gray-700">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="text-center py-8 text-gray-600">
+                        商品が登録されていません
+                      </td>
+                    </tr>
+                  ) : (
+                    products.map((p) => (
+                      <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="p-3 font-mono text-gray-800">{p.product_code}</td>
+                        <td className="p-3 font-medium text-gray-800">
+                          {p.name}
+                          {p.description && (
+                            <p className="text-xs text-gray-500 mt-0.5">{p.description}</p>
+                          )}
+                        </td>
+                        <td className="p-3 text-gray-800">¥{p.price.toLocaleString()}</td>
+                        <td className="p-3 text-gray-600 text-xs">
+                          ¥{taxIncludedPrice(p.price).toLocaleString()}
+                        </td>
+                        <td className="p-3 font-semibold text-green-600">
+                          {calculatePoints(p.price)} pt
+                        </td>
+                        <td className="p-3 text-gray-600">
+                          {p.cost ? `¥${p.cost.toLocaleString()}` : "-"}
+                        </td>
+                        <td className="p-3 text-gray-700">{p.pv}</td>
+                        <td className="p-3">
+                          <span
+                            className={`inline-block px-2 py-1 text-xs font-semibold rounded ${
+                              p.status === "active"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-gray-200 text-gray-600"
+                            }`}
+                          >
+                            {p.status === "active" ? "有効" : "無効"}
+                          </span>
+                        </td>
+                        <td className="p-3 space-x-2">
+                          <button
+                            onClick={() => handleEdit(p)}
+                            className="text-blue-600 hover:text-blue-800 font-medium text-xs"
+                          >
+                            ✏️ 編集
+                          </button>
+                          <button
+                            onClick={() => handleDelete(p.id, p.name)}
+                            className="text-red-600 hover:text-red-800 font-medium text-xs"
+                          >
+                            🗑️ 削除
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* 追加・編集モーダル */}
+      {showModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setShowModal(false)}
+        >
           <div
-            key={p.id}
-            className="grid grid-cols-[150px_1fr_150px_80px_120px] gap-4 border-b px-6 py-4 text-sm hover:bg-slate-50 transition"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
           >
-            {/* 商品コード */}
-            <div>
-              <div className="font-mono text-slate-600 font-semibold">
-                {p.code || "-"}
+            {/* モーダルヘッダー */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+              <h2 className="text-lg font-bold text-gray-800">
+                {editingId ? "✏️ 商品編集" : "➕ 新規商品追加"}
+              </h2>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-gray-600 hover:text-gray-800 text-2xl leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* モーダルコンテンツ */}
+            <div className="px-6 py-6 space-y-4">
+              {formError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-red-800 text-sm font-medium">❌ {formError}</p>
+                </div>
+              )}
+
+              {/* 商品コード */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  商品コード <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.product_code}
+                  onChange={(e) =>
+                    setFormData({ ...formData, product_code: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="例: 1000, 2000, s1000"
+                />
+              </div>
+
+              {/* 商品名 */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  商品名 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="例: VIOLA Pure 翠彩-SUMISAI-"
+                />
+              </div>
+
+              {/* 説明 */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  商品説明（任意）
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                  placeholder="商品の詳細説明"
+                />
+              </div>
+
+              {/* 価格（税抜） */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  価格（税抜） <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="15000"
+                  min="0"
+                />
+                {formData.price && (
+                  <p className="text-xs text-gray-600 mt-1">
+                    税込価格: ¥{taxIncludedPrice(parseFloat(formData.price) || 0).toLocaleString()} / 
+                    ポイント: {calculatePoints(parseFloat(formData.price) || 0)} pt
+                  </p>
+                )}
+              </div>
+
+              {/* 原価 */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  原価（任意）
+                </label>
+                <input
+                  type="number"
+                  value={formData.cost}
+                  onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="0"
+                  min="0"
+                />
+              </div>
+
+              {/* PV */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  PV（ポイントバリュー）
+                </label>
+                <input
+                  type="number"
+                  value={formData.pv}
+                  onChange={(e) => setFormData({ ...formData, pv: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="150"
+                  min="0"
+                />
+              </div>
+
+              {/* ステータス */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  ステータス
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="active">有効</option>
+                  <option value="inactive">無効</option>
+                </select>
               </div>
             </div>
 
-            {/* 商品名 */}
-            <div>
-              <div className="font-semibold text-slate-800">{p.name}</div>
-              {p.description && (
-                <div className="text-xs text-slate-500 mt-1">{p.description}</div>
-              )}
-            </div>
-
-            {/* 価格（インライン編集） */}
-            <div>
-              {editingId === p.id ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={editPrice}
-                    onChange={(e) => setEditPrice(Number(e.target.value))}
-                    className="w-24 px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    autoFocus
-                  />
-                  <span className="text-slate-600">円</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-slate-800">
-                    {p.price.toLocaleString()}円
-                  </span>
-                  <button
-                    onClick={() => handleEditPrice(p)}
-                    className="text-blue-600 hover:text-blue-800 text-xs"
-                    title="価格を編集"
-                  >
-                    <i className="fas fa-edit"></i>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* 状態 */}
-            <div>
-              <span
-                className={`rounded-full px-2 py-1 text-xs ${
-                  p.isActive
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-slate-100 text-slate-700"
-                }`}
+            {/* モーダルフッター */}
+            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex items-center justify-end gap-3 rounded-b-2xl">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition"
+                disabled={saving}
               >
-                {p.isActive ? "公開" : "非公開"}
-              </span>
-            </div>
-
-            {/* 操作 */}
-            <div className="flex gap-2">
-              {editingId === p.id ? (
-                <>
-                  <button
-                    onClick={() => handleSavePrice(p.id)}
-                    className="rounded-lg bg-blue-600 text-white px-3 py-1.5 text-xs font-medium hover:bg-blue-700"
-                  >
-                    保存
-                  </button>
-                  <button
-                    onClick={handleCancelEdit}
-                    className="rounded-lg border px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-50"
-                  >
-                    キャンセル
-                  </button>
-                </>
-              ) : (
-                <Link
-                  href={`/admin/products/${p.id}/edit`}
-                  className="rounded-lg border px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-50"
-                >
-                  編集
-                </Link>
-              )}
+                キャンセル
+              </button>
+              <button
+                onClick={handleSave}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50"
+                disabled={saving}
+              >
+                {saving ? "保存中..." : editingId ? "更新" : "追加"}
+              </button>
             </div>
           </div>
-        ))}
-      </div>
-    </main>
+        </div>
+      )}
+    </div>
   );
 }

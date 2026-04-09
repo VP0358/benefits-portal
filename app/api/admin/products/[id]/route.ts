@@ -1,62 +1,106 @@
-// 動的レンダリングを強制（ビルド時にこのルートを実行しない）
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { neon } from "@neondatabase/serverless";
 
+const sql = neon(process.env.DATABASE_URL!);
 
-import { z } from "zod";
-import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/app/api/admin/route-guard";
+/**
+ * PUT /api/admin/products/[id]
+ * 商品更新
+ */
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-const schema = z.object({
-  code: z.string().max(50).optional().nullable(),
-  name: z.string().min(1).max(255),
-  description: z.string().max(500).optional().nullable(),
-  price: z.number().int().nonnegative(),
-  imageUrl: z.string().url().max(500).optional().nullable().or(z.literal("")),
-  isActive: z.boolean(),
-});
+  try {
+    const resolvedParams = await params;
+    const { id } = resolvedParams;
+    const body = await req.json();
+    const { product_code, name, description, price, cost, pv, status } = body;
 
-function parseId(id: string) {
-  try { return BigInt(id); } catch { return null; }
+    // バリデーション
+    if (!product_code || !name || price == null) {
+      return NextResponse.json(
+        { error: "商品コード、商品名、価格は必須です" },
+        { status: 400 }
+      );
+    }
+
+    // 商品コード重複チェック（自分以外）
+    const existing = await sql`
+      SELECT id FROM mlm_products 
+      WHERE product_code = ${product_code} AND id != ${id}
+    `;
+    if (existing.length > 0) {
+      return NextResponse.json(
+        { error: "この商品コードは既に使用されています" },
+        { status: 400 }
+      );
+    }
+
+    // 商品更新
+    const result = await sql`
+      UPDATE mlm_products
+      SET 
+        product_code = ${product_code},
+        name = ${name},
+        description = ${description || null},
+        price = ${price},
+        cost = ${cost || 0},
+        pv = ${pv || 0},
+        status = ${status || 'active'},
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${id}
+      RETURNING *
+    `;
+
+    if (result.length === 0) {
+      return NextResponse.json({ error: "商品が見つかりません" }, { status: 404 });
+    }
+
+    return NextResponse.json({ product: result[0] });
+  } catch (error: any) {
+    console.error("❌ 商品更新エラー:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
 
-export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin();
-  if (guard.error) return guard.error;
-  const { id } = await params;
-  const pid = parseId(id);
-  if (!pid) return NextResponse.json({ error: "invalid id" }, { status: 400 });
-  const product = await prisma.product.findUnique({ where: { id: pid } });
-  if (!product) return NextResponse.json({ error: "not found" }, { status: 404 });
-  return NextResponse.json({ ...product, id: product.id.toString() });
-}
+/**
+ * DELETE /api/admin/products/[id]
+ * 商品削除
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin();
-  if (guard.error) return guard.error;
-  const { id } = await params;
-  const pid = parseId(id);
-  if (!pid) return NextResponse.json({ error: "invalid id" }, { status: 400 });
-  const json = await req.json();
-  const parsed = schema.safeParse(json);
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  const data = { 
-    ...parsed.data, 
-    code: parsed.data.code || null,
-    imageUrl: parsed.data.imageUrl || null 
-  };
-  const updated = await prisma.product.update({ where: { id: pid }, data });
-  return NextResponse.json({ ...updated, id: updated.id.toString() });
-}
+  try {
+    const resolvedParams = await params;
+    const { id } = resolvedParams;
 
-export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin();
-  if (guard.error) return guard.error;
-  const { id } = await params;
-  const pid = parseId(id);
-  if (!pid) return NextResponse.json({ error: "invalid id" }, { status: 400 });
-  await prisma.product.update({ where: { id: pid }, data: { isActive: false } });
-  return NextResponse.json({ message: "deleted" });
+    // 商品削除（物理削除）
+    const result = await sql`
+      DELETE FROM mlm_products
+      WHERE id = ${id}
+      RETURNING *
+    `;
+
+    if (result.length === 0) {
+      return NextResponse.json({ error: "商品が見つかりません" }, { status: 404 });
+    }
+
+    return NextResponse.json({ message: "商品を削除しました" });
+  } catch (error: any) {
+    console.error("❌ 商品削除エラー:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
