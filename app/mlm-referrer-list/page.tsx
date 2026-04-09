@@ -27,17 +27,24 @@ type ReferrerListData = {
   members: ReferralMember[];
 };
 
+// ── カラー定数 ──
+const GOLD       = "#d4a853";
+const GOLD_LIGHT = "#f0c060";
+const ORANGE     = "#e8893a";
+const PAGE_BG    = "#071228";
+const CARD_BG    = "#0f2347";
+
 const STATUS_LABELS: Record<string, string> = {
   active: "アクティブ", inactive: "非アクティブ", suspended: "停止中",
   canceled: "解約済", pending: "審査中",
 };
-const STATUS_DOT: Record<string, string> = {
-  active: "bg-emerald-400", inactive: "bg-slate-500", suspended: "bg-orange-400",
-  canceled: "bg-red-400", pending: "bg-blue-400",
-};
-const STATUS_TEXT: Record<string, string> = {
-  active: "text-emerald-300", inactive: "text-slate-400", suspended: "text-orange-300",
-  canceled: "text-red-300", pending: "text-blue-300",
+type StatusTheme = { dotColor: string; textColor: string };
+const STATUS_THEME: Record<string, StatusTheme> = {
+  active:    { dotColor: "#34d399", textColor: "#34d399" },
+  inactive:  { dotColor: "#9ca3af", textColor: "rgba(255,255,255,0.4)" },
+  suspended: { dotColor: "#f97316", textColor: "#f97316" },
+  canceled:  { dotColor: "#f87171", textColor: "#f87171" },
+  pending:   { dotColor: ORANGE,    textColor: ORANGE },
 };
 const TYPE_LABELS: Record<string, string> = {
   business: "ビジネス", favorite: "愛用",
@@ -76,29 +83,37 @@ export default function MlmReferrerListPage() {
   }) ?? [];
 
   return (
-    <div className="min-h-screen pb-10" style={{ background: "#0a0f1e" }}>
-      <header className="sticky top-0 z-20 border-b border-white/5"
-        style={{ background: "rgba(10,15,30,0.97)", backdropFilter: "blur(12px)" }}>
+    <div className="min-h-screen pb-10" style={{ background: PAGE_BG }}>
+      {/* ヘッダー */}
+      <header className="sticky top-0 z-20"
+        style={{ background: `rgba(7,18,40,0.97)`, backdropFilter: "blur(16px)", borderBottom: `1px solid ${GOLD}20` }}>
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center gap-3">
-          <Link href="/dashboard" className="flex items-center gap-1.5 text-white/50 hover:text-white transition">
+          <Link href="/dashboard" className="flex items-center gap-1.5 transition" style={{ color: "rgba(255,255,255,0.5)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
             <span className="text-sm">戻る</span>
           </Link>
-          <h1 className="text-base font-bold text-white ml-1">紹介者一覧</h1>
+          <div className="flex items-center gap-2 ml-1">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+              style={{ color: GOLD }}>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            <h1 className="text-base font-bold text-white">紹介者一覧</h1>
+          </div>
         </div>
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-5 space-y-4">
         {loading && (
-          <div className="rounded-2xl p-10 text-center text-white/30 text-sm" style={{ background: "#111827" }}>
-            <div className="w-6 h-6 border-2 border-white/20 border-t-indigo-400 rounded-full animate-spin mx-auto mb-3"></div>
-            読み込み中...
+          <div className="rounded-2xl p-10 text-center" style={{ background: CARD_BG }}>
+            <div className="w-8 h-8 border-2 rounded-full animate-spin mx-auto mb-3"
+              style={{ borderColor: `${GOLD}30`, borderTopColor: GOLD }}></div>
+            <p className="text-sm" style={{ color: `${GOLD}70` }}>読み込み中...</p>
           </div>
         )}
         {error && (
-          <div className="rounded-2xl p-6 text-center text-red-400 text-sm border border-red-500/20 bg-red-500/10">{error}</div>
+          <div className="rounded-2xl p-6 text-center text-sm border border-red-500/20 bg-red-500/10 text-red-400">{error}</div>
         )}
 
         {data && (
@@ -106,13 +121,14 @@ export default function MlmReferrerListPage() {
             {/* サマリー */}
             <div className="grid grid-cols-3 gap-3">
               {[
-                { label: "直紹介数",    value: data.totalCount,   accent: "border-white/10 bg-white/5",         text: "text-white" },
-                { label: "Act（ACT）",  value: data.activeCount,  accent: "border-emerald-400/20 bg-emerald-500/08", text: "text-emerald-300" },
-                { label: "愛用会員",    value: data.favoriteCount,accent: "border-amber-400/20 bg-amber-500/08", text: "text-amber-300" },
+                { label: "直紹介数",   value: data.totalCount,    color: GOLD },
+                { label: "ACT",        value: data.activeCount,   color: "#34d399" },
+                { label: "愛用会員",   value: data.favoriteCount, color: ORANGE },
               ].map((s) => (
-                <div key={s.label} className={`rounded-2xl border p-3.5 text-center ${s.accent}`}>
-                  <div className={`text-2xl font-black ${s.text}`}>{s.value}</div>
-                  <div className="text-[11px] text-white/30 mt-0.5">{s.label}</div>
+                <div key={s.label} className="rounded-2xl p-3.5 text-center"
+                  style={{ background: `${s.color}10`, border: `1px solid ${s.color}25` }}>
+                  <div className="text-2xl font-black" style={{ color: s.color }}>{s.value}</div>
+                  <div className="text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>{s.label}</div>
                 </div>
               ))}
             </div>
@@ -121,23 +137,31 @@ export default function MlmReferrerListPage() {
               <>
                 {/* 検索・フィルター */}
                 <div className="space-y-2.5">
-                  <input
-                    type="text"
-                    placeholder="名前・会員IDで検索..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full rounded-2xl border border-white/10 px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-indigo-400/50 transition"
-                    style={{ background: "#111827" }}
-                  />
+                  <div className="relative">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                      style={{ color: `${GOLD}50` }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input
+                      type="text"
+                      placeholder="名前・会員IDで検索..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="w-full rounded-2xl pl-10 pr-4 py-3 text-sm text-white placeholder-white/25 outline-none transition"
+                      style={{
+                        background: CARD_BG,
+                        border: `1px solid ${GOLD}20`,
+                      }}
+                    />
+                  </div>
                   <div className="flex gap-2">
                     {(["all", "active", "inactive"] as const).map((f) => (
                       <button key={f} onClick={() => setFilter(f)}
-                        className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-                          filter === f
-                            ? "bg-indigo-600 text-white"
-                            : "border border-white/10 text-white/50 hover:text-white hover:border-white/20"
-                        }`}
-                        style={{ background: filter === f ? undefined : "rgba(255,255,255,0.04)" }}>
+                        className="rounded-full px-3.5 py-1.5 text-xs font-semibold transition"
+                        style={filter === f
+                          ? { background: `linear-gradient(135deg, ${GOLD}, ${ORANGE})`, color: "white" }
+                          : { background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.5)", border: `1px solid ${GOLD}20` }
+                        }>
                         {f === "all" ? "すべて" : f === "active" ? "ACTのみ" : "非アクティブ"}
                       </button>
                     ))}
@@ -145,98 +169,114 @@ export default function MlmReferrerListPage() {
                 </div>
 
                 {/* 件数表示 */}
-                <div className="text-xs text-white/30 px-1 font-semibold tracking-wide">{filtered.length}件表示</div>
+                <div className="text-xs font-semibold tracking-wide px-1" style={{ color: `${GOLD}60` }}>{filtered.length}件表示</div>
 
                 {filtered.length === 0 ? (
-                  <div className="rounded-2xl p-8 text-center text-white/30 text-sm" style={{ background: "#111827" }}>
+                  <div className="rounded-2xl p-8 text-center text-sm" style={{ background: CARD_BG, color: "rgba(255,255,255,0.25)" }}>
                     該当する会員がいません
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {filtered.map((m) => (
-                      <div key={m.id} className="rounded-2xl overflow-hidden"
-                        style={{ background: "#111827", border: "1px solid rgba(255,255,255,0.07)" }}>
-                        <div className="px-4 py-4">
-                          {/* 上段：名前＋バッジ */}
-                          <div className="flex items-start justify-between gap-2 mb-3">
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-white/90 text-base">{m.name}</span>
-                                {m.isActive && (
-                                  <span className="rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/20 text-xs px-2 py-0.5 font-bold">
-                                    ACT
+                    {filtered.map((m) => {
+                      const st = STATUS_THEME[m.status] ?? STATUS_THEME.inactive;
+                      return (
+                        <div key={m.id} className="rounded-2xl overflow-hidden"
+                          style={{ background: CARD_BG, border: `1px solid ${GOLD}18` }}>
+                          <div className="px-5 py-4">
+                            {/* 上段：名前＋バッジ */}
+                            <div className="flex items-start justify-between gap-2 mb-3">
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-base text-white">{m.name}</span>
+                                  {m.isActive && (
+                                    <span className="rounded-full text-xs px-2 py-0.5 font-bold border"
+                                      style={{ background: "rgba(52,211,153,0.15)", color: "#34d399", borderColor: "rgba(52,211,153,0.25)" }}>
+                                      ACT
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-xs font-mono mt-0.5" style={{ color: "rgba(255,255,255,0.3)" }}>{m.memberCode}</div>
+                              </div>
+                              <div className="flex flex-col items-end gap-1.5">
+                                <span className="flex items-center gap-1 text-xs font-medium">
+                                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: st.dotColor }}></span>
+                                  <span style={{ color: st.textColor }}>{STATUS_LABELS[m.status] ?? m.status}</span>
+                                </span>
+                                <span className="text-xs px-2 py-0.5 rounded-full font-medium border"
+                                  style={m.memberType === "business"
+                                    ? { background: "rgba(96,165,250,0.12)", color: "#93c5fd", borderColor: "rgba(147,197,253,0.2)" }
+                                    : { background: `${GOLD}12`, color: GOLD, borderColor: `${GOLD}25` }
+                                  }>
+                                  {TYPE_LABELS[m.memberType] ?? m.memberType}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* 購入情報 */}
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="rounded-xl p-2.5 border"
+                                style={{ background: `${ORANGE}10`, borderColor: `${ORANGE}20` }}>
+                                <div className="text-[10px] font-semibold mb-1" style={{ color: `${ORANGE}80` }}>今月購入</div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold" style={{ color: ORANGE }}>
+                                    {m.currentMonthPoints > 0 ? `${m.currentMonthPoints.toLocaleString()}pt` : "—"}
                                   </span>
-                                )}
+                                  {m.currentMonthAmount > 0 && (
+                                    <span className="text-[10px]" style={{ color: `${ORANGE}60` }}>¥{m.currentMonthAmount.toLocaleString()}</span>
+                                  )}
+                                </div>
                               </div>
-                              <div className="text-xs font-mono text-white/30 mt-0.5">{m.memberCode}</div>
+                              <div className="rounded-xl p-2.5 border"
+                                style={{ background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.06)" }}>
+                                <div className="text-[10px] font-semibold mb-1" style={{ color: "rgba(255,255,255,0.3)" }}>先月購入</div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold" style={{ color: "rgba(255,255,255,0.5)" }}>
+                                    {m.lastMonthPoints > 0 ? `${m.lastMonthPoints.toLocaleString()}pt` : "—"}
+                                  </span>
+                                  {m.lastMonthAmount > 0 && (
+                                    <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.25)" }}>¥{m.lastMonthAmount.toLocaleString()}</span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex flex-col items-end gap-1.5">
-                              <span className={`flex items-center gap-1 text-xs font-medium ${STATUS_TEXT[m.status] ?? "text-white/40"}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[m.status] ?? "bg-slate-500"}`}></span>
-                                {STATUS_LABELS[m.status] ?? m.status}
-                              </span>
-                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                m.memberType === "business"
-                                  ? "bg-blue-500/15 text-blue-300 border border-blue-400/20"
-                                  : "bg-amber-500/15 text-amber-300 border border-amber-400/20"
-                              }`}>
-                                {TYPE_LABELS[m.memberType] ?? m.memberType}
-                              </span>
-                            </div>
-                          </div>
 
-                          {/* 購入情報 */}
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="rounded-xl p-2.5 border border-violet-400/15"
-                              style={{ background: "rgba(139,92,246,0.07)" }}>
-                              <div className="text-[10px] text-violet-400/70 font-semibold mb-1">今月購入</div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-violet-300">
-                                  {m.currentMonthPoints > 0 ? `${m.currentMonthPoints.toLocaleString()}pt` : "—"}
-                                </span>
-                                {m.currentMonthAmount > 0 && (
-                                  <span className="text-[10px] text-violet-400/60">¥{m.currentMonthAmount.toLocaleString()}</span>
-                                )}
-                              </div>
+                            {/* 契約日・レベル */}
+                            <div className="mt-2 flex items-center gap-3 text-[11px]" style={{ color: "rgba(255,255,255,0.25)" }}>
+                              {fmtDate(m.contractDate ?? m.registeredAt) && (
+                                <span>契約: {fmtDate(m.contractDate ?? m.registeredAt)}</span>
+                              )}
+                              {m.currentLevel > 0 && (
+                                <span className="rounded-full px-1.5 py-0.5 text-[10px]"
+                                  style={{ background: `${GOLD}12`, color: `${GOLD}80` }}>LV.{m.currentLevel}</span>
+                              )}
                             </div>
-                            <div className="rounded-xl p-2.5 border border-white/8"
-                              style={{ background: "rgba(255,255,255,0.04)" }}>
-                              <div className="text-[10px] text-white/30 font-semibold mb-1">先月購入</div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-white/50">
-                                  {m.lastMonthPoints > 0 ? `${m.lastMonthPoints.toLocaleString()}pt` : "—"}
-                                </span>
-                                {m.lastMonthAmount > 0 && (
-                                  <span className="text-[10px] text-white/30">¥{m.lastMonthAmount.toLocaleString()}</span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* 契約日・レベル */}
-                          <div className="mt-2 flex items-center gap-3 text-[11px] text-white/25">
-                            {fmtDate(m.contractDate ?? m.registeredAt) && (
-                              <span>契約: {fmtDate(m.contractDate ?? m.registeredAt)}</span>
-                            )}
-                            {m.currentLevel > 0 && <span>LV.{m.currentLevel}</span>}
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </>
             )}
 
             {data.members.length === 0 && !loading && (
-              <div className="rounded-2xl p-10 text-center" style={{ background: "#111827" }}>
-                <div className="text-4xl mb-3 opacity-40">👥</div>
-                <div className="text-white/30 text-sm">直紹介の会員がいません</div>
-                <div className="mt-4">
-                  <Link href="/referral" className="text-sm text-emerald-400 font-semibold hover:text-emerald-300 transition">
-                    → 友達を紹介する
-                  </Link>
+              <div className="rounded-2xl p-10 text-center" style={{ background: CARD_BG }}>
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                  style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}20` }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    style={{ color: `${GOLD}50` }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
                 </div>
+                <div className="text-sm mb-4" style={{ color: "rgba(255,255,255,0.3)" }}>直紹介の会員がいません</div>
+                <Link href="/referral"
+                  className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl text-white transition"
+                  style={{ background: `linear-gradient(135deg, ${GOLD}, ${ORANGE})` }}>
+                  友達を紹介する
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
               </div>
             )}
           </>
