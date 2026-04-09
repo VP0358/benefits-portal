@@ -6,15 +6,45 @@ import Link from "next/link";
 interface BonusSettings {
   id: number;
   directBonusAmount: number;
-  unilevelRate1: number;
-  unilevelRate2: number;
-  unilevelRate3: number;
-  unilevelRate4: number;
-  unilevelRate5: number;
-  unilevelRate6: number;
-  unilevelRate7: number;
-  structureMinSeriesRate1: number;
-  structureMinSeriesRate2: number;
+  // LV.1（3段目まで）
+  unilevelLv1Rate1: number;
+  unilevelLv1Rate2: number;
+  unilevelLv1Rate3: number;
+  // LV.2（5段目まで）
+  unilevelLv2Rate1: number;
+  unilevelLv2Rate2: number;
+  unilevelLv2Rate3: number;
+  unilevelLv2Rate4: number;
+  unilevelLv2Rate5: number;
+  // LV.3（7段目まで）
+  unilevelLv3Rate1: number;
+  unilevelLv3Rate2: number;
+  unilevelLv3Rate3: number;
+  unilevelLv3Rate4: number;
+  unilevelLv3Rate5: number;
+  unilevelLv3Rate6: number;
+  unilevelLv3Rate7: number;
+  // LV.4（7段目まで）
+  unilevelLv4Rate1: number;
+  unilevelLv4Rate2: number;
+  unilevelLv4Rate3: number;
+  unilevelLv4Rate4: number;
+  unilevelLv4Rate5: number;
+  unilevelLv4Rate6: number;
+  unilevelLv4Rate7: number;
+  // LV.5（7段目まで）
+  unilevelLv5Rate1: number;
+  unilevelLv5Rate2: number;
+  unilevelLv5Rate3: number;
+  unilevelLv5Rate4: number;
+  unilevelLv5Rate5: number;
+  unilevelLv5Rate6: number;
+  unilevelLv5Rate7: number;
+  // 組織構築ボーナス（LV3以上）
+  structureLv3Rate: number;
+  structureLv4Rate: number;
+  structureLv5Rate: number;
+  // その他設定
   activeThresholdPoints: number;
   serviceFeeAmount: number;
   minPayoutAmount: number;
@@ -250,59 +280,190 @@ export default function BonusSettingsPage() {
           </div>
         </section>
 
-        {/* ユニレベルボーナス設定 */}
+        {/* ユニレベルボーナス設定（レベル別） */}
         <section className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            📊 ユニレベルボーナス設定（7段階）
+            📊 ユニレベルボーナス設定（レベル別）
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-            {[1, 2, 3, 4, 5, 6, 7].map((level) => {
-              const key = `unilevelRate${level}` as keyof BonusSettings;
-              return (
-                <div key={level}>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    {level}段目（%）
-                  </label>
-                  <input
-                    type="number"
-                    value={bonusSettings[key] as number}
-                    onChange={(e) =>
-                      setBonusSettings({
-                        ...bonusSettings,
-                        [key]: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    step="0.1"
-                    min="0"
-                    max="100"
-                  />
-                </div>
-              );
-            })}
+
+          {/* LV.1（3段目まで） */}
+          <div className="mb-6 border border-blue-200 rounded-lg p-4 bg-blue-50">
+            <h3 className="text-md font-bold text-blue-800 mb-3">LV.1（最大3段目まで）</h3>
+            <div className="grid grid-cols-3 gap-3">
+              {[1, 2, 3].map((step) => {
+                const key = `unilevelLv1Rate${step}` as keyof BonusSettings;
+                return (
+                  <div key={step}>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      {step}段目（%）
+                    </label>
+                    <input
+                      type="number"
+                      value={bonusSettings[key] as number}
+                      onChange={(e) =>
+                        setBonusSettings({
+                          ...bonusSettings,
+                          [key]: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs text-gray-600 mt-2">デフォルト: 15%, 7%, 3%</p>
           </div>
-          <p className="text-xs text-gray-500 mt-3">
-            デフォルト: 1段目15%, 2段目10%, 3段目7%, 4段目5%, 5段目3%, 6段目2%, 7段目1%
-          </p>
+
+          {/* LV.2（5段目まで） */}
+          <div className="mb-6 border border-green-200 rounded-lg p-4 bg-green-50">
+            <h3 className="text-md font-bold text-green-800 mb-3">LV.2（最大5段目まで）</h3>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {[1, 2, 3, 4, 5].map((step) => {
+                const key = `unilevelLv2Rate${step}` as keyof BonusSettings;
+                return (
+                  <div key={step}>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      {step}段目（%）
+                    </label>
+                    <input
+                      type="number"
+                      value={bonusSettings[key] as number}
+                      onChange={(e) =>
+                        setBonusSettings({
+                          ...bonusSettings,
+                          [key]: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs text-gray-600 mt-2">デフォルト: 15%, 7%, 3%, 1%, 1%</p>
+          </div>
+
+          {/* LV.3（7段目まで） */}
+          <div className="mb-6 border border-yellow-200 rounded-lg p-4 bg-yellow-50">
+            <h3 className="text-md font-bold text-yellow-800 mb-3">LV.3（最大7段目まで）</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+              {[1, 2, 3, 4, 5, 6, 7].map((step) => {
+                const key = `unilevelLv3Rate${step}` as keyof BonusSettings;
+                return (
+                  <div key={step}>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      {step}段目（%）
+                    </label>
+                    <input
+                      type="number"
+                      value={bonusSettings[key] as number}
+                      onChange={(e) =>
+                        setBonusSettings({
+                          ...bonusSettings,
+                          [key]: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs text-gray-600 mt-2">デフォルト: 15%, 8%, 5%, 4%, 2%, 1%, 1%</p>
+          </div>
+
+          {/* LV.4（7段目まで） */}
+          <div className="mb-6 border border-purple-200 rounded-lg p-4 bg-purple-50">
+            <h3 className="text-md font-bold text-purple-800 mb-3">LV.4（最大7段目まで）</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+              {[1, 2, 3, 4, 5, 6, 7].map((step) => {
+                const key = `unilevelLv4Rate${step}` as keyof BonusSettings;
+                return (
+                  <div key={step}>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      {step}段目（%）
+                    </label>
+                    <input
+                      type="number"
+                      value={bonusSettings[key] as number}
+                      onChange={(e) =>
+                        setBonusSettings({
+                          ...bonusSettings,
+                          [key]: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs text-gray-600 mt-2">デフォルト: 15%, 9%, 6%, 5%, 3%, 2%, 1%</p>
+          </div>
+
+          {/* LV.5（7段目まで） */}
+          <div className="mb-6 border border-red-200 rounded-lg p-4 bg-red-50">
+            <h3 className="text-md font-bold text-red-800 mb-3">LV.5（最大7段目まで）</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+              {[1, 2, 3, 4, 5, 6, 7].map((step) => {
+                const key = `unilevelLv5Rate${step}` as keyof BonusSettings;
+                return (
+                  <div key={step}>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      {step}段目（%）
+                    </label>
+                    <input
+                      type="number"
+                      value={bonusSettings[key] as number}
+                      onChange={(e) =>
+                        setBonusSettings({
+                          ...bonusSettings,
+                          [key]: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs text-gray-600 mt-2">デフォルト: 15%, 10%, 7%, 6%, 4%, 3%, 2%</p>
+          </div>
         </section>
 
-        {/* 組織構築ボーナス設定 */}
+        {/* 組織構築ボーナス設定（LV3以上） */}
         <section className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
             🏢 組織構築ボーナス設定（LV3以上）
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                最小系列1（%）
+                LV.3（%）
               </label>
               <input
                 type="number"
-                value={bonusSettings.structureMinSeriesRate1}
+                value={bonusSettings.structureLv3Rate}
                 onChange={(e) =>
                   setBonusSettings({
                     ...bonusSettings,
-                    structureMinSeriesRate1: parseFloat(e.target.value) || 0,
+                    structureLv3Rate: parseFloat(e.target.value) || 0,
                   })
                 }
                 className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -311,21 +472,21 @@ export default function BonusSettingsPage() {
                 max="100"
               />
               <p className="text-xs text-gray-500 mt-1">
-                最小系列の1つ目に適用される割合（デフォルト: 3%）
+                LV.3の組織構築ボーナス割合（デフォルト: 3%）
               </p>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                最小系列2（%）
+                LV.4（%）
               </label>
               <input
                 type="number"
-                value={bonusSettings.structureMinSeriesRate2}
+                value={bonusSettings.structureLv4Rate}
                 onChange={(e) =>
                   setBonusSettings({
                     ...bonusSettings,
-                    structureMinSeriesRate2: parseFloat(e.target.value) || 0,
+                    structureLv4Rate: parseFloat(e.target.value) || 0,
                   })
                 }
                 className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -334,12 +495,35 @@ export default function BonusSettingsPage() {
                 max="100"
               />
               <p className="text-xs text-gray-500 mt-1">
-                最小系列の2つ目に適用される割合（デフォルト: 4%）
+                LV.4の組織構築ボーナス割合（デフォルト: 3.5%）
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                LV.5（%）
+              </label>
+              <input
+                type="number"
+                value={bonusSettings.structureLv5Rate}
+                onChange={(e) =>
+                  setBonusSettings({
+                    ...bonusSettings,
+                    structureLv5Rate: parseFloat(e.target.value) || 0,
+                  })
+                }
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                step="0.1"
+                min="0"
+                max="100"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                LV.5の組織構築ボーナス割合（デフォルト: 4%）
               </p>
             </div>
           </div>
           <p className="text-xs text-gray-600 mt-3 p-3 bg-blue-50 rounded border border-blue-200">
-            💡 LV3以上の会員に適用されます。無制限段数で計算されます。
+            💡 LV3以上の会員に適用されます。無制限段数で最小系列売上から計算されます。
           </p>
         </section>
 
@@ -425,6 +609,7 @@ export default function BonusSettingsPage() {
             <li>• 既に計算済みのボーナスには影響しません</li>
             <li>• 貯金ボーナスの割合変更は、次回付与時から適用されます</li>
             <li>• 一度付与された貯金ポイントは変更できません</li>
+            <li>• ユニレベルボーナスの報酬段数は会員レベルにより異なります（LV1=3段、LV2=5段、LV3‑5=7段）</li>
           </ul>
         </section>
 

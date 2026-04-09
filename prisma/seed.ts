@@ -77,21 +77,51 @@ async function main() {
   await prisma.siteSetting.upsert({ where: { settingKey: "siteTitle" }, update: { settingValue: "福利厚生ポータル" }, create: { settingKey: "siteTitle", settingValue: "福利厚生ポータル" } });
   await prisma.siteSetting.upsert({ where: { settingKey: "faviconUrl" }, update: { settingValue: null }, create: { settingKey: "faviconUrl", settingValue: null } });
 
-  // ボーナス計算設定の初期化
+  // ボーナス計算設定の初期化（レベル別設定）
   const bonusSettings = await prisma.bonusSettings.findFirst();
   if (!bonusSettings) {
     await prisma.bonusSettings.create({
       data: {
         directBonusAmount: 2000,
-        unilevelRate1: 15.0,
-        unilevelRate2: 10.0,
-        unilevelRate3: 7.0,
-        unilevelRate4: 5.0,
-        unilevelRate5: 3.0,
-        unilevelRate6: 2.0,
-        unilevelRate7: 1.0,
-        structureMinSeriesRate1: 3.0,
-        structureMinSeriesRate2: 4.0,
+        // LV.1（3段目まで）
+        unilevelLv1Rate1: 15.0,
+        unilevelLv1Rate2: 7.0,
+        unilevelLv1Rate3: 3.0,
+        // LV.2（5段目まで）
+        unilevelLv2Rate1: 15.0,
+        unilevelLv2Rate2: 7.0,
+        unilevelLv2Rate3: 3.0,
+        unilevelLv2Rate4: 1.0,
+        unilevelLv2Rate5: 1.0,
+        // LV.3（7段目まで）
+        unilevelLv3Rate1: 15.0,
+        unilevelLv3Rate2: 8.0,
+        unilevelLv3Rate3: 5.0,
+        unilevelLv3Rate4: 4.0,
+        unilevelLv3Rate5: 2.0,
+        unilevelLv3Rate6: 1.0,
+        unilevelLv3Rate7: 1.0,
+        // LV.4（7段目まで）
+        unilevelLv4Rate1: 15.0,
+        unilevelLv4Rate2: 9.0,
+        unilevelLv4Rate3: 6.0,
+        unilevelLv4Rate4: 5.0,
+        unilevelLv4Rate5: 3.0,
+        unilevelLv4Rate6: 2.0,
+        unilevelLv4Rate7: 1.0,
+        // LV.5（7段目まで）
+        unilevelLv5Rate1: 15.0,
+        unilevelLv5Rate2: 10.0,
+        unilevelLv5Rate3: 7.0,
+        unilevelLv5Rate4: 6.0,
+        unilevelLv5Rate5: 4.0,
+        unilevelLv5Rate6: 3.0,
+        unilevelLv5Rate7: 2.0,
+        // 組織構築ボーナス（レベル別）
+        structureLv3Rate: 3.0,
+        structureLv4Rate: 3.5,
+        structureLv5Rate: 4.0,
+        // その他
         activeThresholdPoints: 150,
         serviceFeeAmount: 440,
         minPayoutAmount: 2560,

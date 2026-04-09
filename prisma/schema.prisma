@@ -1029,17 +1029,51 @@ model BonusSettings {
   id                      Int      @id @default(autoincrement())
   // ダイレクトボーナス
   directBonusAmount       Int      @default(2000)    // ダイレクトボーナス額（円）
-  // ユニレベルボーナス（7段階）
-  unilevelRate1           Float    @default(15.0)    // 1段目（15%）
-  unilevelRate2           Float    @default(10.0)    // 2段目（10%）
-  unilevelRate3           Float    @default(7.0)     // 3段目（7%）
-  unilevelRate4           Float    @default(5.0)     // 4段目（5%）
-  unilevelRate5           Float    @default(3.0)     // 5段目（3%）
-  unilevelRate6           Float    @default(2.0)     // 6段目（2%）
-  unilevelRate7           Float    @default(1.0)     // 7段目（1%）
-  // 組織構築ボーナス（LV3以上）
-  structureMinSeriesRate1 Float    @default(3.0)     // 最小系列1（3%）
-  structureMinSeriesRate2 Float    @default(4.0)     // 最小系列2（4%）
+  
+  // ユニレベルボーナス - LV.1（3段目まで）
+  unilevelLv1Rate1        Float    @default(15.0)    // LV.1 1段目
+  unilevelLv1Rate2        Float    @default(7.0)     // LV.1 2段目
+  unilevelLv1Rate3        Float    @default(3.0)     // LV.1 3段目
+  
+  // ユニレベルボーナス - LV.2（5段目まで）
+  unilevelLv2Rate1        Float    @default(15.0)    // LV.2 1段目
+  unilevelLv2Rate2        Float    @default(7.0)     // LV.2 2段目
+  unilevelLv2Rate3        Float    @default(3.0)     // LV.2 3段目
+  unilevelLv2Rate4        Float    @default(1.0)     // LV.2 4段目
+  unilevelLv2Rate5        Float    @default(1.0)     // LV.2 5段目
+  
+  // ユニレベルボーナス - LV.3（7段目まで）
+  unilevelLv3Rate1        Float    @default(15.0)    // LV.3 1段目
+  unilevelLv3Rate2        Float    @default(8.0)     // LV.3 2段目
+  unilevelLv3Rate3        Float    @default(5.0)     // LV.3 3段目
+  unilevelLv3Rate4        Float    @default(4.0)     // LV.3 4段目
+  unilevelLv3Rate5        Float    @default(2.0)     // LV.3 5段目
+  unilevelLv3Rate6        Float    @default(1.0)     // LV.3 6段目
+  unilevelLv3Rate7        Float    @default(1.0)     // LV.3 7段目
+  
+  // ユニレベルボーナス - LV.4（7段目まで）
+  unilevelLv4Rate1        Float    @default(15.0)    // LV.4 1段目
+  unilevelLv4Rate2        Float    @default(9.0)     // LV.4 2段目
+  unilevelLv4Rate3        Float    @default(6.0)     // LV.4 3段目
+  unilevelLv4Rate4        Float    @default(5.0)     // LV.4 4段目
+  unilevelLv4Rate5        Float    @default(3.0)     // LV.4 5段目
+  unilevelLv4Rate6        Float    @default(2.0)     // LV.4 6段目
+  unilevelLv4Rate7        Float    @default(1.0)     // LV.4 7段目
+  
+  // ユニレベルボーナス - LV.5（7段目まで）
+  unilevelLv5Rate1        Float    @default(15.0)    // LV.5 1段目
+  unilevelLv5Rate2        Float    @default(10.0)    // LV.5 2段目
+  unilevelLv5Rate3        Float    @default(7.0)     // LV.5 3段目
+  unilevelLv5Rate4        Float    @default(6.0)     // LV.5 4段目
+  unilevelLv5Rate5        Float    @default(4.0)     // LV.5 5段目
+  unilevelLv5Rate6        Float    @default(3.0)     // LV.5 6段目
+  unilevelLv5Rate7        Float    @default(2.0)     // LV.5 7段目
+  
+  // 組織構築ボーナス（LV3以上、レベル別）
+  structureLv3Rate        Float    @default(3.0)     // LV.3 組織構築ボーナス（3%）
+  structureLv4Rate        Float    @default(3.5)     // LV.4 組織構築ボーナス（3.5%）
+  structureLv5Rate        Float    @default(4.0)     // LV.5 組織構築ボーナス（4%）
+  
   // その他設定
   activeThresholdPoints   Int      @default(150)     // アクティブ判定基準pt
   serviceFeeAmount        Int      @default(440)     // 事務手数料（円）
