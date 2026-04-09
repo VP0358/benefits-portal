@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { neon } from "@neondatabase/serverless";
-
-const sql = neon(process.env.DATABASE_URL!);
+import { prisma } from "@/lib/prisma";
 
 /**
  * GET /api/admin/products
@@ -15,21 +13,9 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const products = await sql`
-      SELECT 
-        id,
-        product_code,
-        name,
-        description,
-        price,
-        cost,
-        pv,
-        status,
-        created_at,
-        updated_at
-      FROM mlm_products
-      ORDER BY product_code ASC
-    `;
+    const products = await prisma.mlmProduct.findMany({
+      orderBy: { productCode: "asc" },
+    });
 
     return NextResponse.json({ products });
   } catch (error: any) {
@@ -61,10 +47,11 @@ export async function POST(req: NextRequest) {
     }
 
     // 商品コード重複チェック
-    const existing = await sql`
-      SELECT id FROM mlm_products WHERE product_code = ${product_code}
-    `;
-    if (existing.length > 0) {
+    const existing = await prisma.mlmProduct.findUnique({
+      where: { productCode: product_code },
+    });
+
+    if (existing) {
       return NextResponse.json(
         { error: "この商品コードは既に使用されています" },
         { status: 400 }
@@ -72,21 +59,19 @@ export async function POST(req: NextRequest) {
     }
 
     // 商品追加
-    const result = await sql`
-      INSERT INTO mlm_products (product_code, name, description, price, cost, pv, status)
-      VALUES (
-        ${product_code},
-        ${name},
-        ${description || null},
-        ${price},
-        ${cost || 0},
-        ${pv || 0},
-        ${status || 'active'}
-      )
-      RETURNING *
-    `;
+    const product = await prisma.mlmProduct.create({
+      data: {
+        productCode: product_code,
+        name,
+        description: description || null,
+        price,
+        cost: cost || 0,
+        pv: pv || 0,
+        status: status || "active",
+      },
+    });
 
-    return NextResponse.json({ product: result[0] }, { status: 201 });
+    return NextResponse.json({ product }, { status: 201 });
   } catch (error: any) {
     console.error("❌ 商品追加エラー:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

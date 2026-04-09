@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { neon } from "@neondatabase/serverless";
-
-const sql = neon(process.env.DATABASE_URL!);
+import { prisma } from "@/lib/prisma";
 
 /**
  * PUT /api/admin/products/[id]
@@ -32,11 +30,14 @@ export async function PUT(
     }
 
     // 商品コード重複チェック（自分以外）
-    const existing = await sql`
-      SELECT id FROM mlm_products 
-      WHERE product_code = ${product_code} AND id != ${id}
-    `;
-    if (existing.length > 0) {
+    const existing = await prisma.mlmProduct.findFirst({
+      where: {
+        productCode: product_code,
+        id: { not: BigInt(id) },
+      },
+    });
+
+    if (existing) {
       return NextResponse.json(
         { error: "この商品コードは既に使用されています" },
         { status: 400 }
@@ -44,28 +45,27 @@ export async function PUT(
     }
 
     // 商品更新
-    const result = await sql`
-      UPDATE mlm_products
-      SET 
-        product_code = ${product_code},
-        name = ${name},
-        description = ${description || null},
-        price = ${price},
-        cost = ${cost || 0},
-        pv = ${pv || 0},
-        status = ${status || 'active'},
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${id}
-      RETURNING *
-    `;
+    const product = await prisma.mlmProduct.update({
+      where: { id: BigInt(id) },
+      data: {
+        productCode: product_code,
+        name,
+        description: description || null,
+        price,
+        cost: cost || 0,
+        pv: pv || 0,
+        status: status || "active",
+      },
+    });
 
-    if (result.length === 0) {
-      return NextResponse.json({ error: "商品が見つかりません" }, { status: 404 });
-    }
-
-    return NextResponse.json({ product: result[0] });
+    return NextResponse.json({ product });
   } catch (error: any) {
     console.error("❌ 商品更新エラー:", error);
+    
+    if (error.code === "P2025") {
+      return NextResponse.json({ error: "商品が見つかりません" }, { status: 404 });
+    }
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -88,19 +88,18 @@ export async function DELETE(
     const { id } = resolvedParams;
 
     // 商品削除（物理削除）
-    const result = await sql`
-      DELETE FROM mlm_products
-      WHERE id = ${id}
-      RETURNING *
-    `;
-
-    if (result.length === 0) {
-      return NextResponse.json({ error: "商品が見つかりません" }, { status: 404 });
-    }
+    await prisma.mlmProduct.delete({
+      where: { id: BigInt(id) },
+    });
 
     return NextResponse.json({ message: "商品を削除しました" });
   } catch (error: any) {
     console.error("❌ 商品削除エラー:", error);
+    
+    if (error.code === "P2025") {
+      return NextResponse.json({ error: "商品が見つかりません" }, { status: 404 });
+    }
+    
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
