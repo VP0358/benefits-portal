@@ -1,9 +1,12 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 import ViolaLogo from "@/app/components/viola-logo";
+import { loginAction } from "./actions";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
   const [form, setForm]       = useState({ email: "", password: "" });
@@ -14,43 +17,33 @@ export default function LoginPage() {
     setError("");
 
     try {
-      // ① CSRFトークン取得
-      const csrfRes   = await fetch("/api/auth/csrf");
-      const csrfData  = await csrfRes.json();
-      const csrfToken = csrfData.csrfToken ?? "";
+      const result = await loginAction(form.email, form.password);
 
-      // ② credentials でログイン
-      await fetch("/api/auth/callback/credentials", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          email:       form.email,
-          password:    form.password,
-          csrfToken,
-          callbackUrl: "/",
-          json:        "true",
-        }).toString(),
-        redirect: "manual",
-      });
-
-      // ③ セッション確認
-      await new Promise((r) => setTimeout(r, 500));
-      const sessionRes = await fetch("/api/auth/session", { cache: "no-store" });
-      const session    = await sessionRes.json();
-
-      if (!session?.user) {
-        setError("メールアドレスまたはパスワードが正しくありません。");
+      if (!result.success) {
+        setError(result.error ?? "ログインに失敗しました。");
         setLoading(false);
         return;
       }
 
-      // ④ ロールで振り分け（管理者は管理者ログインページへ誘導）
+      // ログイン成功 → セッション確認してからリダイレクト
+      await new Promise((r) => setTimeout(r, 300));
+      const sessionRes = await fetch("/api/auth/session", { cache: "no-store" });
+      const session    = await sessionRes.json();
+
+      if (!session?.user) {
+        setError("ログインに失敗しました。もう一度お試しください。");
+        setLoading(false);
+        return;
+      }
+
       if (session.user.role === "admin") {
         setError("管理者アカウントです。管理者ログインページをご利用ください。");
         setLoading(false);
         return;
       }
-      window.location.replace("/dashboard");
+
+      // 強制リロードでセッションを確実に反映
+      window.location.href = "/dashboard";
     } catch (err) {
       console.error("Login error:", err);
       setError("ログインに失敗しました。もう一度お試しください。");
