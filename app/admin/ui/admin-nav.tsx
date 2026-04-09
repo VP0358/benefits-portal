@@ -26,6 +26,7 @@ const menuGroups = [
       { href: "/admin/bonus-results", label: "ボーナス計算結果", icon: "fas fa-file-invoice-dollar" },
       { href: "/admin/bonus-reports", label: "ボーナス関連レポート", icon: "fas fa-file-alt" },
       { href: "/admin/bonus-utilities", label: "ボーナスユーティリティ", icon: "fas fa-tools" },
+      { href: "/admin/bonus-settings", label: "ボーナス設定", icon: "fas fa-cog" },
       { href: "/admin/autoship", label: "オートシップ管理", icon: "fas fa-sync" },
       { href: "/admin/products", label: "商品管理", icon: "fas fa-box" },
       { href: "/admin/product-purchases", label: "商品購入管理", icon: "fas fa-shopping-bag" },
