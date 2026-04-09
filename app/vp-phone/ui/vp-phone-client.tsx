@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import Link from "next/link";
 
 // ── デザイントークン
@@ -374,6 +374,21 @@ export default function VpPhoneClient({
   const [agreed,       setAgreed]       = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showCardCvc,  setShowCardCvc]  = useState(false);
+  const [referrerAutoFilled, setReferrerAutoFilled] = useState(false);
+
+  // ── 紹介者の自動取得（ログインユーザーの紹介者コードを自動設定） ──
+  useEffect(() => {
+    if (app) return; // 申込済みの場合はスキップ
+    fetch("/api/my/referrer-info")
+      .then(r => r.json())
+      .then((d: { referrerCode?: string; referrerName?: string }) => {
+        if (d.referrerCode && d.referrerName) {
+          setForm(prev => ({ ...prev, referrerCode: d.referrerCode!, referrerName: d.referrerName! }));
+          setReferrerAutoFilled(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const voiceTotal = calcVoiceTotal(voiceDataPlan, kakehoudai, voiceOpts);
   const dataTotals = calcDataMonthly(dataCapacity, dataType);
@@ -617,9 +632,15 @@ export default function VpPhoneClient({
               <div className="rounded-2xl bg-white p-5 shadow-sm">
                 <h3 className="font-bold text-gray-800 text-sm mb-4 pb-2 border-b border-gray-100">👥 紹介者情報<span className="text-red-500 ml-1">*</span></h3>
                 <div className="space-y-4">
+                  {referrerAutoFilled && (
+                    <div className="rounded-xl px-4 py-2.5" style={{ background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.25)" }}>
+                      <p className="text-xs font-semibold" style={{ color: "#34d399" }}>✓ 紹介者が自動設定されました</p>
+                      <p className="text-[10px] mt-0.5" style={{ color: "rgba(52,211,153,0.70)" }}>ご紹介いただいた方が自動的に紹介者として設定されています。</p>
+                    </div>
+                  )}
                   <div>
                     <label className={lbl}>紹介者コード（会員コード）<span className="text-red-500 ml-1">*</span></label>
-                    <input required className={inp} placeholder="例: M0001" value={form.referrerCode} onChange={e => setForm({ ...form, referrerCode: e.target.value })} />
+                    <input required className={inp} placeholder="例: M0001" value={form.referrerCode} onChange={e => { setForm({ ...form, referrerCode: e.target.value }); setReferrerAutoFilled(false); }} />
                   </div>
                   <div>
                     <label className={lbl}>紹介者名<span className="text-red-500 ml-1">*</span></label>

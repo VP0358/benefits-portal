@@ -16,9 +16,12 @@ const iconOptions = [
 ];
 
 const menuTypes = [
-  { value: "url",     label: "🔗 URLリンク",         desc: "VPphone / 旅行 / ショッピング / 細胞浴予約" },
-  { value: "skin",    label: "💆 肌診断",             desc: "全国代理店一覧を表示" },
-  { value: "contact", label: "📞 相談窓口",           desc: "お問い合わせフォームを表示" },
+  { value: "url",        label: "🔗 外部URLリンク",   desc: "管理ページで設定したURLを開く（肌診断・細胞浴・ショッピングなど）" },
+  { value: "vp_phone",   label: "📱 VPphone",          desc: "VP未来phone申込ページへ遷移" },
+  { value: "travel_sub", label: "✈️ 格安旅行",          desc: "格安旅行申込モーダルを表示" },
+  { value: "used_car",   label: "🚗 中古車販売",        desc: "中古車専用問い合わせページへ遷移" },
+  { value: "contact",    label: "📞 相談窓口",          desc: "相談窓口フォームへ遷移" },
+  { value: "skin",       label: "💆 肌診断",            desc: "外部URLリンクで設定（linkUrlにURLを入力）" },
 ];
 
 type SkinShop = { name: string; area: string; address: string; phone: string; url?: string };

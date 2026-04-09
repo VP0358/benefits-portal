@@ -172,7 +172,7 @@ const TravelSubButton = forwardRef<{openModal:()=>void}>(function TravelSubButto
     if(!applyForm.name||!applyForm.phone||!applyForm.email){setApplyError("氏名・電話番号・メールアドレスは必須です");return;}
     setApplying(true);setApplyError("");
     try{
-      const res=await fetch("/api/contact",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:applyForm.name,phone:applyForm.phone,email:applyForm.email,content:`【旅行サブスク申込】\n会員コード: ${applyForm.memberCode||"未入力"}\n氏名: ${applyForm.name}\n電話番号: ${applyForm.phone}\nメール: ${applyForm.email}\n現在レベル: Lv${applyForm.level}（¥${TRAVEL_FEES.early[applyForm.level].toLocaleString()}/月）\n\n※支払日：毎月15日\n※お支払い方法：銀行振込のみ`,menuTitle:"旅行サブスク申込"})});
+      const res=await fetch("/api/contact",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:applyForm.name,phone:applyForm.phone,email:applyForm.email,content:`【格安旅行申込】\n会員コード: ${applyForm.memberCode||"未入力"}\n氏名: ${applyForm.name}\n電話番号: ${applyForm.phone}\nメール: ${applyForm.email}\n現在レベル: Lv${applyForm.level}（¥${TRAVEL_FEES.early[applyForm.level].toLocaleString()}/月）\n\n※支払日：毎月15日\n※お支払い方法：銀行振込のみ`,menuTitle:"格安旅行申込"})});
       if(res.ok){setApplyDone(true);}else{const d=await res.json().catch(()=>null);setApplyError(d?.error||"申込に失敗しました。");}
     }catch{setApplyError("通信エラーが発生しました。");}
     setApplying(false);
@@ -182,7 +182,7 @@ const TravelSubButton = forwardRef<{openModal:()=>void}>(function TravelSubButto
   if(!travelSub) return (
     <NavyCard className="p-4 flex items-center gap-3">
       <NavyIconBox color="#93c5fd"><PlaneIcon/></NavyIconBox>
-      <div className="flex-1"><p className="font-jp font-semibold text-sm text-white">旅行サブスク</p><p className="text-xs mt-0.5 animate-pulse" style={{color:`${GOLD}80`}}>読み込み中...</p></div>
+      <div className="flex-1"><p className="font-jp font-semibold text-sm text-white">格安旅行</p><p className="text-xs mt-0.5 animate-pulse" style={{color:`${GOLD}80`}}>読み込み中...</p></div>
     </NavyCard>
   );
   const {sub}=travelSub;
@@ -198,7 +198,7 @@ const TravelSubButton = forwardRef<{openModal:()=>void}>(function TravelSubButto
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <NavyIconBox color="#93c5fd"><PlaneIcon/></NavyIconBox>
-              <div><p className="font-jp font-semibold text-sm text-white">旅行サブスク</p>{sub?<p className="text-xs mt-0.5" style={{color:GOLD}}>{sub.planName} · ¥{sub.monthlyFee.toLocaleString()}/月</p>:<p className="text-xs mt-0.5" style={{color:GOLD}}>タップして詳細・申込</p>}</div>
+              <div><p className="font-jp font-semibold text-sm text-white">格安旅行</p>{sub?<p className="text-xs mt-0.5" style={{color:GOLD}}>{sub.planName} · ¥{sub.monthlyFee.toLocaleString()}/月</p>:<p className="text-xs mt-0.5" style={{color:GOLD}}>タップして詳細・申込</p>}</div>
             </div>
             <div className="flex flex-col items-end gap-1.5">
               {sub&&<span className="rounded-full text-xs font-bold px-2.5 py-0.5 font-label" style={{background:`${GOLD}25`,color:GOLD_LIGHT,border:`1px solid ${GOLD}50`}}>Lv{lv}</span>}
@@ -211,7 +211,7 @@ const TravelSubButton = forwardRef<{openModal:()=>void}>(function TravelSubButto
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" style={{background:"rgba(10,22,40,0.85)"}} onClick={()=>{setShowApplyModal(false);setApplyDone(false);setApplyError("");}}>
           <div className="w-full sm:max-w-2xl rounded-t-3xl sm:rounded-3xl flex flex-col" style={{background:NAVY_CARD,border:`1px solid ${GOLD}30`,maxHeight:"90vh"}} onClick={e=>e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-4" style={{borderBottom:`1px solid ${GOLD}18`}}>
-              <div className="flex items-center gap-2"><NavyIconBox color="#93c5fd" size="sm"><PlaneIcon/></NavyIconBox><h2 className="font-jp font-semibold text-white text-sm">旅行サブスク</h2></div>
+              <div className="flex items-center gap-2"><NavyIconBox color="#93c5fd" size="sm"><PlaneIcon/></NavyIconBox><h2 className="font-jp font-semibold text-white text-sm">格安旅行</h2></div>
               <button onClick={()=>{setShowApplyModal(false);setApplyDone(false);setApplyError("");}} className="text-white/40 text-2xl hover:text-white leading-none">✕</button>
             </div>
             <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4 pb-10">
@@ -236,7 +236,7 @@ const TravelSubButton = forwardRef<{openModal:()=>void}>(function TravelSubButto
               </div>
               {!sub&&!applyDone&&(
                 <div className="rounded-2xl border p-4" style={{background:NAVY_CARD2,borderColor:`${GOLD}18`}}>
-                  <p className="text-sm font-jp font-semibold mb-3 text-white">旅行サブスクに申し込む</p>
+                  <p className="text-sm font-jp font-semibold mb-3 text-white">格安旅行に申し込む</p>
                   <form onSubmit={handleApply} className="space-y-3">
                     {[{label:"会員ID（任意）",type:"text",key:"memberCode",placeholder:"例: M0001",required:false},{label:"氏名",type:"text",key:"name",placeholder:"山田 太郎",required:true},{label:"電話番号",type:"tel",key:"phone",placeholder:"090-1234-5678",required:true},{label:"メールアドレス",type:"email",key:"email",placeholder:"example@email.com",required:true}].map(f=>(
                       <div key={f.key}>
@@ -251,7 +251,7 @@ const TravelSubButton = forwardRef<{openModal:()=>void}>(function TravelSubButto
                       </div>
                     </div>
                     {applyError&&<p className="text-xs text-red-300 bg-red-500/10 border border-red-400/20 rounded-xl px-3 py-2">{applyError}</p>}
-                    <button type="submit" disabled={applying} className="w-full rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-50" style={{background:`linear-gradient(135deg,${GOLD},${ORANGE})`}}>{applying?"申込中...":"旅行サブスクに申し込む"}</button>
+                    <button type="submit" disabled={applying} className="w-full rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-50" style={{background:`linear-gradient(135deg,${GOLD},${ORANGE})`}}>{applying?"申込中...":"格安旅行に申し込む"}</button>
                   </form>
                 </div>
               )}
@@ -754,6 +754,12 @@ export default function MemberDashboard({
 
               if(m.menuType==="contact") return (
                 <a key={m.id} href="/contact" className="rounded-2xl overflow-hidden transition-all hover:scale-[1.03] active:scale-95" style={cardStyle}>{cardContent}</a>
+              );
+              if(m.menuType==="used_car") return (
+                <a key={m.id} href="/used-cars" className="rounded-2xl overflow-hidden transition-all hover:scale-[1.03] active:scale-95" style={cardStyle}>{cardContent}</a>
+              );
+              if(m.menuType==="vp_phone") return (
+                <a key={m.id} href="/vp-phone" className="rounded-2xl overflow-hidden transition-all hover:scale-[1.03] active:scale-95" style={cardStyle}>{cardContent}</a>
               );
               if(m.menuType==="travel_sub"||m.title.includes("旅行")) return (
                 <button key={m.id} onClick={()=>travelSubRef.current?.openModal()} className="w-full rounded-2xl overflow-hidden transition-all hover:scale-[1.03] active:scale-95 text-left" style={cardStyle}>{cardContent}</button>

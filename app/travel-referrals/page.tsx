@@ -104,7 +104,7 @@ function MemberCard({ node, onDrillDown }: { node: TreeNode; onDrillDown: (node:
           </div>
         </div>
 
-        {/* 旅行サブスク情報 */}
+        {/* 格安旅行情報 */}
         {travel ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
@@ -130,7 +130,7 @@ function MemberCard({ node, onDrillDown }: { node: TreeNode; onDrillDown: (node:
             </div>
           </div>
         ) : (
-          <p className="text-xs font-jp italic" style={{ color: "rgba(255,255,255,0.25)" }}>旅行サブスク 申込なし</p>
+          <p className="text-xs font-jp italic" style={{ color: "rgba(255,255,255,0.25)" }}>格安旅行 申込なし</p>
         )}
       </div>
     </div>
