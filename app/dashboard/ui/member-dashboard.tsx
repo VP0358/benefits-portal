@@ -29,10 +29,51 @@ const SLIDE_BG = [
   "linear-gradient(135deg, #0c2212, #1a4a2a)",
   "linear-gradient(135deg, #0c1a35, #0c3055)",
 ];
-const ICON_MAP: Record<string,string> = {
-  smartphone:"📱", plane:"✈️", smile:"😊", cart:"🛒",
-  message:"💬", jar:"🫙", gift:"🎁", star:"⭐", heart:"❤️", home:"🏠"
+
+// 福利厚生メニュー アイコンマップ（スタイリッシュSVGパス）
+const WELFARE_ICON_MAP: Record<string, { svgD: string | string[]; accentColor: string }> = {
+  smartphone: {
+    svgD: "M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z",
+    accentColor: "#34d399"
+  },
+  plane: {
+    svgD: "M12 19l9 2-9-18-9 18 9-2zm0 0v-8",
+    accentColor: "#60a5fa"
+  },
+  smile: {
+    svgD: "M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+    accentColor: "#f0c060"
+  },
+  cart: {
+    svgD: "M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z",
+    accentColor: "#e8893a"
+  },
+  message: {
+    svgD: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z",
+    accentColor: "#a78bfa"
+  },
+  jar: {
+    svgD: "M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18",
+    accentColor: "#d4a853"
+  },
+  gift: {
+    svgD: "M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4 2 2 0 010 4zm14 0a2 2 0 110-4 2 2 0 010 4z",
+    accentColor: "#f472b6"
+  },
+  star: {
+    svgD: "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z",
+    accentColor: "#fbbf24"
+  },
+  heart: {
+    svgD: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z",
+    accentColor: "#f87171"
+  },
+  home: {
+    svgD: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6",
+    accentColor: "#34d399"
+  },
 };
+
 const AVATAR_OPTIONS = ["😊","😎","🦁","🐯","🐼","🦊","🐸","🌸","⭐","🔥","💎","🎯"];
 
 // ────────── 旅行サブスク料金体系 ──────────
@@ -44,7 +85,7 @@ const TRAVEL_FEES: Record<"early"|"standard", Record<number, number>> = {
 // ── 共通スタイル定数 ──
 const CARD_BG   = "#0f2347";
 const CARD_BG2  = "#132a54";
-const PAGE_BG   = "#071228";
+const PAGE_BG   = "#060d1f";
 const GOLD      = "#d4a853";
 const GOLD_LIGHT= "#f0c060";
 const ORANGE    = "#e8893a";
@@ -93,8 +134,12 @@ function VpPhoneButton() {
     return (
       <div className="rounded-2xl p-4 flex items-center gap-3 border"
         style={{ background: CARD_BG, borderColor: "rgba(212,168,83,0.15)" }}>
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-          style={{ background: "rgba(212,168,83,0.1)" }}>📱</div>
+        <div className="w-11 h-11 rounded-xl flex items-center justify-center"
+          style={{ background: "rgba(212,168,83,0.1)" }}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: GOLD }}>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+        </div>
         <div className="flex-1">
           <p className="font-bold text-sm" style={{ color: "rgba(255,255,255,0.8)" }}>VP未来phone</p>
           <p className="text-xs mt-0.5 animate-pulse" style={{ color: "rgba(212,168,83,0.5)" }}>読み込み中...</p>
@@ -109,8 +154,12 @@ function VpPhoneButton() {
         className="block rounded-2xl p-4 transition flex items-center justify-between border"
         style={{ background: CARD_BG, borderColor: "rgba(212,168,83,0.2)" }}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-            style={{ background: "linear-gradient(135deg, #1a6e3a, #2a9e5a)" }}>📱</div>
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center"
+            style={{ background: "linear-gradient(135deg, #1a6e3a, #2a9e5a)" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+          </div>
           <div>
             <p className="font-bold text-sm text-white">VP未来phone</p>
             <p className="text-[11px] mt-0.5" style={{ color: GOLD }}>お得なスマートフォン回線</p>
@@ -135,8 +184,12 @@ function VpPhoneButton() {
       style={{ background: CARD_BG, borderColor: "rgba(212,168,83,0.2)" }}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-            style={{ background: "linear-gradient(135deg, #1a6e3a, #2a9e5a)" }}>📱</div>
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center"
+            style={{ background: "linear-gradient(135deg, #1a6e3a, #2a9e5a)" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+          </div>
           <div>
             <p className="font-bold text-sm text-white">{cardTitle}</p>
             {contractTypeLabel && (
@@ -250,14 +303,6 @@ const TravelSubButton = forwardRef<{ openModal: () => void }>(function TravelSub
     setApplying(false);
   }
 
-  const LV_STYLE: Record<number, { badge: string }> = {
-    1: { badge: "" },
-    2: { badge: "" },
-    3: { badge: "" },
-    4: { badge: "" },
-    5: { badge: "" },
-  };
-
   const FORCE_STYLE: Record<string, { label: string; dot: string }> = {
     forced_active:   { label: "✨ 特別アクティブ", dot: "bg-cyan-400" },
     forced_inactive: { label: "⏸ 一時停止中",    dot: "bg-orange-400" },
@@ -276,7 +321,12 @@ const TravelSubButton = forwardRef<{ openModal: () => void }>(function TravelSub
     return (
       <div className="rounded-2xl p-4 border flex items-center gap-3"
         style={{ background: CARD_BG, borderColor: "rgba(212,168,83,0.15)" }}>
-        <span className="text-2xl">✈️</span>
+        <div className="w-11 h-11 rounded-xl flex items-center justify-center"
+          style={{ background: "linear-gradient(135deg, #3d1a5e, #6a2e9e)" }}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+          </svg>
+        </div>
         <div className="flex-1">
           <p className="font-bold text-sm text-white">旅行サブスク</p>
           <p className="text-xs mt-0.5 animate-pulse" style={{ color: `${GOLD}80` }}>読み込み中...</p>
@@ -310,8 +360,12 @@ const TravelSubButton = forwardRef<{ openModal: () => void }>(function TravelSub
         style={{ background: CARD_BG, borderColor: "rgba(212,168,83,0.2)" }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-              style={{ background: "linear-gradient(135deg, #3d1a5e, #6a2e9e)" }}>✈️</div>
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center"
+              style={{ background: "linear-gradient(135deg, #3d1a5e, #6a2e9e)" }}>
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            </div>
             <div>
               <p className="font-bold text-sm text-white">旅行サブスク</p>
               {sub ? (
@@ -346,7 +400,12 @@ const TravelSubButton = forwardRef<{ openModal: () => void }>(function TravelSub
             <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0"
               style={{ borderColor: `${GOLD}20` }}>
               <div className="flex items-center gap-2">
-                <span className="text-xl">✈️</span>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ background: "linear-gradient(135deg, #3d1a5e, #6a2e9e)" }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                </div>
                 <h2 className="font-bold text-white text-sm">旅行サブスク</h2>
               </div>
               <button onClick={() => { setShowApplyModal(false); setApplyDone(false); setApplyError(""); }}
@@ -518,7 +577,7 @@ const TravelSubButton = forwardRef<{ openModal: () => void }>(function TravelSub
                     <button type="submit" disabled={applying}
                       className="w-full rounded-xl py-3 text-sm font-bold transition disabled:opacity-50 text-white"
                       style={{ background: `linear-gradient(135deg, ${GOLD}, ${ORANGE})` }}>
-                      {applying ? "申込中..." : "✈️ 旅行サブスクに申し込む"}
+                      {applying ? "申込中..." : "旅行サブスクに申し込む"}
                     </button>
                   </form>
                 </div>
@@ -563,7 +622,7 @@ function MlmStatusButton({ status }: { status: string | null }) {
       <div className="rounded-2xl p-4 border flex items-center justify-between"
         style={{ background: CARD_BG, borderColor: `${GOLD}20` }}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center"
             style={{ background: "rgba(255,255,255,0.07)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: GOLD }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -591,7 +650,7 @@ function MlmStatusButton({ status }: { status: string | null }) {
       style={{ background: config.bgColor, borderColor: config.borderColor }}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center"
             style={{ background: "rgba(255,255,255,0.1)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: config.textColor }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -625,7 +684,7 @@ function VpPhoneStatusButton({ status }: { status: string | null }) {
       <div className="rounded-2xl p-4 border flex items-center justify-between"
         style={{ background: CARD_BG, borderColor: `${GOLD}20` }}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center"
             style={{ background: "rgba(255,255,255,0.07)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -653,7 +712,7 @@ function VpPhoneStatusButton({ status }: { status: string | null }) {
       style={{ background: CARD_BG, borderColor: `${GOLD}20` }}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center"
             style={{ background: "linear-gradient(135deg, #1e4d9e, #2563eb)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -686,7 +745,7 @@ function TravelSubStatusButton({ status }: { status: string | null }) {
       <div className="rounded-2xl p-4 border flex items-center justify-between"
         style={{ background: CARD_BG, borderColor: `${GOLD}20` }}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center"
             style={{ background: "rgba(255,255,255,0.07)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -712,7 +771,7 @@ function TravelSubStatusButton({ status }: { status: string | null }) {
     <div className="rounded-2xl p-4 border" style={{ background: CARD_BG, borderColor: `${GOLD}20` }}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center"
             style={{ background: "linear-gradient(135deg, #3d1a5e, #6a2e9e)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -730,13 +789,41 @@ function TravelSubStatusButton({ status }: { status: string | null }) {
 }
 
 // ── セクションヘッダー ──
-function SectionHeader({ label, accentColor }: { label: string; accentColor: string }) {
+function SectionHeader({ label, accentColor, icon }: { label: string; accentColor: string; icon?: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 mb-4">
-      <div className="w-1 h-5 rounded-full" style={{ background: accentColor }}></div>
-      <h2 className="text-sm font-bold tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.65)", letterSpacing: "0.08em" }}>{label}</h2>
+      <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ background: accentColor }}></div>
+      {icon && <span className="flex-shrink-0" style={{ color: accentColor }}>{icon}</span>}
+      <h2 className="text-sm font-bold tracking-widest uppercase flex-1" style={{ color: "rgba(255,255,255,0.75)", letterSpacing: "0.08em" }}>{label}</h2>
+      <div className="h-px flex-1 opacity-20 rounded-full" style={{ background: accentColor, maxWidth: "60px" }}></div>
     </div>
   );
+}
+
+// ── 福利厚生アイコン レンダリング ──
+function WelfareIcon({ iconType, accentColor }: { iconType: string; accentColor: string }) {
+  const iconData = WELFARE_ICON_MAP[iconType];
+  if (!iconData) {
+    // デフォルト：ピン型
+    return (
+      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: accentColor }}>
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+      </svg>
+    );
+  }
+  const paths = Array.isArray(iconData.svgD) ? iconData.svgD : [iconData.svgD];
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: accentColor }}>
+      {paths.map((d, i) => (
+        <path key={i} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={d} />
+      ))}
+    </svg>
+  );
+}
+
+// ── 福利厚生メニューカードのアクセントカラーを取得 ──
+function getWelfareAccentColor(iconType: string): string {
+  return WELFARE_ICON_MAP[iconType]?.accentColor ?? GOLD;
 }
 
 // ──────────── メインダッシュボード ────────────
@@ -846,29 +933,53 @@ export default function MemberDashboard({
 
   return (
     <div className="min-h-screen pb-28 relative" style={{ background: PAGE_BG }}>
+      {/* 背景グラデーション装飾 */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
+        <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full opacity-10"
+          style={{ background: `radial-gradient(circle, ${GOLD}, transparent 70%)` }} />
+        <div className="absolute top-1/2 -left-32 w-80 h-80 rounded-full opacity-8"
+          style={{ background: `radial-gradient(circle, #1a3a6e, transparent 70%)` }} />
+        <div className="absolute bottom-32 right-0 w-64 h-64 rounded-full opacity-8"
+          style={{ background: `radial-gradient(circle, ${ORANGE}60, transparent 70%)` }} />
+      </div>
 
       {/* ── ヘッダー ── */}
       <header className="sticky top-0 z-30"
-        style={{ background: `rgba(7,18,40,0.97)`, backdropFilter: "blur(16px)", borderBottom: `1px solid ${GOLD}20` }}>
-        <div className="max-w-md mx-auto flex items-center justify-between px-5 py-3.5">
+        style={{
+          background: `rgba(6,13,31,0.96)`,
+          backdropFilter: "blur(20px)",
+          borderBottom: `1px solid rgba(212,168,83,0.18)`,
+          boxShadow: `0 4px 30px rgba(0,0,0,0.4)`
+        }}>
+        <div className="max-w-md mx-auto flex items-center justify-between px-5 py-3">
+          {/* ロゴ */}
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-sm font-black"
-              style={{ background: `linear-gradient(135deg, ${GOLD}, ${ORANGE})` }}>V</div>
-            <span className="font-bold text-white text-base tracking-widest">VIOLA <span style={{ color: GOLD }}>Pure</span></span>
+            <div className="relative w-8 h-8 rounded-xl flex items-center justify-center text-white text-sm font-black overflow-hidden"
+              style={{ background: `linear-gradient(135deg, ${GOLD}, ${ORANGE})` }}>
+              <span className="relative z-10">V</span>
+            </div>
+            <div className="leading-tight">
+              <p className="text-white font-extrabold text-sm tracking-widest">VIOLA</p>
+              <p className="text-[9px] font-semibold tracking-[0.2em]" style={{ color: GOLD }}>PURE MEMBERS</p>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <Link href="/announcements" className="relative transition" style={{ color: "rgba(255,255,255,0.6)" }}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="flex items-center gap-3">
+            <Link href="/announcements"
+              className="relative w-9 h-9 rounded-xl flex items-center justify-center transition"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                style={{ color: "rgba(255,255,255,0.6)", width: "18px", height: "18px" }}>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">
-                  {unreadCount}
+                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                  {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
             </Link>
             <button onClick={e => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
-              className="transition p-1" style={{ color: "rgba(255,255,255,0.6)" }}>
+              className="w-9 h-9 rounded-xl flex items-center justify-center transition"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.6)" }}>
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
@@ -879,13 +990,17 @@ export default function MemberDashboard({
 
       {/* ── ドロワーメニュー ── */}
       {menuOpen && (
-        <div className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm" onClick={() => setMenuOpen(false)}>
+        <div className="fixed inset-0 z-40 bg-black/75 backdrop-blur-sm" onClick={() => setMenuOpen(false)}>
           <div className="absolute right-0 top-0 h-full w-72 flex flex-col"
-            style={{ background: "#060f22", borderLeft: `1px solid ${GOLD}20` }}
+            style={{ background: "linear-gradient(180deg, #060d1f 0%, #0a1428 100%)", borderLeft: `1px solid ${GOLD}18` }}
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-5"
-              style={{ borderBottom: `1px solid ${GOLD}15` }}>
-              <span className="font-bold text-white text-base tracking-wider">MENU</span>
+              style={{ borderBottom: `1px solid ${GOLD}12` }}>
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs font-black"
+                  style={{ background: `linear-gradient(135deg, ${GOLD}, ${ORANGE})` }}>V</div>
+                <span className="font-bold text-white text-sm tracking-widest">MENU</span>
+              </div>
               <button onClick={() => setMenuOpen(false)} className="transition" style={{ color: "rgba(255,255,255,0.4)" }}>
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -914,7 +1029,7 @@ export default function MemberDashboard({
               ].map(item => (
                 <Link key={item.href} href={item.href}
                   onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition"
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition hover:bg-white/5"
                   style={{ color: "rgba(255,255,255,0.6)" }}>
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: GOLD }}>
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.svgD} />
@@ -923,9 +1038,9 @@ export default function MemberDashboard({
                 </Link>
               ))}
             </nav>
-            <div className="px-3 pb-6">
+            <div className="px-3 pb-6 pt-2" style={{ borderTop: `1px solid rgba(255,255,255,0.06)` }}>
               <button onClick={async () => { const { signOut } = await import("next-auth/react"); signOut({ callbackUrl: "/login" }); }}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-400 transition">
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-400 transition hover:bg-red-500/10">
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
@@ -936,34 +1051,43 @@ export default function MemberDashboard({
         </div>
       )}
 
-      <main className="max-w-md mx-auto px-4 pt-6 space-y-6">
+      <main className="max-w-md mx-auto px-4 pt-5 space-y-6 relative">
 
         {/* ── ウェルカムカード ── */}
-        <div className="rounded-3xl overflow-hidden"
+        <div className="rounded-3xl overflow-hidden relative"
           style={{
-            background: "linear-gradient(150deg, #0d1e45 0%, #162a56 50%, #0d1e45 100%)",
-            border: `1px solid ${GOLD}30`
+            background: "linear-gradient(145deg, #0d1e45 0%, #162952 40%, #0e1d42 100%)",
+            border: `1px solid rgba(212,168,83,0.25)`,
+            boxShadow: `0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(212,168,83,0.08) inset`
           }}>
-          {/* ゴールドライン */}
-          <div className="h-0.5" style={{ background: `linear-gradient(90deg, transparent, ${GOLD}, ${ORANGE}, transparent)` }}></div>
+          {/* 上部ゴールドライン */}
+          <div className="h-0.5" style={{ background: `linear-gradient(90deg, transparent 0%, ${GOLD} 30%, ${ORANGE} 70%, transparent 100%)` }}></div>
+          {/* 内部グロー効果 */}
+          <div className="absolute top-0 right-0 w-32 h-32 opacity-15 pointer-events-none"
+            style={{ background: `radial-gradient(circle at 100% 0%, ${GOLD}, transparent 70%)` }} />
+
           <div className="p-6">
             {/* ユーザー情報 */}
             <div className="flex items-center gap-4 mb-5">
               <button onClick={() => setShowAvatarPicker(!showAvatarPicker)}
                 className="relative w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center text-2xl flex-shrink-0"
-                style={{ background: "rgba(212,168,83,0.12)", border: `2px solid ${GOLD}50` }}>
+                style={{
+                  background: "linear-gradient(135deg, rgba(212,168,83,0.15), rgba(232,137,58,0.1))",
+                  border: `2px solid rgba(212,168,83,0.4)`,
+                  boxShadow: `0 0 20px rgba(212,168,83,0.15)`
+                }}>
                 {profileAvatarUrl ? (
                   <img src={profileAvatarUrl} alt="アバター" className="w-full h-full object-cover" />
                 ) : avatar}
               </button>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium mb-0.5" style={{ color: `${GOLD}90` }}>こんにちは</p>
-                <p className="text-white text-xl font-bold leading-tight">{user.name} <span style={{ color: GOLD }}>さん</span></p>
-                <p className="text-xs mt-1" style={{ color: `${GOLD}60` }}>会員コード：{user.memberCode}</p>
+                <p className="text-white text-xl font-bold leading-tight truncate">{user.name} <span style={{ color: GOLD }}>さん</span></p>
+                <p className="text-xs mt-1 font-mono" style={{ color: `${GOLD}55` }}>ID: {user.memberCode}</p>
               </div>
               <Link href="/profile"
-                className="flex items-center justify-center w-9 h-9 rounded-xl transition"
-                style={{ border: `1px solid ${GOLD}25`, color: `${GOLD}60` }}>
+                className="flex items-center justify-center w-9 h-9 rounded-xl transition hover:bg-white/10"
+                style={{ border: `1px solid rgba(212,168,83,0.2)`, color: `${GOLD}60` }}>
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
@@ -972,7 +1096,7 @@ export default function MemberDashboard({
 
             {/* アバター選択 */}
             {showAvatarPicker && (
-              <div className="rounded-2xl p-3 mb-5" style={{ background: "rgba(212,168,83,0.07)", border: `1px solid ${GOLD}20` }}>
+              <div className="rounded-2xl p-3 mb-5" style={{ background: "rgba(212,168,83,0.07)", border: `1px solid ${GOLD}18` }}>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-bold" style={{ color: `${GOLD}80` }}>アイコンを選択</p>
                   <Link href="/profile#avatar"
@@ -1001,33 +1125,34 @@ export default function MemberDashboard({
             )}
 
             {/* ポイント情報 */}
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {[
-                { label: "MLM先月ポイント",    value: dashboardPoints.mlmLastMonthPoints,    unit: "VPpt",   barColor: GOLD },
-                { label: "MLM今月ポイント",    value: dashboardPoints.mlmCurrentMonthPoints,  unit: "VPpt",   barColor: ORANGE },
-                { label: "貯金ボーナスポイント", value: dashboardPoints.savingsBonusPoints,   unit: "SAVpt",  barColor: "#34d399" },
-                { label: "携帯紹介ポイント",    value: dashboardPoints.mobileReferralPoints,  unit: "MPIpt",  barColor: "#818cf8" },
+                { label: "MLM先月ポイント",    value: dashboardPoints.mlmLastMonthPoints,    unit: "VPpt",   barColor: GOLD,      gradFrom: GOLD, gradTo: GOLD_LIGHT },
+                { label: "MLM今月ポイント",    value: dashboardPoints.mlmCurrentMonthPoints,  unit: "VPpt",   barColor: ORANGE,    gradFrom: ORANGE, gradTo: "#f4a83a" },
+                { label: "貯金ボーナスポイント", value: dashboardPoints.savingsBonusPoints,   unit: "SAVpt",  barColor: "#34d399", gradFrom: "#34d399", gradTo: "#6ee7b7" },
+                { label: "携帯紹介ポイント",    value: dashboardPoints.mobileReferralPoints,  unit: "MPIpt",  barColor: "#818cf8", gradFrom: "#818cf8", gradTo: "#a78bfa" },
               ].map(item => (
-                <div key={item.label}>
+                <div key={item.label} className="rounded-xl px-3 py-2.5"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>{item.label}</span>
+                    <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.5)" }}>{item.label}</span>
                     <span className="text-sm font-bold text-white">
                       {item.value.toLocaleString()}
-                      <span className="text-[10px] ml-1" style={{ color: `${item.barColor}80` }}>{item.unit}</span>
+                      <span className="text-[10px] ml-1 font-normal" style={{ color: `${item.barColor}90` }}>{item.unit}</span>
                     </span>
                   </div>
-                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                  <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
                     <div className="h-full rounded-full transition-all duration-700"
                       style={{
                         width: `${Math.min((item.value / 10000) * 100, 100)}%`,
-                        background: item.barColor
+                        background: `linear-gradient(90deg, ${item.gradFrom}, ${item.gradTo})`
                       }} />
                   </div>
                 </div>
               ))}
             </div>
           </div>
-          <div className="h-0.5" style={{ background: `linear-gradient(90deg, transparent, ${GOLD}50, transparent)` }}></div>
+          <div className="h-px" style={{ background: `linear-gradient(90deg, transparent, ${GOLD}30, transparent)` }}></div>
         </div>
 
         {/* ── MLM会員状況バナー ── */}
@@ -1035,36 +1160,45 @@ export default function MemberDashboard({
 
         {/* ── お知らせスライダー ── */}
         <section id="news">
-          <SectionHeader label="お知らせ" accentColor={GOLD} />
+          <SectionHeader label="お知らせ" accentColor={GOLD}
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+            }
+          />
           {announcements.length === 0 ? (
             <div className="rounded-2xl p-5 text-center text-sm border"
-              style={{ color: "rgba(255,255,255,0.3)", background: CARD_BG, borderColor: `${GOLD}15` }}>
+              style={{ color: "rgba(255,255,255,0.3)", background: CARD_BG, borderColor: `${GOLD}12` }}>
               現在お知らせはありません
             </div>
           ) : (
             <Link href="/announcements" className="block rounded-2xl overflow-hidden"
-              style={{ background: slideBg, border: `1px solid ${GOLD}20` }}>
-              {/* ゴールドライン */}
-              <div className="h-0.5" style={{ background: `linear-gradient(90deg, ${GOLD}80, ${ORANGE}80)` }}></div>
+              style={{
+                background: slideBg,
+                border: `1px solid rgba(212,168,83,0.2)`,
+                boxShadow: `0 8px 32px rgba(0,0,0,0.3)`
+              }}>
+              <div className="h-0.5" style={{ background: `linear-gradient(90deg, ${GOLD}90, ${ORANGE}90)` }}></div>
               <div className="p-5 min-h-[110px]">
                 <div className="flex items-center gap-2 mb-2.5">
                   <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${TAG_STYLE[activeAnn?.tag] ?? ""}`}
                     style={!TAG_STYLE[activeAnn?.tag] ? { background: `${GOLD}25`, color: GOLD } : {}}>
                     {TAG_LABEL[activeAnn?.tag] ?? "お知らせ"}
                   </span>
-                  <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
+                  <span className="text-xs" style={{ color: "rgba(255,255,255,0.35)" }}>
                     {activeAnn?.publishedAt ? new Date(activeAnn.publishedAt).toLocaleDateString("ja-JP") : ""}
                   </span>
                 </div>
                 <p className="font-bold text-white text-base leading-snug">{activeAnn?.title}</p>
-                <p className="text-xs mt-1.5 line-clamp-2" style={{ color: "rgba(255,255,255,0.6)" }}>{activeAnn?.content}</p>
+                <p className="text-xs mt-1.5 line-clamp-2" style={{ color: "rgba(255,255,255,0.55)" }}>{activeAnn?.content}</p>
               </div>
               {announcements.length > 1 && (
                 <div className="flex justify-center gap-1.5 pb-3">
                   {announcements.map((_, i) => (
                     <button key={i} onClick={e => { e.preventDefault(); slideRef.current = i; setSlide(i); }}
                       className="h-1.5 rounded-full transition-all duration-300"
-                      style={i === slide ? { width: "20px", background: GOLD } : { width: "6px", background: "rgba(255,255,255,0.25)" }} />
+                      style={i === slide ? { width: "20px", background: GOLD } : { width: "6px", background: "rgba(255,255,255,0.2)" }} />
                   ))}
                 </div>
               )}
@@ -1074,22 +1208,32 @@ export default function MemberDashboard({
 
         {/* ── MLMメニュー ── */}
         <section id="mlm-menu">
-          <SectionHeader label="MLM メニュー" accentColor={ORANGE} />
+          <SectionHeader label="MLM メニュー" accentColor={ORANGE}
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            }
+          />
           <div className="grid grid-cols-3 gap-2.5">
             {mlmMenuItems.map((item, idx) => (
               <Link key={idx} href={item.href}
-                className="rounded-2xl overflow-hidden transition-transform hover:scale-[1.02] active:scale-95"
-                style={{ background: CARD_BG, border: `1px solid ${item.accentColor}20` }}>
+                className="rounded-2xl overflow-hidden transition-transform hover:scale-[1.03] active:scale-95"
+                style={{
+                  background: `linear-gradient(160deg, ${CARD_BG} 0%, ${CARD_BG2} 100%)`,
+                  border: `1px solid ${item.accentColor}22`,
+                  boxShadow: `0 4px 16px rgba(0,0,0,0.2)`
+                }}>
                 <div className="h-0.5" style={{ background: item.accentColor }}></div>
                 <div className="p-3 text-center">
                   <div className="w-10 h-10 rounded-xl mx-auto mb-2 flex items-center justify-center"
-                    style={{ background: `${item.accentColor}15` }}>
+                    style={{ background: `${item.accentColor}14`, border: `1px solid ${item.accentColor}25` }}>
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                       style={{ color: item.accentColor }}>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.svgD} />
                     </svg>
                   </div>
-                  <p className="text-[11px] font-semibold leading-tight whitespace-pre-line" style={{ color: "rgba(255,255,255,0.8)" }}>{item.label}</p>
+                  <p className="text-[11px] font-semibold leading-tight whitespace-pre-line" style={{ color: "rgba(255,255,255,0.82)" }}>{item.label}</p>
                 </div>
               </Link>
             ))}
@@ -1098,23 +1242,46 @@ export default function MemberDashboard({
 
         {/* ── 福利厚生メニュー ── */}
         <section id="menu">
-          <SectionHeader label="福利厚生 メニュー" accentColor={GOLD} />
+          <SectionHeader label="福利厚生 メニュー" accentColor={GOLD}
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            }
+          />
           <div className="grid grid-cols-3 gap-2.5">
             {menus.map(m => {
-              const emoji = ICON_MAP[m.iconType ?? ""] ?? "📌";
-              const cardStyle = { background: CARD_BG, border: `1px solid ${GOLD}18` };
+              const iconType = m.iconType ?? "";
+              const accent = getWelfareAccentColor(iconType);
+
+              const cardContent = (
+                <>
+                  <div className="h-0.5" style={{ background: `linear-gradient(90deg, ${accent}80, ${accent})` }}></div>
+                  <div className="p-3 text-center">
+                    <div className="w-10 h-10 rounded-xl mx-auto mb-2 flex items-center justify-center"
+                      style={{ background: `${accent}14`, border: `1px solid ${accent}28` }}>
+                      <WelfareIcon iconType={iconType} accentColor={accent} />
+                    </div>
+                    <p className="text-[11px] font-semibold leading-tight" style={{ color: "rgba(255,255,255,0.85)" }}>{m.title}</p>
+                    {m.subtitle && (
+                      <p className="text-[9px] mt-0.5 font-medium" style={{ color: `${accent}80` }}>{m.subtitle}</p>
+                    )}
+                  </div>
+                </>
+              );
+
+              const baseStyle = {
+                background: `linear-gradient(160deg, ${CARD_BG} 0%, ${CARD_BG2} 100%)`,
+                border: `1px solid ${accent}20`,
+                boxShadow: `0 4px 16px rgba(0,0,0,0.2)`
+              };
 
               if (m.menuType === "contact") {
                 return (
                   <a key={m.id} href="/contact"
-                    className="rounded-2xl overflow-hidden transition-transform hover:scale-[1.02] active:scale-95"
-                    style={cardStyle}>
-                    <div className="h-0.5" style={{ background: `linear-gradient(90deg, ${GOLD}, ${ORANGE})` }}></div>
-                    <div className="p-3 text-center">
-                      <div className="text-2xl mb-2">{emoji}</div>
-                      <p className="text-[11px] font-semibold leading-tight" style={{ color: "rgba(255,255,255,0.8)" }}>{m.title}</p>
-                      {m.subtitle && <p className="text-[10px] mt-0.5" style={{ color: `${GOLD}60` }}>{m.subtitle}</p>}
-                    </div>
+                    className="rounded-2xl overflow-hidden transition-transform hover:scale-[1.03] active:scale-95"
+                    style={baseStyle}>
+                    {cardContent}
                   </a>
                 );
               }
@@ -1122,14 +1289,9 @@ export default function MemberDashboard({
                 return (
                   <button key={m.id}
                     onClick={() => travelSubRef.current?.openModal()}
-                    className="w-full rounded-2xl overflow-hidden transition-transform hover:scale-[1.02] active:scale-95"
-                    style={cardStyle}>
-                    <div className="h-0.5" style={{ background: `linear-gradient(90deg, ${GOLD}, ${ORANGE})` }}></div>
-                    <div className="p-3 text-center">
-                      <div className="text-2xl mb-2">{emoji}</div>
-                      <p className="text-[11px] font-semibold leading-tight" style={{ color: "rgba(255,255,255,0.8)" }}>{m.title}</p>
-                      {m.subtitle && <p className="text-[10px] mt-0.5" style={{ color: `${GOLD}60` }}>{m.subtitle}</p>}
-                    </div>
+                    className="w-full rounded-2xl overflow-hidden transition-transform hover:scale-[1.03] active:scale-95 text-left"
+                    style={baseStyle}>
+                    {cardContent}
                   </button>
                 );
               }
@@ -1140,14 +1302,9 @@ export default function MemberDashboard({
                   href={href}
                   target={isInternal ? undefined : "_blank"}
                   rel={isInternal ? undefined : "noopener noreferrer"}
-                  className="rounded-2xl overflow-hidden transition-transform hover:scale-[1.02] active:scale-95"
-                  style={cardStyle}>
-                  <div className="h-0.5" style={{ background: `linear-gradient(90deg, ${GOLD}, ${ORANGE})` }}></div>
-                  <div className="p-3 text-center">
-                    <div className="text-2xl mb-2">{emoji}</div>
-                    <p className="text-[11px] font-semibold leading-tight" style={{ color: "rgba(255,255,255,0.8)" }}>{m.title}</p>
-                    {m.subtitle && <p className="text-[10px] mt-0.5" style={{ color: `${GOLD}60` }}>{m.subtitle}</p>}
-                  </div>
+                  className="rounded-2xl overflow-hidden transition-transform hover:scale-[1.03] active:scale-95"
+                  style={baseStyle}>
+                  {cardContent}
                 </a>
               );
             })}
@@ -1156,7 +1313,13 @@ export default function MemberDashboard({
 
         {/* ── クイックアクセス ── */}
         <section>
-          <SectionHeader label="クイックアクセス" accentColor="#818cf8" />
+          <SectionHeader label="クイックアクセス" accentColor="#818cf8"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            }
+          />
           <div className="grid grid-cols-2 gap-3">
             {[
               { href: "/points/history",   svgD: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2", label: "ポイント履歴",           accentColor: GOLD },
@@ -1166,15 +1329,19 @@ export default function MemberDashboard({
             ].map(item => (
               <Link key={item.href} href={item.href}
                 className="rounded-2xl p-4 flex items-center gap-3 transition hover:scale-[1.01] active:scale-95"
-                style={{ background: CARD_BG, border: `1px solid ${item.accentColor}20` }}>
+                style={{
+                  background: `linear-gradient(160deg, ${CARD_BG} 0%, ${CARD_BG2} 100%)`,
+                  border: `1px solid ${item.accentColor}20`,
+                  boxShadow: `0 4px 16px rgba(0,0,0,0.2)`
+                }}>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: `${item.accentColor}15` }}>
+                  style={{ background: `${item.accentColor}14`, border: `1px solid ${item.accentColor}25` }}>
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                     style={{ color: item.accentColor }}>
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.svgD} />
                   </svg>
                 </div>
-                <p className="text-xs font-semibold leading-tight whitespace-pre-line" style={{ color: "rgba(255,255,255,0.75)" }}>{item.label}</p>
+                <p className="text-xs font-semibold leading-tight whitespace-pre-line" style={{ color: "rgba(255,255,255,0.78)" }}>{item.label}</p>
               </Link>
             ))}
           </div>
@@ -1189,53 +1356,74 @@ export default function MemberDashboard({
 
       {/* ── ボトムナビ ── */}
       <nav className="fixed bottom-0 left-0 right-0 z-30"
-        style={{ background: "rgba(6,15,34,0.97)", backdropFilter: "blur(16px)", borderTop: `1px solid ${GOLD}20` }}>
-        <div className="max-w-md mx-auto flex items-end justify-around px-2 py-2">
-          <Link href="/dashboard" className="flex flex-col items-center gap-1 py-1 px-4">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-              style={{ color: "rgba(255,255,255,0.5)" }}>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
-            <span className="text-[10px] font-semibold" style={{ color: "rgba(255,255,255,0.45)" }}>ホーム</span>
+        style={{
+          background: "rgba(6,13,31,0.97)",
+          backdropFilter: "blur(20px)",
+          borderTop: `1px solid rgba(212,168,83,0.18)`,
+          boxShadow: `0 -8px 32px rgba(0,0,0,0.4)`
+        }}>
+        <div className="max-w-md mx-auto flex items-end justify-around px-2 pt-2 pb-safe-bottom" style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}>
+          <Link href="/dashboard" className="flex flex-col items-center gap-1 py-1 px-3 group">
+            <div className="w-7 h-7 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 transition group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                style={{ color: "rgba(255,255,255,0.45)" }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+            </div>
+            <span className="text-[10px] font-semibold" style={{ color: "rgba(255,255,255,0.4)" }}>ホーム</span>
           </Link>
-          <Link href="#mlm-menu" className="flex flex-col items-center gap-1 py-1 px-4">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-              style={{ color: "rgba(255,255,255,0.5)" }}>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h8m-8 6h16" />
-            </svg>
-            <span className="text-[10px] font-semibold" style={{ color: "rgba(255,255,255,0.45)" }}>メニュー</span>
+
+          <Link href="#mlm-menu" className="flex flex-col items-center gap-1 py-1 px-3 group">
+            <div className="w-7 h-7 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 transition group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                style={{ color: "rgba(255,255,255,0.45)" }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h8m-8 6h16" />
+              </svg>
+            </div>
+            <span className="text-[10px] font-semibold" style={{ color: "rgba(255,255,255,0.4)" }}>メニュー</span>
           </Link>
-          <Link href="/points/use" className="flex flex-col items-center -mt-6">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center border-2 shadow-xl"
+
+          {/* センターポイントボタン */}
+          <Link href="/points/use" className="flex flex-col items-center -mt-5">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center relative"
               style={{
-                background: `linear-gradient(135deg, ${GOLD}, ${ORANGE})`,
-                borderColor: `${GOLD}60`,
-                boxShadow: `0 8px 24px ${GOLD}40`
+                background: `linear-gradient(135deg, ${GOLD} 0%, ${ORANGE} 100%)`,
+                border: `2px solid rgba(212,168,83,0.5)`,
+                boxShadow: `0 8px 28px rgba(212,168,83,0.4), 0 4px 12px rgba(0,0,0,0.4)`
               }}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {/* 内部グロー */}
+              <div className="absolute inset-0 rounded-2xl opacity-30"
+                style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.3), transparent 60%)" }} />
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 text-white relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <span className="text-[10px] font-semibold mt-1" style={{ color: GOLD }}>ポイント</span>
+            <span className="text-[10px] font-bold mt-1" style={{ color: GOLD }}>ポイント</span>
           </Link>
-          <Link href="/announcements" className="flex flex-col items-center gap-1 py-1 px-4 relative">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-              style={{ color: "rgba(255,255,255,0.5)" }}>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
+
+          <Link href="/announcements" className="flex flex-col items-center gap-1 py-1 px-3 relative group">
+            <div className="w-7 h-7 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 transition group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                style={{ color: "rgba(255,255,255,0.45)" }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+            </div>
             {unreadCount > 0 && (
-              <span className="absolute top-0.5 right-2.5 bg-red-500 text-white text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">
-                {unreadCount}
+              <span className="absolute top-0 right-1 bg-red-500 text-white text-[8px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                {unreadCount > 9 ? "9+" : unreadCount}
               </span>
             )}
-            <span className="text-[10px] font-semibold" style={{ color: "rgba(255,255,255,0.45)" }}>お知らせ</span>
+            <span className="text-[10px] font-semibold" style={{ color: "rgba(255,255,255,0.4)" }}>お知らせ</span>
           </Link>
-          <Link href="/profile" className="flex flex-col items-center gap-1 py-1 px-4">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-              style={{ color: "rgba(255,255,255,0.5)" }}>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            <span className="text-[10px] font-semibold" style={{ color: "rgba(255,255,255,0.45)" }}>マイページ</span>
+
+          <Link href="/profile" className="flex flex-col items-center gap-1 py-1 px-3 group">
+            <div className="w-7 h-7 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 transition group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                style={{ color: "rgba(255,255,255,0.45)" }}>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+            <span className="text-[10px] font-semibold" style={{ color: "rgba(255,255,255,0.4)" }}>マイページ</span>
           </Link>
         </div>
       </nav>

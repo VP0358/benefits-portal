@@ -46,7 +46,7 @@ type StatusData = {
 const GOLD      = "#d4a853";
 const GOLD_LIGHT= "#f0c060";
 const ORANGE    = "#e8893a";
-const PAGE_BG   = "#071228";
+const PAGE_BG   = "#060d1f";
 const CARD_BG   = "#0f2347";
 const CARD_BG2  = "#132a54";
 
@@ -63,12 +63,18 @@ const STATUS_THEME: Record<string, StatusTheme> = {
   pending:  { dotColor: ORANGE,    textColor: ORANGE,     bgColor: `${ORANGE}12`,            borderColor: `${ORANGE}40` },
 };
 
-function SectionTitle({ icon, title }: { icon: string; title: string }) {
+function SectionTitle({ svgD, title, accent }: { svgD: string; title: string; accent?: string }) {
+  const color = accent ?? GOLD;
   return (
     <div className="flex items-center gap-2.5 px-5 py-4"
       style={{ borderBottom: `1px solid rgba(212,168,83,0.1)` }}>
-      <span className="text-lg">{icon}</span>
-      <h2 className="text-sm font-bold tracking-wide" style={{ color: "rgba(255,255,255,0.85)" }}>{title}</h2>
+      <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+        style={{ background: `${color}15`, border: `1px solid ${color}25` }}>
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color }}>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={svgD} />
+        </svg>
+      </div>
+      <h2 className="text-sm font-bold tracking-wide" style={{ color: "rgba(255,255,255,0.88)" }}>{title}</h2>
     </div>
   );
 }
@@ -116,7 +122,7 @@ export default function MlmStatusPage() {
     <div className="min-h-screen pb-10" style={{ background: PAGE_BG }}>
       {/* ヘッダー */}
       <header className="sticky top-0 z-20"
-        style={{ background: `rgba(7,18,40,0.97)`, backdropFilter: "blur(16px)", borderBottom: `1px solid ${GOLD}20` }}>
+        style={{ background: `rgba(6,13,31,0.97)`, backdropFilter: "blur(20px)", borderBottom: `1px solid rgba(212,168,83,0.18)`, boxShadow: `0 4px 24px rgba(0,0,0,0.4)` }}>
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center gap-3">
           <Link href="/dashboard" className="flex items-center gap-1.5 transition" style={{ color: "rgba(255,255,255,0.5)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -200,7 +206,7 @@ export default function MlmStatusPage() {
 
             {/* ── 購入状況 ── */}
             <div className="rounded-2xl overflow-hidden" style={{ background: CARD_BG, border: `1px solid ${GOLD}18` }}>
-              <SectionTitle icon="📦" title="購入状況" />
+              <SectionTitle svgD="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" title="購入状況" accent={ORANGE} />
               <div className="p-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-2xl p-4" style={{ background: `${ORANGE}10`, border: `1px solid ${ORANGE}25` }}>
@@ -235,7 +241,7 @@ export default function MlmStatusPage() {
 
             {/* ── 組織状況 ── */}
             <div className="rounded-2xl overflow-hidden" style={{ background: CARD_BG, border: `1px solid ${GOLD}18` }}>
-              <SectionTitle icon="🌳" title="組織状況" />
+              <SectionTitle svgD="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" title="組織状況" accent="#34d399" />
               <div className="p-4 grid grid-cols-3 gap-3">
                 {[
                   { label: "直紹介数",   value: data.directCount,       unit: "人", color: "#34d399" },
@@ -254,7 +260,7 @@ export default function MlmStatusPage() {
 
             {/* ── ポイント残高 ── */}
             <div className="rounded-2xl overflow-hidden" style={{ background: CARD_BG, border: `1px solid ${GOLD}18` }}>
-              <SectionTitle icon="💎" title="ポイント残高" />
+              <SectionTitle svgD="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" title="ポイント残高" accent={GOLD} />
               <div>
                 {[
                   { label: "自動ポイント", value: data.autoPoints,     svgD: "M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18",   color: "#818cf8" },

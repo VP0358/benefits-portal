@@ -29,7 +29,7 @@ type AutoshipData = {
 const GOLD       = "#d4a853";
 const GOLD_LIGHT = "#f0c060";
 const ORANGE     = "#e8893a";
-const PAGE_BG    = "#071228";
+const PAGE_BG    = "#060d1f";
 const CARD_BG    = "#0f2347";
 
 type StatusConfig = { label: string; dotColor: string; textColor: string };
@@ -77,7 +77,7 @@ export default function MlmAutoshipPage() {
     <div className="min-h-screen pb-10" style={{ background: PAGE_BG }}>
       {/* ヘッダー */}
       <header className="sticky top-0 z-20"
-        style={{ background: `rgba(7,18,40,0.97)`, backdropFilter: "blur(16px)", borderBottom: `1px solid ${GOLD}20` }}>
+        style={{ background: `rgba(6,13,31,0.97)`, backdropFilter: "blur(20px)", borderBottom: `1px solid rgba(212,168,83,0.18)`, boxShadow: `0 4px 24px rgba(0,0,0,0.4)` }}>
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center gap-3">
           <Link href="/dashboard" className="flex items-center gap-1.5 transition" style={{ color: "rgba(255,255,255,0.5)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
