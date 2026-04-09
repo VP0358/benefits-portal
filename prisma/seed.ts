@@ -77,6 +77,40 @@ async function main() {
   await prisma.siteSetting.upsert({ where: { settingKey: "siteTitle" }, update: { settingValue: "福利厚生ポータル" }, create: { settingKey: "siteTitle", settingValue: "福利厚生ポータル" } });
   await prisma.siteSetting.upsert({ where: { settingKey: "faviconUrl" }, update: { settingValue: null }, create: { settingKey: "faviconUrl", settingValue: null } });
 
+  // ボーナス計算設定の初期化
+  const bonusSettings = await prisma.bonusSettings.findFirst();
+  if (!bonusSettings) {
+    await prisma.bonusSettings.create({
+      data: {
+        directBonusAmount: 2000,
+        unilevelRate1: 15.0,
+        unilevelRate2: 10.0,
+        unilevelRate3: 7.0,
+        unilevelRate4: 5.0,
+        unilevelRate5: 3.0,
+        unilevelRate6: 2.0,
+        unilevelRate7: 1.0,
+        structureMinSeriesRate1: 3.0,
+        structureMinSeriesRate2: 4.0,
+        activeThresholdPoints: 150,
+        serviceFeeAmount: 440,
+        minPayoutAmount: 2560,
+      },
+    });
+  }
+
+  // 貯金ボーナス設定の初期化
+  const savingsConfig = await prisma.savingsBonusConfig.findFirst();
+  if (!savingsConfig) {
+    await prisma.savingsBonusConfig.create({
+      data: {
+        registrationRate: 20.0,
+        autoshipRate: 5.0,
+        bonusRate: 3.0,
+      },
+    });
+  }
+
   console.log("✅ Seed完了");
   console.log({ admin: admin.email, member: member.email });
 }

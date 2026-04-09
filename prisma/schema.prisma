@@ -1024,3 +1024,29 @@ model SavingsBonusConfig {
   @@map("savings_bonus_config")
 }
 
+// ボーナス計算設定
+model BonusSettings {
+  id                      Int      @id @default(autoincrement())
+  // ダイレクトボーナス
+  directBonusAmount       Int      @default(2000)    // ダイレクトボーナス額（円）
+  // ユニレベルボーナス（7段階）
+  unilevelRate1           Float    @default(15.0)    // 1段目（15%）
+  unilevelRate2           Float    @default(10.0)    // 2段目（10%）
+  unilevelRate3           Float    @default(7.0)     // 3段目（7%）
+  unilevelRate4           Float    @default(5.0)     // 4段目（5%）
+  unilevelRate5           Float    @default(3.0)     // 5段目（3%）
+  unilevelRate6           Float    @default(2.0)     // 6段目（2%）
+  unilevelRate7           Float    @default(1.0)     // 7段目（1%）
+  // 組織構築ボーナス（LV3以上）
+  structureMinSeriesRate1 Float    @default(3.0)     // 最小系列1（3%）
+  structureMinSeriesRate2 Float    @default(4.0)     // 最小系列2（4%）
+  // その他設定
+  activeThresholdPoints   Int      @default(150)     // アクティブ判定基準pt
+  serviceFeeAmount        Int      @default(440)     // 事務手数料（円）
+  minPayoutAmount         Int      @default(2560)    // 最低振込額（円）
+  updatedAt               DateTime @updatedAt
+  createdAt               DateTime @default(now())
+
+  @@map("bonus_settings")
+}
+
