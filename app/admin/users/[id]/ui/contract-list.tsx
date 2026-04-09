@@ -12,6 +12,8 @@ type Contract = {
   confirmedAt?: string | null;
   canceledAt?: string | null;
   note?: string | null;
+  createdAt?: string | null;
+  isCampaign?: boolean;
 };
 
 function statusLabel(status: string) {
@@ -249,8 +251,20 @@ export default function ContractList({ contracts: initial }: { contracts: Contra
             <>
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <div className="font-semibold text-slate-800 text-sm">{contract.planName}</div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="font-semibold text-slate-800 text-sm">{contract.planName}</div>
+                    {contract.isCampaign && (
+                      <span className="rounded-full bg-orange-100 border border-orange-300 px-2 py-0.5 text-xs font-bold text-orange-700">
+                        🎁 特別キャンペーン
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs text-slate-600 mt-0.5">契約番号: {contract.contractNumber}</div>
+                  {contract.createdAt && (
+                    <div className="text-xs text-slate-500 mt-0.5">
+                      契約日: {new Date(contract.createdAt).toLocaleDateString("ja-JP")}
+                    </div>
+                  )}
                 </div>
                 <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusLabel(contract.status).cls}`}>
                   {statusLabel(contract.status).label}

@@ -39,7 +39,6 @@ const menuGroups = [
       { href: "/admin/vp-phone/stats", label: "携帯契約統計", icon: "fas fa-chart-bar" },
       { href: "/admin/contracts", label: "携帯契約一覧", icon: "fas fa-file-contract" },
       { href: "/admin/referral-rewards", label: "紹介者報酬計算", icon: "fas fa-gift" },
-      { href: "/admin/referral-history", label: "紹介者変更履歴", icon: "fas fa-history" },
     ]
   },
   {
