@@ -45,6 +45,18 @@ export default async function MlmMemberDetailPage({
     },
   });
 
+  // オートシップ注文履歴（最新30件）
+  const autoShipOrders = await prisma.autoShipOrder.findMany({
+    where: { mlmMemberId: mlmMemberId },
+    include: {
+      autoShipRun: {
+        select: { targetMonth: true, paymentMethod: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 30,
+  });
+
   if (!mlmMember) notFound();
 
   const statusLabels: Record<string, string> = {
@@ -418,6 +430,68 @@ export default async function MlmMemberDetailPage({
           </div>
         ) : (
           <p className="text-gray-500 text-sm">ダウンラインなし</p>
+        )}
+      </section>
+
+      {/* オートシップ注文履歴 */}
+      <section className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
+          <i className="fas fa-shopping-cart mr-2"></i>
+          オートシップ注文履歴
+        </h2>
+        {autoShipOrders.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-4 py-2 text-left">対象月</th>
+                  <th className="px-4 py-2 text-left">支払い方法</th>
+                  <th className="px-4 py-2 text-right">金額</th>
+                  <th className="px-4 py-2 text-center">ステータス</th>
+                  <th className="px-4 py-2 text-left">決済日</th>
+                  <th className="px-4 py-2 text-left">失敗理由</th>
+                </tr>
+              </thead>
+              <tbody>
+                {autoShipOrders.map((order) => {
+                  const orderStatusLabel: Record<string, string> = {
+                    pending: "未処理",
+                    paid: "決済完了",
+                    failed: "失敗",
+                    canceled: "キャンセル",
+                  };
+                  const orderStatusColor: Record<string, string> = {
+                    pending: "bg-gray-100 text-gray-600",
+                    paid: "bg-green-100 text-green-700",
+                    failed: "bg-red-100 text-red-700",
+                    canceled: "bg-gray-200 text-gray-500",
+                  };
+                  const pmLabel: Record<string, string> = {
+                    credit_card: "💳 クレジットカード",
+                    bank_transfer: "🏦 口座振替",
+                  };
+                  return (
+                    <tr key={order.id.toString()} className="border-b hover:bg-gray-50">
+                      <td className="px-4 py-2 font-medium">{order.autoShipRun.targetMonth}</td>
+                      <td className="px-4 py-2 text-gray-600 text-xs">{pmLabel[order.autoShipRun.paymentMethod] ?? order.autoShipRun.paymentMethod}</td>
+                      <td className="px-4 py-2 text-right">{order.totalAmount.toLocaleString()}円</td>
+                      <td className="px-4 py-2 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${orderStatusColor[order.status] ?? "bg-gray-100 text-gray-600"}`}>
+                          {orderStatusLabel[order.status] ?? order.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-xs text-gray-500">
+                        {order.paidAt ? new Date(order.paidAt).toLocaleDateString("ja-JP") : "—"}
+                      </td>
+                      <td className="px-4 py-2 text-xs text-red-500">{order.failReason ?? ""}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-gray-500 text-sm">オートシップ注文履歴なし</p>
         )}
       </section>
 

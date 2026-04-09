@@ -140,10 +140,35 @@ export async function GET(req: NextRequest) {
         });
       }
     } else {
-      return NextResponse.json(
-        { error: "検索条件を指定してください" },
-        { status: 400 }
-      );
+      // ★ 検索条件なし → 全体組織図：上位（uplineId=null）の会員を全取得してツリー/リストを返す
+      const rootMembers = await prisma.mlmMember.findMany({
+        where: { uplineId: null },
+        include: { user: { select: { name: true } } },
+        orderBy: { memberCode: "asc" },
+      });
+
+      if (type === "matrix") {
+        // 複数ルートのツリーを並べて返す
+        const roots = await Promise.all(rootMembers.map(m => buildMatrixTree(m.id, 0)));
+        const list  = await Promise.all(rootMembers.map(m => getMatrixList(m.id)));
+        return NextResponse.json({
+          root: roots.length === 1 ? roots[0] : { id: "root", memberCode: "（全体）", name: "全体", level: -1, status: "active", directDownlines: roots.filter(Boolean) },
+          list: list.flat(),
+        }, { status: 200 });
+      } else {
+        // ユニレベル（referrerId=null の会員を起点）
+        const uniRootMembers = await prisma.mlmMember.findMany({
+          where: { referrerId: null },
+          include: { user: { select: { name: true } } },
+          orderBy: { memberCode: "asc" },
+        });
+        const roots = await Promise.all(uniRootMembers.map(m => buildUnilevelTree(m.id, 0)));
+        const list  = await Promise.all(uniRootMembers.map(m => getUnilevelList(m.id)));
+        return NextResponse.json({
+          root: roots.length === 1 ? roots[0] : { id: "root", memberCode: "（全体）", name: "全体", level: -1, status: "active", directDownlines: roots.filter(Boolean) },
+          list: list.flat(),
+        }, { status: 200 });
+      }
     }
 
     if (!targetMember) {

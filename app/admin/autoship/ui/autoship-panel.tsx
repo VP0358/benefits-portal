@@ -128,6 +128,28 @@ export default function AutoShipPanel() {
   /* 操作メッセージ */
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  /* ── 有効会員一覧表示 ── */
+  const [memberListMonth, setMemberListMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [memberListPm, setMemberListPm] = useState<PaymentMethod>("credit_card");
+  const [memberListData, setMemberListData] = useState<{
+    id: string; memberCode: string; memberName: string; memberPhone: string | null; memberEmail: string | null; paymentMethod: string;
+  }[]>([]);
+  const [memberListLoading, setMemberListLoading] = useState(false);
+  const [showMemberList, setShowMemberList] = useState(false);
+
+  /* ── CSV直接インポート（外部ファイルから即アクティブ反映） ── */
+  const [csvImportFile, setCsvImportFile] = useState<File | null>(null);
+  const [csvImportMonth, setCsvImportMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [csvImportPm, setCsvImportPm] = useState<PaymentMethod>("credit_card");
+  const [csvImportLoading, setCsvImportLoading] = useState(false);
+  const [csvImportResult, setCsvImportResult] = useState<{ paidCount: number; failedCount: number; newRunId?: string } | null>(null);
+
   /* ─── 一覧取得 ─── */
   const loadRuns = useCallback(async () => {
     setLoading(true);
@@ -253,6 +275,58 @@ export default function AutoShipPanel() {
     window.open(`/api/admin/autoship/${runId}/yamato-csv`, "_blank");
   }
 
+  /* ─── 有効会員一覧取得 ─── */
+  async function handleLoadMemberList() {
+    setMemberListLoading(true);
+    setMemberListData([]);
+    setMsg(null);
+    try {
+      const params = new URLSearchParams({
+        targetMonth: memberListMonth,
+        paymentMethod: memberListPm,
+      });
+      const res = await fetch(`/api/admin/autoship/members?${params}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "取得失敗");
+      setMemberListData(data.members ?? []);
+      setShowMemberList(true);
+    } catch (e: unknown) {
+      setMsg({ type: "error", text: e instanceof Error ? e.message : "取得失敗" });
+    } finally {
+      setMemberListLoading(false);
+    }
+  }
+
+  /* ─── CSV直接インポート（伝票作成 + 結果取込 を一括処理） ─── */
+  async function handleDirectCsvImport() {
+    if (!csvImportFile) return;
+    setCsvImportLoading(true);
+    setCsvImportResult(null);
+    setMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", csvImportFile);
+      fd.append("targetMonth", csvImportMonth);
+      fd.append("paymentMethod", csvImportPm);
+      const res = await fetch("/api/admin/autoship/import-direct", {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "インポート失敗");
+      setCsvImportResult({ paidCount: data.paidCount, failedCount: data.failedCount, newRunId: data.runId });
+      setMsg({
+        type: "success",
+        text: `CSVインポート完了: 決済成功 ${data.paidCount} 件 / 失敗 ${data.failedCount} 件。当月アクティブ反映済み。`,
+      });
+      loadRuns();
+    } catch (e: unknown) {
+      setMsg({ type: "error", text: e instanceof Error ? e.message : "インポート失敗" });
+    } finally {
+      setCsvImportLoading(false);
+    }
+  }
+
   /* ═══ レンダー ═══ */
   return (
     <div className="space-y-6">
@@ -268,6 +342,145 @@ export default function AutoShipPanel() {
         >
           ＋ 新規月次伝票作成
         </button>
+      </div>
+
+      {/* ──── ② 有効会員一覧 ──── */}
+      <div className="bg-white border border-blue-100 rounded-xl p-5 shadow-sm">
+        <h2 className="text-base font-semibold text-gray-800 mb-3">📋 オートシップ有効会員一覧（対象月・支払方法で絞り込み）</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">対象月</label>
+            <input
+              type="month"
+              value={memberListMonth}
+              onChange={e => setMemberListMonth(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">支払い方法</label>
+            <select
+              value={memberListPm}
+              onChange={e => setMemberListPm(e.target.value as PaymentMethod)}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              <option value="credit_card">💳 クレジットカード (Credix)</option>
+              <option value="bank_transfer">🏦 口座振替 (三菱UFJファクター)</option>
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={handleLoadMemberList}
+              disabled={memberListLoading}
+              className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition"
+            >
+              {memberListLoading ? "取得中…" : "🔍 会員一覧を表示"}
+            </button>
+          </div>
+        </div>
+        {showMemberList && (
+          <div className="mt-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-gray-600">
+                対象: <strong>{memberListMonth}</strong> / {PM_LABELS[memberListPm]} — <strong>{memberListData.length}件</strong>
+              </p>
+              <button onClick={() => setShowMemberList(false)} className="text-xs text-gray-400 hover:text-gray-600">✕ 閉じる</button>
+            </div>
+            {memberListData.length > 0 ? (
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="min-w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 text-gray-500 uppercase">
+                      <th className="px-3 py-2 text-left">会員コード</th>
+                      <th className="px-3 py-2 text-left">氏名</th>
+                      <th className="px-3 py-2 text-left">電話</th>
+                      <th className="px-3 py-2 text-left">メール</th>
+                      <th className="px-3 py-2 text-left">支払い方法</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {memberListData.map(m => (
+                      <tr key={m.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 font-mono">{m.memberCode}</td>
+                        <td className="px-3 py-2">{m.memberName}</td>
+                        <td className="px-3 py-2 text-gray-500">{m.memberPhone ?? "—"}</td>
+                        <td className="px-3 py-2 text-gray-500">{m.memberEmail ?? "—"}</td>
+                        <td className="px-3 py-2">{PM_LABELS[m.paymentMethod as PaymentMethod] ?? m.paymentMethod}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 py-4 text-center">対象会員がいません</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ──── CSV直接インポート ──── */}
+      <div className="bg-white border border-green-100 rounded-xl p-5 shadow-sm">
+        <h2 className="text-base font-semibold text-gray-800 mb-1">📂 CSVデータ取り込み（クレディックス / 三菱UFJファクター）</h2>
+        <p className="text-xs text-gray-500 mb-3">
+          決済会社から出力されたCSVをここで直接インポートできます。インポート後、決済成功会員を当月アクティブとして自動反映します。
+          伝票が未作成の場合は自動作成されます。
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">対象月</label>
+            <input
+              type="month"
+              value={csvImportMonth}
+              onChange={e => setCsvImportMonth(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">決済会社（支払い方法）</label>
+            <select
+              value={csvImportPm}
+              onChange={e => setCsvImportPm(e.target.value as PaymentMethod)}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+            >
+              <option value="credit_card">💳 クレジットカード (Credix)</option>
+              <option value="bank_transfer">🏦 口座振替 (三菱UFJファクター)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">CSVファイル選択</label>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={e => setCsvImportFile(e.target.files?.[0] ?? null)}
+              className="w-full text-xs file:mr-2 file:py-1.5 file:px-3 file:border-0 file:bg-green-50 file:text-green-700 file:rounded file:text-xs file:cursor-pointer"
+            />
+          </div>
+        </div>
+        <div className="mt-3 p-3 bg-yellow-50 rounded-lg text-xs text-yellow-800 border border-yellow-200 mb-3">
+          ⚠️ <strong>CSVフォーマット</strong>: ヘッダー行に「会員コード（code）」「決済結果（result/status）」列が必要です。
+          結果コード: <code className="bg-yellow-100 px-1 rounded">OK</code> または <code className="bg-yellow-100 px-1 rounded">0</code> または <code className="bg-yellow-100 px-1 rounded">1</code> = 成功、それ以外 = 失敗。
+        </div>
+        <button
+          onClick={handleDirectCsvImport}
+          disabled={!csvImportFile || csvImportLoading}
+          className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition"
+        >
+          {csvImportLoading ? "取り込み中…" : "📤 CSVをインポートして当月アクティブ反映"}
+        </button>
+        {csvImportResult && (
+          <div className="mt-3 p-3 bg-green-50 rounded-lg text-sm border border-green-200">
+            <p className="font-semibold text-green-800">✅ インポート完了</p>
+            <p className="text-green-700">決済成功: <strong>{csvImportResult.paidCount}件</strong> / 失敗: <strong>{csvImportResult.failedCount}件</strong></p>
+            {csvImportResult.newRunId && (
+              <button
+                onClick={() => openDetail(csvImportResult.newRunId!)}
+                className="mt-2 text-xs text-indigo-600 hover:underline"
+              >
+                → 作成された伝票を確認
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ──── メッセージ ──── */}

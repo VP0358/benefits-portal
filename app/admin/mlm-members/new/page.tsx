@@ -237,8 +237,14 @@ export default function MlmMemberNewPage() {
       });
 
       if (res.ok) {
-        alert("MLM会員を登録しました");
-        router.push("/admin/mlm-members");
+        const result = await res.json();
+        // 登録した会員のIDを取得して会員詳細に即時遷移
+        const newMemberId = result.member?.id?.toString();
+        if (newMemberId) {
+          router.push(`/admin/mlm-members/${newMemberId}`);
+        } else {
+          router.push("/admin/mlm-members");
+        }
       } else {
         const error = await res.json();
         alert(`登録失敗: ${error.error || "不明なエラー"}`);

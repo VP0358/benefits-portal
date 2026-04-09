@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { LEVEL_LABELS, MEMBER_TYPE_LABELS } from "@/lib/mlm-bonus";
 
 /* ─── 型定義 ─── */
@@ -25,7 +26,11 @@ type MlmMemberRow = {
   savingsPoints: number;
   userName: string;
   userEmail: string;
-  avatarUrl: string | null;
+  userPhone: string | null;
+  userPostalCode: string | null;
+  nickname: string | null;
+  birthDate: string | null;
+  avatarUrl?: string | null;
   downlineCount: number;
   referralCount: number;
   createdAt: string;
@@ -47,6 +52,17 @@ const STATUS_COLORS: Record<string, string> = {
   suspended: "bg-orange-100 text-orange-700",
   withdrawn: "bg-slate-100 text-slate-500",
   midCancel: "bg-slate-100 text-slate-400",
+};
+
+const SEARCH_FIELD_LABELS: Record<string, string> = {
+  all:          "すべて",
+  memberCode:   "会員コード",
+  name:         "名前",
+  nickname:     "ニックネーム",
+  phone:        "電話番号",
+  postalCode:   "郵便番号",
+  birthDate:    "生年月日",
+  contractDate: "契約締結日",
 };
 
 /* ─── 編集モーダル ─── */
@@ -282,10 +298,12 @@ function EditModal({
 
 /* ─── メインページ ─── */
 export default function MlmMembersPage() {
+  const router = useRouter();
   const [members, setMembers] = useState<MlmMemberRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [searchField, setSearchField] = useState("all");
   const [memberType, setMemberType] = useState("");
   const [status, setStatus] = useState("");
   const [editTarget, setEditTarget] = useState<MlmMemberRow | null>(null);
@@ -298,6 +316,7 @@ export default function MlmMembersPage() {
         page: page.toString(),
         limit: "50",
         ...(search && { search }),
+        ...(searchField && searchField !== "all" && { searchField }),
         ...(memberType && { memberType }),
         ...(status && { status }),
       });
@@ -308,7 +327,7 @@ export default function MlmMembersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, memberType, status]);
+  }, [page, search, searchField, memberType, status]);
 
   useEffect(() => { fetchMembers(); }, [fetchMembers]);
 
@@ -326,33 +345,101 @@ export default function MlmMembersPage() {
     await fetchMembers();
   };
 
+  const handleRowClick = (m: MlmMemberRow) => {
+    router.push(`/admin/mlm-members/${m.id}`);
+  };
+
+  const fmtDate = (s: string | null) => {
+    if (!s) return "—";
+    return new Date(s).toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
+  };
+
+  const getSearchPlaceholder = () => {
+    switch (searchField) {
+      case "memberCode":   return "例: 123456-01";
+      case "name":         return "例: 山田太郎";
+      case "nickname":     return "例: たろう";
+      case "phone":        return "例: 090-1234-5678";
+      case "postalCode":   return "例: 020-0026";
+      case "birthDate":    return "例: 1990-01-01 または 1990-01";
+      case "contractDate": return "例: 2024-04-01 または 2024-04";
+      default:             return "名前・メール・会員コード・電話番号など...";
+    }
+  };
+
   return (
     <main className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">👥 MLM会員管理</h1>
           <p className="text-sm text-slate-600 mt-1">
-            会員タイプ・レベル・条件達成・強制アクティブなどを管理します。
+            会員タイプ・レベル・条件達成・強制アクティブなどを管理します。行をクリックで会員詳細へ。
           </p>
         </div>
-        <Link
-          href="/admin/bonus-calculate"
-          className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700 transition"
-        >
-          🧮 ボーナス計算へ
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/admin/mlm-members/new"
+            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 transition"
+          >
+            ＋ 新規登録
+          </Link>
+          <Link
+            href="/admin/bonus-calculate"
+            className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700 transition"
+          >
+            🧮 ボーナス計算へ
+          </Link>
+        </div>
       </div>
 
       {/* フィルター */}
-      <div className="rounded-3xl bg-white p-5 shadow-sm">
+      <div className="rounded-3xl bg-white p-5 shadow-sm space-y-3">
+        {/* 検索フィールド選択 + 検索ワード */}
+        <div className="grid gap-3 md:grid-cols-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1">検索項目</label>
+            <select
+              value={searchField}
+              onChange={(e) => { setSearchField(e.target.value); setPage(1); }}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800"
+            >
+              {Object.entries(SEARCH_FIELD_LABELS).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </select>
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-semibold text-slate-500 mb-1">検索ワード</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder={getSearchPlaceholder()}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { setPage(1); fetchMembers(); } }}
+                className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-300"
+              />
+              <button
+                onClick={() => { setPage(1); fetchMembers(); }}
+                className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700 transition"
+              >
+                検索
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1">　</label>
+            <button
+              onClick={() => { setSearch(""); setSearchField("all"); setMemberType(""); setStatus(""); setPage(1); }}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+            >
+              ✕ リセット
+            </button>
+          </div>
+        </div>
+
+        {/* フィルター行 */}
         <div className="grid gap-3 md:grid-cols-3">
-          <input
-            type="text"
-            placeholder="名前・メール・会員コード..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-300"
-          />
           <select
             value={memberType}
             onChange={(e) => { setMemberType(e.target.value); setPage(1); }}
@@ -372,21 +459,24 @@ export default function MlmMembersPage() {
               <option key={k} value={k}>{v}</option>
             ))}
           </select>
+          <div className="flex items-center text-sm text-slate-500">
+            全 <span className="font-bold text-slate-800 mx-1">{total}</span>件
+          </div>
         </div>
-        <div className="mt-2 text-xs text-slate-500">全 {total}件</div>
       </div>
 
       {/* テーブル */}
       <div className="rounded-3xl bg-white shadow-sm overflow-x-auto">
-        <table className="w-full text-sm min-w-[800px]">
+        <table className="w-full text-sm min-w-[900px]">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50">
               <th className="py-3 px-4 text-left text-slate-600 font-semibold">会員</th>
+              <th className="py-3 px-4 text-left text-slate-600 font-semibold">電話・郵便番号</th>
+              <th className="py-3 px-4 text-left text-slate-600 font-semibold">生年月日</th>
+              <th className="py-3 px-4 text-left text-slate-600 font-semibold">契約締結日</th>
               <th className="py-3 px-4 text-center text-slate-600 font-semibold">タイプ</th>
               <th className="py-3 px-4 text-center text-slate-600 font-semibold">ステータス</th>
               <th className="py-3 px-4 text-center text-slate-600 font-semibold">当月LV</th>
-              <th className="py-3 px-4 text-center text-slate-600 font-semibold">👑称号LV</th>
-              <th className="py-3 px-4 text-center text-slate-600 font-semibold">条件</th>
               <th className="py-3 px-4 text-right text-slate-600 font-semibold">下位</th>
               <th className="py-3 px-4 text-right text-slate-600 font-semibold">貯金pt</th>
               <th className="py-3 px-4 text-center text-slate-600 font-semibold">操作</th>
@@ -395,21 +485,38 @@ export default function MlmMembersPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-slate-400">読み込み中...</td>
+                <td colSpan={10} className="py-12 text-center text-slate-400">読み込み中...</td>
               </tr>
             ) : members.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-slate-400">
-                  MLM会員がいません
+                <td colSpan={10} className="py-12 text-center text-slate-400">
+                  会員が見つかりません
                 </td>
               </tr>
             ) : (
               members.map((m) => (
-                <tr key={m.id} className="border-b border-slate-50 hover:bg-slate-50">
+                <tr
+                  key={m.id}
+                  className="border-b border-slate-50 hover:bg-violet-50 cursor-pointer transition"
+                  onClick={() => handleRowClick(m)}
+                >
                   <td className="py-3 px-4">
                     <div className="font-semibold text-slate-800">{m.userName}</div>
+                    {m.nickname && (
+                      <div className="text-xs text-violet-600">「{m.nickname}」</div>
+                    )}
                     <div className="text-xs text-slate-500">{m.memberCode}</div>
                     <div className="text-xs text-slate-400">{m.userEmail}</div>
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="text-xs text-slate-600">{m.userPhone ?? "—"}</div>
+                    <div className="text-xs text-slate-400">{m.userPostalCode ?? "—"}</div>
+                  </td>
+                  <td className="py-3 px-4 text-xs text-slate-600">
+                    {fmtDate(m.birthDate)}
+                  </td>
+                  <td className="py-3 px-4 text-xs text-slate-600">
+                    {fmtDate(m.contractDate)}
                   </td>
                   <td className="py-3 px-4 text-center">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
@@ -430,17 +537,6 @@ export default function MlmMembersPage() {
                   </td>
                   <td className="py-3 px-4 text-center text-xs font-bold text-violet-700">
                     {LEVEL_LABELS[m.currentLevel] ?? "—"}
-                    {m.forceLevel != null && (
-                      <div className="text-orange-500">（強制: LV.{m.forceLevel}）</div>
-                    )}
-                  </td>
-                  <td className="py-3 px-4 text-center text-xs font-bold text-amber-700">
-                    {LEVEL_LABELS[m.titleLevel] ?? "—"}
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <span className={`text-xs font-semibold ${m.conditionAchieved ? "text-emerald-600" : "text-slate-400"}`}>
-                      {m.conditionAchieved ? "✅ 達成" : "— 未達成"}
-                    </span>
                   </td>
                   <td className="py-3 px-4 text-right text-xs text-slate-600">
                     ↓{m.downlineCount}名
@@ -448,13 +544,15 @@ export default function MlmMembersPage() {
                   <td className="py-3 px-4 text-right text-xs text-slate-600">
                     {m.savingsPoints.toLocaleString()}pt
                   </td>
-                  <td className="py-3 px-4 text-center">
+                  <td
+                    className="py-3 px-4 text-center"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <div className="flex gap-2 justify-center">
                       <Link
                         href={`/admin/mlm-members/${m.id}`}
                         className="rounded-lg bg-green-100 px-3 py-1 text-xs font-semibold text-green-700 hover:bg-green-200 transition"
                       >
-                        <i className="fas fa-eye mr-1"></i>
                         詳細
                       </Link>
                       <button
@@ -469,8 +567,7 @@ export default function MlmMembersPage() {
                         rel="noopener noreferrer"
                         className="rounded-lg bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-200 transition"
                       >
-                        <i className="fas fa-file-pdf mr-1"></i>
-                        登録PDF
+                        PDF
                       </a>
                     </div>
                   </td>

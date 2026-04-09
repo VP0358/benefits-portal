@@ -41,17 +41,13 @@ export default function MlmOrganizationPage() {
   const [refSortType, setRefSortType] = useState("clean");
 
   const handleSearch = async () => {
-    if (!searchCode) {
-      alert("検索キーワードを入力してください");
-      return;
-    }
-
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        [searchType]: searchCode,
-        type: orgType
-      });
+      // searchCode が空の場合はクエリパラメータを付けずに全体表示
+      const params = new URLSearchParams({ type: orgType });
+      if (searchCode.trim()) {
+        params.set(searchType, searchCode.trim());
+      }
       
       const res = await fetch(
         `/api/admin/mlm-organization/tree?${params.toString()}`
@@ -352,14 +348,19 @@ export default function MlmOrganizationPage() {
           </div>
         </div>
 
-        <button
-          onClick={handleSearch}
-          disabled={loading}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold disabled:opacity-50"
-        >
-          <i className="fas fa-search mr-2"></i>
-          {loading ? "検索中..." : "組織図を表示"}
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleSearch}
+            disabled={loading}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold disabled:opacity-50"
+          >
+            <i className="fas fa-search mr-2"></i>
+            {loading ? "検索中..." : "組織図を表示"}
+          </button>
+          <p className="text-sm text-gray-500">
+            ※ 会員コード未入力で「組織図を表示」を押すと全体組織図を表示します
+          </p>
+        </div>
 
         {/* 組織図表示エリア */}
         {viewMode === "tree" && rootMember && (
@@ -426,7 +427,7 @@ export default function MlmOrganizationPage() {
 
         {!loading && !rootMember && listData.length === 0 && (
           <div className="mt-6 p-8 bg-gray-50 rounded-lg text-center text-gray-500">
-            会員コードを入力して「組織図を表示」ボタンをクリックしてください
+            「組織図を表示」ボタンをクリックしてください（会員コード未入力で全体表示）
           </div>
         )}
       </div>

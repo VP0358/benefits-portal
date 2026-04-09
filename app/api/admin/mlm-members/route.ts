@@ -7,7 +7,7 @@ import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { generateMemberCode } from "@/lib/mlm-utils";
 
-// GET: MLM会員一覧取得
+// GET: MLM会員一覧取得（検索・フィルター対応）
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.email) {
@@ -15,43 +15,153 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const members = await prisma.mlmMember.findMany({
-      include: {
-        user: {
-          select: {
-            id: true,
-            memberCode: true,
-            name: true,
-            email: true,
-          },
-        },
-        upline: {
-          select: {
-            memberCode: true,
-            user: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
-        referrer: {
-          select: {
-            memberCode: true,
-            user: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    const url = new URL(req.url);
+    const search      = url.searchParams.get("search") ?? "";
+    const memberType  = url.searchParams.get("memberType") ?? "";
+    const status      = url.searchParams.get("status") ?? "";
+    const searchField = url.searchParams.get("searchField") ?? "all"; // all/memberCode/name/nickname/phone/postalCode/birthDate/contractDate
+    const page        = Math.max(1, parseInt(url.searchParams.get("page") ?? "1"));
+    const limit       = Math.min(200, Math.max(1, parseInt(url.searchParams.get("limit") ?? "50")));
+    const skip        = (page - 1) * limit;
 
-    return NextResponse.json({ members }, { status: 200 });
+    // 検索条件構築
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = {};
+
+    if (memberType) where.memberType = memberType;
+    if (status)     where.status     = status;
+
+    if (search) {
+      const orConditions = [];
+
+      if (searchField === "all" || searchField === "memberCode") {
+        orConditions.push({ memberCode: { contains: search } });
+      }
+      if (searchField === "all" || searchField === "name") {
+        orConditions.push({ user: { name: { contains: search } } });
+      }
+      if (searchField === "all" || searchField === "email") {
+        orConditions.push({ user: { email: { contains: search } } });
+      }
+      if (searchField === "all" || searchField === "phone") {
+        orConditions.push({ user: { phone: { contains: search } } });
+        orConditions.push({ mobile: { contains: search } });
+      }
+      if (searchField === "all" || searchField === "postalCode") {
+        orConditions.push({ user: { postalCode: { contains: search } } });
+      }
+      if (searchField === "all" || searchField === "nickname") {
+        orConditions.push({ mlmRegistration: { nickname: { contains: search } } });
+      }
+      if (searchField === "birthDate") {
+        // 生年月日は日付文字列で部分一致（例: "1990-01"）
+        try {
+          const dateStart = new Date(search + (search.length === 7 ? "-01" : ""));
+          const dateEnd   = new Date(dateStart);
+          if (search.length === 7) {
+            dateEnd.setMonth(dateEnd.getMonth() + 1);
+          } else {
+            dateEnd.setDate(dateEnd.getDate() + 1);
+          }
+          orConditions.push({ birthDate: { gte: dateStart, lt: dateEnd } });
+        } catch {
+          // 日付パース失敗時は無視
+        }
+      }
+      if (searchField === "contractDate") {
+        try {
+          const dateStart = new Date(search + (search.length === 7 ? "-01" : ""));
+          const dateEnd   = new Date(dateStart);
+          if (search.length === 7) {
+            dateEnd.setMonth(dateEnd.getMonth() + 1);
+          } else {
+            dateEnd.setDate(dateEnd.getDate() + 1);
+          }
+          orConditions.push({ contractDate: { gte: dateStart, lt: dateEnd } });
+        } catch {
+          // 日付パース失敗時は無視
+        }
+      }
+
+      if (orConditions.length > 0) {
+        where.OR = orConditions;
+      }
+    }
+
+    const [members, total] = await Promise.all([
+      prisma.mlmMember.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              memberCode: true,
+              name: true,
+              email: true,
+              phone: true,
+              postalCode: true,
+            },
+          },
+          mlmRegistration: {
+            select: {
+              nickname: true,
+              birthDate: true,
+            },
+          },
+          upline: {
+            select: {
+              memberCode: true,
+              user: { select: { name: true } },
+            },
+          },
+          referrer: {
+            select: {
+              memberCode: true,
+              user: { select: { name: true } },
+            },
+          },
+          _count: {
+            select: { downlines: true, referrals: true },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.mlmMember.count({ where }),
+    ]);
+
+    // フロント向けにフラット化
+    const rows = members.map((m) => ({
+      id:                  m.id.toString(),
+      userId:              m.userId.toString(),
+      memberCode:          m.memberCode,
+      memberType:          m.memberType,
+      status:              m.status,
+      currentLevel:        m.currentLevel,
+      titleLevel:          m.titleLevel,
+      conditionAchieved:   m.conditionAchieved,
+      forceActive:         m.forceActive,
+      forceLevel:          m.forceLevel,
+      contractDate:        m.contractDate?.toISOString() ?? null,
+      autoshipEnabled:     m.autoshipEnabled,
+      autoshipStartDate:   m.autoshipStartDate?.toISOString() ?? null,
+      autoshipStopDate:    m.autoshipStopDate?.toISOString() ?? null,
+      autoshipSuspendMonths: m.autoshipSuspendMonths,
+      paymentMethod:       m.paymentMethod,
+      savingsPoints:       m.savingsPoints,
+      userName:            m.user.name,
+      userEmail:           m.user.email,
+      userPhone:           m.user.phone ?? null,
+      userPostalCode:      m.user.postalCode ?? null,
+      nickname:            m.mlmRegistration?.nickname ?? null,
+      birthDate:           m.birthDate?.toISOString() ?? m.mlmRegistration?.birthDate ?? null,
+      downlineCount:       m._count.downlines,
+      referralCount:       m._count.referrals,
+      createdAt:           m.createdAt.toISOString(),
+    }));
+
+    return NextResponse.json({ members: rows, total }, { status: 200 });
   } catch (error) {
     console.error("Error fetching MLM members:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
