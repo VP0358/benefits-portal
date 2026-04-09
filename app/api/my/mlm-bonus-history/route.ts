@@ -35,7 +35,7 @@ export async function GET() {
         },
       },
       orderBy: { bonusMonth: "desc" },
-      take: 24, // 直近2年分
+      take: 36, // 直近3年分
     });
 
     const history = results.map((r) => {
@@ -58,12 +58,38 @@ export async function GET() {
         previousTitleLevelLabel: LEVEL_LABELS[r.previousTitleLevel] ?? "—",
         newTitleLevel: r.newTitleLevel,
         newTitleLevelLabel: LEVEL_LABELS[r.newTitleLevel] ?? "—",
-        // ボーナス金額
+        // ボーナス金額内訳
         directBonus: r.directBonus,
         unilevelBonus: r.unilevelBonus,
+        rankUpBonus: r.rankUpBonus,
+        shareBonus: r.shareBonus,
         structureBonus: r.structureBonus,
         savingsBonus: r.savingsBonus,
+        carryoverAmount: r.carryoverAmount,
+        adjustmentAmount: r.adjustmentAmount,
+        otherPositionAmount: r.otherPositionAmount,
         totalBonus: r.totalBonus,
+        // 支払い計算
+        amountBeforeAdjustment: r.amountBeforeAdjustment,
+        paymentAdjustmentRate: r.paymentAdjustmentRate ?? null,
+        paymentAdjustmentAmount: r.paymentAdjustmentAmount,
+        finalAmount: r.finalAmount,
+        consumptionTax: r.consumptionTax,
+        withholdingTax: r.withholdingTax,
+        shortageAmount: r.shortageAmount,
+        otherPositionShortage: r.otherPositionShortage,
+        serviceFee: r.serviceFee,
+        paymentAmount: r.paymentAmount,
+        // 組織データ
+        groupActiveCount: r.groupActiveCount,
+        minLinePoints: r.minLinePoints,
+        lineCount: r.lineCount,
+        level1Lines: r.level1Lines,
+        level2Lines: r.level2Lines,
+        level3Lines: r.level3Lines,
+        conditions: r.conditions ?? null,
+        savingsPoints: r.savingsPoints,
+        savingsPointsAdded: r.savingsPointsAdded,
         // ユニレベル段数内訳
         unilevelDetail: detail
           ? Object.entries(detail).map(([depth, amount]) => ({
@@ -72,7 +98,6 @@ export async function GET() {
               rate: rates[Number(depth) - 1] ?? 0,
             }))
           : [],
-        savingsPointsAdded: r.savingsPointsAdded,
       };
     });
 
