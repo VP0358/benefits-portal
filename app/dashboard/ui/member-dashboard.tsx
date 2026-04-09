@@ -1024,10 +1024,13 @@ export default function MemberDashboard({
           </div>
         </section>
 
-        {/* ── Travel Sub カード（サービス：格安旅行ボタンからの申込） ── */}
+        {/* ── サービスメニュー（VP未来phone申込・格安旅行申込） ── */}
         <section>
-          <SectionHeader en="SERVICES" ja="格安旅行サービス"/>
-          <TravelSubButton ref={travelSubRef}/>
+          <SectionHeader en="SERVICES" ja="サービスメニュー"/>
+          <div className="space-y-3">
+            <VpPhoneButton/>
+            <TravelSubButton ref={travelSubRef}/>
+          </div>
         </section>
 
         {/* ── クイックアクセス（ライン系カード） ── */}
