@@ -40,7 +40,6 @@ export default function MlmPurchaseHistoryPage() {
   const totalAmount = purchases.reduce((s, p) => s + p.totalAmount, 0);
   const totalPoints = purchases.reduce((s, p) => s + p.totalPoints, 0);
 
-  // 月ごとにグループ化
   const byMonth: Record<string, Purchase[]> = {};
   purchases.forEach((p) => {
     const m = p.purchaseMonth;
@@ -50,78 +49,98 @@ export default function MlmPurchaseHistoryPage() {
   const months = Object.keys(byMonth).sort((a, b) => b.localeCompare(a));
 
   return (
-    <div className="min-h-screen bg-[#e6f2dc]">
-      <header className="bg-white shadow-sm sticky top-0 z-20">
+    <div className="min-h-screen pb-10" style={{ background: "#0a0f1e" }}>
+      <header className="sticky top-0 z-20 border-b border-white/5"
+        style={{ background: "rgba(10,15,30,0.97)", backdropFilter: "blur(12px)" }}>
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center gap-3">
-          <Link href="/dashboard" className="text-green-600 text-sm font-medium hover:text-green-700">← 戻る</Link>
-          <h1 className="text-lg font-bold text-slate-800">📦 購入履歴</h1>
+          <Link href="/dashboard" className="flex items-center gap-1.5 text-white/50 hover:text-white transition">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span className="text-sm">戻る</span>
+          </Link>
+          <h1 className="text-base font-bold text-white ml-1">購入履歴</h1>
         </div>
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-5 space-y-4">
-        {loading && <div className="bg-white rounded-2xl p-10 text-center text-slate-400 shadow-sm">読み込み中...</div>}
-        {error && <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center text-red-600 text-sm shadow-sm">{error}</div>}
+        {loading && (
+          <div className="rounded-2xl p-10 text-center text-white/30 text-sm" style={{ background: "#111827" }}>
+            <div className="w-6 h-6 border-2 border-white/20 border-t-blue-400 rounded-full animate-spin mx-auto mb-3"></div>
+            読み込み中...
+          </div>
+        )}
+        {error && (
+          <div className="rounded-2xl p-6 text-center text-red-400 text-sm border border-red-500/20 bg-red-500/10">{error}</div>
+        )}
 
         {!loading && !error && (
           <>
             {/* サマリー */}
-            <div className="bg-white rounded-2xl shadow-sm p-4 grid grid-cols-3 gap-3">
-              <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 text-center">
-                <div className="text-xs text-blue-500 mb-1">購入件数</div>
-                <div className="text-xl font-black text-blue-700">{purchases.length}</div>
-                <div className="text-[10px] text-blue-400 mt-0.5">件</div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-2xl p-3.5 text-center border border-blue-400/20"
+                style={{ background: "rgba(59,130,246,0.1)" }}>
+                <div className="text-xs text-blue-400/70 mb-1">購入件数</div>
+                <div className="text-2xl font-black text-blue-300">{purchases.length}</div>
+                <div className="text-[10px] text-blue-400/50 mt-0.5">件</div>
               </div>
-              <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-center">
-                <div className="text-xs text-slate-500 mb-1">累計金額</div>
-                <div className="text-sm font-black text-slate-700">
+              <div className="rounded-2xl p-3.5 text-center border border-white/10"
+                style={{ background: "#111827" }}>
+                <div className="text-xs text-white/40 mb-1">累計金額</div>
+                <div className="text-sm font-black text-white/80">
                   ¥{totalAmount.toLocaleString()}
                 </div>
               </div>
-              <div className="rounded-xl bg-violet-50 border border-violet-200 p-3 text-center">
-                <div className="text-xs text-violet-500 mb-1">累計pt</div>
-                <div className="text-sm font-black text-violet-700">
+              <div className="rounded-2xl p-3.5 text-center border border-violet-400/20"
+                style={{ background: "rgba(139,92,246,0.1)" }}>
+                <div className="text-xs text-violet-400/70 mb-1">累計pt</div>
+                <div className="text-sm font-black text-violet-300">
                   {totalPoints.toLocaleString()}<span className="text-[10px] font-normal">pt</span>
                 </div>
               </div>
             </div>
 
             {purchases.length === 0 ? (
-              <div className="bg-white rounded-2xl p-10 text-center text-slate-400 shadow-sm">購入履歴がありません</div>
+              <div className="rounded-2xl p-10 text-center text-white/30 text-sm" style={{ background: "#111827" }}>
+                購入履歴がありません
+              </div>
             ) : (
               months.map((month) => {
                 const items = byMonth[month];
                 const monthTotal = items.reduce((s, p) => s + p.totalAmount, 0);
                 const monthPoints = items.reduce((s, p) => s + p.totalPoints, 0);
                 return (
-                  <div key={month} className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                  <div key={month} className="rounded-2xl overflow-hidden" style={{ background: "#111827", border: "1px solid rgba(255,255,255,0.07)" }}>
                     {/* 月ヘッダー */}
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-                      <span className="text-sm font-bold text-slate-700">{month}</span>
-                      <div className="flex items-center gap-3 text-xs text-slate-500">
-                        <span>¥{monthTotal.toLocaleString()}</span>
-                        <span>{monthPoints.toLocaleString()}pt</span>
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-white/5"
+                      style={{ background: "rgba(255,255,255,0.04)" }}>
+                      <span className="text-sm font-bold text-white/80">{month}</span>
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="text-white/50">¥{monthTotal.toLocaleString()}</span>
+                        <span className="text-violet-400">{monthPoints.toLocaleString()}pt</span>
                       </div>
                     </div>
 
-                    {/* 購入リスト */}
                     {items.map((p, i) => (
-                      <div key={p.id} className={`px-4 py-3 ${i < items.length - 1 ? "border-b border-slate-50" : ""}`}>
+                      <div key={p.id} className={`px-4 py-3.5 ${i < items.length - 1 ? "border-b border-white/5" : ""}`}>
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold text-slate-800 leading-tight">{p.productName}</div>
-                            <div className="flex items-center gap-2 mt-1 flex-wrap">
-                              <span className="text-xs text-slate-400">{fmtDate(p.purchasedAt)}</span>
+                            <div className="text-sm font-semibold text-white/85 leading-snug">{p.productName}</div>
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              <span className="text-xs text-white/30">{fmtDate(p.purchasedAt)}</span>
                               <span className={`rounded-full text-xs px-2 py-0.5 font-medium ${
-                                p.purchaseStatus === "autoship" ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"
+                                p.purchaseStatus === "autoship"
+                                  ? "bg-blue-500/20 text-blue-300 border border-blue-400/20"
+                                  : "bg-white/5 text-white/40 border border-white/10"
                               }`}>
                                 {p.purchaseStatus === "autoship" ? "🔄 自動" : "🛍️ 通常"}
                               </span>
-                              <span className="text-xs text-slate-400">×{p.quantity}</span>
+                              <span className="text-xs text-white/30">×{p.quantity}</span>
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <div className="text-sm font-bold text-slate-800">¥{p.totalAmount.toLocaleString()}</div>
-                            <div className="text-xs text-violet-500 mt-0.5">{p.totalPoints.toLocaleString()}pt</div>
+                            <div className="text-sm font-bold text-white/85">¥{p.totalAmount.toLocaleString()}</div>
+                            <div className="text-xs text-violet-400 mt-0.5">{p.totalPoints.toLocaleString()}pt</div>
                           </div>
                         </div>
                       </div>
