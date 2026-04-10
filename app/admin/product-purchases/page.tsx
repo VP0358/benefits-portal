@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { 
   ShoppingCart, Search, Download, Calendar, 
-  Filter, Package, Users, FileText, Plus, Edit, Trash2 
+  Filter, Package, Users, FileText, Plus, Edit, CheckCircle, X
 } from "lucide-react"
 
 // 型定義
@@ -53,14 +53,26 @@ interface MonthlyPurchase {
 
 const statusLabels: Record<PurchaseStatus, string> = {
   autoship: "オートシップ",
-  one_time: "定期購入",
-  new_member: "入会時等",
+  one_time: "都度払い",
+  new_member: "新規",
   cooling_off: "クーリングオフ",
   canceled: "キャンセル",
   out_of_stock: "欠品",
   out_of_stock_minus_1: "欠品欠1",
   company_sale: "社販",
   other: "その他"
+}
+
+const statusColors: Record<string, string> = {
+  autoship: "bg-blue-100 text-blue-800",
+  one_time: "bg-green-100 text-green-800",
+  new_member: "bg-purple-100 text-purple-800",
+  cooling_off: "bg-orange-100 text-orange-800",
+  canceled: "bg-red-100 text-red-800",
+  out_of_stock: "bg-gray-100 text-gray-800",
+  out_of_stock_minus_1: "bg-gray-100 text-gray-700",
+  company_sale: "bg-yellow-100 text-yellow-800",
+  other: "bg-slate-100 text-slate-800"
 }
 
 export default function ProductPurchasesPage() {
@@ -80,13 +92,17 @@ export default function ProductPurchasesPage() {
   // 購入一覧用状態
   const [monthlyPurchases, setMonthlyPurchases] = useState<MonthlyPurchase[]>([])
   
-  // ステータス別検索用状態
+  // ステータス管理用状態
   const [statusFilters, setStatusFilters] = useState({
     startMonth: "",
     endMonth: "",
-    status: ""
+    status: "",
+    memberCode: ""
   })
   const [statusPurchases, setStatusPurchases] = useState<PurchaseRecord[]>([])
+  const [editingPurchaseId, setEditingPurchaseId] = useState<number | null>(null)
+  const [editingStatus, setEditingStatus] = useState<PurchaseStatus>("one_time")
+  const [savingStatus, setSavingStatus] = useState(false)
   
   // 商品別検索用状態
   const [productFilters, setProductFilters] = useState({
@@ -109,16 +125,15 @@ export default function ProductPurchasesPage() {
     fetch("/api/admin/products")
       .then(res => res.json())
       .then(data => {
-        // APIレスポンスは { products: [...] } の形式
-        const productsArray = data.products || [];
-        const productList = productsArray.map((p: any) => ({
+        const productsArray = data.products || []
+        const productList = productsArray.map((p: { productCode?: string; product_code?: string; name?: string }) => ({
           code: p.productCode || p.product_code || "",
           name: p.name || ""
-        })).filter((p: Product) => p.code);
-        setProducts(productList);
+        })).filter((p: Product) => p.code)
+        setProducts(productList)
       })
-      .catch(err => console.error("Failed to load products:", err));
-  }, []);
+      .catch(err => console.error("Failed to load products:", err))
+  }, [])
 
   // 商品コードから商品名を取得
   const getProductName = (code: string) => {
@@ -132,7 +147,6 @@ export default function ProductPurchasesPage() {
       alert("商品コードと年月を入力してください")
       return
     }
-
     try {
       setLoading(true)
       const res = await fetch("/api/admin/product-purchases", {
@@ -147,17 +161,9 @@ export default function ProductPurchasesPage() {
           points: inputData.points
         })
       })
-
       if (!res.ok) throw new Error("Failed to add purchase")
-
       alert("購入データを追加しました")
-      setInputData({
-        productCode: "",
-        month: "",
-        quantity: 0,
-        amount: 0,
-        points: 0
-      })
+      setInputData({ productCode: "", month: "", quantity: 0, amount: 0, points: 0 })
       fetchMonthlyPurchases()
     } catch (error) {
       console.error("Error adding purchase:", error)
@@ -173,7 +179,6 @@ export default function ProductPurchasesPage() {
       setLoading(true)
       const res = await fetch("/api/admin/product-purchases/monthly")
       if (!res.ok) throw new Error("Failed to fetch purchases")
-      
       const data = await res.json()
       setMonthlyPurchases(data.purchases || [])
     } catch (error) {
@@ -191,10 +196,10 @@ export default function ProductPurchasesPage() {
       if (statusFilters.startMonth) params.append("startMonth", statusFilters.startMonth)
       if (statusFilters.endMonth) params.append("endMonth", statusFilters.endMonth)
       if (statusFilters.status) params.append("status", statusFilters.status)
+      if (statusFilters.memberCode) params.append("memberCode", statusFilters.memberCode)
 
       const res = await fetch(`/api/admin/product-purchases/by-status?${params.toString()}`)
       if (!res.ok) throw new Error("Failed to search")
-      
       const data = await res.json()
       setStatusPurchases(data.purchases || [])
     } catch (error) {
@@ -202,6 +207,31 @@ export default function ProductPurchasesPage() {
       alert("検索に失敗しました")
     } finally {
       setLoading(false)
+    }
+  }
+
+  // 購入ステータス更新
+  const handleUpdateStatus = async (purchaseId: number) => {
+    try {
+      setSavingStatus(true)
+      const res = await fetch(`/api/admin/product-purchases/${purchaseId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ purchaseStatus: editingStatus })
+      })
+      if (!res.ok) throw new Error("Failed to update")
+      
+      // ローカル状態を更新
+      setStatusPurchases(prev => prev.map(p => 
+        p.id === purchaseId ? { ...p, purchaseStatus: editingStatus } : p
+      ))
+      setEditingPurchaseId(null)
+      alert("ステータスを更新しました")
+    } catch (error) {
+      console.error("Error updating status:", error)
+      alert("更新に失敗しました")
+    } finally {
+      setSavingStatus(false)
     }
   }
 
@@ -216,7 +246,6 @@ export default function ProductPurchasesPage() {
 
       const res = await fetch(`/api/admin/product-purchases/by-product?${params.toString()}`)
       if (!res.ok) throw new Error("Failed to search")
-      
       const data = await res.json()
       setProductPurchases(data.purchases || [])
     } catch (error) {
@@ -238,7 +267,6 @@ export default function ProductPurchasesPage() {
 
       const res = await fetch(`/api/admin/product-purchases/by-member?${params.toString()}`)
       if (!res.ok) throw new Error("Failed to search")
-      
       const data = await res.json()
       setMemberPurchases(data.purchases || [])
     } catch (error) {
@@ -296,6 +324,13 @@ export default function ProductPurchasesPage() {
     }
   }, [activeTab])
 
+  const tabClass = (tab: string) =>
+    `px-5 py-3 font-medium text-sm transition-colors flex items-center gap-2 ${
+      activeTab === tab
+        ? "border-b-2 border-blue-600 text-blue-600"
+        : "text-gray-600 hover:text-gray-800"
+    }`
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-[1800px] mx-auto">
@@ -307,87 +342,35 @@ export default function ProductPurchasesPage() {
           </div>
 
           {/* タブ */}
-          <div className="flex space-x-2 border-b border-gray-200">
-            <button
-              onClick={() => setActiveTab("input")}
-              className={`px-6 py-3 font-medium transition-colors ${
-                activeTab === "input"
-                  ? "border-b-2 border-blue-600 text-blue-600"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <Plus className="w-4 h-4" />
-                <span>商品購入入力</span>
-              </div>
+          <div className="flex flex-wrap gap-1 border-b border-gray-200">
+            <button onClick={() => setActiveTab("input")} className={tabClass("input")}>
+              <Plus className="w-4 h-4" /><span>購入入力</span>
             </button>
-            <button
-              onClick={() => setActiveTab("list")}
-              className={`px-6 py-3 font-medium transition-colors ${
-                activeTab === "list"
-                  ? "border-b-2 border-blue-600 text-blue-600"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <FileText className="w-4 h-4" />
-                <span>購入一覧</span>
-              </div>
+            <button onClick={() => setActiveTab("list")} className={tabClass("list")}>
+              <FileText className="w-4 h-4" /><span>購入一覧</span>
             </button>
-            <button
-              onClick={() => setActiveTab("status")}
-              className={`px-6 py-3 font-medium transition-colors ${
-                activeTab === "status"
-                  ? "border-b-2 border-blue-600 text-blue-600"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <Filter className="w-4 h-4" />
-                <span>購入ポイント設定上限検索</span>
-              </div>
+            <button onClick={() => setActiveTab("status")} className={tabClass("status")}>
+              <Edit className="w-4 h-4" /><span>購入ステータス管理</span>
             </button>
-            <button
-              onClick={() => setActiveTab("product")}
-              className={`px-6 py-3 font-medium transition-colors ${
-                activeTab === "product"
-                  ? "border-b-2 border-blue-600 text-blue-600"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <Package className="w-4 h-4" />
-                <span>商品別購入一覧</span>
-              </div>
+            <button onClick={() => setActiveTab("product")} className={tabClass("product")}>
+              <Package className="w-4 h-4" /><span>商品別一覧</span>
             </button>
-            <button
-              onClick={() => setActiveTab("member")}
-              className={`px-6 py-3 font-medium transition-colors ${
-                activeTab === "member"
-                  ? "border-b-2 border-blue-600 text-blue-600"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                <Users className="w-4 h-4" />
-                <span>購入者の購入記録一覧</span>
-              </div>
+            <button onClick={() => setActiveTab("member")} className={tabClass("member")}>
+              <Users className="w-4 h-4" /><span>会員別一覧</span>
             </button>
           </div>
         </div>
 
         {/* コンテンツエリア */}
         <div className="bg-white rounded-lg shadow-sm p-6">
-          {/* 商品購入入力タブ */}
+
+          {/* 購入入力タブ */}
           {activeTab === "input" && (
             <div className="space-y-6">
               <h2 className="text-xl font-bold text-gray-800 mb-4">商品購入入力</h2>
-              
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    商品コード <span className="text-red-500">*</span>
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">商品コード <span className="text-red-500">*</span></label>
                   <select
                     value={inputData.productCode}
                     onChange={(e) => setInputData({ ...inputData, productCode: e.target.value })}
@@ -395,67 +378,33 @@ export default function ProductPurchasesPage() {
                   >
                     <option value="">選択してください</option>
                     {products.map((product) => (
-                      <option key={product.code} value={product.code}>
-                        {product.code} - {product.name}
-                      </option>
+                      <option key={product.code} value={product.code}>{product.code} - {product.name}</option>
                     ))}
                   </select>
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    年月 <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="month"
-                    value={inputData.month}
-                    onChange={(e) => setInputData({ ...inputData, month: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">年月 <span className="text-red-500">*</span></label>
+                  <input type="month" value={inputData.month} onChange={(e) => setInputData({ ...inputData, month: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    数量
-                  </label>
-                  <input
-                    type="number"
-                    value={inputData.quantity}
-                    onChange={(e) => setInputData({ ...inputData, quantity: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">数量</label>
+                  <input type="number" value={inputData.quantity} onChange={(e) => setInputData({ ...inputData, quantity: parseInt(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    金額（円）
-                  </label>
-                  <input
-                    type="number"
-                    value={inputData.amount}
-                    onChange={(e) => setInputData({ ...inputData, amount: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">金額（円）</label>
+                  <input type="number" value={inputData.amount} onChange={(e) => setInputData({ ...inputData, amount: parseInt(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    ポイント
-                  </label>
-                  <input
-                    type="number"
-                    value={inputData.points}
-                    onChange={(e) => setInputData({ ...inputData, points: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">ポイント</label>
+                  <input type="number" value={inputData.points} onChange={(e) => setInputData({ ...inputData, points: parseInt(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
                 </div>
               </div>
-
-              <button
-                onClick={handleAddPurchase}
-                disabled={loading}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-              >
+              <button onClick={handleAddPurchase} disabled={loading}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
                 {loading ? "追加中..." : "購入データを追加"}
               </button>
             </div>
@@ -465,13 +414,10 @@ export default function ProductPurchasesPage() {
           {activeTab === "list" && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-800">購入一覧</h2>
-                <button
-                  onClick={() => handleExportCSV("product")}
-                  className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>CSV出力</span>
+                <h2 className="text-xl font-bold text-gray-800">購入一覧（商品別月次）</h2>
+                <button onClick={() => handleExportCSV("product")}
+                  className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                  <Download className="w-4 h-4" /><span>CSV出力</span>
                 </button>
               </div>
 
@@ -487,36 +433,28 @@ export default function ProductPurchasesPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full text-sm">
                     <thead className="bg-gray-100 border-b">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">商品コード</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">商品名</th>
-                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">2024年2月</th>
-                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">2024年3月</th>
-                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">2024年4月</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">商品コード</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">商品名</th>
+                        {Object.keys(monthlyPurchases[0]?.months || {}).sort().map(month => (
+                          <th key={month} className="px-4 py-3 text-right font-semibold text-gray-700">{month}</th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {monthlyPurchases.map((purchase) => (
                         <tr key={purchase.productCode} className="hover:bg-gray-50">
-                          <td className="px-4 py-4 text-sm">{purchase.productCode}</td>
-                          <td className="px-4 py-4 text-sm">{purchase.productName}</td>
-                          <td className="px-4 py-4 text-sm text-right">
-                            {purchase.months["2024-02"]?.quantity || 0} / 
-                            ¥{(purchase.months["2024-02"]?.amount || 0).toLocaleString()} / 
-                            {purchase.months["2024-02"]?.points || 0}pt
-                          </td>
-                          <td className="px-4 py-4 text-sm text-right">
-                            {purchase.months["2024-03"]?.quantity || 0} / 
-                            ¥{(purchase.months["2024-03"]?.amount || 0).toLocaleString()} / 
-                            {purchase.months["2024-03"]?.points || 0}pt
-                          </td>
-                          <td className="px-4 py-4 text-sm text-right">
-                            {purchase.months["2024-04"]?.quantity || 0} / 
-                            ¥{(purchase.months["2024-04"]?.amount || 0).toLocaleString()} / 
-                            {purchase.months["2024-04"]?.points || 0}pt
-                          </td>
+                          <td className="px-4 py-3">{purchase.productCode}</td>
+                          <td className="px-4 py-3">{purchase.productName}</td>
+                          {Object.keys(purchase.months).sort().map(month => (
+                            <td key={month} className="px-4 py-3 text-right text-xs">
+                              {purchase.months[month]?.quantity || 0}個 / 
+                              ¥{(purchase.months[month]?.amount || 0).toLocaleString()} / 
+                              {purchase.months[month]?.points || 0}pt
+                            </td>
+                          ))}
                         </tr>
                       ))}
                     </tbody>
@@ -526,107 +464,148 @@ export default function ProductPurchasesPage() {
             </div>
           )}
 
-          {/* 購入ポイント設定上限検索タブ */}
+          {/* 購入ステータス管理タブ */}
           {activeTab === "status" && (
             <div className="space-y-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">購入ポイント設定上限検索</h2>
+              <h2 className="text-xl font-bold text-gray-800 mb-4">購入ステータス管理</h2>
+              <p className="text-sm text-gray-600 mb-4">購入記録を検索し、ステータスを変更できます。</p>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    開始年月
-                  </label>
-                  <input
-                    type="month"
-                    value={statusFilters.startMonth}
-                    onChange={(e) => setStatusFilters({ ...statusFilters, startMonth: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
+              {/* 検索フォーム */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">検索条件</h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">開始年月</label>
+                    <input type="month" value={statusFilters.startMonth}
+                      onChange={(e) => setStatusFilters({ ...statusFilters, startMonth: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">終了年月</label>
+                    <input type="month" value={statusFilters.endMonth}
+                      onChange={(e) => setStatusFilters({ ...statusFilters, endMonth: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">ステータス</label>
+                    <select value={statusFilters.status}
+                      onChange={(e) => setStatusFilters({ ...statusFilters, status: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                      <option value="">すべて</option>
+                      {Object.entries(statusLabels).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">会員コード</label>
+                    <input type="text" value={statusFilters.memberCode} placeholder="例: 100001"
+                      onChange={(e) => setStatusFilters({ ...statusFilters, memberCode: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                  </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    終了年月
-                  </label>
-                  <input
-                    type="month"
-                    value={statusFilters.endMonth}
-                    onChange={(e) => setStatusFilters({ ...statusFilters, endMonth: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    ステータス
-                  </label>
-                  <select
-                    value={statusFilters.status}
-                    onChange={(e) => setStatusFilters({ ...statusFilters, status: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">すべて</option>
-                    {Object.entries(statusLabels).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
+                <div className="flex gap-3 mt-4">
+                  <button onClick={handleSearchByStatus} disabled={loading}
+                    className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
+                    <Search className="w-4 h-4" /><span>{loading ? "検索中..." : "検索"}</span>
+                  </button>
+                  <button onClick={() => handleExportCSV("status")}
+                    className="flex items-center gap-2 px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
+                    <Download className="w-4 h-4" /><span>CSV出力</span>
+                  </button>
                 </div>
               </div>
 
-              <div className="flex space-x-3">
-                <button
-                  onClick={handleSearchByStatus}
-                  disabled={loading}
-                  className="flex items-center space-x-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  <Search className="w-4 h-4" />
-                  <span>検索</span>
-                </button>
-                <button
-                  onClick={() => handleExportCSV("status")}
-                  className="flex items-center space-x-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>ダウンロード</span>
-                </button>
-              </div>
-
+              {/* 検索結果 */}
               {statusPurchases.length > 0 && (
-                <div className="overflow-x-auto mt-6">
-                  <table className="w-full">
+                <div className="overflow-x-auto mt-2">
+                  <p className="text-sm text-gray-600 mb-3">検索結果: {statusPurchases.length}件</p>
+                  <table className="w-full text-sm">
                     <thead className="bg-gray-100 border-b">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">会員コード</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">氏名</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">商品</th>
-                        <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">ステータス</th>
-                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">数量</th>
-                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">金額</th>
-                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">ポイント</th>
-                        <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">購入月</th>
+                        <th className="px-3 py-3 text-left font-semibold text-gray-700">会員コード</th>
+                        <th className="px-3 py-3 text-left font-semibold text-gray-700">氏名</th>
+                        <th className="px-3 py-3 text-left font-semibold text-gray-700">商品</th>
+                        <th className="px-3 py-3 text-center font-semibold text-gray-700">現在のステータス</th>
+                        <th className="px-3 py-3 text-right font-semibold text-gray-700">数量</th>
+                        <th className="px-3 py-3 text-right font-semibold text-gray-700">金額</th>
+                        <th className="px-3 py-3 text-right font-semibold text-gray-700">ポイント</th>
+                        <th className="px-3 py-3 text-center font-semibold text-gray-700">購入月</th>
+                        <th className="px-3 py-3 text-center font-semibold text-gray-700">操作</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {statusPurchases.map((purchase) => (
                         <tr key={purchase.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-4 text-sm">{purchase.memberCode}</td>
-                          <td className="px-4 py-4 text-sm">{purchase.memberName}</td>
-                          <td className="px-4 py-4 text-sm">
-                            {purchase.productCode} - {purchase.productName}
+                          <td className="px-3 py-3">{purchase.memberCode}</td>
+                          <td className="px-3 py-3">{purchase.memberName}</td>
+                          <td className="px-3 py-3 text-xs">
+                            <div className="font-medium">{purchase.productName}</div>
+                            <div className="text-gray-500">{purchase.productCode}</div>
                           </td>
-                          <td className="px-4 py-4 text-sm text-center">
-                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                              {statusLabels[purchase.purchaseStatus]}
-                            </span>
+                          <td className="px-3 py-3 text-center">
+                            {editingPurchaseId === purchase.id ? (
+                              <div className="flex items-center gap-2 justify-center">
+                                <select
+                                  value={editingStatus}
+                                  onChange={(e) => setEditingStatus(e.target.value as PurchaseStatus)}
+                                  className="px-2 py-1 border border-blue-400 rounded text-sm focus:ring-2 focus:ring-blue-500 bg-white"
+                                  autoFocus
+                                >
+                                  {Object.entries(statusLabels).map(([key, label]) => (
+                                    <option key={key} value={key}>{label}</option>
+                                  ))}
+                                </select>
+                                <button
+                                  onClick={() => handleUpdateStatus(purchase.id)}
+                                  disabled={savingStatus}
+                                  className="p-1 text-green-600 hover:text-green-800 disabled:opacity-50"
+                                  title="保存"
+                                >
+                                  <CheckCircle className="w-5 h-5" />
+                                </button>
+                                <button
+                                  onClick={() => setEditingPurchaseId(null)}
+                                  className="p-1 text-gray-500 hover:text-gray-700"
+                                  title="キャンセル"
+                                >
+                                  <X className="w-5 h-5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[purchase.purchaseStatus] || "bg-gray-100 text-gray-800"}`}>
+                                {statusLabels[purchase.purchaseStatus] || purchase.purchaseStatus}
+                              </span>
+                            )}
                           </td>
-                          <td className="px-4 py-4 text-sm text-right">{purchase.quantity}</td>
-                          <td className="px-4 py-4 text-sm text-right">¥{purchase.totalAmount.toLocaleString()}</td>
-                          <td className="px-4 py-4 text-sm text-right">{purchase.totalPoints}</td>
-                          <td className="px-4 py-4 text-sm text-center">{purchase.purchaseMonth}</td>
+                          <td className="px-3 py-3 text-right">{purchase.quantity}</td>
+                          <td className="px-3 py-3 text-right">¥{purchase.totalAmount.toLocaleString()}</td>
+                          <td className="px-3 py-3 text-right">{purchase.totalPoints}</td>
+                          <td className="px-3 py-3 text-center">{purchase.purchaseMonth}</td>
+                          <td className="px-3 py-3 text-center">
+                            {editingPurchaseId !== purchase.id && (
+                              <button
+                                onClick={() => {
+                                  setEditingPurchaseId(purchase.id)
+                                  setEditingStatus(purchase.purchaseStatus)
+                                }}
+                                className="flex items-center gap-1 mx-auto px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-xs"
+                              >
+                                <Edit className="w-3 h-3" /><span>変更</span>
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {statusPurchases.length === 0 && !loading && (
+                <div className="text-center py-12 text-gray-500">
+                  <Filter className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p>検索条件を設定して「検索」ボタンをクリックしてください</p>
                 </div>
               )}
             </div>
@@ -636,200 +615,180 @@ export default function ProductPurchasesPage() {
           {activeTab === "product" && (
             <div className="space-y-6">
               <h2 className="text-xl font-bold text-gray-800 mb-4">商品別購入一覧</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    商品コード
-                  </label>
-                  <select
-                    value={productFilters.productCode}
-                    onChange={(e) => setProductFilters({ ...productFilters, productCode: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">すべて</option>
-                    {products.map((product) => (
-                      <option key={product.code} value={product.code}>
-                        {product.code} - {product.name}
-                      </option>
-                    ))}
-                  </select>
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">商品コード</label>
+                    <select value={productFilters.productCode}
+                      onChange={(e) => setProductFilters({ ...productFilters, productCode: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                      <option value="">すべて</option>
+                      {products.map((product) => (
+                        <option key={product.code} value={product.code}>{product.code} - {product.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">開始年月</label>
+                    <input type="month" value={productFilters.startMonth}
+                      onChange={(e) => setProductFilters({ ...productFilters, startMonth: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">終了年月</label>
+                    <input type="month" value={productFilters.endMonth}
+                      onChange={(e) => setProductFilters({ ...productFilters, endMonth: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                  </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    開始年月
-                  </label>
-                  <input
-                    type="month"
-                    value={productFilters.startMonth}
-                    onChange={(e) => setProductFilters({ ...productFilters, startMonth: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
+                <div className="flex gap-3 mt-4">
+                  <button onClick={handleSearchByProduct} disabled={loading}
+                    className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
+                    <Search className="w-4 h-4" /><span>{loading ? "検索中..." : "検索"}</span>
+                  </button>
+                  <button onClick={() => handleExportCSV("product")}
+                    className="flex items-center gap-2 px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
+                    <Download className="w-4 h-4" /><span>CSV出力</span>
+                  </button>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    終了年月
-                  </label>
-                  <input
-                    type="month"
-                    value={productFilters.endMonth}
-                    onChange={(e) => setProductFilters({ ...productFilters, endMonth: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex space-x-3">
-                <button
-                  onClick={handleSearchByProduct}
-                  disabled={loading}
-                  className="flex items-center space-x-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  <Search className="w-4 h-4" />
-                  <span>検索</span>
-                </button>
-                <button
-                  onClick={() => handleExportCSV("product")}
-                  className="flex items-center space-x-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>ダウンロード</span>
-                </button>
               </div>
 
               {productPurchases.length > 0 && (
-                <div className="overflow-x-auto mt-6">
-                  <table className="w-full">
+                <div className="overflow-x-auto">
+                  <p className="text-sm text-gray-600 mb-3">検索結果: {productPurchases.length}件</p>
+                  <table className="w-full text-sm">
                     <thead className="bg-gray-100 border-b">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">注文ID</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">氏名</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">会員コード</th>
-                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">購入数</th>
-                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">金額</th>
-                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">ポイント</th>
-                        <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">購入月</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">ID</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">氏名</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">会員コード</th>
+                        <th className="px-4 py-3 text-center font-semibold text-gray-700">ステータス</th>
+                        <th className="px-4 py-3 text-right font-semibold text-gray-700">数量</th>
+                        <th className="px-4 py-3 text-right font-semibold text-gray-700">金額</th>
+                        <th className="px-4 py-3 text-right font-semibold text-gray-700">ポイント</th>
+                        <th className="px-4 py-3 text-center font-semibold text-gray-700">購入月</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {productPurchases.map((purchase) => (
                         <tr key={purchase.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-4 text-sm">{purchase.id}</td>
-                          <td className="px-4 py-4 text-sm">{purchase.memberName}</td>
-                          <td className="px-4 py-4 text-sm">{purchase.memberCode}</td>
-                          <td className="px-4 py-4 text-sm text-right">{purchase.quantity}</td>
-                          <td className="px-4 py-4 text-sm text-right">¥{purchase.totalAmount.toLocaleString()}</td>
-                          <td className="px-4 py-4 text-sm text-right">{purchase.totalPoints}</td>
-                          <td className="px-4 py-4 text-sm text-center">{purchase.purchaseMonth}</td>
+                          <td className="px-4 py-3">{purchase.id}</td>
+                          <td className="px-4 py-3">{purchase.memberName}</td>
+                          <td className="px-4 py-3">{purchase.memberCode}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[purchase.purchaseStatus] || "bg-gray-100 text-gray-800"}`}>
+                              {statusLabels[purchase.purchaseStatus] || purchase.purchaseStatus}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">{purchase.quantity}</td>
+                          <td className="px-4 py-3 text-right">¥{purchase.totalAmount.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right">{purchase.totalPoints}</td>
+                          <td className="px-4 py-3 text-center">{purchase.purchaseMonth}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               )}
+
+              {productPurchases.length === 0 && !loading && (
+                <div className="text-center py-12 text-gray-500">
+                  <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p>検索条件を設定して「検索」ボタンをクリックしてください</p>
+                </div>
+              )}
             </div>
           )}
 
-          {/* 購入者の購入記録一覧タブ */}
+          {/* 会員別購入一覧タブ */}
           {activeTab === "member" && (
             <div className="space-y-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">購入者の購入記録一覧</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    会員ID
-                  </label>
-                  <input
-                    type="text"
-                    value={memberFilters.memberCode}
-                    onChange={(e) => setMemberFilters({ ...memberFilters, memberCode: e.target.value })}
-                    placeholder="会員コードを入力"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
+              <h2 className="text-xl font-bold text-gray-800 mb-4">会員別購入記録一覧</h2>
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">会員コード</label>
+                    <input type="text" value={memberFilters.memberCode} placeholder="例: 100001"
+                      onChange={(e) => setMemberFilters({ ...memberFilters, memberCode: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">開始年月</label>
+                    <input type="month" value={memberFilters.startMonth}
+                      onChange={(e) => setMemberFilters({ ...memberFilters, startMonth: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">終了年月</label>
+                    <input type="month" value={memberFilters.endMonth}
+                      onChange={(e) => setMemberFilters({ ...memberFilters, endMonth: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                  </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    開始年月
-                  </label>
-                  <input
-                    type="month"
-                    value={memberFilters.startMonth}
-                    onChange={(e) => setMemberFilters({ ...memberFilters, startMonth: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
+                <div className="flex gap-3 mt-4">
+                  <button onClick={handleSearchByMember} disabled={loading}
+                    className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
+                    <Search className="w-4 h-4" /><span>{loading ? "検索中..." : "検索"}</span>
+                  </button>
+                  <button onClick={() => handleExportCSV("member")}
+                    className="flex items-center gap-2 px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
+                    <Download className="w-4 h-4" /><span>CSV出力</span>
+                  </button>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    終了年月
-                  </label>
-                  <input
-                    type="month"
-                    value={memberFilters.endMonth}
-                    onChange={(e) => setMemberFilters({ ...memberFilters, endMonth: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex space-x-3">
-                <button
-                  onClick={handleSearchByMember}
-                  disabled={loading}
-                  className="flex items-center space-x-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  <Search className="w-4 h-4" />
-                  <span>検索</span>
-                </button>
-                <button
-                  onClick={() => handleExportCSV("member")}
-                  className="flex items-center space-x-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>ダウンロード</span>
-                </button>
               </div>
 
               {memberPurchases.length > 0 && (
-                <div className="overflow-x-auto mt-6">
-                  <table className="w-full">
+                <div className="overflow-x-auto">
+                  <p className="text-sm text-gray-600 mb-3">検索結果: {memberPurchases.length}件</p>
+                  <table className="w-full text-sm">
                     <thead className="bg-gray-100 border-b">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">注文1</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">氏名</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">注文確認日</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">会員コード</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">商品</th>
-                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">数量</th>
-                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">金額</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">ID</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">氏名</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">会員コード</th>
+                        <th className="px-4 py-3 text-left font-semibold text-gray-700">商品</th>
+                        <th className="px-4 py-3 text-center font-semibold text-gray-700">ステータス</th>
+                        <th className="px-4 py-3 text-right font-semibold text-gray-700">数量</th>
+                        <th className="px-4 py-3 text-right font-semibold text-gray-700">金額</th>
+                        <th className="px-4 py-3 text-center font-semibold text-gray-700">購入日</th>
+                        <th className="px-4 py-3 text-center font-semibold text-gray-700">購入月</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {memberPurchases.map((purchase) => (
                         <tr key={purchase.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-4 text-sm">{purchase.id}</td>
-                          <td className="px-4 py-4 text-sm">{purchase.memberName}</td>
-                          <td className="px-4 py-4 text-sm">
-                            {new Date(purchase.purchasedAt).toLocaleDateString("ja-JP")}
+                          <td className="px-4 py-3">{purchase.id}</td>
+                          <td className="px-4 py-3">{purchase.memberName}</td>
+                          <td className="px-4 py-3">{purchase.memberCode}</td>
+                          <td className="px-4 py-3 text-xs">
+                            <div className="font-medium">{purchase.productName}</div>
+                            <div className="text-gray-500">{purchase.productCode}</div>
                           </td>
-                          <td className="px-4 py-4 text-sm">{purchase.memberCode}</td>
-                          <td className="px-4 py-4 text-sm">
-                            {purchase.productCode} - {purchase.productName}
+                          <td className="px-4 py-3 text-center">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[purchase.purchaseStatus] || "bg-gray-100 text-gray-800"}`}>
+                              {statusLabels[purchase.purchaseStatus] || purchase.purchaseStatus}
+                            </span>
                           </td>
-                          <td className="px-4 py-4 text-sm text-right">{purchase.quantity}</td>
-                          <td className="px-4 py-4 text-sm text-right">¥{purchase.totalAmount.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right">{purchase.quantity}</td>
+                          <td className="px-4 py-3 text-right">¥{purchase.totalAmount.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-center">{new Date(purchase.purchasedAt).toLocaleDateString("ja-JP")}</td>
+                          <td className="px-4 py-3 text-center">{purchase.purchaseMonth}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               )}
+
+              {memberPurchases.length === 0 && !loading && (
+                <div className="text-center py-12 text-gray-500">
+                  <Users className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p>会員コードを入力して「検索」ボタンをクリックしてください</p>
+                </div>
+              )}
             </div>
           )}
+
         </div>
       </div>
     </div>
