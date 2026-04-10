@@ -44,7 +44,7 @@ export default function CsvExportPanel() {
       url = `/api/admin/export/travel-subscriptions?${params}`;
     } else if (type === "webfricom") {
       const params = new URLSearchParams();
-      if (filters.bonusMonth) params.set("month", filters.bonusMonth);
+      if (filters.bonusMonth) params.set("bonusMonth", filters.bonusMonth); // webfricom APIはbonusMonthパラメータを使用
       url = `/api/admin/export/webfricom?${params}`;
     } else if (type === "credix") {
       const params = new URLSearchParams();

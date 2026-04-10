@@ -89,6 +89,12 @@ export async function GET(req: NextRequest) {
 
   const rows = activeMembers.map(member => {
     const reg = member.user.mlmRegistration;
+    // MlmMember直接格納（CSVインポート）を優先、なければMlmRegistrationを使用
+    const bankName = member.bankName || reg?.bankName || "";
+    const branchName = member.branchName || reg?.bankBranch || "";
+    const accountType = member.accountType || reg?.bankAccountType || "普通";
+    const accountNumber = member.accountNumber || reg?.bankAccountNumber || "";
+    const accountHolder = member.accountHolder || reg?.bankAccountHolder || "";
     
     return [
       member.user.memberCode,
@@ -99,11 +105,11 @@ export async function GET(req: NextRequest) {
       member.user.phone ?? "",
       member.user.postalCode ?? "",
       member.user.address ?? "",
-      reg?.bankName ?? "",
-      reg?.bankBranch ?? "",
-      reg?.bankAccountType ?? "普通",
-      reg?.bankAccountNumber ?? "",
-      reg?.bankAccountHolder ?? "",
+      bankName,
+      branchName,
+      accountType,
+      accountNumber,
+      accountHolder,
       "2000", // 商品コード（VIOLA Pure 翠彩-SUMISAI-）
       "VIOLA Pure 翠彩-SUMISAI-",
       "16500", // 単価（税込）

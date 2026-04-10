@@ -26,17 +26,17 @@ export default async function MlmMemberDetailPage({
           pointWallet: true,
         },
       },
-      sponsor: {
+      referrer: {
         include: {
           user: true,
         },
       },
-      parent: {
+      upline: {
         include: {
           user: true,
         },
       },
-      downline: {
+      downlines: {
         include: {
           user: true,
         },
@@ -321,72 +321,72 @@ export default async function MlmMemberDetailPage({
 
       {/* 組織情報 */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* スポンサー情報 */}
+        {/* 紹介者情報（ユニレベル） */}
         <section className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
             <i className="fas fa-user-tie mr-2"></i>
-            スポンサー情報
+            紹介者（ユニレベル）
           </h2>
-          {mlmMember.sponsor ? (
+          {mlmMember.referrer ? (
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">会員コード:</span>
                 <Link
-                  href={`/admin/mlm-members/${mlmMember.sponsor.id}`}
+                  href={`/admin/mlm-members/${mlmMember.referrer.id}`}
                   className="text-blue-600 hover:text-blue-700 font-semibold"
                 >
-                  {mlmMember.sponsor.memberCode}
+                  {mlmMember.referrer.memberCode}
                 </Link>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">氏名:</span>
                 <span className="font-semibold">
-                  {mlmMember.sponsor.user.name}
+                  {mlmMember.referrer.user.name}
                 </span>
               </div>
             </div>
           ) : (
-            <p className="text-gray-500 text-sm">スポンサーなし（トップリーダー）</p>
+            <p className="text-gray-500 text-sm">紹介者なし（トップリーダー）</p>
           )}
         </section>
 
-        {/* 親会員情報（マトリックス） */}
+        {/* 直上者情報（マトリックス） */}
         <section className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
             <i className="fas fa-sitemap mr-2"></i>
-            親会員情報（マトリックス）
+            直上者（マトリックス）
           </h2>
-          {mlmMember.parent ? (
+          {mlmMember.upline ? (
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">会員コード:</span>
                 <Link
-                  href={`/admin/mlm-members/${mlmMember.parent.id}`}
+                  href={`/admin/mlm-members/${mlmMember.upline.id}`}
                   className="text-blue-600 hover:text-blue-700 font-semibold"
                 >
-                  {mlmMember.parent.memberCode}
+                  {mlmMember.upline.memberCode}
                 </Link>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">氏名:</span>
                 <span className="font-semibold">
-                  {mlmMember.parent.user.name}
+                  {mlmMember.upline.user.name}
                 </span>
               </div>
             </div>
           ) : (
-            <p className="text-gray-500 text-sm">親会員なし</p>
+            <p className="text-gray-500 text-sm">直上者なし</p>
           )}
         </section>
       </div>
 
-      {/* 直下ダウンライン */}
+      {/* 直下ダウンライン（マトリックス） */}
       <section className="bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
           <i className="fas fa-users mr-2"></i>
-          直下ダウンライン（最大20名）
+          直下ダウンライン（マトリックス・最大20名）
         </h2>
-        {mlmMember.downline.length > 0 ? (
+        {mlmMember.downlines.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b">
@@ -399,7 +399,7 @@ export default async function MlmMemberDetailPage({
                 </tr>
               </thead>
               <tbody>
-                {mlmMember.downline.map((child) => (
+                {mlmMember.downlines.map((child) => (
                   <tr key={child.id.toString()} className="border-b hover:bg-gray-50">
                     <td className="px-4 py-2 font-mono">{child.memberCode}</td>
                     <td className="px-4 py-2">{child.user.name}</td>

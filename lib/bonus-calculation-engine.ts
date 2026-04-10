@@ -66,10 +66,7 @@ export async function executeBonusCalculation(
 
   const purchases = await prisma.mlmPurchase.findMany({
     where: {
-      purchaseDate: {
-        gte: startDate,
-        lte: endDate,
-      },
+      purchaseMonth: bonusMonth,  // "YYYY-MM" 形式のインデックスを使用
     },
     include: {
       mlmMember: {
@@ -124,11 +121,12 @@ export async function executeBonusCalculation(
   const childrenMap = new Map<bigint, bigint[]>();
 
   for (const member of members) {
-    if (member.sponsorId) {
-      if (!childrenMap.has(member.sponsorId)) {
-        childrenMap.set(member.sponsorId, []);
+    // referrerId = ユニレベル紹介者（ボーナス計算はユニレベルライン基準）
+    if (member.referrerId) {
+      if (!childrenMap.has(member.referrerId)) {
+        childrenMap.set(member.referrerId, []);
       }
-      childrenMap.get(member.sponsorId)!.push(member.id);
+      childrenMap.get(member.referrerId)!.push(member.id);
     }
   }
 
