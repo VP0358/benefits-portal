@@ -54,16 +54,27 @@ const PAGE_BG    = "#eee8e0";
 const LINEN      = "#f5f0e8";
 
 const STATUS_LABELS: Record<string, string> = {
-  active: "アクティブ", inactive: "非アクティブ", suspended: "停止中",
-  canceled: "解約済", pending: "審査中",
+  active:    "活動中",
+  autoship:  "オートシップ",
+  withdrawn: "退会",
+  midCancel: "クーリングオフ",
+  lapsed:    "失効",
+  suspended: "停止中",
+  inactive:  "非アクティブ",
+  canceled:  "解約済",
+  pending:   "審査中",
 };
 type StatusTheme = { dotColor: string; textColor: string; bgColor: string; borderColor: string };
 const STATUS_THEME: Record<string, StatusTheme> = {
-  active:   { dotColor: "#34d399", textColor: "#6ee7b7",  bgColor: "rgba(16,185,129,0.10)",  borderColor: "rgba(52,211,153,0.25)" },
-  inactive: { dotColor: "#6b7280", textColor: "#9ca3af",  bgColor: "rgba(75,85,99,0.08)",    borderColor: "rgba(107,114,128,0.20)" },
-  suspended:{ dotColor: "#f97316", textColor: "#fb923c",  bgColor: "rgba(249,115,22,0.08)",  borderColor: "rgba(249,115,22,0.22)" },
-  canceled: { dotColor: "#f87171", textColor: "#fca5a5",  bgColor: "rgba(239,68,68,0.08)",   borderColor: "rgba(248,113,113,0.22)" },
-  pending:  { dotColor: GOLD,      textColor: GOLD_LIGHT, bgColor: `${GOLD}12`,              borderColor: `${GOLD}35` },
+  active:    { dotColor: "#34d399", textColor: "#6ee7b7",  bgColor: "rgba(16,185,129,0.10)",  borderColor: "rgba(52,211,153,0.25)" },
+  autoship:  { dotColor: "#60a5fa", textColor: "#93c5fd",  bgColor: "rgba(59,130,246,0.10)",  borderColor: "rgba(96,165,250,0.25)" },
+  withdrawn: { dotColor: "#f87171", textColor: "#fca5a5",  bgColor: "rgba(239,68,68,0.08)",   borderColor: "rgba(248,113,113,0.22)" },
+  midCancel: { dotColor: "#fb923c", textColor: "#fdba74",  bgColor: "rgba(249,115,22,0.08)",  borderColor: "rgba(251,146,60,0.22)" },
+  lapsed:    { dotColor: "#9ca3af", textColor: "#d1d5db",  bgColor: "rgba(107,114,128,0.06)", borderColor: "rgba(156,163,175,0.18)" },
+  inactive:  { dotColor: "#6b7280", textColor: "#9ca3af",  bgColor: "rgba(75,85,99,0.08)",    borderColor: "rgba(107,114,128,0.20)" },
+  suspended: { dotColor: "#f97316", textColor: "#fb923c",  bgColor: "rgba(249,115,22,0.08)",  borderColor: "rgba(249,115,22,0.22)" },
+  canceled:  { dotColor: "#f87171", textColor: "#fca5a5",  bgColor: "rgba(239,68,68,0.08)",   borderColor: "rgba(248,113,113,0.22)" },
+  pending:   { dotColor: GOLD,      textColor: GOLD_LIGHT, bgColor: `${GOLD}12`,              borderColor: `${GOLD}35` },
 };
 
 function SectionTitle({ svgD, title, accent }: { svgD: string; title: string; accent?: string }) {
