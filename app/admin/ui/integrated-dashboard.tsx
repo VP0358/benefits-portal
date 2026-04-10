@@ -18,7 +18,7 @@ export default function IntegratedDashboard() {
   const tabs: { id: Tab; label: string; icon: string; color: string }[] = [
     { id: "mlm", label: "MLM関連", icon: "fas fa-users", color: "blue" },
     { id: "mobile", label: "携帯契約", icon: "fas fa-mobile-alt", color: "green" },
-    { id: "travel", label: "旅行サブスク", icon: "fas fa-plane", color: "purple" },
+    { id: "travel", label: "格安旅行", icon: "fas fa-plane", color: "purple" },
     { id: "export", label: "データ出力", icon: "fas fa-download", color: "orange" },
     { id: "other", label: "システム設定", icon: "fas fa-cog", color: "gray" },
   ];
@@ -233,7 +233,7 @@ function TravelContent({ cardClass, iconClass }: { cardClass: string; iconClass:
 
   return (
     <div>
-      <SectionTitle title="旅行サブスク関連機能" subtitle="旅行サブスクリプション契約の管理" />
+      <SectionTitle title="格安旅行関連機能" subtitle="旅行サブスクリプション契約の管理" />
       <div className="grid gap-3 md:grid-cols-2">
         {items.map(item => (
           <NavCard key={item.href} item={item} cardClass={cardClass} iconClass={iconClass} />

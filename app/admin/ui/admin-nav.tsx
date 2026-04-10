@@ -39,7 +39,7 @@ const menuGroups = [
   },
   {
     id: "travel",
-    title: "旅行サブスク",
+    title: "格安旅行",
     icon: "fas fa-plane",
     items: [
       { href: "/admin/travel-subscriptions", label: "旅行サブスク一覧", icon: "fas fa-plane" },
@@ -220,15 +220,15 @@ export default function AdminNav() {
               {/* グループヘッダー（折りたたみ） */}
               <button
                 onClick={() => toggleGroup(group.id)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                  hasActive ? "text-violet-300 bg-gray-800" : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/60"
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
+                  hasActive ? "text-violet-200 bg-gray-800" : "text-gray-300 hover:text-white hover:bg-gray-800/60"
                 }`}
               >
-                <span className="flex items-center gap-2">
-                  <i className={`${group.icon} w-4 text-center text-xs`}></i>
-                  <span className="text-xs tracking-wide uppercase">{group.title}</span>
+                <span className="flex items-center gap-2.5">
+                  <i className={`${group.icon} w-4 text-center text-sm ${hasActive ? "text-violet-400" : "text-gray-500"}`}></i>
+                  <span className="text-sm font-bold">{group.title}</span>
                 </span>
-                <i className={`fas fa-chevron-${isOpen ? "up" : "down"} text-xs opacity-60`}></i>
+                <i className={`fas fa-chevron-${isOpen ? "up" : "down"} text-xs opacity-50`}></i>
               </button>
 
               {/* グループアイテム */}
