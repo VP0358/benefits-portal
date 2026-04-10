@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import ContractsOrgChart from "./ui/contracts-org-chart";
+import MemberStatsSummary from "@/app/admin/ui/member-stats-summary";
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   pending:   { label: "申込中",  cls: "bg-yellow-50 text-yellow-700 border-yellow-200" },
@@ -95,6 +96,9 @@ export default async function AdminContractsPage({
 
   return (
     <main className="space-y-5">
+      {/* 携帯契約 統計サマリー */}
+      <MemberStatsSummary show={["mobile"]} compact />
+
       {/* ヘッダー */}
       <div className="rounded-3xl bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between flex-wrap gap-3">

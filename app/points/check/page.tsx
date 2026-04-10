@@ -5,7 +5,7 @@
 
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import prisma from "@/lib/prisma";
+import { prisma } from '@/lib/prisma';
 import PointsCheckClient from "./ui/points-check-client";
 
 export default async function PointsCheckPage() {

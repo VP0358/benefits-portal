@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import MemberActions from "./ui/member-actions";
+import MemberStatsSummary from "@/app/admin/ui/member-stats-summary";
 
 function fmtDateTime(d: Date | null | undefined) {
   if (!d) return "—";
@@ -100,6 +101,8 @@ export default async function AdminMembersPage({
 
   return (
     <main className="space-y-5">
+      {/* 全体統計サマリー */}
+      <MemberStatsSummary compact />
 
       {/* ヘッダー */}
       <div className="rounded-3xl bg-white p-6 shadow-sm">

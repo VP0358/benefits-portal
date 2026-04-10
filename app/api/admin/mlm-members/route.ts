@@ -4,7 +4,7 @@ export const revalidate = 0
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import prisma from "@/lib/prisma";
+import { prisma } from '@/lib/prisma';
 import { generateMemberCode } from "@/lib/mlm-utils";
 
 // GET: MLM会員一覧取得（検索・フィルター対応）

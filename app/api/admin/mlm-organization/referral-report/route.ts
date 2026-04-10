@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 
 import { auth } from "@/auth";
-import prisma from "@/lib/prisma";
+import { prisma } from '@/lib/prisma';
 
 // 紹介実績積算レポートCSV出力
 export async function GET(req: NextRequest) {

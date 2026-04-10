@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LEVEL_LABELS, MEMBER_TYPE_LABELS } from "@/lib/mlm-bonus";
+import MemberStatsSummary from "@/app/admin/ui/member-stats-summary";
 
 /* ─── 型定義 ─── */
 type MlmMemberRow = {
@@ -369,6 +370,9 @@ export default function MlmMembersPage() {
 
   return (
     <main className="space-y-6">
+      {/* MLM統計サマリー */}
+      <MemberStatsSummary show={["mlm"]} compact />
+
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">👥 MLM会員管理</h1>
