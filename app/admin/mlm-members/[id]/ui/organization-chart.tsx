@@ -80,7 +80,7 @@ export default function OrganizationChart({ memberCode }: { memberCode: string }
       <div key={node.id} className="mb-1">
         <div
           className="flex items-center gap-2 p-2 bg-white rounded-lg border hover:shadow-sm transition"
-          style={{ marginLeft: `${indent}px` }}
+          style={{ paddingLeft: `${indent + 8}px` }}
         >
           <div className={`w-9 h-9 ${levelColor} text-white rounded-full flex items-center justify-center font-bold text-xs shrink-0`}>
             {levelLabel}
@@ -156,7 +156,7 @@ export default function OrganizationChart({ memberCode }: { memberCode: string }
           組織データなし
         </div>
       ) : (
-        <div className="space-y-1 max-h-[500px] overflow-y-auto border rounded-lg p-3 bg-gray-50">
+        <div className="space-y-1 max-h-[500px] overflow-y-auto overflow-x-auto border rounded-xl p-3 bg-stone-50">
           {renderTreeNode(rootMember)}
         </div>
       )}

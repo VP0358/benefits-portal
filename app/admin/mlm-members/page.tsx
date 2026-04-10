@@ -326,7 +326,8 @@ export default function MlmMembersPage() {
       const res = await fetch(`/api/admin/mlm-members?${params}`);
       const data = await res.json();
       if (!res.ok) {
-        setApiError(data.error ?? `APIエラー (HTTP ${res.status})`);
+        const detail = data.detail ? ` (${data.detail})` : "";
+        setApiError((data.error ?? `APIエラー (HTTP ${res.status})`) + detail);
         setMembers([]);
         setTotal(0);
       } else {
