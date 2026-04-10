@@ -241,6 +241,10 @@ export default function MlmMemberNewPage() {
         // 登録した会員のIDを取得して会員詳細に即時遷移
         const newMemberId = result.member?.id?.toString();
         if (newMemberId) {
+          // 初期パスワードをセッションストレージに保存して詳細画面で表示
+          if (result.initialPassword) {
+            sessionStorage.setItem(`mlm_init_pw_${newMemberId}`, result.initialPassword);
+          }
           router.push(`/admin/mlm-members/${newMemberId}`);
         } else {
           router.push("/admin/mlm-members");

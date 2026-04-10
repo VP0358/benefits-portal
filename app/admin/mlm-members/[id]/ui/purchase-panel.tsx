@@ -114,20 +114,20 @@ export default function PurchasePanel({ memberCode }: { memberCode: string }) {
       <div className="flex items-center justify-between mb-4 border-b pb-2">
         <h2 className="text-xl font-bold text-gray-800">
           <i className="fas fa-shopping-bag mr-2"></i>
-          MLM購入データ（ポイント計算用）
+          購入履歴
         </h2>
         <button
           onClick={() => setShowForm(!showForm)}
           className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition"
         >
-          {showForm ? "✕ キャンセル" : "＋ 購入データ追加"}
+          {showForm ? "✕ キャンセル" : "＋ 購入履歴追加"}
         </button>
       </div>
 
       {/* 購入データ追加フォーム */}
       {showForm && (
         <form onSubmit={handleAdd} className="mb-6 p-4 bg-blue-50 rounded-lg space-y-3">
-          <h3 className="font-semibold text-blue-800 text-sm">購入データを追加</h3>
+          <h3 className="font-semibold text-blue-800 text-sm">購入履歴を追加</h3>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-600 mb-1">商品</label>

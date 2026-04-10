@@ -693,6 +693,9 @@ model MlmMember {
   address1          String?         @db.VarChar(255)
   address2          String?         @db.VarChar(255)
   note              String?         @db.VarChar(500)
+  // 追加フィールド
+  firstPayDate      DateTime?                                // 初回入金日
+  creditCardId      String?         @db.VarChar(100)        // クレジットカード決済ID（クレディックス顧客ID）
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 

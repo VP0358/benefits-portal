@@ -6,6 +6,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from '@/lib/prisma';
 import { generateMemberCode } from "@/lib/mlm-utils";
+import bcrypt from "bcryptjs";
+
+// 初期パスワード生成（英小文字大文字数字記号 8桁）
+function generateInitialPassword(): string {
+  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789!@#$%';
+  let pw = '';
+  // 必ず各層の文字が最低1桁入るように
+  pw += 'abcdefghjkmnpqrstuvwxyz'[Math.floor(Math.random() * 23)];
+  pw += 'ABCDEFGHJKMNPQRSTUVWXYZ'[Math.floor(Math.random() * 23)];
+  pw += '23456789'[Math.floor(Math.random() * 8)];
+  pw += '!@#$%'[Math.floor(Math.random() * 5)];
+  for (let i = 4; i < 8; i++) {
+    pw += chars[Math.floor(Math.random() * chars.length)];
+  }
+  // シャッフル
+  return pw.split('').sort(() => Math.random() - 0.5).join('');
+}
 
 // GET: MLM会員一覧取得（検索・フィルター対応）
 export async function GET(req: NextRequest) {
@@ -257,6 +274,9 @@ export async function POST(req: NextRequest) {
       referrerId = referrer.id;
     }
 
+    // 初期パスワード生成
+    const initialPassword = generateInitialPassword();
+
     // トランザクションで User と MlmMember を作成
     const result = await prisma.$transaction(async (tx) => {
       // 1. User作成
@@ -266,7 +286,7 @@ export async function POST(req: NextRequest) {
           name: data.name,
           nameKana: data.nameKana || null,
           email: data.email,
-          passwordHash: "$2a$10$dummyhashforadmincreateduser", // 仮パスワード
+          passwordHash: await bcrypt.hash(initialPassword, 10),
           phone: data.phone || null,
           postalCode: data.postalCode || null,
           address: [
@@ -330,7 +350,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         message: "MLM会員を登録しました",
-        member: result.mlmMember,
+        member: { ...result.mlmMember, id: result.mlmMember.id.toString() },
+        initialPassword, // 初期パスワードを返却
       },
       { status: 201 }
     );
