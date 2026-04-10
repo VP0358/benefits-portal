@@ -270,16 +270,31 @@ model Product {
 }
 
 model Order {
-  id             BigInt   @id @default(autoincrement())
+  id             BigInt    @id @default(autoincrement())
   userId         BigInt
-  orderNumber    String   @unique @db.VarChar(100)
-  status         String   @db.VarChar(30)
+  orderNumber    String    @unique @db.VarChar(100)
+  status         String    @db.VarChar(30)           // pending/processing/shipped/completed/canceled
+  // 伝票種別 (新規/都度購入/オートシップ/返品/クーリングオフ等)
+  slipType       String    @default("one_time") @db.VarChar(50)
+  // 支払い方法 (bank_transfer/card/direct_debit/cod/other)
+  paymentMethod  String?   @db.VarChar(50)
+  // 入金ステータス (unpaid/paid/ignored)
+  paymentStatus  String    @default("unpaid") @db.VarChar(20)
+  // 発送ステータス (unshipped/shipped/ignored)
+  shippingStatus String    @default("unshipped") @db.VarChar(20)
+  // 出庫BOX番号 (0=未振り分け, 1-10)
+  outboxNo       Int       @default(0)
+  // 入金日
+  paidAt         DateTime?
+  // 備考
+  note           String?   @db.VarChar(500)
+  noteSlip       String?   @db.VarChar(500)  // 納品書用備考
   subtotalAmount Int
-  usedPoints     Int      @default(0)
+  usedPoints     Int       @default(0)
   totalAmount    Int
-  orderedAt      DateTime @default(now())
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  orderedAt      DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   items         OrderItem[]
@@ -287,6 +302,12 @@ model Order {
   shippingLabel ShippingLabel?
 
   @@index([userId])
+  @@index([slipType])
+  @@index([paymentMethod])
+  @@index([paymentStatus])
+  @@index([shippingStatus])
+  @@index([outboxNo])
+  @@index([orderedAt])
 }
 
 model OrderItem {

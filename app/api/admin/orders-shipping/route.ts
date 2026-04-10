@@ -1,123 +1,110 @@
-// 動的レンダリングを強制（ビルド時にこのルートを実行しない）
+// 動的レンダリングを強制
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
 
+// 支払方法の表示名マップ
+const paymentMethodLabels: Record<string, string> = {
+  bank_transfer: "口座振替",
+  card: "カード",
+  credit_card: "カード",
+  direct_debit: "口座振替",
+  cod: "代引き",
+  bank_payment: "銀行振込",
+  convenience: "コンビニ",
+  other: "その他",
+}
+
+// 伝票種別の表示名マップ
+const slipTypeLabels: Record<string, string> = {
+  new_member: "新規",
+  one_time: "都度購入",
+  autoship: "オートシップ",
+  return: "返品",
+  cooling_off: "クーリングオフ",
+  exchange: "交換",
+  cancel: "キャンセル",
+  additional: "追加",
+  present: "プレゼント",
+  web: "Web",
+  other: "その他",
+}
+
 // 受注・発送状況一覧取得
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    
-    const startDate = searchParams.get("startDate")
-    const endDate = searchParams.get("endDate")
-    const memberCode = searchParams.get("memberCode")
-    const status = searchParams.get("status")
-    const carrier = searchParams.get("carrier")
-    const keyword = searchParams.get("keyword")
-    const paymentMethod = searchParams.get("paymentMethod") // カード/口座振替/銀行振込/代引き/その他
-    const slipType = searchParams.get("slipType")           // 伝票種別: autoship/one_time/new_member/cooling_off/return
 
-    // 検索条件構築
+    const startDate      = searchParams.get("startDate")
+    const endDate        = searchParams.get("endDate")
+    const dateType       = searchParams.get("dateType") || "orderedAt" // orderedAt/paidAt/shippedAt
+    const memberCode     = searchParams.get("memberCode")
+    const status         = searchParams.get("status")
+    const carrier        = searchParams.get("carrier")
+    const keyword        = searchParams.get("keyword")
+    const paymentMethod  = searchParams.get("paymentMethod")
+    const slipType       = searchParams.get("slipType")
+    const paymentStatus  = searchParams.get("paymentStatus")  // unpaid/paid/ignored
+    const shippingStatus = searchParams.get("shippingStatus") // unshipped/shipped/ignored
+    const outboxNo       = searchParams.get("outboxNo")
+    const summaryOnly    = searchParams.get("summaryOnly") === "true"
+
+    // サマリーのみ取得
+    if (summaryOnly) {
+      return await getSummary()
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {}
 
     // 日付範囲
     if (startDate || endDate) {
-      where.orderedAt = {}
-      if (startDate) where.orderedAt.gte = new Date(startDate)
-      if (endDate) {
-        const end = new Date(endDate)
-        end.setHours(23, 59, 59, 999)
-        where.orderedAt.lte = end
+      if (dateType === "paidAt") {
+        where.paidAt = {}
+        if (startDate) where.paidAt.gte = new Date(startDate)
+        if (endDate) { const e = new Date(endDate); e.setHours(23,59,59,999); where.paidAt.lte = e }
+      } else if (dateType === "shippedAt") {
+        where.shippingLabel = { shippedAt: {} }
+        if (startDate) where.shippingLabel.shippedAt.gte = new Date(startDate)
+        if (endDate) { const e = new Date(endDate); e.setHours(23,59,59,999); where.shippingLabel.shippedAt.lte = e }
+      } else {
+        where.orderedAt = {}
+        if (startDate) where.orderedAt.gte = new Date(startDate)
+        if (endDate) { const e = new Date(endDate); e.setHours(23,59,59,999); where.orderedAt.lte = e }
       }
     }
 
-    // ステータス
-    if (status) {
-      where.status = status
-    }
+    if (status)         where.status = status
+    if (paymentStatus)  where.paymentStatus = paymentStatus
+    if (shippingStatus) where.shippingStatus = shippingStatus
+    if (slipType)       where.slipType = slipType
+    if (paymentMethod)  where.paymentMethod = paymentMethod
+    if (outboxNo !== null) where.outboxNo = Number(outboxNo)
 
-    // 会員コード
     if (memberCode) {
       where.user = {
-        mlmMember: {
-          memberCode: { contains: memberCode }
-        }
+        OR: [
+          { memberCode: { contains: memberCode } },
+          { mlmMember: { memberCode: { contains: memberCode } } }
+        ]
       }
     }
 
-    // 配送業者
     if (carrier) {
-      where.shippingLabel = {
-        carrier: carrier
-      }
+      where.shippingLabel = { ...(where.shippingLabel || {}), carrier }
     }
 
-    // 支払方法（MlmMemberのpaymentMethodを検索）
-    if (paymentMethod) {
-      // paymentMethodのマッピング
-      const pmMap: Record<string, string> = {
-        "card": "credit_card",
-        "bank_transfer": "bank_transfer",
-        "bank_payment": "bank_payment",
-        "cod": "cod",           // 代引き（将来対応）
-        "other": "other"        // その他（将来対応）
-      }
-      const dbPaymentMethod = pmMap[paymentMethod] || paymentMethod
-      
-      if (where.user) {
-        where.user = {
-          ...where.user,
-          mlmMember: {
-            ...(where.user.mlmMember || {}),
-            paymentMethod: dbPaymentMethod
-          }
-        }
-      } else {
-        where.user = {
-          mlmMember: { paymentMethod: dbPaymentMethod }
-        }
-      }
-    }
-
-    // 伝票種別（ShippingLabel.deliveryTypeで検索）
-    if (slipType) {
-      const slipTypeMap: Record<string, string> = {
-        "autoship": "autoship",
-        "one_time": "one_time",       // 都度払い→都度購入
-        "new_member": "new_member",   // 新規
-        "cooling_off": "cooling_off", // クーリングオフ
-        "return": "return"            // 返品
-      }
-      const dbSlipType = slipTypeMap[slipType] || slipType
-      
-      if (where.shippingLabel && typeof where.shippingLabel === 'object') {
-        where.shippingLabel = {
-          ...where.shippingLabel,
-          deliveryType: dbSlipType
-        }
-      } else {
-        where.shippingLabel = {
-          deliveryType: dbSlipType
-        }
-      }
-    }
-
-    // 商品名・コードでの検索
     if (keyword) {
-      where.items = {
-        some: {
-          OR: [
-            { productName: { contains: keyword } },
-            { productCode: { contains: keyword } }
-          ]
-        }
-      }
+      where.OR = [
+        { orderNumber: { contains: keyword } },
+        { user: { name: { contains: keyword } } },
+        { items: { some: { productName: { contains: keyword } } } },
+        { shippingLabel: { trackingNumber: { contains: keyword } } },
+      ]
     }
 
-    // 注文データ取得
     const orders = await prisma.order.findMany({
       where,
       include: {
@@ -126,12 +113,7 @@ export async function GET(request: NextRequest) {
             memberCode: true,
             name: true,
             email: true,
-            mlmMember: {
-              select: {
-                memberCode: true,
-                paymentMethod: true
-              }
-            }
+            mlmMember: { select: { memberCode: true, paymentMethod: true } }
           }
         },
         items: {
@@ -141,12 +123,7 @@ export async function GET(request: NextRequest) {
             unitPrice: true,
             quantity: true,
             lineAmount: true,
-            product: {
-              select: {
-                code: true,
-                name: true
-              }
-            }
+            product: { select: { code: true } }
           }
         },
         shippingLabel: {
@@ -162,50 +139,47 @@ export async function GET(request: NextRequest) {
             itemDescription: true,
             itemCount: true,
             deliveryType: true,
-            orderMethod: true,
             printedAt: true,
-            shippedAt: true
+            shippedAt: true,
           }
         }
       },
-      orderBy: {
-        orderedAt: "desc"
-      },
+      orderBy: { orderedAt: "desc" },
       take: 500
     })
 
-    // レスポンス整形
     const formattedOrders = orders.map((order) => {
-      const mlmMember = order.user.mlmMember
-      const paymentMethodValue = mlmMember?.paymentMethod || null
-      
-      // 支払方法の表示名
-      const paymentMethodLabel: Record<string, string> = {
-        credit_card: "カード",
-        bank_transfer: "口座振替",
-        bank_payment: "銀行振込"
-      }
-
+      const mlm = order.user.mlmMember
+      const pm = (order.paymentMethod || mlm?.paymentMethod || "")
       return {
         id: Number(order.id),
         orderNumber: order.orderNumber,
         status: order.status,
+        slipType: order.slipType,
+        slipTypeLabel: slipTypeLabels[order.slipType] || order.slipType,
+        paymentMethod: pm,
+        paymentMethodLabel: paymentMethodLabels[pm] || pm || "-",
+        paymentStatus: order.paymentStatus,
+        shippingStatus: order.shippingStatus,
+        outboxNo: order.outboxNo,
+        paidAt: order.paidAt?.toISOString() || null,
+        note: order.note,
+        noteSlip: order.noteSlip,
         subtotalAmount: order.subtotalAmount,
         usedPoints: order.usedPoints,
         totalAmount: order.totalAmount,
         orderedAt: order.orderedAt.toISOString(),
-        memberCode: mlmMember?.memberCode || order.user.memberCode,
+        createdAt: order.createdAt.toISOString(),
+        memberCode: mlm?.memberCode || order.user.memberCode,
         memberName: order.user.name,
         memberEmail: order.user.email,
-        paymentMethod: paymentMethodValue,
-        paymentMethodLabel: paymentMethodLabel[paymentMethodValue || ""] || "-",
         items: order.items.map((item) => ({
           id: Number(item.id),
           productName: item.productName,
           productCode: item.product?.code || "",
           quantity: item.quantity,
           unitPrice: item.unitPrice,
-          lineAmount: item.lineAmount
+          lineAmount: item.lineAmount,
         })),
         shippingLabel: order.shippingLabel ? {
           id: Number(order.shippingLabel.id),
@@ -219,24 +193,129 @@ export async function GET(request: NextRequest) {
           itemDescription: order.shippingLabel.itemDescription,
           itemCount: order.shippingLabel.itemCount,
           deliveryType: order.shippingLabel.deliveryType,
-          orderMethod: order.shippingLabel.orderMethod,
           printedAt: order.shippingLabel.printedAt?.toISOString() || null,
-          shippedAt: order.shippingLabel.shippedAt?.toISOString() || null
-        } : null
+          shippedAt: order.shippingLabel.shippedAt?.toISOString() || null,
+        } : null,
       }
     })
 
-    return NextResponse.json({
-      success: true,
-      orders: formattedOrders,
-      count: formattedOrders.length
-    })
+    return NextResponse.json({ success: true, orders: formattedOrders, count: formattedOrders.length })
   } catch (error) {
     console.error("Error fetching orders:", error)
-    return NextResponse.json(
-      { success: false, error: "Failed to fetch orders" },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, error: "Failed to fetch orders" }, { status: 500 })
+  } finally {
+    await prisma.$disconnect()
+  }
+}
+
+// 未処理伝票サマリー取得
+async function getSummary() {
+  const now = new Date()
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const thisMonthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const lastMonthEnd   = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
+
+  const paymentMethods = ["bank_transfer", "card", "direct_debit", "cod", "bank_payment", "convenience", "other"]
+
+  const buildSummaryRow = async (dateStart: Date, dateEnd: Date, rowType: "unpaid" | "unshipped") => {
+    const row: Record<string, number> = {}
+    for (const pm of paymentMethods) {
+      const count = await prisma.order.count({
+        where: {
+          orderedAt: { gte: dateStart, lte: dateEnd },
+          paymentMethod: pm,
+          ...(rowType === "unpaid" ? { paymentStatus: "unpaid" } : { shippingStatus: "unshipped" })
+        }
+      })
+      row[pm] = count
+    }
+    return row
+  }
+
+  // 未処理伝票カウント（当月以前の未入金）
+  const prevUnpaidCount = await prisma.order.count({
+    where: { orderedAt: { lt: thisMonthStart }, paymentStatus: "unpaid" }
+  })
+
+  const [thisUnpaid, thisUnshipped, lastUnpaid, lastUnshipped] = await Promise.all([
+    buildSummaryRow(thisMonthStart, thisMonthEnd, "unpaid"),
+    buildSummaryRow(thisMonthStart, thisMonthEnd, "unshipped"),
+    buildSummaryRow(lastMonthStart, lastMonthEnd, "unpaid"),
+    buildSummaryRow(lastMonthStart, lastMonthEnd, "unshipped"),
+  ])
+
+  // 総未入金・未発送
+  const totalUnpaid = await prisma.order.count({ where: { paymentStatus: "unpaid" } })
+  const totalUnshipped = await prisma.order.count({ where: { shippingStatus: "unshipped" } })
+
+  // 出庫BOX件数
+  const outboxCounts: Record<number, number> = {}
+  for (let i = 1; i <= 10; i++) {
+    outboxCounts[i] = await prisma.order.count({ where: { outboxNo: i } })
+  }
+
+  return NextResponse.json({
+    success: true,
+    summary: {
+      prevUnpaidCount,
+      totalUnpaid,
+      totalUnshipped,
+      thisMonth: { unpaid: thisUnpaid, unshipped: thisUnshipped },
+      lastMonth: { unpaid: lastUnpaid, unshipped: lastUnshipped },
+      paymentMethods,
+      outboxCounts,
+    }
+  })
+}
+
+// 一括更新（出庫BOX移動・入金日設定・発送ステータス変更等）
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { orderIds, action, value } = body
+
+    if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+      return NextResponse.json({ success: false, error: "orderIds required" }, { status: 400 })
+    }
+
+    const ids = orderIds.map(Number)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let updateData: any = {}
+
+    switch (action) {
+      case "setOutbox":
+        updateData = { outboxNo: Number(value) }
+        break
+      case "setPaymentStatus":
+        updateData = { paymentStatus: value }
+        if (value === "paid") updateData.paidAt = new Date()
+        break
+      case "setShippingStatus":
+        updateData = { shippingStatus: value }
+        break
+      case "setNote":
+        updateData = { note: value }
+        break
+      case "setNoteSlip":
+        updateData = { noteSlip: value }
+        break
+      case "setPaidAt":
+        updateData = { paidAt: value ? new Date(value) : null, paymentStatus: "paid" }
+        break
+      default:
+        return NextResponse.json({ success: false, error: "Unknown action" }, { status: 400 })
+    }
+
+    await prisma.order.updateMany({
+      where: { id: { in: ids.map(BigInt) } },
+      data: updateData,
+    })
+
+    return NextResponse.json({ success: true, updated: ids.length })
+  } catch (error) {
+    console.error("Bulk update error:", error)
+    return NextResponse.json({ success: false, error: "Bulk update failed" }, { status: 500 })
   } finally {
     await prisma.$disconnect()
   }
