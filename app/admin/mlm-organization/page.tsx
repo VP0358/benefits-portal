@@ -8,7 +8,8 @@ type OrgType = "matrix" | "unilevel";
 type MemberNode = {
   id: string;
   memberCode: string;
-  name: string;
+  name: string;            // 表示名（法人名 or ユーザー名）
+  companyName: string | null;  // 法人名
   email: string;
   phone: string | null;
   nickname: string | null;
@@ -146,6 +147,9 @@ function MemberDetailModal({ node, orgType, onClose, onZoom }: {
                 </span>
               </div>
               <div className="text-lg font-bold text-slate-800">{node.name}</div>
+              {node.companyName && node.companyName !== node.name && (
+                <div className="text-xs text-slate-500 mt-0.5">法人: {node.companyName}</div>
+              )}
               {node.nickname && <div className="text-xs text-violet-600 mt-0.5">ニックネーム: 「{node.nickname}」</div>}
               <div className="text-xs text-slate-500 font-mono mt-0.5">{node.memberCode}</div>
             </div>
@@ -272,8 +276,10 @@ function NodeCard({
 
       {/* 名前 */}
       <div className={`mt-1 font-bold text-slate-800 leading-tight truncate ${isRoot ? "text-sm" : "text-xs"}`}
-        title={node.name}>
-        {node.name}
+        title={node.companyName ? `法人: ${node.companyName}` : node.name}>
+        {node.companyName ? (
+          <span>🏢 {node.name}</span>
+        ) : node.name}
       </div>
       {/* 会員コード */}
       <div className="text-[9px] text-slate-500 mt-0.5 font-mono truncate">{node.memberCode}</div>
@@ -808,10 +814,10 @@ export default function MlmOrganizationPage() {
             {/* スクロールエリア（縦横両方） */}
             <div
               ref={treeScrollRef}
-              className="rounded-2xl border border-slate-100 bg-gradient-to-b from-slate-50 to-white overflow-auto"
-              style={{ maxHeight: "70vh" }}
+              className="rounded-2xl border border-slate-100 bg-gradient-to-b from-slate-50 to-white"
+              style={{ maxHeight: "70vh", overflowX: "auto", overflowY: "auto", WebkitOverflowScrolling: "touch" }}
             >
-              <div className="inline-flex flex-col items-center px-8 pt-6 pb-10" style={{ minWidth: "max-content" }}>
+              <div className="inline-flex flex-col items-center px-8 pt-6 pb-10" style={{ minWidth: "max-content", width: "max-content" }}>
                 <TreeNode
                   node={rootMember}
                   depth={0}

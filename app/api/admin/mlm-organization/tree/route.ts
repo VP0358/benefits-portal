@@ -138,13 +138,17 @@ export async function GET(req: NextRequest) {
     const rootMemberFull = await prisma.mlmMember.findUnique({
       where: { id: targetMember.id },
       select: {
-        upline: { select: { id: true, memberCode: true, user: { select: { name: true } } } },
-        referrer: { select: { id: true, memberCode: true, user: { select: { name: true } } } },
+        upline: { select: { id: true, memberCode: true, companyName: true, user: { select: { name: true } } } },
+        referrer: { select: { id: true, memberCode: true, companyName: true, user: { select: { name: true } } } },
       },
     });
-    const rootUplineName = rootMemberFull?.upline?.user?.name ?? null;
+    const rootUplineName = rootMemberFull?.upline
+      ? (rootMemberFull.upline.companyName?.trim() || rootMemberFull.upline.user?.name || null)
+      : null;
     const rootUplineCode = rootMemberFull?.upline?.memberCode ?? null;
-    const rootReferrerName = rootMemberFull?.referrer?.user?.name ?? null;
+    const rootReferrerName = rootMemberFull?.referrer
+      ? (rootMemberFull.referrer.companyName?.trim() || rootMemberFull.referrer.user?.name || null)
+      : null;
     const rootReferrerCode = rootMemberFull?.referrer?.memberCode ?? null;
 
     const rootNode = buildTreeWithDepthLimit(
@@ -179,6 +183,7 @@ async function fetchAllDescendants(rootId: bigint, parentField: "uplineId" | "re
       matrixPosition: true,
       contractDate: true,
       createdAt: true,
+      companyName: true,
       user: {
         select: {
           name: true,
@@ -211,10 +216,13 @@ async function fetchAllDescendants(rootId: bigint, parentField: "uplineId" | "re
     .filter(m => idSet.has(m.id.toString()))
     .map(m => {
       const pid = parentField === "uplineId" ? m.uplineId : m.referrerId;
+      // 表示名: 法人名 > ユーザー名 > 「未設定」
+      const displayName = m.companyName?.trim() || m.user.name?.trim() || "未設定";
       return {
         id: m.id.toString(),
         memberCode: m.memberCode,
-        name: m.user.name,
+        name: displayName,
+        companyName: m.companyName ?? null,
         email: m.user.email,
         phone: m.user.phone ?? null,
         nickname: m.user.mlmRegistration?.nickname ?? null,
@@ -234,7 +242,8 @@ async function fetchAllDescendants(rootId: bigint, parentField: "uplineId" | "re
 type FlatMember = {
   id: string;
   memberCode: string;
-  name: string;
+  name: string;           // 表示名（法人名 or ユーザー名）
+  companyName: string | null;  // 法人名元データ
   email: string;
   phone: string | null;
   nickname: string | null;
