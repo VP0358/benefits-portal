@@ -162,6 +162,7 @@ function MlmContent({ accent }: { accent: string }) {
       <GroupSection title="会員管理" subtitle="MLM会員の登録・編集・統計" accent={accent} items={[
         { href: "/admin/mlm-members",      label: "MLM会員管理",    icon: "fas fa-users",          desc: "会員一覧・詳細・編集・登録完了通知書" },
         { href: "/admin/mlm-members/new",  label: "新規会員登録",   icon: "fas fa-user-plus",      desc: "新規MLM会員の登録フォーム" },
+        { href: "/admin/mlm-stats",        label: "MLM月次統計",    icon: "fas fa-chart-pie",      desc: "年齢・性別・地域・オートシップ継続率の月次レポート", badge: "NEW" },
         { href: "/admin/mlm-members/stats",label: "会員統計",       icon: "fas fa-chart-bar",      desc: "会員数・状況の統計データ" },
         { href: "/admin/mlm-organization", label: "組織図・リスト", icon: "fas fa-sitemap",        desc: "組織ツリーとダウンライン一覧" },
       ]} />

@@ -17,6 +17,7 @@ const menuGroups = [
     items: [
       { href: "/admin/mlm-members", label: "MLM会員管理", icon: "fas fa-id-card" },
       { href: "/admin/mlm-members/new", label: "新規会員登録", icon: "fas fa-user-plus" },
+      { href: "/admin/mlm-stats", label: "MLM月次統計", icon: "fas fa-chart-pie" },
       { href: "/admin/mlm-organization", label: "組織図・リスト", icon: "fas fa-sitemap" },
       { href: "/admin/bonus-calculate", label: "ボーナス計算・処理", icon: "fas fa-calculator" },
       { href: "/admin/bonus-report-center", label: "ボーナス結果・レポート", icon: "fas fa-file-invoice-dollar" },
