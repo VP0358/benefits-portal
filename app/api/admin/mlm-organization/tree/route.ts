@@ -67,21 +67,62 @@ export async function GET(req: NextRequest) {
     let targetMember: { id: bigint; memberCode: string; user: { name: string } } | null = null;
 
     if (memberCode) {
-      targetMember = await prisma.mlmMember.findUnique({
-        where: { memberCode },
-        select: { id: true, memberCode: true, user: { select: { name: true } } },
+      // 会員コード：完全一致 or 前方一致で候補を返す
+      const candidates = await prisma.mlmMember.findMany({
+        where: { memberCode: { startsWith: memberCode } },
+        select: { id: true, memberCode: true, status: true, currentLevel: true, user: { select: { name: true } } },
+        orderBy: { memberCode: "asc" },
+        take: 30,
       });
+      if (candidates.length === 0) {
+        return NextResponse.json({ error: "会員が見つかりません" }, { status: 404 });
+      }
+      if (candidates.length === 1) {
+        // 1件のみ → そのままツリー表示
+        targetMember = candidates[0];
+      } else {
+        // 完全一致があればそれを使う
+        const exact = candidates.find(c => c.memberCode === memberCode);
+        if (exact) {
+          targetMember = exact;
+        } else {
+          // 複数候補 → 候補一覧を返す
+          return NextResponse.json({
+            candidates: candidates.map(c => ({
+              id: c.id.toString(),
+              memberCode: c.memberCode,
+              name: c.user.name,
+              status: c.status,
+              level: c.currentLevel,
+            })),
+          }, { status: 200 });
+        }
+      }
     } else if (name) {
-      const users = await prisma.user.findMany({
-        where: { name: { contains: name } },
-        select: { id: true },
-        take: 1,
+      // 氏名：部分一致で候補を返す
+      const members = await prisma.mlmMember.findMany({
+        where: { user: { name: { contains: name } } },
+        select: { id: true, memberCode: true, status: true, currentLevel: true, user: { select: { name: true } } },
+        orderBy: { memberCode: "asc" },
+        take: 50,
       });
-      if (users.length > 0) {
-        targetMember = await prisma.mlmMember.findUnique({
-          where: { userId: users[0].id },
-          select: { id: true, memberCode: true, user: { select: { name: true } } },
-        });
+      if (members.length === 0) {
+        return NextResponse.json({ error: "会員が見つかりません" }, { status: 404 });
+      }
+      if (members.length === 1) {
+        // 1件のみ → そのままツリー表示
+        targetMember = members[0];
+      } else {
+        // 複数候補 → 候補一覧を返す
+        return NextResponse.json({
+          candidates: members.map(c => ({
+            id: c.id.toString(),
+            memberCode: c.memberCode,
+            name: c.user.name,
+            status: c.status,
+            level: c.currentLevel,
+          })),
+        }, { status: 200 });
       }
     } else if (email) {
       const user = await prisma.user.findUnique({
@@ -91,18 +132,18 @@ export async function GET(req: NextRequest) {
       if (user) {
         targetMember = await prisma.mlmMember.findUnique({
           where: { userId: user.id },
-          select: { id: true, memberCode: true, user: { select: { name: true } } },
+          select: { id: true, memberCode: true, status: true, currentLevel: true, user: { select: { name: true } } },
         });
       }
     } else if (phone) {
       const user = await prisma.user.findFirst({
-        where: { OR: [{ phone: { contains: phone } }] },
+        where: { OR: [{ phone: { contains: phone } }, { mobile: { contains: phone } }] },
         select: { id: true },
       });
       if (user) {
         targetMember = await prisma.mlmMember.findUnique({
           where: { userId: user.id },
-          select: { id: true, memberCode: true, user: { select: { name: true } } },
+          select: { id: true, memberCode: true, status: true, currentLevel: true, user: { select: { name: true } } },
         });
       }
     }

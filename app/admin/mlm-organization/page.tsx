@@ -142,6 +142,90 @@ function VisualTree({ root }: { root: MemberNode }) {
   );
 }
 
+// 候補一覧の型
+type CandidateMember = {
+  id: string;
+  memberCode: string;
+  name: string;
+  status: string;
+  level: number;
+};
+
+// ─────────────────────────────────────────────
+// 候補選択モーダル
+// ─────────────────────────────────────────────
+function CandidateModal({
+  candidates,
+  keyword,
+  onSelect,
+  onClose,
+}: {
+  candidates: CandidateMember[];
+  keyword: string;
+  onSelect: (memberCode: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+        {/* ヘッダー */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div>
+            <h3 className="text-base font-bold text-slate-800">🔍 検索結果 — 会員を選択</h3>
+            <p className="text-xs text-slate-500 mt-0.5">「{keyword}」に一致する会員が {candidates.length} 件見つかりました</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl font-bold">✕</button>
+        </div>
+        {/* 一覧 */}
+        <div className="overflow-y-auto flex-1">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-slate-50">
+              <tr className="border-b border-slate-100">
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600">氏名</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600">会員コード</th>
+                <th className="px-4 py-2.5 text-center text-xs font-semibold text-slate-600">LV</th>
+                <th className="px-4 py-2.5 text-center text-xs font-semibold text-slate-600">ステータス</th>
+                <th className="px-4 py-2.5 text-center text-xs font-semibold text-slate-600">操作</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {candidates.map((c) => (
+                <tr key={c.id} className="hover:bg-violet-50 transition">
+                  <td className="px-4 py-2.5 font-medium text-slate-800">{c.name}</td>
+                  <td className="px-4 py-2.5 text-slate-500 text-xs">{c.memberCode}</td>
+                  <td className="px-4 py-2.5 text-center">
+                    <span className={`${LEVEL_COLOR[c.level] ?? "bg-gray-400"} text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full`}>
+                      LV.{c.level}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                      c.status === "active" ? "bg-emerald-100 text-emerald-700" :
+                      c.status === "autoship" ? "bg-blue-100 text-blue-700" :
+                      c.status === "withdrawn" ? "bg-red-100 text-red-700" :
+                      "bg-slate-100 text-slate-600"
+                    }`}>
+                      {STATUS_LABEL[c.status] ?? c.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    <button
+                      onClick={() => onSelect(c.memberCode)}
+                      className="rounded-lg bg-violet-600 px-3 py-1 text-xs font-bold text-white hover:bg-violet-700 transition"
+                    >
+                      表示
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────
 // メインページ
 // ─────────────────────────────────────────────
@@ -156,6 +240,9 @@ export default function MlmOrganizationPage() {
   const [totalCount, setTotalCount] = useState<number | null>(null);
   const [searchMessage, setSearchMessage] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // 候補一覧
+  const [candidates, setCandidates] = useState<CandidateMember[]>([]);
+  const [candidateKeyword, setCandidateKeyword] = useState("");
 
   // レポート用
   const [reportSearchCode, setReportSearchCode] = useState("");
@@ -168,18 +255,46 @@ export default function MlmOrganizationPage() {
   const [refEndDate, setRefEndDate] = useState("");
   const [refSortType, setRefSortType] = useState("clean");
 
+  // 会員コードを指定してツリーを直接取得（候補選択後などに使う）
+  const fetchTreeByMemberCode = async (code: string) => {
+    setLoading(true);
+    setErrorMsg(null);
+    setSearchMessage(null);
+    setCandidates([]);
+    try {
+      const params = new URLSearchParams({ type: orgType, memberCode: code });
+      const res = await fetch(`/api/admin/mlm-organization/tree?${params}`);
+      const data = await res.json();
+      if (res.ok && !data.candidates) {
+        setRootMember(data.root ?? null);
+        setListData(data.list || []);
+        setTotalCount(null);
+        setViewMode("tree");
+      } else {
+        setErrorMsg(data.error ?? "会員が見つかりませんでした");
+        setRootMember(null);
+        setListData([]);
+      }
+    } catch {
+      setErrorMsg("通信エラーが発生しました");
+    }
+    setLoading(false);
+  };
+
   const handleSearch = async () => {
     setLoading(true);
     setErrorMsg(null);
     setSearchMessage(null);
+    setCandidates([]);
     try {
       const params = new URLSearchParams({ type: orgType });
       const isSearchEmpty = !searchCode.trim();
       if (!isSearchEmpty) params.set(searchType, searchCode.trim());
 
       const res = await fetch(`/api/admin/mlm-organization/tree?${params}`);
+      const data = await res.json();
+
       if (res.ok) {
-        const data = await res.json();
         if (isSearchEmpty) {
           // 全体表示 → フラットリスト
           setRootMember(null);
@@ -187,18 +302,24 @@ export default function MlmOrganizationPage() {
           setTotalCount(data.totalCount ?? null);
           setSearchMessage(data.message ?? null);
           setViewMode("list");
+        } else if (data.candidates) {
+          // 複数候補 → 候補モーダルを表示
+          setCandidates(data.candidates);
+          setCandidateKeyword(searchCode.trim());
+          setRootMember(null);
+          setListData([]);
         } else {
+          // 1件確定 → ツリー表示
           setRootMember(data.root ?? null);
           setListData(data.list || []);
           setTotalCount(null);
         }
       } else {
-        const err = await res.json().catch(() => ({}));
-        setErrorMsg(err.error ?? "会員が見つかりませんでした");
+        setErrorMsg(data.error ?? "会員が見つかりませんでした");
         setRootMember(null);
         setListData([]);
       }
-    } catch (e) {
+    } catch {
       setErrorMsg("通信エラーが発生しました");
     }
     setLoading(false);
@@ -257,6 +378,20 @@ export default function MlmOrganizationPage() {
 
   return (
     <main className="space-y-6">
+      {/* 候補選択モーダル */}
+      {candidates.length > 0 && (
+        <CandidateModal
+          candidates={candidates}
+          keyword={candidateKeyword}
+          onSelect={(code) => {
+            setSearchCode(code);
+            setSearchType("memberCode");
+            fetchTreeByMemberCode(code);
+          }}
+          onClose={() => setCandidates([])}
+        />
+      )}
+
       {/* ヘッダー */}
       <div>
         <h1 className="text-2xl font-bold text-slate-800">🌐 組織図・リスト</h1>
