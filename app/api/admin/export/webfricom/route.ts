@@ -4,14 +4,14 @@ export const revalidate = 0
 
 import { NextRequest, NextResponse } from "next/server";
 
-
-
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 /**
  * GET /api/admin/export/webfricom?bonusMonth=2026-02
  * Webフリコム形式データ出力（固定長120文字）
+ * 
+ * 複数ポジション取得者は末尾-01ポジションに合算して出力する
  */
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -31,15 +31,11 @@ export async function GET(req: NextRequest) {
     const results = await prisma.bonusResult.findMany({
       where: {
         bonusMonth,
-        paymentAmount: {
-          gt: 0,
-        },
+        paymentAmount: { gt: 0 },
       },
       include: {
         mlmMember: {
-          include: {
-            user: true,
-          },
+          include: { user: true },
         },
       },
       orderBy: { mlmMember: { memberCode: "asc" } },
@@ -55,34 +51,78 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Webフリコム形式の固定長120文字データを生成
-    const lines = results.map((r) => {
-      // 会員の銀行情報を取得（実際のDBスキーマに合わせて調整）
-      const bankCode = r.mlmMember.bankCode || "0000"; // 銀行コード（4桁）
-      const branchCode = r.mlmMember.branchCode || "000"; // 支店コード（3桁）
-      const accountType = r.mlmMember.accountType === "savings" ? "1" : "2"; // 1:普通 2:当座
-      const accountNumber = (r.mlmMember.accountNumber || "0000000").padStart(7, "0"); // 口座番号（7桁）
-      const accountHolder = (r.mlmMember.accountHolder || r.mlmMember.user.name)
-        .substring(0, 30)
-        .padEnd(30, " "); // 口座名義（30文字）
-      const amount = String(r.paymentAmount).padStart(10, "0"); // 金額（10桁）
-      const memberCode = r.mlmMember.memberCode.padEnd(20, " "); // 会員コード（20文字）
+    // ── 複数ポジション合算処理 ──
+    // memberCodeの先頭6桁をベースコードとして、同一人物の支払額を-01ポジションに合算
+    type MergedEntry = {
+      memberCode: string; // 末尾-01のコード（例: 123456-01）
+      bankCode: string;
+      branchCode: string;
+      accountType: string;
+      accountNumber: string;
+      accountHolder: string;
+      paymentAmount: number;
+    };
 
-      // データコード（1文字）+ 銀行コード（4桁）+ 支店コード（3桁）+ 
-      // 預金種目（1桁）+ 口座番号（7桁）+ 受取人名（30文字）+ 
-      // 振込金額（10桁）+ 顧客コード（20桁）+ ダミー（44桁）= 120文字
+    const mergedMap = new Map<string, MergedEntry>();
+
+    for (const r of results) {
+      const mc = r.mlmMember.memberCode; // 例: "12345601" or "123456-01"
+      // ベースコード：ハイフン除いた先頭6桁 or 8桁全体から末尾2桁を除く
+      const normalized = mc.replace(/-/g, "");
+      const baseCode = normalized.substring(0, normalized.length - 2); // 先頭6桁
+      const primaryCode = `${baseCode}-01`; // 正規化キー（ハイフン付き6桁-01形式）
+
+      if (mergedMap.has(baseCode)) {
+        // 合算
+        mergedMap.get(baseCode)!.paymentAmount += r.paymentAmount;
+      } else {
+        // -01ポジションの銀行情報を使用
+        const member = r.mlmMember;
+        mergedMap.set(baseCode, {
+          memberCode: primaryCode,
+          bankCode: member.bankCode || "0000",
+          branchCode: member.branchCode || "000",
+          accountType: member.accountType === "savings" ? "1" : "2",
+          accountNumber: (member.accountNumber || "0000000").padStart(7, "0"),
+          accountHolder: (member.accountHolder || member.user.name).substring(0, 30).padEnd(30, " "),
+          paymentAmount: r.paymentAmount,
+        });
+      }
+    }
+
+    // -01ポジションの銀行情報を正式に取得して上書き
+    for (const [baseCode, entry] of mergedMap.entries()) {
+      const primaryMemberCode = `${baseCode}-01`;
+      const primaryMember = await prisma.mlmMember.findUnique({
+        where: { memberCode: primaryMemberCode },
+        include: { user: true },
+      });
+      if (primaryMember) {
+        entry.bankCode = primaryMember.bankCode || entry.bankCode;
+        entry.branchCode = primaryMember.branchCode || entry.branchCode;
+        entry.accountType = primaryMember.accountType === "savings" ? "1" : "2";
+        entry.accountNumber = (primaryMember.accountNumber || entry.accountNumber.trim()).padStart(7, "0");
+        entry.accountHolder = (primaryMember.accountHolder || primaryMember.user.name).substring(0, 30).padEnd(30, " ");
+        entry.memberCode = primaryMemberCode;
+      }
+    }
+
+    // Webフリコム形式の固定長120文字データを生成
+    const mergedList = Array.from(mergedMap.values()).sort((a, b) =>
+      a.memberCode.localeCompare(b.memberCode)
+    );
+
+    const lines = mergedList.map((entry) => {
+      const amount = String(entry.paymentAmount).padStart(10, "0");
+      const memberCode = entry.memberCode.padEnd(20, " ");
       const dummy = "".padEnd(44, " ");
-      
-      const line = `2${bankCode}${branchCode}${accountType}${accountNumber}${accountHolder}${amount}${memberCode}${dummy}`;
-      
-      return line.substring(0, 120); // 念のため120文字に切り詰め
+      const line = `2${entry.bankCode}${entry.branchCode}${entry.accountType}${entry.accountNumber}${entry.accountHolder}${amount}${memberCode}${dummy}`;
+      return line.substring(0, 120);
     });
 
-    // ヘッダー行を追加（オプション）
-    const header = "1".padEnd(120, " "); // ヘッダーレコード
-    const trailer = `9${String(results.length).padStart(6, "0")}${String(
-      results.reduce((sum, r) => sum + r.paymentAmount, 0)
-    ).padStart(12, "0")}`.padEnd(120, " "); // トレーラーレコード
+    const totalAmount = mergedList.reduce((sum, e) => sum + e.paymentAmount, 0);
+    const header = "1".padEnd(120, " ");
+    const trailer = `9${String(mergedList.length).padStart(6, "0")}${String(totalAmount).padStart(12, "0")}`.padEnd(120, " ");
 
     const content = [header, ...lines, trailer].join("\r\n");
 

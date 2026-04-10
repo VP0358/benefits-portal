@@ -112,18 +112,50 @@ function Section({ title, svgD, children }: { title: string; svgD: string; child
   );
 }
 
+type PositionInfo = {
+  memberCode: string;
+  status: string;
+  currentLevel: number;
+  contractDate: string | null;
+  autoshipEnabled: boolean;
+  currentMonthPoints: number;
+  lastMonthPoints: number;
+};
+type PositionsData = {
+  isMultiPosition: boolean;
+  positionCount: number;
+  positions: PositionInfo[];
+  totalCurrentMonthPoints: number;
+  totalLastMonthPoints: number;
+};
+
+const POS_STATUS_LABELS: Record<string, string> = {
+  active: "稼働中", autoship: "オートシップ", suspended: "停止中",
+  withdrawn: "退会", midCancel: "クーリングオフ",
+};
+const POS_STATUS_COLOR: Record<string, string> = {
+  active: "#34d399", autoship: "#60a5fa", suspended: "#f97316",
+  withdrawn: "#f87171", midCancel: "#a78bfa",
+};
+
 export default function MlmBusinessPage() {
   const [data, setData] = useState<RegistrationData | null>(null);
+  const [posData, setPosData] = useState<PositionsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/my/mlm-registration")
-      .then((r) => {
+    Promise.all([
+      fetch("/api/my/mlm-registration").then((r) => {
         if (!r.ok) throw new Error(r.status === 404 ? "MLM会員情報がありません" : "取得に失敗しました");
         return r.json();
+      }),
+      fetch("/api/my/mlm-positions").then((r) => r.ok ? r.json() : null).catch(() => null),
+    ])
+      .then(([regData, positions]) => {
+        setData(regData);
+        setPosData(positions);
       })
-      .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
@@ -318,6 +350,106 @@ export default function MlmBusinessPage() {
                 } />
               <Row label="口座名義"  svgD="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"    value={data.bankAccount.accountHolder} />
             </Section>
+
+            {/* 複数ポジション（2ポジション以上の場合のみ表示） */}
+            {posData && posData.isMultiPosition && (
+              <div className="rounded-2xl overflow-hidden" style={{ background: CARD_BG, border: `1px solid ${GOLD}18` }}>
+                <div className="flex items-center gap-2.5 px-5 py-4" style={{ borderBottom: `1px solid ${GOLD}10` }}>
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${GOLD}15` }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: GOLD }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  </div>
+                  <h2 className="text-sm font-bold" style={{ color: "rgba(255,255,255,0.85)" }}>
+                    複数ポジション情報
+                  </h2>
+                  <span className="ml-auto text-xs font-bold px-2.5 py-1 rounded-full"
+                    style={{ background: `${GOLD}20`, color: GOLD }}>
+                    {posData.positionCount}ポジション取得中
+                  </span>
+                </div>
+
+                {/* 合計ポイント */}
+                <div className="px-5 pt-4 pb-3">
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="rounded-xl p-3 text-center" style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}20` }}>
+                      <div className="text-[10px] mb-1" style={{ color: `${GOLD}60` }}>今月合計ポイント</div>
+                      <div className="text-lg font-black" style={{ color: GOLD_LIGHT }}>
+                        {posData.totalCurrentMonthPoints.toLocaleString()}
+                        <span className="text-xs font-normal ml-1" style={{ color: `${GOLD}50` }}>pt</span>
+                      </div>
+                    </div>
+                    <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                      <div className="text-[10px] mb-1" style={{ color: "rgba(255,255,255,0.35)" }}>先月合計ポイント</div>
+                      <div className="text-lg font-black" style={{ color: "rgba(255,255,255,0.7)" }}>
+                        {posData.totalLastMonthPoints.toLocaleString()}
+                        <span className="text-xs font-normal ml-1" style={{ color: "rgba(255,255,255,0.25)" }}>pt</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 各ポジション詳細 */}
+                  <div className="space-y-2">
+                    {posData.positions.map((pos, idx) => {
+                      const statusColor = POS_STATUS_COLOR[pos.status] ?? "#9ca3af";
+                      const statusLabel = POS_STATUS_LABELS[pos.status] ?? pos.status;
+                      const isActive = pos.status === "active" || pos.status === "autoship";
+                      return (
+                        <div key={pos.memberCode} className="rounded-xl p-3.5"
+                          style={{
+                            background: isActive ? "rgba(52,211,153,0.05)" : "rgba(255,255,255,0.03)",
+                            border: `1px solid ${isActive ? "rgba(52,211,153,0.2)" : "rgba(255,255,255,0.06)"}`,
+                          }}>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-md"
+                                style={{ background: `${GOLD}15`, color: GOLD }}>
+                                {`POS.${String(idx + 1).padStart(2, "0")}`}
+                              </span>
+                              <span className="text-sm font-mono font-medium" style={{ color: "rgba(255,255,255,0.7)" }}>
+                                {pos.memberCode}
+                              </span>
+                            </div>
+                            <span className="flex items-center gap-1 text-xs font-medium">
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusColor }}></span>
+                              <span style={{ color: statusColor }}>{statusLabel}</span>
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span style={{ color: "rgba(255,255,255,0.3)" }}>今月: </span>
+                              <span className="font-bold" style={{ color: isActive ? GOLD_LIGHT : "rgba(255,255,255,0.5)" }}>
+                                {pos.currentMonthPoints.toLocaleString()} pt
+                              </span>
+                            </div>
+                            <div>
+                              <span style={{ color: "rgba(255,255,255,0.3)" }}>先月: </span>
+                              <span style={{ color: "rgba(255,255,255,0.5)" }}>
+                                {pos.lastMonthPoints.toLocaleString()} pt
+                              </span>
+                            </div>
+                            <div>
+                              <span style={{ color: "rgba(255,255,255,0.3)" }}>オートシップ: </span>
+                              <span style={{ color: pos.autoshipEnabled ? "#60a5fa" : "rgba(255,255,255,0.3)" }}>
+                                {pos.autoshipEnabled ? "有効" : "停止"}
+                              </span>
+                            </div>
+                            {pos.contractDate && (
+                              <div>
+                                <span style={{ color: "rgba(255,255,255,0.3)" }}>契約: </span>
+                                <span style={{ color: "rgba(255,255,255,0.5)" }}>
+                                  {fmtDate(pos.contractDate)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
       </main>
