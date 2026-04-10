@@ -115,38 +115,47 @@ body {
 
 /* ──────────────────────────────────────────
    管理ページ専用スタイル（全管理ページ共通）
+   会員ページと同じ VIOLA Pure デザイントークン使用
 ────────────────────────────────────────── */
 
-/* 管理ページ背景 */
+/* 管理ページ背景 - 会員ページと同じリネンベージュ */
 .admin-bg {
-  --admin-bg: #f7f6f4;
-  background-color: #f7f6f4;
+  --admin-bg: #eee8e0;
+  background-color: #eee8e0;
 }
 
-/* 管理ページカード */
+/* 管理ページ メインカード（リネン調ライトカード） */
 .admin-card {
-  background: #ffffff;
-  border-radius: 16px;
-  border: 1px solid rgba(0,0,0,0.06);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03);
+  background: #fff;
+  border-radius: 20px;
+  border: 1px solid rgba(201,168,76,0.12);
+  box-shadow: 0 4px 20px rgba(10,22,40,0.06), 0 1px 4px rgba(10,22,40,0.04);
+}
+
+/* 管理ページ ネイビーカード（会員ページ NavyCard と同等） */
+.admin-navy-card {
+  background: linear-gradient(135deg, #0d1e38, #122444);
+  border-radius: 20px;
+  border: 1px solid rgba(201,168,76,0.18);
+  box-shadow: 0 8px 32px rgba(10,22,40,0.25), 0 2px 8px rgba(10,22,40,0.15);
 }
 
 /* 管理ページセクションタイトル */
 .admin-section-title {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #1c1917;
+  color: #0a1628;
   letter-spacing: -0.02em;
 }
 
-/* 管理ページテーブル */
+/* 管理ページテーブル - NAVY系ヘッダー */
 .admin-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.875rem;
 }
 .admin-table thead th {
-  background: #1c1917;
+  background: linear-gradient(90deg, #0a1628, #162c50);
   color: rgba(255,255,255,0.85);
   font-size: 0.75rem;
   font-weight: 600;
@@ -156,44 +165,73 @@ body {
   text-align: left;
   white-space: nowrap;
 }
+.admin-table thead th:first-child {
+  border-radius: 12px 0 0 0;
+}
+.admin-table thead th:last-child {
+  border-radius: 0 12px 0 0;
+}
 .admin-table tbody tr {
-  border-bottom: 1px solid #f0eeec;
-  transition: background 0.1s;
+  border-bottom: 1px solid rgba(201,168,76,0.08);
+  transition: background 0.12s;
 }
 .admin-table tbody tr:hover {
-  background: #faf9f7;
+  background: rgba(201,168,76,0.04);
 }
 .admin-table tbody td {
   padding: 10px 16px;
-  color: #3d3530;
+  color: #1a1410;
   vertical-align: middle;
 }
 
-/* 管理ページ プライマリボタン */
+/* 管理ページ プライマリボタン（GOLD系） */
 .admin-btn-primary {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 8px 18px;
-  border-radius: 10px;
+  border-radius: 12px;
   font-size: 0.8125rem;
   font-weight: 600;
   letter-spacing: 0.01em;
-  background: linear-gradient(135deg, #1c1917, #3d3530);
-  color: #fff;
+  background: linear-gradient(135deg, #c9a84c, #a88830);
+  color: #1a1410;
   border: none;
   cursor: pointer;
   transition: all 0.15s;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  box-shadow: 0 2px 8px rgba(201,168,76,0.35);
 }
 .admin-btn-primary:hover {
-  background: linear-gradient(135deg, #3d3530, #5a4e48);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  background: linear-gradient(135deg, #b8962e, #d4b447);
+  box-shadow: 0 4px 14px rgba(201,168,76,0.45);
   transform: translateY(-1px);
 }
+
+/* 管理ページ ネイビーボタン */
+.admin-btn-navy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 12px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #0a1628, #162c50);
+  color: #e8c96a;
+  border: 1px solid rgba(201,168,76,0.25);
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 2px 8px rgba(10,22,40,0.25);
+}
+.admin-btn-navy:hover {
+  background: linear-gradient(135deg, #162c50, #1e3a6a);
+  box-shadow: 0 4px 14px rgba(10,22,40,0.35);
+  transform: translateY(-1px);
+}
+
 .admin-btn-gold {
   background: linear-gradient(135deg, #c9a84c, #e8c96a);
-  color: #1c1917;
+  color: #1a1410;
 }
 .admin-btn-gold:hover {
   background: linear-gradient(135deg, #b8962e, #d4b447);
@@ -202,18 +240,18 @@ body {
 /* 管理ページ インプット */
 .admin-input {
   width: 100%;
-  border: 1px solid #e5e2de;
-  border-radius: 10px;
+  border: 1px solid rgba(201,168,76,0.25);
+  border-radius: 12px;
   padding: 8px 12px;
   font-size: 0.875rem;
-  color: #1c1917;
-  background: #fff;
+  color: #1a1410;
+  background: rgba(255,255,255,0.9);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .admin-input:focus {
   border-color: #c9a84c;
-  box-shadow: 0 0 0 3px rgba(201,168,76,0.12);
+  box-shadow: 0 0 0 3px rgba(201,168,76,0.15);
 }
 
 /* ステータスバッジ */
@@ -226,6 +264,36 @@ body {
   font-weight: 600;
   letter-spacing: 0.03em;
   white-space: nowrap;
+}
+
+/* ──────────────────────────────────────────
+   管理ページ ゴールドライン区切り
+────────────────────────────────────────── */
+.admin-gold-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201,168,76,0.35) 30%, rgba(232,201,106,0.5) 50%, rgba(201,168,76,0.35) 70%, transparent);
+}
+
+/* 管理ページ セクションヘッダー */
+.admin-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(201,168,76,0.15);
+  margin-bottom: 16px;
+}
+
+/* 管理ページ アイコンボックス（NAVYカード内） */
+.admin-icon-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(201,168,76,0.15);
+  flex-shrink: 0;
 }
 
 /* ──────────────────────────────────────────

@@ -1,6 +1,6 @@
 /**
  * AdminPageHeader - 管理画面共通ページヘッダーコンポーネント
- * 統一されたサロン風スタイリッシュデザイン
+ * VIOLA Pure デザインシステム統一版
  */
 
 interface AdminPageHeaderProps {
@@ -22,13 +22,27 @@ export function AdminPageHeader({
     <div className="flex items-start justify-between flex-wrap gap-4 mb-6">
       <div>
         {category && (
-          <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: accent }}>
+          <p
+            className="text-xs font-semibold tracking-widest uppercase mb-1"
+            style={{
+              color: accent,
+              fontFamily: "var(--font-josefin), 'Arial Narrow', sans-serif",
+              letterSpacing: "0.15em",
+            }}
+          >
             {category}
           </p>
         )}
-        <h1 className="text-2xl font-bold text-stone-900 tracking-tight">{title}</h1>
+        <h1
+          className="text-2xl font-bold tracking-tight"
+          style={{ color: "#0a1628" }}
+        >
+          {title}
+        </h1>
         {description && (
-          <p className="text-sm text-stone-400 mt-0.5">{description}</p>
+          <p className="text-sm mt-0.5" style={{ color: "#78716c" }}>
+            {description}
+          </p>
         )}
       </div>
       {actions && (
@@ -41,19 +55,38 @@ export function AdminPageHeader({
 }
 
 /**
- * AdminCard - 管理画面共通カードコンポーネント
+ * AdminCard - 管理画面共通カードコンポーネント（VIOLA Pure デザイン）
  */
 interface AdminCardProps {
   children: React.ReactNode
   className?: string
   noPadding?: boolean
+  variant?: "light" | "navy"
 }
 
-export function AdminCard({ children, className = "", noPadding = false }: AdminCardProps) {
+export function AdminCard({ children, className = "", noPadding = false, variant = "light" }: AdminCardProps) {
+  if (variant === "navy") {
+    return (
+      <div
+        className={`rounded-2xl ${noPadding ? "" : "p-6"} ${className}`}
+        style={{
+          background: "linear-gradient(135deg, #0d1e38, #122444)",
+          border: "1px solid rgba(201,168,76,0.18)",
+          boxShadow: "0 8px 32px rgba(10,22,40,0.25), 0 2px 8px rgba(10,22,40,0.15)",
+        }}
+      >
+        {children}
+      </div>
+    )
+  }
+
   return (
     <div
-      className={`rounded-2xl bg-white border border-stone-100 ${noPadding ? "" : "p-6"} ${className}`}
-      style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03)" }}
+      className={`rounded-2xl bg-white ${noPadding ? "" : "p-6"} ${className}`}
+      style={{
+        border: "1px solid rgba(201,168,76,0.12)",
+        boxShadow: "0 4px 20px rgba(10,22,40,0.06), 0 1px 4px rgba(10,22,40,0.04)",
+      }}
     >
       {children}
     </div>
@@ -61,40 +94,44 @@ export function AdminCard({ children, className = "", noPadding = false }: Admin
 }
 
 /**
- * AdminBadge - ステータスバッジコンポーネント
+ * AdminBadge - ステータスバッジコンポーネント（VIOLA Pure デザイン）
  */
 interface AdminBadgeProps {
   children: React.ReactNode
-  variant?: "success" | "warning" | "error" | "info" | "neutral" | "gold"
+  variant?: "success" | "warning" | "error" | "info" | "neutral" | "gold" | "navy"
   size?: "sm" | "md"
 }
 
 export function AdminBadge({ children, variant = "neutral", size = "sm" }: AdminBadgeProps) {
-  const styles: Record<string, string> = {
-    success: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    warning: "bg-amber-50 text-amber-700 border-amber-200",
-    error:   "bg-red-50 text-red-700 border-red-200",
-    info:    "bg-blue-50 text-blue-700 border-blue-200",
-    neutral: "bg-stone-50 text-stone-600 border-stone-200",
-    gold:    "bg-amber-50 text-amber-800 border-amber-300",
+  const styles: Record<string, React.CSSProperties> = {
+    success: { background: "rgba(16,185,129,0.08)", color: "#059669", border: "1px solid rgba(16,185,129,0.2)" },
+    warning: { background: "rgba(251,191,36,0.08)", color: "#b45309", border: "1px solid rgba(251,191,36,0.25)" },
+    error:   { background: "rgba(239,68,68,0.08)",  color: "#dc2626", border: "1px solid rgba(239,68,68,0.2)" },
+    info:    { background: "rgba(59,130,246,0.08)",  color: "#2563eb", border: "1px solid rgba(59,130,246,0.2)" },
+    neutral: { background: "rgba(120,113,108,0.08)", color: "#57534e", border: "1px solid rgba(120,113,108,0.15)" },
+    gold:    { background: "rgba(201,168,76,0.1)",   color: "#c9a84c", border: "1px solid rgba(201,168,76,0.3)" },
+    navy:    { background: "rgba(10,22,40,0.08)",    color: "#0a1628", border: "1px solid rgba(10,22,40,0.15)" },
   }
   const sizeClass = size === "md" ? "px-2.5 py-1 text-xs" : "px-2 py-0.5 text-[11px]"
 
   return (
-    <span className={`inline-flex items-center rounded-full border font-semibold ${sizeClass} ${styles[variant]}`}>
+    <span
+      className={`inline-flex items-center rounded-full font-semibold ${sizeClass}`}
+      style={styles[variant]}
+    >
       {children}
     </span>
   )
 }
 
 /**
- * AdminButton - 統一ボタンコンポーネント
+ * AdminButton - 統一ボタンコンポーネント（VIOLA Pure デザイン）
  */
 interface AdminButtonProps {
   children: React.ReactNode
   onClick?: () => void
   href?: string
-  variant?: "primary" | "secondary" | "danger" | "ghost"
+  variant?: "primary" | "secondary" | "danger" | "ghost" | "navy"
   size?: "sm" | "md" | "lg"
   disabled?: boolean
   loading?: boolean
@@ -120,10 +157,35 @@ export function AdminButton({
   }[size]
 
   const variantStyle: Record<string, React.CSSProperties> = {
-    primary: { background: "linear-gradient(135deg, #c9a84c, #a88830)", color: "#fff", boxShadow: "0 2px 8px rgba(201,168,76,0.35)" },
-    secondary: { background: "#fff", color: "#44403c", border: "1px solid rgba(0,0,0,0.12)" },
-    danger: { background: "linear-gradient(135deg, #ef4444, #dc2626)", color: "#fff", boxShadow: "0 2px 8px rgba(239,68,68,0.3)" },
-    ghost: { background: "transparent", color: "#78716c" },
+    primary: {
+      background: "linear-gradient(135deg, #c9a84c, #a88830)",
+      color: "#1a1410",
+      boxShadow: "0 2px 8px rgba(201,168,76,0.35)",
+      border: "none",
+    },
+    navy: {
+      background: "linear-gradient(135deg, #0a1628, #162c50)",
+      color: "#e8c96a",
+      border: "1px solid rgba(201,168,76,0.25)",
+      boxShadow: "0 2px 8px rgba(10,22,40,0.25)",
+    },
+    secondary: {
+      background: "#fff",
+      color: "#44403c",
+      border: "1px solid rgba(201,168,76,0.2)",
+      boxShadow: "0 1px 3px rgba(10,22,40,0.06)",
+    },
+    danger: {
+      background: "linear-gradient(135deg, #ef4444, #dc2626)",
+      color: "#fff",
+      boxShadow: "0 2px 8px rgba(239,68,68,0.3)",
+      border: "none",
+    },
+    ghost: {
+      background: "transparent",
+      color: "#78716c",
+      border: "1px solid transparent",
+    },
   }
 
   const baseClass = `inline-flex items-center gap-2 font-semibold transition-all duration-150 disabled:opacity-50 ${sizeClass} ${className}`
@@ -152,7 +214,7 @@ export function AdminButton({
 }
 
 /**
- * AdminEmptyState - 空の状態表示コンポーネント
+ * AdminEmptyState - 空の状態表示コンポーネント（VIOLA Pure デザイン）
  */
 interface AdminEmptyStateProps {
   icon?: string
@@ -164,30 +226,36 @@ interface AdminEmptyStateProps {
 export function AdminEmptyState({ icon = "fas fa-inbox", title, description, action }: AdminEmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-stone-50 flex items-center justify-center mb-4">
-        <i className={`${icon} text-2xl text-stone-300`} />
+      <div
+        className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+        style={{ background: "rgba(201,168,76,0.06)", border: "1px solid rgba(201,168,76,0.15)" }}
+      >
+        <i className={`${icon} text-2xl`} style={{ color: "rgba(201,168,76,0.4)" }} />
       </div>
-      <p className="font-semibold text-stone-700 mb-1">{title}</p>
-      {description && <p className="text-sm text-stone-400 mb-4">{description}</p>}
+      <p className="font-semibold mb-1" style={{ color: "#1a1410" }}>{title}</p>
+      {description && <p className="text-sm mb-4" style={{ color: "#78716c" }}>{description}</p>}
       {action}
     </div>
   )
 }
 
 /**
- * AdminLoadingSpinner - ローディングスピナー
+ * AdminLoadingSpinner - ローディングスピナー（VIOLA Pure デザイン）
  */
 export function AdminLoadingSpinner({ text = "読み込み中..." }: { text?: string }) {
   return (
     <div className="flex items-center justify-center py-20 gap-3">
-      <span className="w-6 h-6 border-2 border-stone-200 border-t-amber-500 rounded-full animate-spin" />
-      <span className="text-sm text-stone-400">{text}</span>
+      <span
+        className="w-6 h-6 rounded-full animate-spin"
+        style={{ border: "2px solid rgba(201,168,76,0.2)", borderTopColor: "#c9a84c" }}
+      />
+      <span className="text-sm" style={{ color: "#78716c" }}>{text}</span>
     </div>
   )
 }
 
 /**
- * AdminAlertBanner - 警告・エラーバナー
+ * AdminAlertBanner - 警告・エラーバナー（VIOLA Pure デザイン）
  */
 interface AdminAlertBannerProps {
   children: React.ReactNode
@@ -196,20 +264,23 @@ interface AdminAlertBannerProps {
 }
 
 export function AdminAlertBanner({ children, variant = "error", onClose }: AdminAlertBannerProps) {
-  const styles: Record<string, { bg: string; border: string; text: string; icon: string }> = {
-    error:   { bg: "bg-red-50",    border: "border-red-200",   text: "text-red-700",   icon: "fas fa-exclamation-circle text-red-500" },
-    warning: { bg: "bg-amber-50",  border: "border-amber-200", text: "text-amber-800", icon: "fas fa-exclamation-triangle text-amber-500" },
-    success: { bg: "bg-emerald-50",border: "border-emerald-200",text: "text-emerald-800",icon: "fas fa-check-circle text-emerald-500" },
-    info:    { bg: "bg-blue-50",   border: "border-blue-200",  text: "text-blue-800",  icon: "fas fa-info-circle text-blue-500" },
+  const styles: Record<string, { bg: string; border: string; text: string; iconColor: string; icon: string }> = {
+    error:   { bg: "rgba(239,68,68,0.06)",  border: "rgba(239,68,68,0.2)",   text: "#dc2626", iconColor: "#ef4444", icon: "fas fa-exclamation-circle" },
+    warning: { bg: "rgba(251,191,36,0.08)", border: "rgba(251,191,36,0.25)", text: "#92400e", iconColor: "#d97706", icon: "fas fa-exclamation-triangle" },
+    success: { bg: "rgba(16,185,129,0.06)", border: "rgba(16,185,129,0.2)",  text: "#065f46", iconColor: "#10b981", icon: "fas fa-check-circle" },
+    info:    { bg: "rgba(59,130,246,0.06)", border: "rgba(59,130,246,0.2)",  text: "#1e40af", iconColor: "#3b82f6", icon: "fas fa-info-circle" },
   }
   const s = styles[variant]
 
   return (
-    <div className={`rounded-2xl border ${s.bg} ${s.border} p-4 flex items-start gap-3`}>
-      <i className={`${s.icon} text-lg mt-0.5 flex-shrink-0`} />
-      <p className={`text-sm flex-1 ${s.text}`}>{children}</p>
+    <div
+      className="rounded-2xl p-4 flex items-start gap-3"
+      style={{ background: s.bg, border: `1px solid ${s.border}` }}
+    >
+      <i className={`${s.icon} text-lg mt-0.5 flex-shrink-0`} style={{ color: s.iconColor }} />
+      <p className="text-sm flex-1" style={{ color: s.text }}>{children}</p>
       {onClose && (
-        <button onClick={onClose} className={`${s.text} opacity-60 hover:opacity-100`}>✕</button>
+        <button onClick={onClose} className="opacity-60 hover:opacity-100 transition" style={{ color: s.text }}>✕</button>
       )}
     </div>
   )

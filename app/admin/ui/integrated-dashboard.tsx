@@ -29,29 +29,34 @@ export default function IntegratedDashboard() {
       {/* ページヘッダー */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "#c9a84c" }}>
+          <p
+            className="text-xs font-semibold tracking-widest uppercase mb-1"
+            style={{ color: "#c9a84c", fontFamily: "var(--font-josefin), 'Arial Narrow', sans-serif", letterSpacing: "0.15em" }}
+          >
             Admin Portal
           </p>
-          <h1 className="text-2xl font-bold text-stone-900 tracking-tight">管理ダッシュボード</h1>
-          <p className="text-sm text-stone-400 mt-0.5">各機能へのクイックアクセス</p>
+          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "#0a1628" }}>管理ダッシュボード</h1>
+          <p className="text-sm mt-0.5" style={{ color: "#78716c" }}>各機能へのクイックアクセス</p>
         </div>
         <div className="flex gap-2">
           <a href="/admin/contacts"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all"
-            style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)", boxShadow: "0 2px 8px rgba(239,68,68,0.3)" }}>
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+            style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)", color: "#fff", boxShadow: "0 2px 8px rgba(239,68,68,0.3)" }}>
             <i className="fas fa-comments text-xs" /> 相談窓口
           </a>
           <a href="/admin/dashboard"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all"
-            style={{ background: "linear-gradient(135deg, #1c1917, #3d3530)", boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+            style={{ background: "linear-gradient(135deg, #0a1628, #162c50)", color: "#e8c96a", border: "1px solid rgba(201,168,76,0.25)", boxShadow: "0 2px 8px rgba(10,22,40,0.25)" }}>
             <i className="fas fa-chart-line text-xs" /> 売上レポート
           </a>
         </div>
       </div>
 
       {/* タブナビゲーション */}
-      <div className="flex gap-1 overflow-x-auto pb-0"
-        style={{ borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
+      <div
+        className="flex gap-1 overflow-x-auto pb-0"
+        style={{ borderBottom: "1px solid rgba(201,168,76,0.15)" }}
+      >
         {TAB_CONFIG.map((t) => (
           <button
             key={t.id}
@@ -61,7 +66,7 @@ export default function IntegratedDashboard() {
               ? { borderColor: t.accent, color: t.accent, background: `${t.accent}0c` }
               : { borderColor: "transparent", color: "#78716c" }
             }
-            onMouseEnter={e => { if (activeTab !== t.id) (e.currentTarget as HTMLElement).style.color = "#1c1917"; }}
+            onMouseEnter={e => { if (activeTab !== t.id) (e.currentTarget as HTMLElement).style.color = "#0a1628"; }}
             onMouseLeave={e => { if (activeTab !== t.id) (e.currentTarget as HTMLElement).style.color = "#78716c"; }}
           >
             <i className={t.icon} style={{ fontSize: "13px" }} />
@@ -71,8 +76,10 @@ export default function IntegratedDashboard() {
       </div>
 
       {/* タブコンテンツ */}
-      <div className="rounded-2xl bg-white border border-stone-100 p-6"
-        style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03)" }}>
+      <div
+        className="rounded-2xl bg-white p-6"
+        style={{ border: "1px solid rgba(201,168,76,0.12)", boxShadow: "0 4px 20px rgba(10,22,40,0.06), 0 1px 4px rgba(10,22,40,0.04)" }}
+      >
         {activeTab === "mlm"    && <MlmContent    accent={tab.accent} />}
         {activeTab === "mobile" && <MobileContent accent={tab.accent} />}
         {activeTab === "travel" && <TravelContent accent={tab.accent} />}
@@ -86,36 +93,39 @@ export default function IntegratedDashboard() {
 /* ─── NavCard ─── */
 function NavCard({ item, accent }: { item: NavItem; accent: string }) {
   return (
-    <a href={item.href}
-      className="group flex items-start gap-3 p-4 rounded-xl border transition-all duration-150"
-      style={{ borderColor: "rgba(0,0,0,0.07)", background: "#fafaf9" }}
+    <a
+      href={item.href}
+      className="group flex items-start gap-3 p-4 rounded-xl transition-all duration-150"
+      style={{ border: "1px solid rgba(201,168,76,0.1)", background: "rgba(255,252,248,1)" }}
       onMouseEnter={e => {
-        (e.currentTarget as HTMLElement).style.borderColor = accent;
-        (e.currentTarget as HTMLElement).style.background = `${accent}0a`;
+        (e.currentTarget as HTMLElement).style.borderColor = `${accent}60`;
+        (e.currentTarget as HTMLElement).style.background = `${accent}06`;
         (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)";
-        (e.currentTarget as HTMLElement).style.boxShadow = `0 4px 16px ${accent}20`;
+        (e.currentTarget as HTMLElement).style.boxShadow = `0 4px 16px ${accent}18`;
       }}
       onMouseLeave={e => {
-        (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.07)";
-        (e.currentTarget as HTMLElement).style.background = "#fafaf9";
+        (e.currentTarget as HTMLElement).style.borderColor = "rgba(201,168,76,0.1)";
+        (e.currentTarget as HTMLElement).style.background = "rgba(255,252,248,1)";
         (e.currentTarget as HTMLElement).style.transform = "";
         (e.currentTarget as HTMLElement).style.boxShadow = "";
       }}
     >
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl flex-shrink-0 mt-0.5"
-        style={{ background: `${accent}15` }}>
+      <div
+        className="flex h-9 w-9 items-center justify-center rounded-xl flex-shrink-0 mt-0.5"
+        style={{ background: `${accent}12`, border: `1px solid ${accent}20` }}
+      >
         <i className={item.icon} style={{ color: accent, fontSize: "14px" }} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-stone-800 text-sm leading-snug">{item.label}</span>
+          <span className="font-semibold text-sm leading-snug" style={{ color: "#0a1628" }}>{item.label}</span>
           {item.badge && (
-            <span className="px-1.5 py-0.5 text-[10px] bg-rose-100 text-rose-600 rounded-md font-bold">{item.badge}</span>
+            <span className="px-1.5 py-0.5 text-[10px] rounded-md font-bold" style={{ background: "rgba(239,68,68,0.1)", color: "#dc2626" }}>{item.badge}</span>
           )}
         </div>
-        <p className="text-xs text-stone-400 mt-0.5 leading-relaxed line-clamp-2">{item.desc}</p>
+        <p className="text-xs mt-0.5 leading-relaxed line-clamp-2" style={{ color: "#78716c" }}>{item.desc}</p>
       </div>
-      <i className="fas fa-chevron-right text-[10px] text-stone-300 mt-1 group-hover:translate-x-0.5 transition-transform" />
+      <i className="fas fa-chevron-right text-[10px] mt-1 group-hover:translate-x-0.5 transition-transform" style={{ color: "rgba(201,168,76,0.35)" }} />
     </a>
   );
 }
@@ -123,8 +133,8 @@ function NavCard({ item, accent }: { item: NavItem; accent: string }) {
 function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="mb-5">
-      <h2 className="text-base font-bold text-stone-800">{title}</h2>
-      {subtitle && <p className="text-xs text-stone-400 mt-0.5">{subtitle}</p>}
+      <h2 className="text-base font-bold" style={{ color: "#0a1628" }}>{title}</h2>
+      {subtitle && <p className="text-xs mt-0.5" style={{ color: "#78716c" }}>{subtitle}</p>}
     </div>
   );
 }
@@ -132,9 +142,10 @@ function SectionTitle({ title, subtitle }: { title: string; subtitle?: string })
 function GroupSection({ title, subtitle, items, accent }: { title: string; subtitle?: string; items: NavItem[]; accent: string }) {
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
-        <h3 className="text-sm font-bold text-stone-700">{title}</h3>
-        {subtitle && <span className="text-xs text-stone-400">{subtitle}</span>}
+      <div className="flex items-center gap-2 mb-3" style={{ borderBottom: "1px solid rgba(201,168,76,0.1)", paddingBottom: "8px" }}>
+        <span className="w-1 h-4 rounded-full flex-shrink-0" style={{ background: accent }} />
+        <h3 className="text-sm font-bold" style={{ color: "#0a1628" }}>{title}</h3>
+        {subtitle && <span className="text-xs" style={{ color: "#78716c" }}>{subtitle}</span>}
       </div>
       <div className="grid gap-2.5 md:grid-cols-2 lg:grid-cols-4">
         {items.map(item => <NavCard key={item.href} item={item} accent={accent} />)}

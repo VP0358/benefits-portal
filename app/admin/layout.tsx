@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import AdminNav from "./ui/admin-nav";
+import ViolaLogo from "@/app/components/viola-logo";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const hdrs = await headers();
@@ -26,17 +27,35 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (role !== "admin") redirect("/admin/login");
 
   return (
-    <div className="flex min-h-screen" style={{ background: "var(--admin-bg, #f7f6f4)" }}>
+    <div
+      className="flex min-h-screen"
+      style={{ background: "#eee8e0", fontFamily: "var(--font-noto), 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', sans-serif" }}
+    >
       <AdminNav />
       <div className="flex-1 min-w-0 overflow-auto">
         {/* トップバー */}
-        <div className="sticky top-0 z-10 h-14 flex items-center px-6 border-b border-stone-200/80 bg-white/80 backdrop-blur-sm">
+        <div
+          className="sticky top-0 z-10 h-14 flex items-center px-6 backdrop-blur-md"
+          style={{
+            background: "rgba(10,22,40,0.92)",
+            borderBottom: "1px solid rgba(201,168,76,0.20)",
+            boxShadow: "0 2px 12px rgba(10,22,40,0.25)",
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <ViolaLogo size="sm" />
+          </div>
           <div className="flex-1" />
-          <div className="flex items-center gap-2 text-xs text-stone-400 font-medium tracking-wide">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
-            VIOLA Pure 管理システム
+          <div className="flex items-center gap-2 text-xs font-semibold tracking-widest uppercase"
+            style={{ color: "#c9a84c", fontFamily: "var(--font-josefin), 'Arial Narrow', sans-serif" }}>
+            <span
+              className="w-1.5 h-1.5 rounded-full inline-block"
+              style={{ background: "linear-gradient(135deg, #c9a84c, #e8c96a)", boxShadow: "0 0 6px rgba(201,168,76,0.6)" }}
+            />
+            Admin Portal
           </div>
         </div>
+        {/* メインコンテンツ */}
         <div className="p-6 md:p-8 max-w-screen-2xl mx-auto">
           {children}
         </div>

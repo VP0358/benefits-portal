@@ -917,7 +917,8 @@ export default function MlmOrganizationPage() {
             {/* ズーム・パンエリア */}
             <div
               ref={treeScrollRef}
-              className="rounded-2xl border border-slate-100 bg-gradient-to-b from-slate-50 to-white select-none"
+              className="rounded-2xl select-none"
+              style={{ border: "1px solid rgba(201,168,76,0.15)", background: "linear-gradient(180deg, rgba(10,22,40,0.03) 0%, #fff 100%)" }}
               style={{
                 height: "70vh",
                 overflow: "hidden",
@@ -970,7 +971,7 @@ export default function MlmOrganizationPage() {
             <div className="mb-2 text-sm font-bold text-slate-700">
               📋 一覧（{listData.length}件 / 全 {totalCount ?? listData.length}件）
             </div>
-            <div className="overflow-x-auto rounded-2xl border border-slate-100">
+            <div className="overflow-x-auto rounded-2xl" style={{ border: "1px solid rgba(201,168,76,0.12)" }}>
               <table className="w-full text-sm min-w-[480px]">
                 <thead>
                   <tr className="bg-slate-800 text-white">
