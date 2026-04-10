@@ -177,6 +177,13 @@ export default function ProductsManagementPage() {
   // ポイント表示（税抜価格から 1pt = ¥100）
   const calculatePoints = (price: number) => Math.floor(price / 100);
 
+  // ポイント付与対象判定（商品コードが数字のみ && 1000〜2999の範囲）
+  const isPointGrantTarget = (productCode: string): boolean => {
+    const codeNum = parseInt(productCode, 10)
+    if (isNaN(codeNum)) return false
+    return codeNum >= 1000 && codeNum <= 2999
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ヘッダー */}
@@ -225,7 +232,8 @@ export default function ProductsManagementPage() {
                     <th className="text-right p-3 font-semibold text-gray-700">税抜価格</th>
                     <th className="text-right p-3 font-semibold text-gray-700">消費税（10%）</th>
                     <th className="text-right p-3 font-semibold text-gray-700">税込価格</th>
-                    <th className="text-right p-3 font-semibold text-gray-700">ポイント</th>
+                    <th className="text-center p-3 font-semibold text-gray-700">ポイント付与</th>
+                    <th className="text-right p-3 font-semibold text-gray-700">ポイント数</th>
                     <th className="text-right p-3 font-semibold text-gray-700">原価</th>
                     <th className="text-right p-3 font-semibold text-gray-700">PV</th>
                     <th className="text-left p-3 font-semibold text-gray-700">ステータス</th>
@@ -261,9 +269,17 @@ export default function ProductsManagementPage() {
                         <td className="p-3 text-right text-gray-700 font-semibold">
                           ¥{taxIncludedPrice(p.price).toLocaleString()}
                         </td>
-                        {/* ポイント（税抜から計算） */}
+                        {/* ポイント付与対象 */}
+                        <td className="p-3 text-center">
+                          {isPointGrantTarget(p.product_code) ? (
+                            <span className="inline-block px-2 py-1 text-xs font-semibold rounded bg-green-100 text-green-700">✓ 対象</span>
+                          ) : (
+                            <span className="inline-block px-2 py-1 text-xs font-semibold rounded bg-gray-100 text-gray-500">対象外</span>
+                          )}
+                        </td>
+                        {/* ポイント数（対象のみ表示） */}
                         <td className="p-3 text-right font-semibold text-green-600">
-                          {calculatePoints(p.price)} pt
+                          {isPointGrantTarget(p.product_code) ? `${calculatePoints(p.price)} pt` : <span className="text-gray-400 text-xs">-</span>}
                         </td>
                         <td className="p-3 text-right text-gray-600">
                           {p.cost ? `¥${p.cost.toLocaleString()}` : "-"}
@@ -349,6 +365,13 @@ export default function ProductsManagementPage() {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="例: 1000, 2000, s1000"
                 />
+                {formData.product_code && (
+                  <div className={`mt-1 text-xs font-medium ${isPointGrantTarget(formData.product_code) ? "text-green-600" : "text-gray-500"}`}>
+                    {isPointGrantTarget(formData.product_code)
+                      ? "✓ ポイント付与対象（商品コード 1000〜2999）"
+                      : "✗ ポイント付与対象外（コードが 1000〜2999 の範囲外）"}
+                  </div>
+                )}
               </div>
 
               {/* 商品名 */}
@@ -402,10 +425,17 @@ export default function ProductsManagementPage() {
                       <span>税込価格</span>
                       <span>¥{taxIncludedPrice(parseFloat(formData.price) || 0).toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between text-green-700 font-semibold border-t border-gray-200 pt-1">
-                      <span>ポイント（税抜から計算）</span>
-                      <span>{calculatePoints(parseFloat(formData.price) || 0)} pt</span>
-                    </div>
+                    {isPointGrantTarget(formData.product_code) ? (
+                      <div className="flex justify-between text-green-700 font-semibold border-t border-gray-200 pt-1">
+                        <span>ポイント付与数（税抜から計算）</span>
+                        <span>{calculatePoints(parseFloat(formData.price) || 0)} pt</span>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between text-gray-400 border-t border-gray-200 pt-1">
+                        <span>ポイント付与</span>
+                        <span>対象外</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

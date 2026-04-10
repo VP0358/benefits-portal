@@ -152,13 +152,13 @@ export default function AdminOrderDetail({ orderId }: { orderId: string }) {
       <div className="space-y-2">
         <label className="block text-sm font-medium">納品書PDF</label>
         <a
-          href={`/api/admin/pdf/invoice?orderId=${orderId}`}
+          href={`/admin/print/invoice?orderId=${orderId}`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 rounded-xl bg-blue-50 border border-blue-500 px-5 py-3 text-sm font-medium text-blue-700 hover:bg-blue-100 transition"
         >
           <i className="fas fa-file-pdf"></i>
-          納品書をダウンロード
+          納品書を印刷
         </a>
       </div>
     </div>

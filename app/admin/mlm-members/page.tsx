@@ -562,12 +562,12 @@ export default function MlmMembersPage() {
                         編集
                       </button>
                       <a
-                        href={`/api/admin/pdf/registration-complete?memberId=${m.id}`}
+                        href={`/admin/print/registration-complete?memberId=${m.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="rounded-lg bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-200 transition"
                       >
-                        PDF
+                        登録完了通知書
                       </a>
                     </div>
                   </td>

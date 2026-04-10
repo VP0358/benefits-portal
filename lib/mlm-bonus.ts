@@ -110,6 +110,21 @@ export function isActiveMember(params: {
 }
 
 /**
+ * 商品コードがポイント付与対象かどうかを判定する
+ * ポイント付与対象: 商品コードが数字のみで構成され、1000〜2999の範囲
+ * ポイント付与対象外: s1000（登録料）等、範囲外のコード
+ *
+ * @param productCode 商品コード（例: "1000", "2000", "s1000"）
+ * @returns ポイント付与対象の場合 true
+ */
+export function isPointGrantTarget(productCode: string): boolean {
+  const codeNum = parseInt(productCode, 10)
+  // 数字のみ && 1000〜2999の範囲
+  if (isNaN(codeNum)) return false
+  return codeNum >= 1000 && codeNum <= 2999
+}
+
+/**
  * ユニレベルボーナス算出率を取得（段数ごと）
  * 2026年3月4日版: レベル別に獲得段数が異なる
  * 直接紹介2人以上が購入していることが条件

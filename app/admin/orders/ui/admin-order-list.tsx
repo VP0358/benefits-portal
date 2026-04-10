@@ -47,13 +47,13 @@ export default function AdminOrderList() {
           <div className="mt-4 flex justify-end gap-2">
             <Link href={`/admin/orders/${row.id}`} className="rounded-xl border px-4 py-2 text-sm font-medium text-slate-800">詳細 / 状態変更</Link>
             <a
-              href={`/api/admin/pdf/invoice?orderId=${row.id}`}
+              href={`/admin/print/invoice?orderId=${row.id}`}
               target="_blank"
               rel="noopener noreferrer"
               className="rounded-xl border border-blue-500 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 transition"
             >
               <i className="fas fa-file-pdf mr-1"></i>
-              納品書PDF
+              納品書
             </a>
           </div>
         </div>
