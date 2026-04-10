@@ -3,47 +3,10 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 import { NextRequest, NextResponse } from "next/server";
-
-
 import { auth } from "@/auth";
 import { prisma } from '@/lib/prisma';
 
 type OrgType = "matrix" | "unilevel";
-
-// MLMポイント情報を取得する関数（mlmPurchaseテーブルから取得）
-async function getMlmPoints(mlmMemberId: bigint) {
-  try {
-    const now = new Date()
-    // 先月の月コード
-    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    const lastMonth = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`
-    // 今月の月コード
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-
-    // 先月・今月のMLM購入ポイントを集計
-    const [lastMonthAgg, currentMonthAgg] = await Promise.all([
-      prisma.mlmPurchase.aggregate({
-        where: { mlmMemberId, purchaseMonth: lastMonth },
-        _sum: { totalPoints: true },
-      }),
-      prisma.mlmPurchase.aggregate({
-        where: { mlmMemberId, purchaseMonth: currentMonth },
-        _sum: { totalPoints: true },
-      }),
-    ])
-
-    return {
-      lastMonthPoints: lastMonthAgg._sum.totalPoints ?? 0,
-      currentMonthPoints: currentMonthAgg._sum.totalPoints ?? 0,
-    }
-  } catch (error) {
-    console.error('ポイント取得エラー:', error)
-    return {
-      lastMonthPoints: 0,
-      currentMonthPoints: 0
-    }
-  }
-}
 
 // 組織図データ取得
 export async function GET(req: NextRequest) {
@@ -60,69 +23,24 @@ export async function GET(req: NextRequest) {
     const phone = searchParams.get("phone");
     const type = (searchParams.get("type") as OrgType) || "matrix";
 
-    // 検索条件の構築
-    let targetMember;
-    
-    if (memberCode) {
-      targetMember = await prisma.mlmMember.findUnique({
-        where: { memberCode },
-        include: {
-          user: { select: { name: true } },
-        },
-      });
-    } else if (name) {
-      // 氏名で検索（部分一致）
-      const users = await prisma.user.findMany({
-        where: { name: { contains: name } },
-        take: 1,
-      });
-      if (users.length > 0) {
-        targetMember = await prisma.mlmMember.findUnique({
-          where: { userId: users[0].id },
-          include: {
+    // ★ 検索条件なし → 全会員フラットリストを返す（タイムアウト防止）
+    if (!memberCode && !name && !email && !phone) {
+      const [allMembers, totalCount] = await Promise.all([
+        prisma.mlmMember.findMany({
+          select: {
+            id: true,
+            memberCode: true,
+            currentLevel: true,
+            status: true,
+            uplineId: true,
+            referrerId: true,
             user: { select: { name: true } },
           },
-        });
-      }
-    } else if (email) {
-      // メールアドレスで検索
-      const user = await prisma.user.findUnique({
-        where: { email },
-      });
-      if (user) {
-        targetMember = await prisma.mlmMember.findUnique({
-          where: { userId: user.id },
-          include: {
-            user: { select: { name: true } },
-          },
-        });
-      }
-    } else if (phone) {
-      // 電話番号で検索（mobile or phone）
-      const user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { phone: { contains: phone } },
-          ],
-        },
-      });
-      if (user) {
-        targetMember = await prisma.mlmMember.findUnique({
-          where: { userId: user.id },
-          include: {
-            user: { select: { name: true } },
-          },
-        });
-      }
-    } else {
-      // ★ 検索条件なし → 全会員フラットリストを返す（再帰ツリーはタイムアウトするため使わない）
-      const allMembers = await prisma.mlmMember.findMany({
-        include: {
-          user: { select: { name: true } },
-        },
-        orderBy: { memberCode: "asc" },
-        take: 500, // 上限500件
-      });
+          orderBy: { memberCode: "asc" },
+          take: 500,
+        }),
+        prisma.mlmMember.count(),
+      ]);
 
       const list = allMembers.map(m => ({
         id: m.id.toString(),
@@ -140,9 +58,53 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         root: null,
         list,
-        totalCount: await prisma.mlmMember.count(),
-        message: "全体表示は会員コードを入力して検索してください",
+        totalCount,
+        message: "会員コードを入力すると個別ツリーを表示できます",
       }, { status: 200 });
+    }
+
+    // 検索条件で対象会員を特定
+    let targetMember: { id: bigint; memberCode: string; user: { name: string } } | null = null;
+
+    if (memberCode) {
+      targetMember = await prisma.mlmMember.findUnique({
+        where: { memberCode },
+        select: { id: true, memberCode: true, user: { select: { name: true } } },
+      });
+    } else if (name) {
+      const users = await prisma.user.findMany({
+        where: { name: { contains: name } },
+        select: { id: true },
+        take: 1,
+      });
+      if (users.length > 0) {
+        targetMember = await prisma.mlmMember.findUnique({
+          where: { userId: users[0].id },
+          select: { id: true, memberCode: true, user: { select: { name: true } } },
+        });
+      }
+    } else if (email) {
+      const user = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true },
+      });
+      if (user) {
+        targetMember = await prisma.mlmMember.findUnique({
+          where: { userId: user.id },
+          select: { id: true, memberCode: true, user: { select: { name: true } } },
+        });
+      }
+    } else if (phone) {
+      const user = await prisma.user.findFirst({
+        where: { OR: [{ phone: { contains: phone } }] },
+        select: { id: true },
+      });
+      if (user) {
+        targetMember = await prisma.mlmMember.findUnique({
+          where: { userId: user.id },
+          select: { id: true, memberCode: true, user: { select: { name: true } } },
+        });
+      }
     }
 
     if (!targetMember) {
@@ -152,16 +114,20 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // ★ 一括取得でツリー構築（N+1クエリを廃止）
     if (type === "matrix") {
-      // マトリックス組織図（直下のみ）
-      const root = await buildMatrixTree(targetMember.id, 0);
-      const list = await getMatrixList(targetMember.id);
-      return NextResponse.json({ root, list }, { status: 200 });
+      // マトリックス: uplineId を辿る
+      // 対象会員のダウンラインをすべて一括取得（再帰CTEの代わりに全取得してメモリ上でツリー構築）
+      const allDescendants = await fetchAllMatrixDescendants(targetMember.id);
+      const rootNode = buildTreeFromFlatList(targetMember.id, allDescendants, "matrix");
+      const list = flattenTree(rootNode);
+      return NextResponse.json({ root: rootNode, list }, { status: 200 });
     } else {
-      // ユニレベル組織図（紹介ライン）
-      const root = await buildUnilevelTree(targetMember.id, 0);
-      const list = await getUnilevelList(targetMember.id);
-      return NextResponse.json({ root, list }, { status: 200 });
+      // ユニレベル: referrerId を辿る
+      const allDescendants = await fetchAllUnilevelDescendants(targetMember.id);
+      const rootNode = buildTreeFromFlatList(targetMember.id, allDescendants, "unilevel");
+      const list = flattenTree(rootNode);
+      return NextResponse.json({ root: rootNode, list }, { status: 200 });
     }
   } catch (error) {
     console.error("Error fetching organization tree:", error);
@@ -172,212 +138,141 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// マトリックスツリー構築（再帰）
-async function buildMatrixTree(memberId: bigint, currentDepth: number, maxDepth = 5) {
-  if (currentDepth > maxDepth) {
-    return null;
-  }
-
-  const member = await prisma.mlmMember.findUnique({
-    where: { id: memberId },
-    include: {
-      user: {
-        select: {
-          name: true,
-        },
-      },
-      downlines: {
-        select: {
-          id: true,
-          memberCode: true,
-          status: true,
-          currentLevel: true,
-          user: {
-            select: {
-              name: true,
-            },
-          },
-        },
-        orderBy: {
-          matrixPosition: "asc",
-        },
-      },
+// ─── マトリックスの全ダウンラインを一括取得 ───
+async function fetchAllMatrixDescendants(rootId: bigint) {
+  // rootId以下のメンバーを全部取得してメモリ上でツリー構築
+  // まずrootを含む全メンバーを取得
+  const allMembers = await prisma.mlmMember.findMany({
+    select: {
+      id: true,
+      memberCode: true,
+      currentLevel: true,
+      status: true,
+      uplineId: true,
+      matrixPosition: true,
+      user: { select: { name: true } },
     },
+    orderBy: { matrixPosition: "asc" },
   });
 
-  if (!member) {
-    return null;
-  }
+  // rootId配下に存在するメンバーだけをフィルタ（BFS）
+  const idSet = new Set<string>();
+  idSet.add(rootId.toString());
 
-  const children = await Promise.all(
-    member.downlines.map((child) =>
-      buildMatrixTree(child.id, currentDepth + 1, maxDepth)
-    )
-  );
-
-  // ポイント情報を取得（mlmMember.idで集計）
-  const points = await getMlmPoints(member.id);
-
-  return {
-    id: member.id.toString(),
-    memberCode: member.memberCode,
-    name: member.user.name,
-    level: member.currentLevel,
-    status: member.status,
-    directDownlines: children.filter(Boolean),
-    lastMonthPoints: points.lastMonthPoints,
-    currentMonthPoints: points.currentMonthPoints,
-  };
-}
-
-// ユニレベルツリー構築（再帰）
-async function buildUnilevelTree(memberId: bigint, currentDepth: number, maxDepth = 5) {
-  if (currentDepth > maxDepth) {
-    return null;
-  }
-
-  const member = await prisma.mlmMember.findUnique({
-    where: { id: memberId },
-    include: {
-      user: {
-        select: {
-          name: true,
-        },
-      },
-      referrals: {
-        select: {
-          id: true,
-          memberCode: true,
-          status: true,
-          currentLevel: true,
-          user: {
-            select: {
-              name: true,
-            },
-          },
-        },
-        orderBy: {
-          createdAt: "asc",
-        },
-      },
-    },
-  });
-
-  if (!member) {
-    return null;
-  }
-
-  const children = await Promise.all(
-    member.referrals.map((child) =>
-      buildUnilevelTree(child.id, currentDepth + 1, maxDepth)
-    )
-  );
-
-  // ポイント情報を取得（mlmMember.idで集計）
-  const points = await getMlmPoints(member.id);
-
-  return {
-    id: member.id.toString(),
-    memberCode: member.memberCode,
-    name: member.user.name,
-    level: member.currentLevel,
-    status: member.status,
-    directDownlines: children.filter(Boolean),
-    lastMonthPoints: points.lastMonthPoints,
-    currentMonthPoints: points.currentMonthPoints,
-  };
-}
-
-// マトリックスリスト取得（フラット）
-async function getMatrixList(memberId: bigint) {
-  const visited = new Set<string>();
-  const result: any[] = [];
-
-  async function traverse(id: bigint, depth: number) {
-    const idStr = id.toString();
-    if (visited.has(idStr) || depth > 10) {
-      return;
-    }
-    visited.add(idStr);
-
-    const member = await prisma.mlmMember.findUnique({
-      where: { id },
-      include: {
-        user: {
-          select: {
-            name: true,
-          },
-        },
-        downlines: {
-          select: {
-            id: true,
-          },
-        },
-      },
-    });
-
-    if (member) {
-      result.push({
-        id: member.id.toString(),
-        memberCode: member.memberCode,
-        name: member.user.name,
-        level: depth,
-        status: member.status,
-      });
-
-      for (const child of member.downlines) {
-        await traverse(child.id, depth + 1);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const m of allMembers) {
+      if (m.uplineId && idSet.has(m.uplineId.toString()) && !idSet.has(m.id.toString())) {
+        idSet.add(m.id.toString());
+        changed = true;
       }
     }
   }
 
-  await traverse(memberId, 0);
-  return result;
+  return allMembers.filter(m => idSet.has(m.id.toString())).map(m => ({
+    id: m.id.toString(),
+    memberCode: m.memberCode,
+    name: m.user.name,
+    level: m.currentLevel,
+    status: m.status,
+    parentId: m.uplineId?.toString() ?? null,
+    position: m.matrixPosition,
+    lastMonthPoints: 0,
+    currentMonthPoints: 0,
+  }));
 }
 
-// ユニレベルリスト取得（フラット）
-async function getUnilevelList(memberId: bigint) {
-  const visited = new Set<string>();
-  const result: any[] = [];
+// ─── ユニレベルの全ダウンラインを一括取得 ───
+async function fetchAllUnilevelDescendants(rootId: bigint) {
+  const allMembers = await prisma.mlmMember.findMany({
+    select: {
+      id: true,
+      memberCode: true,
+      currentLevel: true,
+      status: true,
+      referrerId: true,
+      createdAt: true,
+      user: { select: { name: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
 
-  async function traverse(id: bigint, depth: number) {
-    const idStr = id.toString();
-    if (visited.has(idStr) || depth > 10) {
-      return;
-    }
-    visited.add(idStr);
+  const idSet = new Set<string>();
+  idSet.add(rootId.toString());
 
-    const member = await prisma.mlmMember.findUnique({
-      where: { id },
-      include: {
-        user: {
-          select: {
-            name: true,
-          },
-        },
-        referrals: {
-          select: {
-            id: true,
-          },
-        },
-      },
-    });
-
-    if (member) {
-      result.push({
-        id: member.id.toString(),
-        memberCode: member.memberCode,
-        name: member.user.name,
-        level: depth,
-        status: member.status,
-      });
-
-      for (const child of member.referrals) {
-        await traverse(child.id, depth + 1);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const m of allMembers) {
+      if (m.referrerId && idSet.has(m.referrerId.toString()) && !idSet.has(m.id.toString())) {
+        idSet.add(m.id.toString());
+        changed = true;
       }
     }
   }
 
-  await traverse(memberId, 0);
+  return allMembers.filter(m => idSet.has(m.id.toString())).map(m => ({
+    id: m.id.toString(),
+    memberCode: m.memberCode,
+    name: m.user.name,
+    level: m.currentLevel,
+    status: m.status,
+    parentId: m.referrerId?.toString() ?? null,
+    position: 0,
+    lastMonthPoints: 0,
+    currentMonthPoints: 0,
+  }));
+}
+
+// ─── フラットリストからツリーノードを構築 ───
+type FlatMember = {
+  id: string;
+  memberCode: string;
+  name: string;
+  level: number;
+  status: string;
+  parentId: string | null;
+  position: number;
+  lastMonthPoints: number;
+  currentMonthPoints: number;
+};
+
+type TreeNode = FlatMember & { directDownlines: TreeNode[] };
+
+function buildTreeFromFlatList(rootId: bigint, members: FlatMember[], _type: OrgType): TreeNode {
+  const map = new Map<string, TreeNode>();
+  const rootIdStr = rootId.toString();
+
+  for (const m of members) {
+    map.set(m.id, { ...m, directDownlines: [] });
+  }
+
+  let root: TreeNode | undefined;
+  for (const [id, node] of map) {
+    if (id === rootIdStr) {
+      root = node;
+      continue;
+    }
+    if (node.parentId && map.has(node.parentId)) {
+      const parent = map.get(node.parentId)!;
+      parent.directDownlines.push(node);
+    }
+  }
+
+  // 子ノードをpositionでソート
+  for (const node of map.values()) {
+    node.directDownlines.sort((a, b) => a.position - b.position);
+  }
+
+  return root ?? { id: rootIdStr, memberCode: "", name: "不明", level: 0, status: "unknown", parentId: null, position: 0, lastMonthPoints: 0, currentMonthPoints: 0, directDownlines: [] };
+}
+
+// ─── ツリーをフラットなリストに変換 ───
+function flattenTree(node: TreeNode, depth = 0): FlatMember[] {
+  const result: FlatMember[] = [{ ...node, level: depth }];
+  for (const child of node.directDownlines) {
+    result.push(...flattenTree(child, depth + 1));
+  }
   return result;
 }
