@@ -75,6 +75,11 @@ export async function POST(request: Request) {
       });
     }
 
+    // ポイントウォレットを自動作成
+    await tx.pointWallet.create({
+      data: { userId: newUser.id },
+    });
+
     return newUser;
   });
 

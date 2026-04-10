@@ -10,56 +10,31 @@ import prisma from "@/lib/prisma";
 
 type OrgType = "matrix" | "unilevel";
 
-// MLMポイント情報を取得する関数
-async function getMlmPoints(userId: bigint) {
+// MLMポイント情報を取得する関数（mlmPurchaseテーブルから取得）
+async function getMlmPoints(mlmMemberId: bigint) {
   try {
-    // 先月の範囲を計算
     const now = new Date()
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
+    // 先月の月コード
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const lastMonth = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`
+    // 今月の月コード
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
-    // 今月の範囲を計算（昨日まで）
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    const yesterday = new Date(now)
-    yesterday.setDate(yesterday.getDate() - 1)
-    const currentMonthEnd = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59, 999)
+    // 先月・今月のMLM購入ポイントを集計
+    const [lastMonthAgg, currentMonthAgg] = await Promise.all([
+      prisma.mlmPurchase.aggregate({
+        where: { mlmMemberId, purchaseMonth: lastMonth },
+        _sum: { totalPoints: true },
+      }),
+      prisma.mlmPurchase.aggregate({
+        where: { mlmMemberId, purchaseMonth: currentMonth },
+        _sum: { totalPoints: true },
+      }),
+    ])
 
-    // 先月の購入データ取得
-    const lastMonthOrders = await prisma.order.findMany({
-      where: {
-        userId,
-        orderedAt: {
-          gte: lastMonthStart,
-          lte: lastMonthEnd
-        }
-      }
-    })
-
-    // 今月の購入データ取得（昨日まで）
-    const currentMonthOrders = await prisma.order.findMany({
-      where: {
-        userId,
-        orderedAt: {
-          gte: currentMonthStart,
-          lte: currentMonthEnd
-        }
-      }
-    })
-
-    // 先月の購入金額集計
-    const lastMonthPurchaseAmount = lastMonthOrders.reduce((sum, order) => {
-      return sum + order.totalAmount
-    }, 0)
-
-    // 今月の購入金額集計（昨日まで）
-    const currentMonthPurchaseAmount = currentMonthOrders.reduce((sum, order) => {
-      return sum + order.totalAmount
-    }, 0)
-
-    // ポイント計算（1pt = 100円）
     return {
-      lastMonthPoints: Math.floor(lastMonthPurchaseAmount / 100),
-      currentMonthPoints: Math.floor(currentMonthPurchaseAmount / 100)
+      lastMonthPoints: lastMonthAgg._sum.totalPoints ?? 0,
+      currentMonthPoints: currentMonthAgg._sum.totalPoints ?? 0,
     }
   } catch (error) {
     console.error('ポイント取得エラー:', error)
@@ -241,8 +216,8 @@ async function buildMatrixTree(memberId: bigint, currentDepth: number, maxDepth 
     )
   );
 
-  // ポイント情報を取得
-  const points = await getMlmPoints(member.userId);
+  // ポイント情報を取得（mlmMember.idで集計）
+  const points = await getMlmPoints(member.id);
 
   return {
     id: member.id.toString(),
@@ -299,8 +274,8 @@ async function buildUnilevelTree(memberId: bigint, currentDepth: number, maxDept
     )
   );
 
-  // ポイント情報を取得
-  const points = await getMlmPoints(member.userId);
+  // ポイント情報を取得（mlmMember.idで集計）
+  const points = await getMlmPoints(member.id);
 
   return {
     id: member.id.toString(),

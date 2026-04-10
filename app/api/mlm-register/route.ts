@@ -150,6 +150,14 @@ export async function POST(request: Request) {
         },
       });
 
+      // 5. ポイントウォレットを自動作成（未作成の場合のみ）
+      const existingWallet = await tx.pointWallet.findUnique({ where: { userId: newUser.id } });
+      if (!existingWallet) {
+        await tx.pointWallet.create({
+          data: { userId: newUser.id },
+        });
+      }
+
       return newUser;
     });
 

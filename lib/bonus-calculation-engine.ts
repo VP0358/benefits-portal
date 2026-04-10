@@ -206,7 +206,7 @@ export async function executeBonusCalculation(
       totalCommission * (savingsConfig.bonusRate / 100)
     );
 
-    // 合計ボーナス
+    // 合計ボーナス（貯金ボーナスは支払額には含めず別途積み立て）
     const totalBonus = directBonus + unilevelResult.total + structureBonus;
 
     // 支払調整

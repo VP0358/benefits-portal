@@ -44,58 +44,44 @@ export async function GET() {
       })
     }
 
-    // 先月の範囲を計算
+    // 先月・今月の月文字列を計算
     const now = new Date()
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const lastMonthStr = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`
+    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
-    // 今月の範囲を計算（昨日まで）
-    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    const yesterday = new Date(now)
-    yesterday.setDate(yesterday.getDate() - 1)
-    const currentMonthEnd = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59, 999)
-
-    // 先月の購入データ取得
-    const lastMonthOrders = await prisma.order.findMany({
+    // 先月のmlmPurchaseポイント集計
+    const lastMonthAgg = await prisma.mlmPurchase.aggregate({
       where: {
-        userId: user.id,
-        orderedAt: {
-          gte: lastMonthStart,
-          lte: lastMonthEnd
-        }
+        mlmMemberId: user.mlmMember.id,
+        purchaseMonth: lastMonthStr
       },
-      include: {
-        items: true
+      _sum: {
+        totalPoints: true,
+        unitPrice: true,
+        quantity: true
       }
     })
 
-    // 今月の購入データ取得（昨日まで）
-    const currentMonthOrders = await prisma.order.findMany({
+    // 今月のmlmPurchaseポイント集計
+    const currentMonthAgg = await prisma.mlmPurchase.aggregate({
       where: {
-        userId: user.id,
-        orderedAt: {
-          gte: currentMonthStart,
-          lte: currentMonthEnd
-        }
+        mlmMemberId: user.mlmMember.id,
+        purchaseMonth: currentMonthStr
       },
-      include: {
-        items: true
+      _sum: {
+        totalPoints: true,
+        unitPrice: true,
+        quantity: true
       }
     })
 
-    // 先月の購入金額集計
-    const lastMonthPurchaseAmount = lastMonthOrders.reduce((sum, order) => {
-      return sum + order.totalAmount
-    }, 0)
+    const lastMonthPoints = lastMonthAgg._sum.totalPoints ?? 0
+    const currentMonthPoints = currentMonthAgg._sum.totalPoints ?? 0
 
-    // 今月の購入金額集計（昨日まで）
-    const currentMonthPurchaseAmount = currentMonthOrders.reduce((sum, order) => {
-      return sum + order.totalAmount
-    }, 0)
-
-    // ポイント計算（1pt = 100円）
-    const lastMonthPoints = Math.floor(lastMonthPurchaseAmount / 100)
-    const currentMonthPoints = Math.floor(currentMonthPurchaseAmount / 100)
+    // 購入金額（unitPrice × quantity の合計）
+    const lastMonthPurchaseAmount = (lastMonthAgg._sum.unitPrice ?? 0) * (lastMonthAgg._sum.quantity ?? 1)
+    const currentMonthPurchaseAmount = (currentMonthAgg._sum.unitPrice ?? 0) * (currentMonthAgg._sum.quantity ?? 1)
 
     return NextResponse.json({
       lastMonthPoints,

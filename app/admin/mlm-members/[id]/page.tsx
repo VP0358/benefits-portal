@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { LEVEL_LABELS, MEMBER_TYPE_LABELS } from "@/lib/mlm-bonus";
 import OrganizationChart from "./ui/organization-chart";
+import PurchasePanel from "./ui/purchase-panel";
 
 export default async function MlmMemberDetailPage({
   params,
@@ -495,11 +496,14 @@ export default async function MlmMemberDetailPage({
         )}
       </section>
 
+      {/* MLM購入データ（ポイント計算用） */}
+      <PurchasePanel memberCode={mlmMember.memberCode} />
+
       {/* 組織図 */}
       <section className="bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
           <i className="fas fa-sitemap mr-2"></i>
-          組織図（ユニレベル）
+          組織図（マトリックス）
         </h2>
         <OrganizationChart memberCode={mlmMember.memberCode} />
       </section>

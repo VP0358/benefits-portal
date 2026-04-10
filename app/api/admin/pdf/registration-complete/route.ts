@@ -27,11 +27,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "memberId is required" }, { status: 400 });
     }
 
-    // MLM会員情報を取得
+    // MLM会員情報を取得（MlmRegistrationも含む）
     const mlmMember = await prisma.mlmMember.findUnique({
       where: { id: BigInt(memberId) },
       include: {
-        user: true,
+        user: {
+          include: {
+            mlmRegistration: true
+          }
+        },
         referrer: {
           include: {
             user: true
@@ -52,6 +56,7 @@ export async function GET(req: NextRequest) {
     });
 
     const user = mlmMember.user;
+    const reg = user.mlmRegistration;
     const memberCode = mlmMember.memberCode;
     const contractDate = mlmMember.contractDate ? new Date(mlmMember.contractDate).toLocaleDateString('ja-JP') : "-";
     const referrerName = mlmMember.referrer?.user?.name || "-";
@@ -109,20 +114,32 @@ export async function GET(req: NextRequest) {
     addField("会員ID", memberCode);
     addField("氏名", `${user.name || ""} 様`);
     addField("登録住所", `〒${user.postalCode || ""} ${user.address || ""}`);
-    addField("配送先住所", `〒${user.postalCode || ""} ${user.address || ""}`);
-    addField("連絡先", `TEL ${user.phone || ""}　　　FAX ${user.fax || ""}`);
     
-    const birthDate = user.birthDate ? new Date(user.birthDate).toLocaleDateString('ja-JP') : "-";
+    // 配送先（MlmRegistrationから）
+    const deliveryAddr = reg?.deliveryPostalCode
+      ? `〒${reg.deliveryPostalCode} ${reg.deliveryAddress || ""}`
+      : `〒${user.postalCode || ""} ${user.address || ""}`;
+    addField("配送先住所", deliveryAddr);
+    
+    // 電話番号（mlmMemberのmobileを優先）
+    const phone = mlmMember.mobile || user.phone || "";
+    addField("連絡先", `TEL ${phone}`);
+    
+    // 生年月日（MlmMemberから）
+    const birthDate = mlmMember.birthDate
+      ? new Date(mlmMember.birthDate).toLocaleDateString('ja-JP')
+      : "-";
     addField("生年月日", birthDate);
     addField("メールアドレス", user.email || "");
-    addField("携帯Eメール", user.mobileEmail || "");
     addField("契約締結日", contractDate);
     addField("紹介者情報", `${referrerCode} ${referrerName} 様`);
 
-    // 口座情報（ダミーデータ - 実際にはDBから取得）
-    const bankInfo = user.bankName && user.bankBranch && user.bankAccountNumber
-      ? `${user.bankName}　${user.bankBranch}　${user.bankAccountType}　${user.bankAccountNumber}　${user.bankAccountHolder || ""}`
-      : "未登録";
+    // 口座情報（MlmMemberから取得）
+    const bankInfo = mlmMember.bankName && mlmMember.bankAccountNumber
+      ? `${mlmMember.bankName}　${mlmMember.branchName || ""}　${mlmMember.accountType || "普通"}　${mlmMember.accountNumber || mlmMember.bankAccountNumber}　${mlmMember.accountHolder || ""}`
+      : (reg?.bankName && reg?.bankAccountNumber
+        ? `${reg.bankName}　${reg.bankBranch || ""}　${reg.bankAccountType || "普通"}　${reg.bankAccountNumber}　${reg.bankAccountHolder || ""}`
+        : "未登録");
     addField("口座情報", bankInfo);
 
     // マイページ情報
@@ -132,7 +149,6 @@ export async function GET(req: NextRequest) {
     doc.setFont("helvetica", "normal");
     doc.text("https://viola-pure.jp/", 25, y + 5);
     doc.text(`ログインID：${memberCode.replace(/-/g, "")}`, 25, y + 10);
-    // パスワードは生成ロジックが必要（仮で***表示）
     doc.text(`パスワード：**********`, 25, y + 15);
 
     // フッター（会社情報）

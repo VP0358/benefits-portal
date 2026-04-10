@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
     });
 
     const user = order.user;
-    const memberCode = user.mlmMember?.[0]?.memberCode || "-";
+    const memberCode = user.mlmMember?.memberCode || user.memberCode || "-";
     const orderDate = new Date(order.createdAt).toLocaleDateString('ja-JP');
     const orderMonth = new Date(order.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' });
 

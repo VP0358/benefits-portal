@@ -33,62 +33,43 @@ export async function GET() {
     let mlmLastMonthPoints = 0;
     let mlmCurrentMonthPoints = 0;
 
-    // MLMポイント計算（1pt = 100円）
+    // MLMポイント計算（mlmPurchaseテーブルから取得）
     if (mlmMember) {
       const now = new Date();
-      
-      // 先月の範囲
-      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-      
-      // 今月の範囲（昨日まで）
-      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      const yesterday = new Date(now);
-      yesterday.setDate(yesterday.getDate() - 1);
-      yesterday.setHours(23, 59, 59, 999);
 
-      // 先月の購入額集計
-      const lastMonthOrders = await prisma.order.groupBy({
-        by: ['userId'],
+      // 先月・今月の月文字列を計算
+      const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthStr = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
+      const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+      // 先月のmlmPurchaseポイント集計
+      const lastMonthAgg = await prisma.mlmPurchase.aggregate({
         where: {
-          userId,
-          orderedAt: {
-            gte: lastMonthStart,
-            lte: lastMonthEnd
-          }
+          mlmMemberId: mlmMember.id,
+          purchaseMonth: lastMonthStr
         },
         _sum: {
-          totalAmount: true
+          totalPoints: true
         }
       });
 
-      if (lastMonthOrders.length > 0 && lastMonthOrders[0]._sum.totalAmount) {
-        mlmLastMonthPoints = Math.floor(lastMonthOrders[0]._sum.totalAmount / 100);
-      }
-
-      // 今月（昨日まで）の購入額集計
-      const currentMonthOrders = await prisma.order.groupBy({
-        by: ['userId'],
+      // 今月のmlmPurchaseポイント集計
+      const currentMonthAgg = await prisma.mlmPurchase.aggregate({
         where: {
-          userId,
-          orderedAt: {
-            gte: currentMonthStart,
-            lte: yesterday
-          }
+          mlmMemberId: mlmMember.id,
+          purchaseMonth: currentMonthStr
         },
         _sum: {
-          totalAmount: true
+          totalPoints: true
         }
       });
 
-      if (currentMonthOrders.length > 0 && currentMonthOrders[0]._sum.totalAmount) {
-        mlmCurrentMonthPoints = Math.floor(currentMonthOrders[0]._sum.totalAmount / 100);
-      }
+      mlmLastMonthPoints = lastMonthAgg._sum.totalPoints ?? 0;
+      mlmCurrentMonthPoints = currentMonthAgg._sum.totalPoints ?? 0;
     }
 
     // 貯金ボーナスポイント（SAVpt）
     // TODO: 実際のボーナス計算ロジックに置き換え
-    // 例: 自動積立や特定条件達成時のボーナス
     const savingsBonusPoints = 0;
 
     // 携帯紹介ポイント（MPIpt）
