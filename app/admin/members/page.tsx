@@ -104,43 +104,48 @@ export default async function AdminMembersPage({
       {/* 全体統計サマリー */}
       <MemberStatsSummary compact />
 
-      {/* ヘッダー */}
-      <div className="rounded-3xl bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-bold text-slate-800">👥 会員管理</h1>
-        <div className="flex gap-4 mt-3">
-          <div className="rounded-2xl bg-emerald-50 border border-emerald-200 px-5 py-3 text-center min-w-[90px]">
-            <div className="text-xs font-semibold text-emerald-700 mb-0.5">有効会員</div>
-            <div className="text-2xl font-bold text-emerald-700">{activeCount.toLocaleString()}</div>
-            <div className="text-xs text-emerald-500">名</div>
-          </div>
-          <div className="rounded-2xl bg-red-50 border border-red-200 px-5 py-3 text-center min-w-[90px]">
-            <div className="text-xs font-semibold text-red-700 mb-0.5">契約解除済</div>
-            <div className="text-2xl font-bold text-red-700">{canceledCount.toLocaleString()}</div>
-            <div className="text-xs text-red-500">名</div>
+      {/* ページヘッダー */}
+      <div>
+        <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "#c9a84c" }}>
+          Member Management
+        </p>
+        <div className="flex items-center gap-4 flex-wrap">
+          <h1 className="text-2xl font-bold text-stone-900 tracking-tight">会員管理</h1>
+          <div className="flex gap-3">
+            <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-2 text-center">
+              <div className="text-[11px] font-semibold text-emerald-700">有効会員</div>
+              <div className="text-xl font-bold text-emerald-700">{activeCount.toLocaleString()}<span className="text-xs ml-0.5">名</span></div>
+            </div>
+            <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-2 text-center">
+              <div className="text-[11px] font-semibold text-red-700">契約解除済</div>
+              <div className="text-xl font-bold text-red-700">{canceledCount.toLocaleString()}<span className="text-xs ml-0.5">名</span></div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* タブ */}
-      <div className="rounded-3xl bg-white p-4 shadow-sm flex gap-2">
+      <div className="rounded-2xl bg-white border border-stone-100 p-3 flex gap-2" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
         <Link
           href="/admin/members?tab=active"
-          className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors ${
-            tab === "active" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+          className={`rounded-xl px-5 py-2 text-sm font-semibold transition-all ${
+            tab === "active" ? "text-white" : "bg-stone-50 text-stone-600 hover:bg-stone-100"
           }`}
+          style={tab === "active" ? { background: "linear-gradient(135deg, #1c1917, #3d3530)", color: "#fff" } : {}}
         >
-          👥 会員一覧
-          <span className={`ml-2 text-xs font-bold ${tab === "active" ? "text-slate-300" : "text-slate-500"}`}>
-            {activeCount}
-          </span>
+          <i className="fas fa-users mr-2 text-xs opacity-70" />
+          会員一覧
+          <span className="ml-2 text-xs font-bold opacity-70">{activeCount}</span>
         </Link>
         <Link
           href="/admin/members?tab=canceled"
-          className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors flex items-center gap-2 ${
-            tab === "canceled" ? "bg-red-600 text-white" : "bg-red-50 text-red-700 hover:bg-red-100"
+          className={`rounded-xl px-5 py-2 text-sm font-semibold transition-all flex items-center gap-2 ${
+            tab === "canceled" ? "text-white" : "bg-red-50 text-red-700 hover:bg-red-100"
           }`}
+          style={tab === "canceled" ? { background: "linear-gradient(135deg, #ef4444, #dc2626)" } : {}}
         >
-          🚫 契約解除者一覧
+          <i className="fas fa-user-slash text-xs opacity-70" />
+          契約解除者一覧
           {canceledCount > 0 && (
             <span className={`rounded-full text-xs font-bold px-2 py-0.5 min-w-[22px] text-center ${
               tab === "canceled" ? "bg-white text-red-600" : "bg-red-500 text-white"
@@ -152,13 +157,13 @@ export default async function AdminMembersPage({
       </div>
 
       {/* 検索フォーム */}
-      <form method="GET" className="rounded-3xl bg-white p-4 shadow-sm flex flex-wrap gap-3 items-center">
+      <form method="GET" className="rounded-2xl bg-white border border-stone-100 p-4 flex flex-wrap gap-3 items-center" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
         <input type="hidden" name="tab" value={tab} />
         <input
           name="q"
           defaultValue={q}
           placeholder="氏名・会員コード・メールで検索"
-          className="border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 w-64 focus:outline-none focus:ring-2 focus:ring-slate-300"
+          className="border border-stone-200 rounded-xl px-4 py-2 text-sm text-stone-800 w-64 focus:outline-none focus:ring-2 focus:ring-amber-300"
         />
         {tab === "active" && (
           <div className="flex gap-2 flex-wrap">
@@ -170,25 +175,27 @@ export default async function AdminMembersPage({
             ].map(opt => (
               <Link key={opt.value}
                 href={`/admin/members?tab=active&status=${opt.value}&q=${q}`}
-                className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
                   statusFilter === opt.value
-                    ? "bg-slate-900 text-white"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}>
+                    ? "text-white"
+                    : "bg-stone-50 text-stone-600 hover:bg-stone-100"
+                }`}
+                style={statusFilter === opt.value ? { background: "linear-gradient(135deg, #1c1917, #3d3530)" } : {}}>
                 {opt.label}
               </Link>
             ))}
           </div>
         )}
         <button type="submit"
-          className="rounded-xl bg-slate-800 text-white px-4 py-2 text-sm font-medium hover:bg-slate-700">
-          検索
+          className="rounded-xl px-4 py-2 text-sm font-semibold text-white transition-all"
+          style={{ background: "linear-gradient(135deg, #c9a84c, #a88830)", boxShadow: "0 2px 6px rgba(201,168,76,0.3)" }}>
+          <i className="fas fa-search mr-1.5 text-xs" />検索
         </button>
       </form>
 
       {/* ─── 会員一覧テーブル ─── */}
       {tab === "active" && (
-        <div className="rounded-3xl bg-white shadow-sm overflow-hidden">
+        <div className="rounded-2xl bg-white border border-stone-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-100">
@@ -292,7 +299,7 @@ export default async function AdminMembersPage({
 
       {/* ─── 契約解除者一覧テーブル ─── */}
       {tab === "canceled" && (
-        <div className="rounded-3xl bg-white shadow-sm overflow-hidden">
+        <div className="rounded-2xl bg-white border border-stone-100 overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <div>
               <div className="font-semibold text-slate-800">🚫 契約解除者一覧</div>

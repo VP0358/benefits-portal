@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
   /* ライトベージュ系 × 深紺ゴールド ── サロン高級UI */
@@ -110,6 +111,121 @@ body {
     0 4px 20px rgba(10,22,40,0.08),
     0 1px 4px rgba(10,22,40,0.05),
     0 1px 0 rgba(255,255,255,0.80) inset;
+}
+
+/* ──────────────────────────────────────────
+   管理ページ専用スタイル（全管理ページ共通）
+────────────────────────────────────────── */
+
+/* 管理ページ背景 */
+.admin-bg {
+  --admin-bg: #f7f6f4;
+  background-color: #f7f6f4;
+}
+
+/* 管理ページカード */
+.admin-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03);
+}
+
+/* 管理ページセクションタイトル */
+.admin-section-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1c1917;
+  letter-spacing: -0.02em;
+}
+
+/* 管理ページテーブル */
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.admin-table thead th {
+  background: #1c1917;
+  color: rgba(255,255,255,0.85);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 10px 16px;
+  text-align: left;
+  white-space: nowrap;
+}
+.admin-table tbody tr {
+  border-bottom: 1px solid #f0eeec;
+  transition: background 0.1s;
+}
+.admin-table tbody tr:hover {
+  background: #faf9f7;
+}
+.admin-table tbody td {
+  padding: 10px 16px;
+  color: #3d3530;
+  vertical-align: middle;
+}
+
+/* 管理ページ プライマリボタン */
+.admin-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  background: linear-gradient(135deg, #1c1917, #3d3530);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+.admin-btn-primary:hover {
+  background: linear-gradient(135deg, #3d3530, #5a4e48);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  transform: translateY(-1px);
+}
+.admin-btn-gold {
+  background: linear-gradient(135deg, #c9a84c, #e8c96a);
+  color: #1c1917;
+}
+.admin-btn-gold:hover {
+  background: linear-gradient(135deg, #b8962e, #d4b447);
+}
+
+/* 管理ページ インプット */
+.admin-input {
+  width: 100%;
+  border: 1px solid #e5e2de;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 0.875rem;
+  color: #1c1917;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.admin-input:focus {
+  border-color: #c9a84c;
+  box-shadow: 0 0 0 3px rgba(201,168,76,0.12);
+}
+
+/* ステータスバッジ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
 }
 
 /* ──────────────────────────────────────────

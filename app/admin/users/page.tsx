@@ -11,7 +11,7 @@ export default async function AdminUsersPage() {
     <main className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-800">会員管理</h1>
+          <h1 className="text-2xl font-bold text-stone-900 tracking-tight">会員管理</h1>
           <p className="mt-2 text-slate-800">会員情報とポイント残高を確認できます。</p>
         </div>
         <div className="flex gap-2">

@@ -80,7 +80,7 @@ export default function TestDataPage() {
       </div>
 
       {/* MLMテストデータ生成 */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-2xl border border-stone-100 p-6">
         <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
           <i className="fas fa-users mr-2"></i>
           MLMテストアカウント生成
@@ -126,7 +126,7 @@ export default function TestDataPage() {
       </div>
 
       {/* 商品マスタデータ投入 */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-2xl border border-stone-100 p-6">
         <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
           <i className="fas fa-box mr-2"></i>
           商品マスタ初期データ投入
@@ -173,7 +173,7 @@ export default function TestDataPage() {
 
       {/* 実行結果 */}
       {result && (
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-2xl border border-stone-100 p-6">
           <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
             <i className="fas fa-terminal mr-2"></i>
             実行結果
@@ -185,7 +185,7 @@ export default function TestDataPage() {
       )}
 
       {/* 確認リンク */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-2xl border border-stone-100 p-6">
         <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
           <i className="fas fa-link mr-2"></i>
           確認リンク

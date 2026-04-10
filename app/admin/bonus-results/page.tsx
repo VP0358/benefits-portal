@@ -253,7 +253,7 @@ export default function BonusResultsPage() {
       </div>
 
       {/* 対象月選択 */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-2xl border border-stone-100 p-6">
         <label className="block text-sm font-semibold text-gray-700 mb-2">
           対象月
         </label>
@@ -310,7 +310,7 @@ export default function BonusResultsPage() {
       )}
 
       {/* タブ切り替え */}
-      <div className="bg-white rounded-lg shadow">
+      <div className="bg-white rounded-2xl border border-stone-100">
         <div className="border-b border-gray-200">
           <nav className="flex space-x-4 px-6 pt-4">
             <button

@@ -185,30 +185,27 @@ export default function ProductsManagementPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* ヘッダー */}
-      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/admin/dashboard"
-              className="text-gray-600 hover:text-gray-800 transition"
-            >
-              ← 戻る
-            </Link>
-            <h1 className="text-xl font-bold text-gray-800">📦 商品マスター管理</h1>
-          </div>
-          <button
-            onClick={handleAddNew}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition"
-          >
-            ➕ 新規商品追加
-          </button>
+    <div className="space-y-6">
+      {/* ページヘッダー */}
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "#c9a84c" }}>
+            Product Management
+          </p>
+          <h1 className="text-2xl font-bold text-stone-900 tracking-tight">商品マスター管理</h1>
+          <p className="text-sm text-stone-400 mt-0.5">商品の登録・編集・価格・PV設定</p>
         </div>
-      </header>
+        <button
+          onClick={handleAddNew}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all"
+          style={{ background: "linear-gradient(135deg, #c9a84c, #a88830)", boxShadow: "0 2px 8px rgba(201,168,76,0.35)" }}
+        >
+          <i className="fas fa-plus text-xs" /> 新規商品追加
+        </button>
+      </div>
 
       {/* メインコンテンツ */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main>
         {loading && (
           <div className="text-center py-8 text-gray-600">
             <p className="animate-pulse">読み込み中...</p>
@@ -222,7 +219,7 @@ export default function ProductsManagementPage() {
         )}
 
         {!loading && !error && (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="bg-white rounded-2xl border border-stone-100 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-100 border-b border-gray-200">

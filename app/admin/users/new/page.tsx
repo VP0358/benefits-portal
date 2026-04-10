@@ -54,7 +54,7 @@ export default function NewUserPage() {
   return (
     <main className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-800">会員新規登録</h1>
+        <h1 className="text-2xl font-bold text-stone-900 tracking-tight">会員新規登録</h1>
         <p className="mt-2 text-slate-700 text-sm">新しい会員を登録します。</p>
       </div>
 

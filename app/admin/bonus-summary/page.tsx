@@ -197,7 +197,7 @@ export default function BonusSummaryPage() {
 
       {/* ボーナス一覧テーブル */}
       {data.length > 0 && (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-white rounded-2xl border border-stone-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-xs min-w-[1800px]">
               <thead className="bg-gray-800 text-white">

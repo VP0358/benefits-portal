@@ -69,7 +69,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
   return (
     <main className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-800">会員詳細</h1>
+        <h1 className="text-2xl font-bold text-stone-900 tracking-tight">会員詳細</h1>
         <p className="mt-2 text-slate-800">{user!.memberCode} / {user!.name}</p>
       </div>
 
@@ -97,7 +97,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-3xl bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-slate-800">基本情報</h2>
+          <h2 className="text-xl font-bold text-stone-800">基本情報</h2>
           <div className="mt-4 space-y-2 text-sm text-slate-700">
             <div>会員番号: <span className="font-medium">{user!.memberCode}</span></div>
             <div>氏名: <span className="font-medium">{user!.name}</span></div>
@@ -115,7 +115,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
 
         {/* MLM情報セクション */}
         <section className="rounded-3xl bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-slate-800">MLM会員情報</h2>
+          <h2 className="text-xl font-bold text-stone-800">MLM会員情報</h2>
           {mlmMember ? (
             <div className="mt-4 space-y-2 text-sm text-slate-700">
               <div>MLM会員コード: <span className="font-mono font-bold text-slate-800">{mlmMember.memberCode}</span></div>
@@ -154,7 +154,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
         </section>
 
         <section className="rounded-3xl bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-slate-800">ポイント残高</h2>
+          <h2 className="text-xl font-bold text-stone-800">ポイント残高</h2>
           <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
             {[
               { label: "自動", value: user!.pointWallet?.autoPointsBalance ?? 0 },
@@ -171,14 +171,14 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
         </section>
 
         <section className="rounded-3xl bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-slate-800">紹介者管理</h2>
+          <h2 className="text-xl font-bold text-stone-800">紹介者管理</h2>
           <div className="mt-4">
             <ReferralManager userId={user!.id.toString()} initialReferrals={initialReferrals} referrerOptions={referrerItems} />
           </div>
         </section>
 
         <section className="rounded-3xl bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-slate-800">契約登録</h2>
+          <h2 className="text-xl font-bold text-stone-800">契約登録</h2>
           <div className="mt-4"><ContractForm userId={user!.id.toString()} /></div>
         </section>
       </div>
@@ -186,7 +186,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
       {/* 携帯契約詳細セクション */}
       <section className="rounded-3xl bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-slate-800">📱 携帯契約一覧</h2>
+          <h2 className="text-xl font-bold text-stone-800">📱 携帯契約一覧</h2>
           <div className="flex gap-2 text-xs">
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">
               全 {user!.contracts.length} 件
@@ -238,11 +238,11 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
       </section>
 
       <section className="rounded-3xl bg-white p-6 shadow-sm">
-        <h2 className="text-xl font-bold text-slate-800">手動ポイント加算 / 減算</h2>
+        <h2 className="text-xl font-bold text-stone-800">手動ポイント加算 / 減算</h2>
         <div className="mt-4"><ManualPointAdjuster userId={user!.id.toString()} /></div>
       </section>
       <section className="rounded-3xl bg-white p-6 shadow-sm">
-        <h2 className="text-xl font-bold text-slate-800">最新ポイント履歴</h2>
+        <h2 className="text-xl font-bold text-stone-800">最新ポイント履歴</h2>
         <div className="mt-4 space-y-2 text-sm">
           {user!.pointLogs.length === 0 ? <div className="text-slate-700">履歴はありません。</div> : user!.pointLogs.map(log => (
             <div key={log.id.toString()} className="grid grid-cols-[160px_120px_100px_1fr] gap-4 rounded-2xl border p-3">

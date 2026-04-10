@@ -142,7 +142,7 @@ export default function AdminMenuEditPage() {
       {/* ヘッダー */}
       <div className="rounded-3xl bg-white p-6 shadow-sm flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-800">📋 メニュー編集</h1>
+          <h1 className="text-xl font-bold text-stone-800">📋 メニュー編集</h1>
           <p className="text-sm text-slate-800 mt-0.5">変更後「更新する」を押してください</p>
         </div>
         <button type="button" onClick={() => router.push("/admin/menus")}

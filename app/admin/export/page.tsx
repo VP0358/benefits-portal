@@ -3,13 +3,24 @@ import CsvExportPanel from "./ui/csv-export-panel";
 export default function ExportPage() {
   return (
     <main className="space-y-6">
+      {/* ページヘッダー */}
       <div>
-        <h1 className="text-3xl font-bold text-slate-800">CSV エクスポート</h1>
-        <p className="mt-2 text-slate-700 text-sm">会員・注文・監査ログのデータをCSVでダウンロードできます。</p>
+        <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "#c9a84c" }}>
+          Data Export
+        </p>
+        <h1 className="text-2xl font-bold text-stone-900 tracking-tight">CSV エクスポート</h1>
+        <p className="text-sm text-stone-400 mt-0.5">
+          会員・注文・監査ログのデータをCSVでダウンロードできます
+        </p>
       </div>
-      <section className="rounded-3xl bg-white p-6 shadow-sm">
+
+      {/* コンテンツ */}
+      <div
+        className="rounded-2xl bg-white border border-stone-100 p-6"
+        style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03)" }}
+      >
         <CsvExportPanel />
-      </section>
+      </div>
     </main>
   );
 }

@@ -31,7 +31,7 @@ export default function NewProductPage() {
 
   return (
     <main className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
-      <h1 className="text-2xl font-bold text-slate-800">商品新規追加</h1>
+      <h1 className="text-2xl font-bold text-stone-900 tracking-tight">商品新規追加</h1>
       <div>
         <label className="mb-1 block text-sm font-medium">商品コード</label>
         <input 

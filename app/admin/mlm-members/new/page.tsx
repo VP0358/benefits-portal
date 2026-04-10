@@ -291,7 +291,7 @@ export default function MlmMemberNewPage() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 基本情報 */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-2xl border border-stone-100 p-6">
           <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
             <i className="fas fa-id-card mr-2"></i>
             基本情報
@@ -354,7 +354,7 @@ export default function MlmMemberNewPage() {
         </div>
 
         {/* 個人情報 */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-2xl border border-stone-100 p-6">
           <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
             <i className="fas fa-user mr-2"></i>
             個人情報
@@ -435,7 +435,7 @@ export default function MlmMemberNewPage() {
         </div>
 
         {/* 連絡先情報 */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-2xl border border-stone-100 p-6">
           <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
             <i className="fas fa-address-book mr-2"></i>
             連絡先情報
@@ -552,7 +552,7 @@ export default function MlmMemberNewPage() {
         </div>
 
         {/* 銀行情報 */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-2xl border border-stone-100 p-6">
           <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
             <i className="fas fa-university mr-2"></i>
             銀行情報
@@ -671,7 +671,7 @@ export default function MlmMemberNewPage() {
         </div>
 
         {/* 組織情報 */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-2xl border border-stone-100 p-6">
           <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
             <i className="fas fa-sitemap mr-2"></i>
             組織情報
@@ -758,7 +758,7 @@ export default function MlmMemberNewPage() {
         </div>
 
         {/* オートシップ情報 */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-2xl border border-stone-100 p-6">
           <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
             <i className="fas fa-sync-alt mr-2"></i>
             オートシップ情報
@@ -801,7 +801,7 @@ export default function MlmMemberNewPage() {
         </div>
 
         {/* 備考 */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-2xl border border-stone-100 p-6">
           <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
             <i className="fas fa-sticky-note mr-2"></i>
             備考

@@ -289,59 +289,56 @@ export default function BonusReportCenterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* ヘッダー */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/admin/dashboard" className="text-gray-600 hover:text-gray-800 transition">
-                ← 戻る
-              </Link>
-              <h1 className="text-2xl font-bold text-gray-800">
-                <i className="fas fa-file-invoice-dollar mr-2"></i>
-                📊 ボーナス結果・レポート
-              </h1>
-            </div>
-            {activeTab === "results" && (
-              <button
-                onClick={handleExportResultCSV}
-                disabled={filteredResults.length === 0}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-              >
-                <i className="fas fa-download mr-2"></i>
-                CSVエクスポート
-              </button>
-            )}
-          </div>
+    <div className="space-y-6">
+      {/* ページヘッダー */}
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "#c9a84c" }}>
+            Bonus Reports
+          </p>
+          <h1 className="text-2xl font-bold text-stone-900 tracking-tight">ボーナス結果・レポート</h1>
+          <p className="text-sm text-stone-400 mt-0.5">計算結果・明細・サマリーレポートの確認</p>
         </div>
-      </header>
+        <div>
+          {activeTab === "results" && (
+            <button
+              onClick={handleExportResultCSV}
+              disabled={filteredResults.length === 0}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-50"
+              style={{ background: "linear-gradient(135deg, #059669, #047857)", boxShadow: "0 2px 8px rgba(5,150,105,0.3)" }}
+            >
+              <i className="fas fa-download text-xs"></i>
+              CSVエクスポート
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* メインコンテンツ */}
-      <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+      <div className="space-y-6">
         {/* メインタブ */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="flex border-b">
+        <div className="rounded-2xl bg-white border border-stone-100 overflow-hidden" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
+          <div className="flex border-b border-stone-100">
             <button
               onClick={() => setActiveTab("results")}
-              className={`px-6 py-3 font-semibold transition ${
+              className={`px-6 py-3.5 text-sm font-semibold transition border-b-2 ${
                 activeTab === "results"
-                  ? "bg-blue-50 text-blue-700 border-b-2 border-blue-600"
-                  : "text-gray-600 hover:bg-gray-50"
+                  ? "border-amber-500 text-amber-700 bg-amber-50/50"
+                  : "border-transparent text-stone-500 hover:text-stone-700 hover:bg-stone-50"
               }`}
             >
-              <i className="fas fa-list mr-2"></i>
+              <i className="fas fa-list mr-2 text-xs"></i>
               ボーナス計算結果
             </button>
             <button
               onClick={() => setActiveTab("reports")}
-              className={`px-6 py-3 font-semibold transition ${
+              className={`px-6 py-3.5 text-sm font-semibold transition border-b-2 ${
                 activeTab === "reports"
-                  ? "bg-blue-50 text-blue-700 border-b-2 border-blue-600"
-                  : "text-gray-600 hover:bg-gray-50"
+                  ? "border-amber-500 text-amber-700 bg-amber-50/50"
+                  : "border-transparent text-stone-500 hover:text-stone-700 hover:bg-stone-50"
               }`}
             >
-              <i className="fas fa-file-alt mr-2"></i>
+              <i className="fas fa-file-alt mr-2 text-xs"></i>
               ボーナス関連レポート
             </button>
             <button
@@ -349,7 +346,7 @@ export default function BonusReportCenterPage() {
               className={`px-6 py-3 font-semibold transition ${
                 activeTab === "summary"
                   ? "bg-blue-50 text-blue-700 border-b-2 border-blue-600"
-                  : "text-gray-600 hover:bg-gray-50"
+                  : "text-gray-600 hover:bg-stone-50"
               }`}
             >
               <i className="fas fa-chart-bar mr-2"></i>
@@ -492,7 +489,7 @@ export default function BonusReportCenterPage() {
                       </thead>
                       <tbody className="divide-y divide-gray-200 bg-white">
                         {filteredResults.map((r) => (
-                          <tr key={r.id} className="hover:bg-gray-50">
+                          <tr key={r.id} className="hover:bg-stone-50">
                             <td className="px-3 py-2 font-mono text-xs sticky left-0 bg-white">{r.memberCode}</td>
                             <td className="px-3 py-2">{r.memberName}</td>
                             <td className="px-3 py-2 text-gray-600">{r.companyName || "-"}</td>
@@ -591,7 +588,7 @@ export default function BonusReportCenterPage() {
                 {/* Webフリコム出力 */}
                 {reportsSubTab === "webfricom" && (
                   <div className="space-y-4">
-                    <div className="bg-gray-50 rounded-lg p-6">
+                    <div className="bg-stone-50 rounded-lg p-6">
                       <h3 className="text-lg font-bold text-gray-800 mb-4">Webフリコム形式出力</h3>
                       <p className="text-sm text-gray-600 mb-6">
                         固定長120文字フォーマットのWebフリコム振込データを出力します。
@@ -636,7 +633,7 @@ export default function BonusReportCenterPage() {
                           </thead>
                           <tbody>
                             {levelChanges.map((r, idx) => (
-                              <tr key={idx} className="border-b hover:bg-gray-50">
+                              <tr key={idx} className="border-b hover:bg-stone-50">
                                 <td className="p-3 font-mono">{r.memberCode}</td>
                                 <td className="p-3">{r.memberName}</td>
                                 <td className="p-3 text-center">LV{r.previousLevel}</td>
@@ -677,7 +674,7 @@ export default function BonusReportCenterPage() {
                           </thead>
                           <tbody>
                             {carryoverList.map((r, idx) => (
-                              <tr key={idx} className="border-b hover:bg-gray-50">
+                              <tr key={idx} className="border-b hover:bg-stone-50">
                                 <td className="p-3 font-mono">{r.memberCode}</td>
                                 <td className="p-3 text-gray-600">{r.companyName || "-"}</td>
                                 <td className="p-3">{r.memberName}</td>
@@ -710,7 +707,7 @@ export default function BonusReportCenterPage() {
                           </thead>
                           <tbody>
                             {adjustmentList.map((r, idx) => (
-                              <tr key={idx} className="border-b hover:bg-gray-50">
+                              <tr key={idx} className="border-b hover:bg-stone-50">
                                 <td className="p-3 font-mono">{r.memberCode}</td>
                                 <td className="p-3 text-gray-600">{r.companyName || "-"}</td>
                                 <td className="p-3">{r.memberName}</td>
@@ -751,7 +748,7 @@ export default function BonusReportCenterPage() {
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {summaryList.map((s, idx) => (
-                          <tr key={idx} className="hover:bg-gray-50">
+                          <tr key={idx} className="hover:bg-stone-50">
                             <td className="p-3 font-semibold text-gray-800">{s.month}</td>
                             <td className="p-3 text-right">{s.totalMembers}人</td>
                             <td className="p-3 text-right text-green-600">{s.totalActiveMembers}人</td>
@@ -771,7 +768,7 @@ export default function BonusReportCenterPage() {
             )}
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

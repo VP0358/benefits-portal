@@ -692,14 +692,17 @@ export default function MlmOrganizationPage() {
 
       {/* ページヘッダー */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">🌐 組織図・リスト</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          会員コード / 氏名などで検索 → ツリー表示。5段ごとに展開。ノードをタップで詳細確認。
+        <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "#c9a84c" }}>
+          Organization Chart
+        </p>
+        <h1 className="text-2xl font-bold text-stone-900 tracking-tight">組織図・リスト</h1>
+        <p className="text-sm text-stone-400 mt-0.5">
+          会員コード / 氏名などで検索してツリーを表示。ノードをタップで詳細確認。
         </p>
       </div>
 
       {/* 組織図表示エリア */}
-      <div className="rounded-3xl bg-white shadow-sm p-5 space-y-4">
+      <div className="rounded-2xl bg-white border border-stone-100 p-5 space-y-4">
         <h2 className="text-base font-bold text-slate-800">組織図表示</h2>
 
         {/* 検索コントロール */}
@@ -893,7 +896,7 @@ export default function MlmOrganizationPage() {
       </div>
 
       {/* ─── ダウンラインレポート ─── */}
-      <div className="rounded-3xl bg-white shadow-sm p-5 space-y-3">
+      <div className="rounded-2xl bg-white border border-stone-100 p-5 space-y-3">
         <h2 className="text-base font-bold text-slate-800">📥 ダウンラインレポート CSV出力</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
@@ -924,7 +927,7 @@ export default function MlmOrganizationPage() {
       </div>
 
       {/* ─── 購入レポート ─── */}
-      <div className="rounded-3xl bg-white shadow-sm p-5 space-y-3">
+      <div className="rounded-2xl bg-white border border-stone-100 p-5 space-y-3">
         <h2 className="text-base font-bold text-slate-800">🛒 購入レポート CSV出力</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
           <div>
@@ -965,7 +968,7 @@ export default function MlmOrganizationPage() {
       </div>
 
       {/* ─── 紹介実績レポート ─── */}
-      <div className="rounded-3xl bg-white shadow-sm p-5 space-y-3">
+      <div className="rounded-2xl bg-white border border-stone-100 p-5 space-y-3">
         <h2 className="text-base font-bold text-slate-800">👥 紹介実績積算ダウンロード</h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>

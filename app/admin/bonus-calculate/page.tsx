@@ -129,7 +129,7 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
         </span>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-x-auto" style={{ minWidth: "900px" }}>
+      <div className="bg-white rounded-2xl border border-stone-100 overflow-x-auto" style={{ minWidth: "900px" }}>
         <table className="w-full text-xs">
           <thead className="bg-gray-100 border-b">
             <tr>
@@ -461,31 +461,20 @@ export default function BonusCalculatePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* ヘッダー */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link
-                href="/admin/dashboard"
-                className="text-gray-600 hover:text-gray-800 transition"
-              >
-                ← 戻る
-              </Link>
-              <h1 className="text-2xl font-bold text-gray-800">
-                <i className="fas fa-calculator mr-2"></i>
-                💰 MLMボーナス計算・処理
-              </h1>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="space-y-6">
+      {/* ページヘッダー */}
+      <div>
+        <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "#c9a84c" }}>
+          Bonus Calculation
+        </p>
+        <h1 className="text-2xl font-bold text-stone-900 tracking-tight">MLMボーナス計算・処理</h1>
+        <p className="text-sm text-stone-400 mt-0.5">月次ボーナス計算実行・確定・調整金管理</p>
+      </div>
 
       {/* メインコンテンツ */}
-      <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
+      <div className="space-y-6">
         {/* 月選択 */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-2xl border border-stone-100 p-6">
           <h2 className="text-lg font-bold text-gray-800 mb-4">
             <i className="fas fa-calendar mr-2"></i>
             対象月選択
@@ -562,7 +551,7 @@ export default function BonusCalculatePage() {
         )}
 
         {/* タブナビゲーション */}
-        <div className="bg-white rounded-lg shadow">
+        <div className="bg-white rounded-2xl border border-stone-100">
           <div className="flex border-b">
             <button
               onClick={() => setActiveTab("calculation")}
@@ -767,12 +756,12 @@ export default function BonusCalculatePage() {
             )}
           </div>
         </div>
-      </main>
+      </div>
 
       {/* 調整金追加モーダル */}
       {showAdjustmentModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-6 space-y-4">
+          <div className="bg-white rounded-2xl border border-stone-100-2xl w-full max-w-md p-6 space-y-4">
             <h3 className="text-lg font-bold text-gray-800">調整金追加</h3>
             <div className="space-y-3">
               <div>
@@ -846,7 +835,7 @@ export default function BonusCalculatePage() {
       {/* 過不足金追加モーダル */}
       {showShortageModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-6 space-y-4">
+          <div className="bg-white rounded-2xl border border-stone-100-2xl w-full max-w-md p-6 space-y-4">
             <h3 className="text-lg font-bold text-gray-800">過不足金追加</h3>
             <div className="space-y-3">
               <div>
@@ -905,7 +894,7 @@ export default function BonusCalculatePage() {
       {/* 貯金ボーナス設定編集モーダル */}
       {showSavingsConfigModal && savingsConfig && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-6 space-y-4">
+          <div className="bg-white rounded-2xl border border-stone-100-2xl w-full max-w-md p-6 space-y-4">
             <h3 className="text-lg font-bold text-gray-800">貯金ボーナス設定編集</h3>
             <div className="space-y-3">
               <div>

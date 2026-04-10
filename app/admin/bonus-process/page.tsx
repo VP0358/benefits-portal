@@ -429,7 +429,7 @@ export default function BonusProcessPage() {
       </div>
 
       {/* 対象月選択 */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-2xl border border-stone-100 p-6">
         <label className="block text-sm font-semibold text-gray-700 mb-2">対象月</label>
         <select
           value={selectedMonth}
@@ -450,7 +450,7 @@ export default function BonusProcessPage() {
 
       {/* ボーナス実行情報 */}
       {bonusRun && (
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-2xl border border-stone-100 p-6">
           <h2 className="text-xl font-bold text-gray-800 mb-4">
             <i className="fas fa-info-circle mr-2"></i>
             ボーナス実行情報
@@ -501,7 +501,7 @@ export default function BonusProcessPage() {
       )}
 
       {/* 調整金入力 */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-2xl border border-stone-100 p-6">
         <h2 className="text-xl font-bold text-gray-800 mb-4">
           <i className="fas fa-edit mr-2"></i>
           調整金入力
@@ -623,7 +623,7 @@ export default function BonusProcessPage() {
       </div>
 
       {/* 過不足金入力（源泉対象外） */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-2xl border border-stone-100 p-6">
         <h2 className="text-xl font-bold text-gray-800 mb-4">
           <i className="fas fa-balance-scale mr-2"></i>
           過不足金入力（源泉対象外）
@@ -745,7 +745,7 @@ export default function BonusProcessPage() {
       </div>
 
       {/* 貯金ボーナス設定 */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-2xl border border-stone-100 p-6">
         <h2 className="text-xl font-bold text-gray-800 mb-4">
           <i className="fas fa-piggy-bank mr-2"></i>
           貯金ボーナス設定

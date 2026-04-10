@@ -100,11 +100,12 @@ export default async function AdminContractsPage({
       <MemberStatsSummary show={["mobile"]} compact />
 
       {/* ヘッダー */}
-      <div className="rounded-3xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white border border-stone-100 p-6" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-xl font-bold text-slate-800">📱 携帯契約管理</h1>
-            <p className="text-sm text-slate-700 mt-0.5">全 {total.toLocaleString()} 件</p>
+            <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "#34d399" }}>Mobile Contracts</p>
+            <h1 className="text-2xl font-bold text-stone-900 tracking-tight">携帯契約管理</h1>
+            <p className="text-sm text-stone-400 mt-0.5">全 {total.toLocaleString()} 件</p>
           </div>
           {/* 集計カード */}
           <div className="flex gap-3 flex-wrap">
@@ -149,7 +150,7 @@ export default async function AdminContractsPage({
       </div>
 
       {/* タブ切り替え */}
-      <div className="rounded-3xl bg-white p-4 shadow-sm">
+      <div className="rounded-2xl bg-white border border-stone-100 p-4">
         <div className="flex gap-2">
           <Link
             href="/admin/contracts?tab=list"
@@ -178,7 +179,7 @@ export default async function AdminContractsPage({
       {activeTab === "list" && (
         <>
           {/* フィルター */}
-          <div className="rounded-3xl bg-white p-4 shadow-sm">
+          <div className="rounded-2xl bg-white border border-stone-100 p-4">
             <div className="space-y-3">
               {/* ステータスフィルター */}
               <div>
@@ -244,7 +245,7 @@ export default async function AdminContractsPage({
           </div>
 
           {/* テーブル */}
-          <div className="rounded-3xl bg-white shadow-sm overflow-hidden">
+          <div className="rounded-2xl bg-white border border-stone-100 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-100">

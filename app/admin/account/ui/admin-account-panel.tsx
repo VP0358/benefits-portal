@@ -76,14 +76,14 @@ export default function AdminAccountPanel() {
   }
 
   if (loading) {
-    return <div className="rounded-3xl bg-white p-8 text-center text-slate-700 shadow-sm">読み込み中...</div>;
+    return <div className="rounded-2xl bg-white border border-stone-100 p-8 text-center text-stone-600">読み込み中...</div>;
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
 
       {/* 現在の情報 */}
-      <div className="rounded-3xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white border border-stone-100 p-6">
         <h2 className="text-sm font-bold text-slate-800 mb-4">現在のログイン情報</h2>
         <div className="space-y-2 text-sm">
           <div className="flex gap-3">
@@ -102,7 +102,7 @@ export default function AdminAccountPanel() {
       </div>
 
       {/* 名前変更 */}
-      <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
+      <div className="rounded-2xl bg-white border border-stone-100 p-6 space-y-4">
         <h2 className="text-sm font-bold text-slate-700 border-b pb-2">管理者名の変更</h2>
         <div>
           <label className="mb-1.5 block text-xs font-semibold text-slate-700">新しい管理者名</label>
@@ -118,7 +118,7 @@ export default function AdminAccountPanel() {
       </div>
 
       {/* メール変更 */}
-      <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
+      <div className="rounded-2xl bg-white border border-stone-100 p-6 space-y-4">
         <h2 className="text-sm font-bold text-slate-700 border-b pb-2">ログインID（メールアドレス）の変更</h2>
         <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800">
           <span className="mt-0.5 text-base leading-none">📬</span>
@@ -141,7 +141,7 @@ export default function AdminAccountPanel() {
       </div>
 
       {/* パスワード変更 */}
-      <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
+      <div className="rounded-2xl bg-white border border-stone-100 p-6 space-y-4">
         <h2 className="text-sm font-bold text-slate-700 border-b pb-2">
           パスワード変更
           <span className="ml-2 text-xs font-normal text-slate-500">（変更する場合のみ入力）</span>
@@ -188,7 +188,8 @@ export default function AdminAccountPanel() {
       <button
         type="submit"
         disabled={saving}
-        className="w-full rounded-2xl bg-slate-900 py-4 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50 transition-colors shadow-sm"
+        className="w-full rounded-2xl py-4 text-sm font-bold text-white disabled:opacity-50 transition-all"
+        style={{ background: "linear-gradient(135deg, #1c1917, #3d3530)", boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}
       >
         {saving ? "更新中..." : "ログイン情報を更新する"}
       </button>

@@ -207,6 +207,19 @@ export default function RegistrationCompletePrint({ data }: Props) {
           color: #1a0dab;
           text-decoration: underline;
         }
+        .mypage-note {
+          font-size: 9pt;
+          color: #555;
+          margin-top: 2mm;
+          padding-top: 2mm;
+          border-top: 1px dashed #ccc;
+        }
+        .pw-highlight {
+          font-weight: bold;
+          font-size: 12pt;
+          color: #cc0000;
+          letter-spacing: 0.1em;
+        }
 
         /* 会社フッター */
         .company-footer {
@@ -328,11 +341,14 @@ export default function RegistrationCompletePrint({ data }: Props) {
 
         {/* マイページ */}
         <div className="mypage-section">
-          <div className="mypage-title">マイページ</div>
+          <div className="mypage-title">マイページ ログイン情報</div>
           <div className="mypage-info">
-            <span className="mypage-url">https://viola-pure.jp/</span><br />
-            ログインID：{data.loginId}<br />
-            パスワード：（別途お知らせいたします）
+            URL：<span className="mypage-url">https://viola-pure.xyz/</span><br />
+            ログインID：<strong>{data.loginId}</strong>（ご自身の会員ID）<br />
+            初期パスワード：<span className="pw-highlight">0000</span>
+          </div>
+          <div className="mypage-note">
+            ※ 初回ログイン後、必ずマイページの「パスワード変更」からご自身でパスワードを変更してください。
           </div>
         </div>
 

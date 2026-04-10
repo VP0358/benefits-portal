@@ -369,15 +369,14 @@ export default function ShippingLabelsPage() {
   }
   
   return (
-    <div className="p-6 max-w-[1800px] mx-auto">
-      {/* ヘッダー */}
-      <div className="mb-6 pb-4 border-b border-blue-200 bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 rounded-lg shadow-lg">
+    <div className="space-y-6">
+      {/* ページヘッダー */}
+      <div className="rounded-2xl border border-stone-100 p-6 mb-0" style={{ background: "linear-gradient(135deg, #1c1917 0%, #292524 60%, #1c1917 100%)", boxShadow: "0 4px 20px rgba(0,0,0,0.15)" }}>
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold mb-1">発送伝票管理</h1>
-            <p className="text-blue-100 text-sm">CLAIRホールディングス株式会社</p>
-            <p className="text-blue-100 text-xs">〒020-0026 岩手県盛岡市開運橋通5-6 第五菱和ビル5F</p>
-            <p className="text-blue-100 text-xs">TEL: 019-681-3667</p>
+            <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "#c9a84c" }}>Shipping Labels</p>
+            <h1 className="text-2xl font-bold text-white tracking-tight">発送伝票管理</h1>
+            <p className="text-stone-400 text-xs mt-1">CLAIRホールディングス株式会社 / 〒020-0026 岩手県盛岡市 / TEL: 019-681-3667</p>
           </div>
           <div className="flex gap-2">
             <button
@@ -883,7 +882,7 @@ export default function ShippingLabelsPage() {
             <h3 className="text-md font-bold mb-3 text-gray-800 bg-gray-100 p-2 rounded">商品明細</h3>
             
             {/* 商品追加フォーム */}
-            <div className="grid grid-cols-6 gap-2 mb-3 p-3 bg-gray-50 rounded border">
+            <div className="grid grid-cols-6 gap-2 mb-3 p-3 bg-stone-50 rounded border">
               <div>
                 <label className="block text-xs font-medium mb-1">商品コード</label>
                 <input
@@ -1044,7 +1043,7 @@ export default function ShippingLabelsPage() {
       
       {/* 伝票一覧 */}
       {!showForm && (
-        <div className="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
+        <div className="bg-white rounded-2xl border border-stone-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-100 border-b">
@@ -1075,7 +1074,7 @@ export default function ShippingLabelsPage() {
                   </tr>
                 ) : (
                   labels.map((label) => (
-                    <tr key={label.id} className="border-b hover:bg-gray-50">
+                    <tr key={label.id} className="border-b hover:bg-stone-50">
                       <td className="px-4 py-3">{label.id}</td>
                       <td className="px-4 py-3">{label.orderNumber}</td>
                       <td className="px-4 py-3">{label.recipientName}</td>

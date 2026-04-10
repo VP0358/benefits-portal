@@ -7,11 +7,14 @@ export default async function AdminAccountPage() {
   if (!session?.user || session.user.role !== "admin") redirect("/login");
 
   return (
-    <main className="space-y-5">
-      <div className="rounded-3xl bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-bold text-slate-800 mb-1">🔐 ログイン情報変更</h1>
-        <p className="text-sm text-slate-700">
-          管理者のログインID（メールアドレス）とパスワードを変更できます。
+    <main className="space-y-6">
+      <div>
+        <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "#c9a84c" }}>
+          Account Settings
+        </p>
+        <h1 className="text-2xl font-bold text-stone-900 tracking-tight">ログイン情報変更</h1>
+        <p className="text-sm text-stone-400 mt-0.5">
+          管理者のログインID（メールアドレス）とパスワードを変更できます
         </p>
       </div>
       <AdminAccountPanel />

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 
 type Tag = "important" | "campaign" | "new" | "notice";
 
@@ -15,11 +14,11 @@ interface Announcement {
   createdAt: string;
 }
 
-const TAG_LABELS: Record<Tag, { label: string; color: string }> = {
-  important: { label: "重要",         color: "bg-red-100 text-red-700" },
-  campaign:  { label: "キャンペーン", color: "bg-yellow-100 text-yellow-700" },
-  new:       { label: "新機能",       color: "bg-blue-100 text-blue-700" },
-  notice:    { label: "お知らせ",     color: "bg-gray-100 text-gray-600" },
+const TAG_LABELS: Record<Tag, { label: string; bg: string; text: string }> = {
+  important: { label: "重要",         bg: "bg-red-50",    text: "text-red-700" },
+  campaign:  { label: "キャンペーン", bg: "bg-amber-50",  text: "text-amber-700" },
+  new:       { label: "新機能",       bg: "bg-blue-50",   text: "text-blue-700" },
+  notice:    { label: "お知らせ",     bg: "bg-stone-50",  text: "text-stone-600" },
 };
 
 const EMPTY: Partial<Announcement> = {
@@ -49,9 +48,7 @@ export default function AnnouncementsAdminPage() {
     }
     setSaving(true);
     const method = editing.id ? "PUT" : "POST";
-    const url    = editing.id
-      ? `/api/announcements/${editing.id}`
-      : "/api/announcements";
+    const url    = editing.id ? `/api/announcements/${editing.id}` : "/api/announcements";
     await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
@@ -78,44 +75,49 @@ export default function AnnouncementsAdminPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
-      {/* ヘッダー */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <Link href="/admin" className="text-indigo-400 hover:text-indigo-600 text-sm">
-            ← 管理画面に戻る
-          </Link>
-          <h1 className="text-2xl font-bold text-indigo-900">📢 お知らせ管理</h1>
+    <main className="space-y-6">
+      {/* ページヘッダー */}
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "#c9a84c" }}>
+            Announcements
+          </p>
+          <h1 className="text-2xl font-bold text-stone-900 tracking-tight">お知らせ管理</h1>
+          <p className="text-sm text-stone-400 mt-0.5">お知らせの投稿・編集・公開管理</p>
         </div>
         <button
           onClick={() => setEditing(EMPTY)}
-          className="px-4 py-2 rounded-xl text-white text-sm font-semibold shadow"
-          style={{ background: "linear-gradient(135deg, #4338ca, #7c3aed)" }}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all"
+          style={{ background: "linear-gradient(135deg, #c9a84c, #a88830)", boxShadow: "0 2px 8px rgba(201,168,76,0.35)" }}
         >
-          ＋ 新規作成
+          <i className="fas fa-plus text-xs" /> 新規作成
         </button>
       </div>
 
       {/* 編集・新規フォーム */}
       {editing && (
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 border border-indigo-100">
-          <h2 className="text-lg font-bold text-indigo-800 mb-4">
-            {editing.id ? "✏️ 編集" : "🆕 新規お知らせ"}
+        <div
+          className="rounded-2xl bg-white border border-stone-100 p-6 space-y-4"
+          style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03)" }}
+        >
+          <h2 className="text-base font-bold text-stone-800 flex items-center gap-2">
+            <i className={`fas ${editing.id ? "fa-edit" : "fa-plus-circle"} text-sm`} style={{ color: "#c9a84c" }} />
+            {editing.id ? "お知らせを編集" : "新規お知らせ作成"}
           </h2>
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">タイトル</label>
+              <label className="block text-xs font-semibold text-stone-600 mb-1">タイトル</label>
               <input
-              className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm text-gray-900 placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              placeholder="タイトルを入力"
+                className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-300"
+                placeholder="タイトルを入力"
                 value={editing.title ?? ""}
                 onChange={(e) => setEditing({ ...editing, title: e.target.value })}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">タグ</label>
+              <label className="block text-xs font-semibold text-stone-600 mb-1">タグ</label>
               <select
-                className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-300"
                 value={editing.tag ?? "notice"}
                 onChange={(e) => setEditing({ ...editing, tag: e.target.value as Tag })}
               >
@@ -126,36 +128,40 @@ export default function AnnouncementsAdminPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">内容</label>
+              <label className="block text-xs font-semibold text-stone-600 mb-1">内容</label>
               <textarea
-              className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm text-gray-900 placeholder:text-gray-600 h-32 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              placeholder="お知らせの内容を入力"
+                className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 h-32 focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
+                placeholder="お知らせの内容を入力"
                 value={editing.content ?? ""}
                 onChange={(e) => setEditing({ ...editing, content: e.target.value })}
               />
             </div>
-            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+            <label className="flex items-center gap-2.5 text-sm text-stone-700 cursor-pointer select-none">
               <input
                 type="checkbox"
-                className="w-4 h-4 rounded accent-indigo-600"
+                className="w-4 h-4 rounded accent-amber-600"
                 checked={editing.isPublished ?? false}
                 onChange={(e) => setEditing({ ...editing, isPublished: e.target.checked })}
               />
               すぐに公開する
             </label>
           </div>
-          <div className="flex gap-3 mt-5">
+          <div className="flex gap-3">
             <button
               onClick={save}
               disabled={saving}
-              className="px-6 py-2 rounded-xl text-white text-sm font-semibold disabled:opacity-50 shadow"
-              style={{ background: "linear-gradient(135deg, #4338ca, #7c3aed)" }}
+              className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-all"
+              style={{ background: "linear-gradient(135deg, #c9a84c, #a88830)", boxShadow: "0 2px 8px rgba(201,168,76,0.3)" }}
             >
-              {saving ? "保存中..." : "💾 保存する"}
+              {saving ? (
+                <><span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> 保存中...</>
+              ) : (
+                <><i className="fas fa-save" /> 保存する</>
+              )}
             </button>
             <button
               onClick={() => setEditing(null)}
-              className="px-6 py-2 rounded-xl text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 transition"
+              className="px-5 py-2 rounded-xl text-sm font-semibold text-stone-600 bg-stone-100 hover:bg-stone-200 transition"
             >
               キャンセル
             </button>
@@ -164,67 +170,79 @@ export default function AnnouncementsAdminPage() {
       )}
 
       {/* 一覧 */}
-      {loading ? (
-        <div className="text-center text-gray-600 py-12">読み込み中...</div>
-      ) : list.length === 0 ? (
-        <div className="text-center text-gray-600 py-12">
-          <p className="text-4xl mb-3">📭</p>
-          <p>お知らせがありません</p>
-          <p className="text-sm mt-1">「＋ 新規作成」から追加してください</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {list.map((a) => {
-            const tagInfo = TAG_LABELS[a.tag as Tag] ?? TAG_LABELS.notice;
-            return (
-              <div
-                key={a.id}
-                className="bg-white rounded-2xl shadow p-4 flex items-start gap-4 border border-gray-100"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${tagInfo.color}`}>
-                      {tagInfo.label}
-                    </span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                      a.isPublished
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-700"
-                    }`}>
-                      {a.isPublished ? "✅ 公開中" : "🔒 非公開"}
-                    </span>
-                    <span className="text-xs text-gray-600">
-                      {new Date(a.createdAt).toLocaleDateString("ja-JP")}
-                    </span>
+      <div
+        className="rounded-2xl bg-white border border-stone-100"
+        style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03)" }}
+      >
+        {loading ? (
+          <div className="flex items-center justify-center py-16 gap-3">
+            <span className="w-5 h-5 border-2 border-stone-200 border-t-amber-500 rounded-full animate-spin" />
+            <span className="text-sm text-stone-400">読み込み中...</span>
+          </div>
+        ) : list.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-stone-50 flex items-center justify-center mb-4">
+              <i className="fas fa-bullhorn text-2xl text-stone-300" />
+            </div>
+            <p className="font-semibold text-stone-700 mb-1">お知らせがありません</p>
+            <p className="text-sm text-stone-400">「新規作成」からお知らせを追加してください</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-stone-50">
+            {list.map((a) => {
+              const tagInfo = TAG_LABELS[a.tag as Tag] ?? TAG_LABELS.notice;
+              return (
+                <div key={a.id} className="flex items-start gap-4 p-5 hover:bg-stone-50/50 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${tagInfo.bg} ${tagInfo.text}`} style={{ borderColor: "transparent" }}>
+                        {tagInfo.label}
+                      </span>
+                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
+                        a.isPublished ? "bg-emerald-50 text-emerald-700" : "bg-stone-50 text-stone-500"
+                      }`}>
+                        {a.isPublished ? "公開中" : "非公開"}
+                      </span>
+                      <span className="text-xs text-stone-400">
+                        {new Date(a.createdAt).toLocaleDateString("ja-JP")}
+                      </span>
+                    </div>
+                    <p className="font-semibold text-stone-800 text-sm truncate">{a.title}</p>
+                    <p className="text-xs text-stone-500 mt-0.5 line-clamp-2">{a.content}</p>
                   </div>
-                  <p className="font-bold text-gray-900 text-sm truncate">{a.title}</p>
-                  <p className="text-xs font-medium text-gray-700 mt-0.5 line-clamp-2">{a.content}</p>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => setEditing(a)}
+                      className="p-2 rounded-lg text-xs text-stone-500 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+                      title="編集"
+                    >
+                      <i className="fas fa-edit" />
+                    </button>
+                    <button
+                      onClick={() => togglePublish(a)}
+                      className={`p-2 rounded-lg text-xs transition-colors ${
+                        a.isPublished
+                          ? "text-amber-500 hover:bg-amber-50"
+                          : "text-emerald-500 hover:bg-emerald-50"
+                      }`}
+                      title={a.isPublished ? "非公開にする" : "公開する"}
+                    >
+                      <i className={`fas ${a.isPublished ? "fa-eye-slash" : "fa-eye"}`} />
+                    </button>
+                    <button
+                      onClick={() => remove(a.id)}
+                      className="p-2 rounded-lg text-xs text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                      title="削除"
+                    >
+                      <i className="fas fa-trash-alt" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex flex-col gap-2 min-w-max text-right">
-                  <button
-                    onClick={() => setEditing(a)}
-                    className="text-xs text-indigo-600 hover:underline"
-                  >
-                    ✏️ 編集
-                  </button>
-                  <button
-                    onClick={() => togglePublish(a)}
-                    className="text-xs text-green-600 hover:underline"
-                  >
-                    {a.isPublished ? "🔒 非公開に" : "✅ 公開する"}
-                  </button>
-                  <button
-                    onClick={() => remove(a.id)}
-                    className="text-xs text-red-500 hover:underline"
-                  >
-                    🗑️ 削除
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </main>
   );
 }

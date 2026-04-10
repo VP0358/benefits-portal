@@ -80,9 +80,9 @@ export default function MlmStatsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8">
+      <div className="min-h-screen bg-stone-50 p-8">
         <div className="max-w-7xl mx-auto">
-          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+          <div className="bg-white rounded-2xl border border-stone-100 p-12 text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
             <p className="mt-4 text-gray-600">統計データを読み込み中...</p>
           </div>
@@ -93,9 +93,9 @@ export default function MlmStatsPage() {
 
   if (!stats) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8">
+      <div className="min-h-screen bg-stone-50 p-8">
         <div className="max-w-7xl mx-auto">
-          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+          <div className="bg-white rounded-2xl border border-stone-100 p-12 text-center">
             <p className="text-gray-600">統計データがありません</p>
           </div>
         </div>
@@ -104,7 +104,7 @@ export default function MlmStatsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-stone-50">
       {/* ヘッダー */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-8 px-8 shadow-lg">
         <div className="max-w-7xl mx-auto">
@@ -119,7 +119,7 @@ export default function MlmStatsPage() {
       <div className="max-w-7xl mx-auto p-8">
         {/* サマリーカード */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-white rounded-2xl border border-stone-100 p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 mb-1">総会員数</p>
@@ -131,7 +131,7 @@ export default function MlmStatsPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-white rounded-2xl border border-stone-100 p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 mb-1">アクティブ会員</p>
@@ -143,7 +143,7 @@ export default function MlmStatsPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-white rounded-2xl border border-stone-100 p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 mb-1">ビジネス会員</p>
@@ -155,7 +155,7 @@ export default function MlmStatsPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-white rounded-2xl border border-stone-100 p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 mb-1">コンシューマー会員</p>
@@ -169,7 +169,7 @@ export default function MlmStatsPage() {
         </div>
 
         {/* タブ切り替え */}
-        <div className="bg-white rounded-lg shadow-sm mb-8">
+        <div className="bg-white rounded-2xl border border-stone-100 mb-8">
           <div className="border-b border-gray-200">
             <nav className="flex space-x-8 px-6" aria-label="Tabs">
               <button

@@ -77,11 +77,12 @@ export default async function AdminVpPhonePage({
     <main className="space-y-5">
 
       {/* ヘッダー */}
-      <div className="rounded-3xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white border border-stone-100 p-6" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-xl font-bold text-slate-800">📱 VP未来phone 申し込み管理</h1>
-            <p className="text-sm text-slate-500 mt-0.5">全 {total.toLocaleString()} 件</p>
+            <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "#34d399" }}>Phone Applications</p>
+            <h1 className="text-2xl font-bold text-stone-900 tracking-tight">VP未来phone 申し込み管理</h1>
+            <p className="text-sm text-stone-400 mt-0.5">全 {total.toLocaleString()} 件</p>
           </div>
           <div className="flex gap-3 flex-wrap">
             {(["pending", "reviewing", "contracted", "rejected"] as const).map(s => (
@@ -145,7 +146,7 @@ export default async function AdminVpPhonePage({
 
       {/* 申請種別フィルター（会員からの要対応申請） */}
       {(planChangeCnt > 0 || contractCancelCnt > 0 || cancelApplyCnt > 0) && (
-        <div className="rounded-3xl bg-white p-4 shadow-sm">
+        <div className="rounded-2xl bg-white border border-stone-100 p-4">
           <p className="text-xs font-bold text-slate-600 mb-3">⚠️ 会員からの申請（要対応）</p>
           <div className="flex gap-2 flex-wrap">
             <Link
@@ -200,7 +201,7 @@ export default async function AdminVpPhonePage({
       )}
 
       {/* ステータスフィルター */}
-      <div className="rounded-3xl bg-white p-4 shadow-sm">
+      <div className="rounded-2xl bg-white border border-stone-100 p-4">
         <p className="text-xs font-bold text-slate-600 mb-3">ステータスで絞り込み</p>
         <div className="flex gap-2 flex-wrap">
           {[
@@ -267,7 +268,7 @@ export default async function AdminVpPhonePage({
           const officeEmail = (a as typeof a & { officeEmail?: string | null }).officeEmail ?? "";
 
           return (
-            <div key={a.id.toString()} className={`rounded-3xl bg-white shadow-sm overflow-hidden ${isBeforeDeadline ? "ring-2 ring-blue-200" : ""}`}>
+            <div key={a.id.toString()} className={`rounded-2xl bg-white border border-stone-100 overflow-hidden ${isBeforeDeadline ? "ring-2 ring-blue-200" : ""}`}>
 
               {/* 2026年4月末区分バナー */}
               {isBeforeDeadline ? (

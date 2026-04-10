@@ -136,11 +136,12 @@ export default async function AdminTravelSubsPage({
       <MemberStatsSummary show={["travel"]} compact />
 
       {/* ヘッダー */}
-      <div className="rounded-3xl bg-white p-6 shadow-sm">
+      <div className="rounded-2xl bg-white border border-stone-100 p-6" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
         <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
           <div>
-            <h1 className="text-xl font-bold text-slate-800">✈️ 旅行サブスク一覧</h1>
-            <p className="text-sm text-slate-700 mt-0.5">全会員 {totalActiveUsers.toLocaleString()} 名</p>
+            <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "#a78bfa" }}>Travel Subscriptions</p>
+            <h1 className="text-2xl font-bold text-stone-900 tracking-tight">旅行サブスク一覧</h1>
+            <p className="text-sm text-stone-400 mt-0.5">全会員 {totalActiveUsers.toLocaleString()} 名</p>
           </div>
           <TravelSubsActions users={usersForForm} mode="register-only" />
         </div>
@@ -208,7 +209,7 @@ export default async function AdminTravelSubsPage({
       </div>
 
       {/* タブ切替 */}
-      <div className="rounded-3xl bg-white p-4 shadow-sm">
+      <div className="rounded-2xl bg-white border border-stone-100 p-4">
         <div className="flex gap-2 flex-wrap">
           <Link
             href="/admin/travel-subscriptions?tab=list"
@@ -238,7 +239,7 @@ export default async function AdminTravelSubsPage({
 
       {/* ─── 未登録者タブ ─── */}
       {tab === "unregistered" && (
-        <div className="rounded-3xl bg-white shadow-sm overflow-hidden">
+        <div className="rounded-2xl bg-white border border-stone-100 overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <div>
               <div className="font-semibold text-slate-800">💤 未登録会員一覧</div>
@@ -287,7 +288,7 @@ export default async function AdminTravelSubsPage({
       {tab === "list" && (
         <>
           {/* フィルター */}
-          <div className="rounded-3xl bg-white p-4 shadow-sm flex items-center gap-2 flex-wrap">
+          <div className="rounded-2xl bg-white border border-stone-100 p-4 flex items-center gap-2 flex-wrap">
             {[
               { value: "", label: "すべて" },
               { value: "active", label: "有効" },
@@ -310,7 +311,7 @@ export default async function AdminTravelSubsPage({
           </div>
 
           {/* テーブル */}
-          <div className="rounded-3xl bg-white shadow-sm overflow-hidden">
+          <div className="rounded-2xl bg-white border border-stone-100 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-100">

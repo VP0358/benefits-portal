@@ -217,20 +217,18 @@ export default function BonusUtilitiesPage() {
   };
 
   return (
-    <main className="space-y-6">
-      {/* ヘッダー */}
+    <div className="space-y-6">
+      {/* ページヘッダー */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-800">
-          <i className="fas fa-tools mr-2"></i>
-          ボーナス管理ユーティリティ
-        </h1>
-        <p className="mt-2 text-gray-600">
-          支払調書、購入一覧、備考入力、貯金B一覧、更新履歴
+        <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "#c9a84c" }}>
+          Bonus Utilities
         </p>
+        <h1 className="text-2xl font-bold text-stone-900 tracking-tight">ボーナス管理ユーティリティ</h1>
+        <p className="text-sm text-stone-400 mt-0.5">支払調書・購入一覧・備考入力・貯金B一覧・更新履歴</p>
       </div>
 
       {/* 対象月選択 */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="rounded-2xl bg-white border border-stone-100 p-6" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
         <label className="block text-sm font-semibold text-gray-700 mb-2">
           対象月
         </label>
@@ -254,7 +252,7 @@ export default function BonusUtilitiesPage() {
       )}
 
       {/* タブナビゲーション */}
-      <div className="bg-white rounded-lg shadow">
+      <div className="rounded-2xl bg-white border border-stone-100">
         <div className="border-b border-gray-200">
           <nav className="flex space-x-4 px-6 pt-4 overflow-x-auto">
             <button
@@ -344,7 +342,7 @@ export default function BonusUtilitiesPage() {
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-stone-50">
                       <tr>
                         <th className="px-4 py-3 text-left">
                           <input
@@ -375,7 +373,7 @@ export default function BonusUtilitiesPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {paymentRecords.map((r) => (
-                        <tr key={r.memberCode} className="hover:bg-gray-50">
+                        <tr key={r.memberCode} className="hover:bg-stone-50">
                           <td className="px-4 py-3">
                             <input
                               type="checkbox"
@@ -429,7 +427,7 @@ export default function BonusUtilitiesPage() {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-stone-50">
                     <tr>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">
                         商品コード
@@ -469,7 +467,7 @@ export default function BonusUtilitiesPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {purchaseRecords.map((r) => (
-                      <tr key={r.productCode} className="hover:bg-gray-50">
+                      <tr key={r.productCode} className="hover:bg-stone-50">
                         <td className="px-4 py-3 font-mono">{r.productCode}</td>
                         <td className="px-4 py-3">{r.productName}</td>
                         <td className="px-4 py-3 text-right">
@@ -537,7 +535,7 @@ export default function BonusUtilitiesPage() {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-stone-50">
                     <tr>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">
                         会員ID
@@ -558,7 +556,7 @@ export default function BonusUtilitiesPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {savingsInputs.map((s, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50">
+                      <tr key={idx} className="hover:bg-stone-50">
                         <td className="px-4 py-3 font-mono">{s.memberCode}</td>
                         <td className="px-4 py-3">
                           {s.companyName || <span className="text-gray-400">-</span>}
@@ -608,6 +606,6 @@ export default function BonusUtilitiesPage() {
           )}
         </div>
       </div>
-    </main>
+    </div>
   );
 }

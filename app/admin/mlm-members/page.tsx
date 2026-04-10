@@ -119,7 +119,7 @@ function EditModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="bg-white rounded-3xl shadow-xl w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-bold text-slate-800">会員編集: {member.userName}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">✕</button>
@@ -383,31 +383,36 @@ export default function MlmMembersPage() {
       {/* MLM統計サマリー */}
       <MemberStatsSummary show={["mlm"]} compact />
 
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">👥 MLM会員管理</h1>
-          <p className="text-sm text-slate-600 mt-1">
-            会員タイプ・レベル・条件達成・強制アクティブなどを管理します。行をクリックで会員詳細へ。
+          <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "#c9a84c" }}>
+            MLM Members
+          </p>
+          <h1 className="text-2xl font-bold text-stone-900 tracking-tight">MLM会員管理</h1>
+          <p className="text-sm text-stone-400 mt-0.5">
+            会員タイプ・レベル・条件達成・強制アクティブなどを管理します
           </p>
         </div>
         <div className="flex gap-2">
           <Link
             href="/admin/mlm-members/new"
-            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 transition"
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-white transition-all"
+            style={{ background: "linear-gradient(135deg, #c9a84c, #a88830)", boxShadow: "0 2px 8px rgba(201,168,76,0.35)" }}
           >
-            ＋ 新規登録
+            <i className="fas fa-user-plus text-xs" /> 新規登録
           </Link>
           <Link
             href="/admin/bonus-calculate"
-            className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700 transition"
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-white transition-all"
+            style={{ background: "linear-gradient(135deg, #7c3aed, #6d28d9)", boxShadow: "0 2px 8px rgba(124,58,237,0.3)" }}
           >
-            🧮 ボーナス計算へ
+            <i className="fas fa-calculator text-xs" /> ボーナス計算
           </Link>
         </div>
       </div>
 
       {/* フィルター */}
-      <div className="rounded-3xl bg-white p-5 shadow-sm space-y-3">
+      <div className="rounded-2xl bg-white border border-stone-100 p-5 space-y-3">
         {/* 検索フィールド選択 + 検索ワード */}
         <div className="grid gap-3 md:grid-cols-4">
           <div>
@@ -487,7 +492,7 @@ export default function MlmMembersPage() {
       )}
 
       {/* テーブル */}
-      <div className="rounded-3xl bg-white shadow-sm overflow-x-auto">
+      <div className="rounded-2xl bg-white border border-stone-100 overflow-x-auto">
         <table className="w-full text-sm min-w-[900px]">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50">

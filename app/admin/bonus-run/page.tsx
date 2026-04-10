@@ -241,14 +241,14 @@ export default function BonusRunPage() {
   return (
     <main className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">🧮 MLMボーナス計算</h1>
+        <h1 className="text-2xl font-bold text-stone-900 tracking-tight">🧮 MLMボーナス計算</h1>
         <p className="text-sm text-slate-600 mt-1">
           月次ボーナスの計算・確定を行います。計算はいつでも再実行できます。確定すると会員の称号レベルが更新されます。
         </p>
       </div>
 
       {/* ━━━ 計算実行パネル ━━━ */}
-      <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
+      <div className="rounded-2xl bg-white border border-stone-100 p-6 space-y-4">
         <h2 className="text-sm font-bold text-slate-700">📅 ボーナス計算実行</h2>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -318,7 +318,7 @@ export default function BonusRunPage() {
 
       {/* ━━━ 計算結果詳細 ━━━ */}
       {detail && (
-        <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
+        <div className="rounded-2xl bg-white border border-stone-100 p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold text-slate-700">
               📊 {detail.bonusMonth} 計算結果
@@ -351,7 +351,7 @@ export default function BonusRunPage() {
       )}
 
       {/* ━━━ 過去の計算履歴 ━━━ */}
-      <div className="rounded-3xl bg-white p-6 shadow-sm space-y-3">
+      <div className="rounded-2xl bg-white border border-stone-100 p-6 space-y-3">
         <h2 className="text-sm font-bold text-slate-700">🗂️ 計算履歴</h2>
 
         {loading ? (

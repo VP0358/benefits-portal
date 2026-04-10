@@ -110,15 +110,15 @@ export default function PurchasePanel({ memberCode }: { memberCode: string }) {
   }
 
   return (
-    <section className="bg-white rounded-lg shadow p-6">
+    <section className="bg-white rounded-2xl border border-stone-100 p-5">
       <div className="flex items-center justify-between mb-4 border-b pb-2">
-        <h2 className="text-xl font-bold text-gray-800">
-          <i className="fas fa-shopping-bag mr-2"></i>
+        <h2 className="text-base font-bold text-slate-800">
+          <i className="fas fa-shopping-bag mr-2 text-slate-600"></i>
           購入履歴
         </h2>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition"
+          className="flex items-center gap-1 px-3 py-1.5 bg-violet-600 text-white text-xs font-bold rounded-lg hover:bg-violet-700 transition"
         >
           {showForm ? "✕ キャンセル" : "＋ 購入履歴追加"}
         </button>
@@ -126,15 +126,15 @@ export default function PurchasePanel({ memberCode }: { memberCode: string }) {
 
       {/* 購入データ追加フォーム */}
       {showForm && (
-        <form onSubmit={handleAdd} className="mb-6 p-4 bg-blue-50 rounded-lg space-y-3">
-          <h3 className="font-semibold text-blue-800 text-sm">購入履歴を追加</h3>
+        <form onSubmit={handleAdd} className="mb-6 p-4 bg-violet-50 rounded-xl space-y-3">
+          <h3 className="font-semibold text-violet-800 text-sm">購入履歴を追加</h3>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-gray-600 mb-1">商品</label>
               <select
                 value={form.productCode}
                 onChange={e => onProductChange(e.target.value)}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white"
                 required
               >
                 {PRODUCT_OPTIONS.map(o => (
@@ -149,7 +149,7 @@ export default function PurchasePanel({ memberCode }: { memberCode: string }) {
                 type="month"
                 value={form.month}
                 onChange={e => setForm(f => ({ ...f, month: e.target.value }))}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white"
                 required
               />
             </div>
@@ -160,7 +160,7 @@ export default function PurchasePanel({ memberCode }: { memberCode: string }) {
                 min={1}
                 value={form.quantity}
                 onChange={e => setForm(f => ({ ...f, quantity: parseInt(e.target.value) || 1 }))}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white"
               />
             </div>
             <div>
@@ -170,7 +170,7 @@ export default function PurchasePanel({ memberCode }: { memberCode: string }) {
                 min={0}
                 value={form.unitPrice}
                 onChange={e => setForm(f => ({ ...f, unitPrice: parseInt(e.target.value) || 0 }))}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white"
               />
             </div>
             <div>
@@ -180,7 +180,7 @@ export default function PurchasePanel({ memberCode }: { memberCode: string }) {
                 min={0}
                 value={form.points}
                 onChange={e => setForm(f => ({ ...f, points: parseInt(e.target.value) || 0 }))}
-                className="w-full border rounded px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white"
               />
             </div>
             <div className="flex items-end">
@@ -192,7 +192,7 @@ export default function PurchasePanel({ memberCode }: { memberCode: string }) {
           <button
             type="submit"
             disabled={adding}
-            className="px-6 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="px-6 py-2 bg-violet-600 text-white text-sm font-bold rounded-xl hover:bg-violet-700 disabled:opacity-50 transition"
           >
             {adding ? "追加中..." : "追加する"}
           </button>
@@ -207,7 +207,7 @@ export default function PurchasePanel({ memberCode }: { memberCode: string }) {
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
+            <thead className="bg-slate-800 text-white">
               <tr>
                 <th className="px-3 py-2 text-left">対象月</th>
                 <th className="px-3 py-2 text-left">商品コード</th>
@@ -221,7 +221,7 @@ export default function PurchasePanel({ memberCode }: { memberCode: string }) {
             </thead>
             <tbody>
               {purchases.map(p => (
-                <tr key={p.id} className="border-b hover:bg-gray-50">
+                <tr key={p.id} className="border-b hover:bg-violet-50 transition">
                   <td className="px-3 py-2 font-medium">{p.purchaseMonth}</td>
                   <td className="px-3 py-2 font-mono text-xs">{p.productCode}</td>
                   <td className="px-3 py-2 text-gray-700">{p.productName}</td>
@@ -240,7 +240,7 @@ export default function PurchasePanel({ memberCode }: { memberCode: string }) {
                 </tr>
               ))}
             </tbody>
-            <tfoot className="bg-gray-50 border-t">
+            <tfoot className="bg-slate-50 border-t">
               <tr>
                 <td colSpan={6} className="px-3 py-2 text-right font-semibold text-gray-700">合計ポイント:</td>
                 <td className="px-3 py-2 text-right font-bold text-blue-700">

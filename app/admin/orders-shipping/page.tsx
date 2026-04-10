@@ -317,14 +317,15 @@ export default function OrdersShippingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-[1800px] mx-auto">
-        {/* ヘッダー */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-5">
+    <div className="space-y-6">
+      <div>
+        {/* ページヘッダー */}
+        <div className="rounded-2xl bg-white border border-stone-100 p-5 mb-5" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
           <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center space-x-3">
-              <Package className="w-7 h-7 text-blue-600" />
-              <h1 className="text-xl font-bold text-gray-800">受注・発送状況</h1>
+            <div>
+              <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "#c9a84c" }}>Shipping Status</p>
+              <h1 className="text-2xl font-bold text-stone-900 tracking-tight">受注・発送状況</h1>
+              <p className="text-sm text-stone-400 mt-0.5">支払い方法・伝票種別での絞り込みと発送管理</p>
             </div>
             <div className="flex space-x-2">
               {hasSearched && orders.length > 0 && (
@@ -499,13 +500,13 @@ export default function OrdersShippingPage() {
         ) : (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             {/* 件数バー */}
-            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+            <div className="px-4 py-3 bg-stone-50 border-b border-gray-200 flex items-center justify-between">
               <span className="text-sm text-gray-600 font-medium">{orders.length}件の注文が見つかりました</span>
             </div>
 
             <div className="divide-y divide-gray-100">
               {orders.map((order) => (
-                <div key={order.id} className="hover:bg-gray-50 transition-colors">
+                <div key={order.id} className="hover:bg-stone-50 transition-colors">
                   {/* メイン行 */}
                   <div className="px-4 py-3 flex items-center gap-3">
                     {/* 展開ボタン */}
@@ -700,7 +701,7 @@ export default function OrdersShippingPage() {
               </div>
 
               {/* 会員情報（読み取り専用） */}
-              <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm">
+              <div className="bg-stone-50 rounded-lg p-3 mb-4 text-sm">
                 <div className="grid grid-cols-2 gap-2">
                   <div><span className="text-gray-500">会員名：</span>{editingOrder.memberName}</div>
                   <div><span className="text-gray-500">会員コード：</span>{editingOrder.memberCode}</div>
@@ -769,7 +770,7 @@ export default function OrdersShippingPage() {
 
                 {/* 配送先情報 */}
                 {editingOrder.shippingLabel && (
-                  <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="bg-stone-50 p-4 rounded-lg">
                     <h3 className="font-medium text-gray-800 mb-2 text-sm">配送先情報</h3>
                     <div className="text-sm text-gray-700 space-y-1">
                       <div>氏名: {editingOrder.shippingLabel.recipientName}</div>
@@ -784,7 +785,7 @@ export default function OrdersShippingPage() {
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   onClick={() => setShowEditModal(false)}
-                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-stone-50 transition-colors"
                 >
                   キャンセル
                 </button>

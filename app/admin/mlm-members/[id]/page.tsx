@@ -375,7 +375,7 @@ export default function MlmMemberDetailPage() {
             className="text-sm text-blue-600 hover:text-blue-700 mb-1 inline-flex items-center gap-1">
             ← MLM会員一覧
           </Link>
-          <h1 className="text-2xl font-bold text-slate-800 mt-1">MLM会員詳細</h1>
+          <h1 className="text-2xl font-bold text-stone-900 tracking-tight mt-1">MLM会員詳細</h1>
           <p className="text-sm text-slate-500 mt-0.5">
             {m.memberCode} ／ {dispName}
           </p>

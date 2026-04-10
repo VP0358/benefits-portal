@@ -76,7 +76,7 @@ export default function EditProductPage() {
 
   return (
     <main className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
-      <h1 className="text-2xl font-bold text-slate-800">商品編集</h1>
+      <h1 className="text-2xl font-bold text-stone-900 tracking-tight">商品編集</h1>
 
       <div>
         <label className="mb-1 block text-sm font-semibold text-slate-700">商品コード</label>

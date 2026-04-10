@@ -332,17 +332,18 @@ export default function ProductPurchasesPage() {
     }`
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-[1800px] mx-auto">
-        {/* ヘッダー */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex items-center space-x-3 mb-6">
-            <ShoppingCart className="w-8 h-8 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-800">商品購入管理</h1>
+    <div className="space-y-6">
+      <div>
+        {/* ページヘッダー */}
+        <div className="rounded-2xl bg-white border border-stone-100 p-6 mb-6" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
+          <div className="mb-4">
+            <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: "#c9a84c" }}>Product Purchases</p>
+            <h1 className="text-2xl font-bold text-stone-900 tracking-tight">商品購入管理</h1>
+            <p className="text-sm text-stone-400 mt-0.5">購入記録・ステータス管理・CSV出力</p>
           </div>
 
           {/* タブ */}
-          <div className="flex flex-wrap gap-1 border-b border-gray-200">
+          <div className="flex flex-wrap gap-1 border-b border-stone-100">
             <button onClick={() => setActiveTab("input")} className={tabClass("input")}>
               <Plus className="w-4 h-4" /><span>購入入力</span>
             </button>
@@ -362,7 +363,7 @@ export default function ProductPurchasesPage() {
         </div>
 
         {/* コンテンツエリア */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="bg-white rounded-2xl border border-stone-100 p-6">
 
           {/* 購入入力タブ */}
           {activeTab === "input" && (
@@ -445,7 +446,7 @@ export default function ProductPurchasesPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {monthlyPurchases.map((purchase) => (
-                        <tr key={purchase.productCode} className="hover:bg-gray-50">
+                        <tr key={purchase.productCode} className="hover:bg-stone-50">
                           <td className="px-4 py-3">{purchase.productCode}</td>
                           <td className="px-4 py-3">{purchase.productName}</td>
                           {Object.keys(purchase.months).sort().map(month => (
@@ -471,7 +472,7 @@ export default function ProductPurchasesPage() {
               <p className="text-sm text-gray-600 mb-4">購入記録を検索し、ステータスを変更できます。</p>
               
               {/* 検索フォーム */}
-              <div className="bg-gray-50 rounded-lg p-4">
+              <div className="bg-stone-50 rounded-lg p-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">検索条件</h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
@@ -536,7 +537,7 @@ export default function ProductPurchasesPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {statusPurchases.map((purchase) => (
-                        <tr key={purchase.id} className="hover:bg-gray-50">
+                        <tr key={purchase.id} className="hover:bg-stone-50">
                           <td className="px-3 py-3">{purchase.memberCode}</td>
                           <td className="px-3 py-3">{purchase.memberName}</td>
                           <td className="px-3 py-3 text-xs">
@@ -615,7 +616,7 @@ export default function ProductPurchasesPage() {
           {activeTab === "product" && (
             <div className="space-y-6">
               <h2 className="text-xl font-bold text-gray-800 mb-4">商品別購入一覧</h2>
-              <div className="bg-gray-50 rounded-lg p-4">
+              <div className="bg-stone-50 rounded-lg p-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">商品コード</label>
@@ -671,7 +672,7 @@ export default function ProductPurchasesPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {productPurchases.map((purchase) => (
-                        <tr key={purchase.id} className="hover:bg-gray-50">
+                        <tr key={purchase.id} className="hover:bg-stone-50">
                           <td className="px-4 py-3">{purchase.id}</td>
                           <td className="px-4 py-3">{purchase.memberName}</td>
                           <td className="px-4 py-3">{purchase.memberCode}</td>
@@ -704,7 +705,7 @@ export default function ProductPurchasesPage() {
           {activeTab === "member" && (
             <div className="space-y-6">
               <h2 className="text-xl font-bold text-gray-800 mb-4">会員別購入記録一覧</h2>
-              <div className="bg-gray-50 rounded-lg p-4">
+              <div className="bg-stone-50 rounded-lg p-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">会員コード</label>
@@ -756,7 +757,7 @@ export default function ProductPurchasesPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {memberPurchases.map((purchase) => (
-                        <tr key={purchase.id} className="hover:bg-gray-50">
+                        <tr key={purchase.id} className="hover:bg-stone-50">
                           <td className="px-4 py-3">{purchase.id}</td>
                           <td className="px-4 py-3">{purchase.memberName}</td>
                           <td className="px-4 py-3">{purchase.memberCode}</td>

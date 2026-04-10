@@ -8,20 +8,10 @@ import { prisma } from '@/lib/prisma';
 import { generateMemberCode } from "@/lib/mlm-utils";
 import bcrypt from "bcryptjs";
 
-// 初期パスワード生成（英小文字大文字数字記号 8桁）
+// 初期パスワード：全会員一律「0000」
+// ※ ログイン後、会員自身がパスワードを変更してください
 function generateInitialPassword(): string {
-  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789!@#$%';
-  let pw = '';
-  // 必ず各層の文字が最低1桁入るように
-  pw += 'abcdefghjkmnpqrstuvwxyz'[Math.floor(Math.random() * 23)];
-  pw += 'ABCDEFGHJKMNPQRSTUVWXYZ'[Math.floor(Math.random() * 23)];
-  pw += '23456789'[Math.floor(Math.random() * 8)];
-  pw += '!@#$%'[Math.floor(Math.random() * 5)];
-  for (let i = 4; i < 8; i++) {
-    pw += chars[Math.floor(Math.random() * chars.length)];
-  }
-  // シャッフル
-  return pw.split('').sort(() => Math.random() - 0.5).join('');
+  return "0000";
 }
 
 // GET: MLM会員一覧取得（検索・フィルター対応）
