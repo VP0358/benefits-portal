@@ -286,6 +286,41 @@ export default function OrdersShippingPage() {
     router.push(`/admin/orders-shipping/delivery-note?ids=${ids}&type=${type}`)
   }
 
+  // ─── クロネコヤマトB2CSV出力 ──────────────────────────
+  const handleExportYamatoCSV = async () => {
+    const target = selected.size > 0 ? orders.filter(o => selected.has(o.id)) : orders
+    if (target.length === 0) { alert("伝票がありません"); return }
+    const ids = target.map(o => o.id).join(",")
+    try {
+      const res = await fetch(`/api/admin/orders-shipping/yamato-csv?ids=${ids}`)
+      if (!res.ok) { const d = await res.json(); alert(d.error || "CSV出力に失敗しました"); return }
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement("a")
+      a.href = url
+      a.download = `yamato_${new Date().toISOString().slice(0,10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch { alert("CSV出力に失敗しました") }
+  }
+
+  // ─── 振替伝票の入金日削除 ──────────────────────────────
+  const handleClearBankTransferPaidAt = async () => {
+    const target = selected.size > 0
+      ? orders.filter(o => selected.has(o.id) && (o.paymentMethod === "bank_transfer" || o.paymentMethod === "direct_debit"))
+      : orders.filter(o => o.paymentMethod === "bank_transfer" || o.paymentMethod === "direct_debit")
+    if (target.length === 0) { alert("口座振替の伝票がありません（選択された伝票を確認してください）"); return }
+    if (!confirm(`口座振替 ${target.length}件 の入金日を削除しますか？\n（入金状態は「未入金」に戻ります）`)) return
+    const res = await fetch("/api/admin/orders-shipping", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderIds: target.map(o => o.id), action: "clearPaidAt", value: null }),
+    })
+    if (!res.ok) { alert("更新に失敗しました"); return }
+    alert(`${target.length}件の入金日を削除しました`)
+    fetchSummary(); fetchOrders()
+  }
+
   // ─── CSV出力 ─────────────────────────────────────────
   const exportCSV = () => {
     const target = selected.size > 0 ? orders.filter(o => selected.has(o.id)) : orders
@@ -541,6 +576,12 @@ export default function OrdersShippingPage() {
               className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-400 rounded text-sm hover:bg-gray-50">
               <Download className="w-3.5 h-3.5" />伝票CSV出力
             </button>
+            {/* クロネコヤマトB2CSV出力 */}
+            <button onClick={handleExportYamatoCSV}
+              className="flex items-center gap-1 px-3 py-1.5 bg-white border border-amber-500 text-amber-700 rounded text-sm hover:bg-amber-50"
+              title="選択した伝票をヤマトB2クラウド取込用CSVでダウンロード">
+              <Download className="w-3.5 h-3.5" />ヤマトB2CSV出力
+            </button>
             {/* 納品書ボタン → 納品書・出庫リストページへ遷移 */}
             <button
               onClick={() => handleGoDeliveryNote("delivery")}
@@ -569,6 +610,12 @@ export default function OrdersShippingPage() {
               <Upload className="w-3.5 h-3.5" />振替結果CSV取込
               <input ref={debitInputRef} type="file" accept=".csv" className="hidden" onChange={handleDebitImport} />
             </label>
+            {/* 振替伝票の入金日削除 */}
+            <button onClick={handleClearBankTransferPaidAt}
+              className="flex items-center gap-1 px-3 py-1.5 bg-white border border-red-300 text-red-600 rounded text-sm hover:bg-red-50"
+              title="選択した口座振替伝票の入金日をクリアして未入金に戻す">
+              <AlertCircle className="w-3.5 h-3.5" />振替入金日削除
+            </button>
           </div>
         </div>
       </div>
@@ -667,10 +714,17 @@ export default function OrdersShippingPage() {
               )}
               <span className="text-xs text-gray-500">計 {orders.length}件</span>
             </div>
-            <button onClick={exportCSV}
-              className="flex items-center gap-1 text-xs px-3 py-1 border border-gray-300 rounded hover:bg-gray-50">
-              <Download className="w-3.5 h-3.5" />CSV出力
-            </button>
+            <div className="flex gap-1">
+              <button onClick={exportCSV}
+                className="flex items-center gap-1 text-xs px-3 py-1 border border-gray-300 rounded hover:bg-gray-50">
+                <Download className="w-3.5 h-3.5" />CSV出力
+              </button>
+              <button onClick={handleExportYamatoCSV}
+                className="flex items-center gap-1 text-xs px-3 py-1 border border-amber-400 text-amber-700 rounded hover:bg-amber-50"
+                title="ヤマトB2クラウド取込用CSV">
+                <Download className="w-3.5 h-3.5" />ヤマトCSV
+              </button>
+            </div>
           </div>
 
           {loading ? (

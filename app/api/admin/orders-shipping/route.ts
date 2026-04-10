@@ -303,6 +303,9 @@ export async function PATCH(request: NextRequest) {
       case "setPaidAt":
         updateData = { paidAt: value ? new Date(value) : null, paymentStatus: "paid" }
         break
+      case "clearPaidAt":
+        updateData = { paidAt: null, paymentStatus: "unpaid" }
+        break
       case "setShippedAt":
         updateData = { shippingStatus: "shipped" }
         // ShippingLabel の shippedAt を更新

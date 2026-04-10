@@ -301,6 +301,85 @@ export default function MlmMemberDetailPage() {
     }
   };
 
+  // 登録完了通知書を印刷
+  const handlePrintRegistrationNotice = () => {
+    if (!member) return;
+    const m = member;
+    const r = m.user.mlmRegistration;
+    const today = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" });
+    const html = `<!DOCTYPE html><html lang="ja"><head>
+      <meta charset="UTF-8">
+      <title>登録完了通知書</title>
+      <style>
+        @media print { body { margin: 0; } @page { margin: 10mm; size: A4; } }
+        body { font-family: 'Noto Sans JP', 'Yu Gothic', 'Hiragino Sans', sans-serif; font-size: 12px; }
+      </style>
+    </head><body>
+      <div style="padding:36px 40px;font-family:'Noto Sans JP','Yu Gothic',sans-serif;font-size:12px;max-width:680px;margin:0 auto;">
+        <div style="text-align:center;margin-bottom:32px;border-bottom:3px solid #1d4ed8;padding-bottom:16px;">
+          <h1 style="font-size:26px;font-weight:700;color:#1d4ed8;letter-spacing:5px;margin:0 0 4px;">登録完了通知書</h1>
+          <div style="font-size:11px;color:#6b7280;letter-spacing:2px;">Registration Completion Notice</div>
+        </div>
+        <div style="text-align:right;font-size:12px;margin-bottom:24px;color:#374151;">${today}</div>
+        <div style="margin-bottom:28px;">
+          ${m.companyName ? `<div style="font-size:14px;color:#374151;margin-bottom:2px;">${m.companyName}</div>` : ""}
+          <div style="font-size:22px;font-weight:700;border-bottom:2px solid #374151;padding-bottom:6px;display:inline-block;">${m.user.name} 様</div>
+          <div style="font-size:11px;color:#6b7280;margin-top:6px;">会員コード: ${m.memberCode}</div>
+        </div>
+        <div style="font-size:13px;line-height:2.2;margin-bottom:28px;color:#374151;">
+          <p style="margin:0 0 8px;">このたびはCLAIR会員へのご登録をいただき、誠にありがとうございます。</p>
+          <p style="margin:0;">以下の内容にて登録が完了いたしましたことをお知らせいたします。</p>
+        </div>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:28px;font-size:12px;">
+          <tbody>
+            <tr style="background:#eff6ff;">
+              <td style="padding:11px 18px;font-weight:600;border:1px solid #bfdbfe;width:38%;color:#1d4ed8;">会員コード</td>
+              <td style="padding:11px 18px;border:1px solid #bfdbfe;">${m.memberCode}</td>
+            </tr>
+            <tr>
+              <td style="padding:11px 18px;font-weight:600;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;">お名前</td>
+              <td style="padding:11px 18px;border:1px solid #bfdbfe;">${m.user.name}</td>
+            </tr>
+            <tr style="background:#eff6ff;">
+              <td style="padding:11px 18px;font-weight:600;border:1px solid #bfdbfe;color:#1d4ed8;">会員区分</td>
+              <td style="padding:11px 18px;border:1px solid #bfdbfe;">CLAIR会員</td>
+            </tr>
+            <tr>
+              <td style="padding:11px 18px;font-weight:600;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;">ご登録日</td>
+              <td style="padding:11px 18px;border:1px solid #bfdbfe;">${m.contractDate ? new Date(m.contractDate).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" }) : today}</td>
+            </tr>
+            <tr style="background:#eff6ff;">
+              <td style="padding:11px 18px;font-weight:600;border:1px solid #bfdbfe;color:#1d4ed8;">電話番号</td>
+              <td style="padding:11px 18px;border:1px solid #bfdbfe;">${m.user.phone || "—"}</td>
+            </tr>
+            <tr>
+              <td style="padding:11px 18px;font-weight:600;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;">メールアドレス</td>
+              <td style="padding:11px 18px;border:1px solid #bfdbfe;">${m.user.email}</td>
+            </tr>
+            ${initialPassword ? `<tr style="background:#fef3c7;"><td style="padding:11px 18px;font-weight:600;border:1px solid #fcd34d;color:#b45309;">マイページパスワード</td><td style="padding:11px 18px;border:1px solid #fcd34d;font-weight:700;font-family:monospace;font-size:16px;letter-spacing:3px;">${initialPassword}</td></tr>` : ""}
+          </tbody>
+        </table>
+        ${(r?.deliveryPostalCode || r?.deliveryAddress) ? `
+        <div style="border:1px solid #e5e7eb;border-radius:6px;padding:12px 16px;font-size:11px;margin-bottom:28px;color:#374151;">
+          <strong>お届け先:</strong> ${r.deliveryPostalCode ? `〒${r.deliveryPostalCode}　` : ""}${r.deliveryAddress || ""}
+          ${r.deliveryName ? `　${r.deliveryName}` : ""}
+        </div>
+        ` : ""}
+        <div style="text-align:right;font-size:12px;border-top:1px solid #e5e7eb;padding-top:18px;">
+          <div style="font-weight:700;font-size:15px;margin-bottom:2px;">CLAIRホールディングス株式会社</div>
+          <div style="color:#6b7280;">〒020-0026 岩手県盛岡市開運橋通5-6 第五菱和ビル5F</div>
+          <div style="color:#6b7280;">TEL: 019-681-3667</div>
+        </div>
+      </div>
+    </body></html>`;
+    const win = window.open("", "_blank", "width=900,height=700");
+    if (!win) { alert("ポップアップをブロックされました。ブラウザの設定から許可してください。"); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 600);
+  };
+
   // 編集モーダルを開く
   const openEdit = (section: typeof editSection) => {
     if (!member) return;
@@ -487,6 +566,12 @@ export default function MlmMemberDetailPage() {
                 コピー
               </button>
               <button
+                onClick={handlePrintRegistrationNotice}
+                className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition"
+              >
+                📄 登録完了通知書を印刷
+              </button>
+              <button
                 onClick={() => {
                   sessionStorage.removeItem(`mlm_init_pw_${memberId}`);
                   setInitialPassword(null);
@@ -535,6 +620,15 @@ export default function MlmMemberDetailPage() {
             <InfoRow label="クレジット決済ID" value={m.creditCardId ? <span className="font-mono text-xs">{m.creditCardId}</span> : null} />
             <InfoRow label="備考"             value={m.note} />
           </div>
+        </div>
+        {/* 登録完了通知書ボタン */}
+        <div className="mt-4 pt-3 border-t border-slate-100 flex gap-2">
+          <button
+            onClick={handlePrintRegistrationNotice}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-300 text-blue-700 text-xs font-medium rounded-lg hover:bg-blue-100 transition"
+          >
+            <i className="fas fa-print text-[11px]"></i> 登録完了通知書を印刷
+          </button>
         </div>
       </section>
 
