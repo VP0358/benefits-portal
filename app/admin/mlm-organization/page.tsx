@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 type OrgType = "matrix" | "unilevel";
-type ViewMode = "tree" | "list";
 
 type MemberNode = {
   id: string;
@@ -16,9 +15,139 @@ type MemberNode = {
   currentMonthPoints?: number;
 };
 
+// ─────────────────────────────────────────────
+// ステータス設定
+// ─────────────────────────────────────────────
+const STATUS_LABEL: Record<string, string> = {
+  active: "活動中",
+  autoship: "オートシップ",
+  withdrawn: "退会",
+  midCancel: "中途解約",
+  lapsed: "失効",
+  suspended: "停止",
+};
+
+const STATUS_BG: Record<string, string> = {
+  active: "bg-emerald-500",
+  autoship: "bg-blue-500",
+  withdrawn: "bg-red-400",
+  midCancel: "bg-orange-400",
+  lapsed: "bg-gray-400",
+  suspended: "bg-yellow-400",
+};
+
+const LEVEL_COLOR: Record<number, string> = {
+  0: "bg-gray-500",
+  1: "bg-blue-600",
+  2: "bg-violet-600",
+  3: "bg-amber-500",
+  4: "bg-rose-500",
+  5: "bg-red-700",
+};
+
+// ─────────────────────────────────────────────
+// ビジュアルツリーノードコンポーネント
+// ─────────────────────────────────────────────
+function TreeNode({ node, isRoot = false }: { node: MemberNode; isRoot?: boolean }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const hasChildren = node.directDownlines && node.directDownlines.length > 0;
+  const statusBg = STATUS_BG[node.status] ?? "bg-gray-400";
+  const levelBg = LEVEL_COLOR[node.level] ?? "bg-gray-500";
+
+  return (
+    <div className="flex flex-col items-center">
+      {/* ノードカード */}
+      <div className="relative flex flex-col items-center">
+        <div
+          className={`
+            relative rounded-xl shadow-md border-2 px-3 py-2 min-w-[130px] max-w-[160px] text-center cursor-default
+            ${isRoot
+              ? "border-violet-500 bg-violet-50"
+              : "border-slate-200 bg-white hover:border-violet-300 hover:shadow-lg"}
+            transition-all
+          `}
+        >
+          {/* レベルバッジ */}
+          <span className={`absolute -top-2.5 left-1/2 -translate-x-1/2 ${levelBg} text-white text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap`}>
+            LV.{node.level}
+          </span>
+
+          {/* 名前 */}
+          <div className="mt-1 font-bold text-slate-800 text-xs leading-tight truncate" title={node.name}>
+            {node.name}
+          </div>
+
+          {/* 会員コード */}
+          <div className="text-[10px] text-slate-500 mt-0.5">{node.memberCode}</div>
+
+          {/* ステータス */}
+          <span className={`inline-block mt-1 ${statusBg} text-white text-[9px] font-semibold px-1.5 py-0.5 rounded-full`}>
+            {STATUS_LABEL[node.status] ?? node.status}
+          </span>
+
+          {/* ポイント */}
+          {(node.lastMonthPoints !== undefined || node.currentMonthPoints !== undefined) && (
+            <div className="mt-1 flex gap-1 justify-center flex-wrap">
+              {node.lastMonthPoints !== undefined && node.lastMonthPoints > 0 && (
+                <span className="text-[9px] text-purple-600 font-medium">先月:{node.lastMonthPoints.toLocaleString()}pt</span>
+              )}
+              {node.currentMonthPoints !== undefined && node.currentMonthPoints > 0 && (
+                <span className="text-[9px] text-pink-600 font-medium">今月:{node.currentMonthPoints.toLocaleString()}pt</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 折りたたみボタン */}
+        {hasChildren && (
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="mt-1 w-5 h-5 rounded-full bg-violet-500 text-white text-[10px] font-bold flex items-center justify-center hover:bg-violet-600 transition z-10 shadow"
+          >
+            {collapsed ? "+" : "−"}
+          </button>
+        )}
+      </div>
+
+      {/* 子ノード */}
+      {hasChildren && !collapsed && (
+        <div className="flex flex-col items-center mt-0">
+          {/* 縦線（親→分岐点） */}
+          <div className="w-px h-4 bg-slate-300" />
+
+          {/* 横線 + 子ノード群 */}
+          <div className="flex flex-row items-start gap-4">
+            {node.directDownlines!.map((child, idx) => (
+              <div key={child.id} className="flex flex-col items-center">
+                {/* 縦線（分岐点→子） */}
+                <div className="w-px h-4 bg-slate-300" />
+                <TreeNode node={child} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 横線で子ノードをつなぐ（CSSでの実装）
+function VisualTree({ root }: { root: MemberNode }) {
+  return (
+    <div className="overflow-auto pb-8">
+      <div className="inline-flex flex-col items-center min-w-max px-8 pt-6">
+        <TreeNode node={root} isRoot />
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// メインページ
+// ─────────────────────────────────────────────
 export default function MlmOrganizationPage() {
   const [orgType, setOrgType] = useState<OrgType>("matrix");
-  const [viewMode, setViewMode] = useState<ViewMode>("tree");
+  const [viewMode, setViewMode] = useState<"tree" | "list">("tree");
   const [searchCode, setSearchCode] = useState("");
   const [searchType, setSearchType] = useState<"memberCode" | "name" | "email" | "phone">("memberCode");
   const [loading, setLoading] = useState(false);
@@ -26,291 +155,126 @@ export default function MlmOrganizationPage() {
   const [listData, setListData] = useState<MemberNode[]>([]);
   const [totalCount, setTotalCount] = useState<number | null>(null);
   const [searchMessage, setSearchMessage] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // ダウンラインレポート用
+  // レポート用
   const [reportSearchCode, setReportSearchCode] = useState("");
   const [reportOrgType, setReportOrgType] = useState<OrgType>("matrix");
-  
-  // 購入レポート用
   const [purchaseSearchCode, setPurchaseSearchCode] = useState("");
   const [purchaseOrgType, setPurchaseOrgType] = useState<OrgType>("matrix");
   const [purchaseStartMonth, setPurchaseStartMonth] = useState("");
   const [purchaseEndMonth, setPurchaseEndMonth] = useState("");
-
-  // 紹介実績積算用
   const [refStartDate, setRefStartDate] = useState("");
   const [refEndDate, setRefEndDate] = useState("");
   const [refSortType, setRefSortType] = useState("clean");
 
   const handleSearch = async () => {
     setLoading(true);
+    setErrorMsg(null);
     setSearchMessage(null);
     try {
       const params = new URLSearchParams({ type: orgType });
       const isSearchEmpty = !searchCode.trim();
-      if (!isSearchEmpty) {
-        params.set(searchType, searchCode.trim());
-      }
-      
-      const res = await fetch(
-        `/api/admin/mlm-organization/tree?${params.toString()}`
-      );
+      if (!isSearchEmpty) params.set(searchType, searchCode.trim());
+
+      const res = await fetch(`/api/admin/mlm-organization/tree?${params}`);
       if (res.ok) {
         const data = await res.json();
-        // 検索条件なし（全体）の場合はリストのみ返ってくる
         if (isSearchEmpty) {
+          // 全体表示 → フラットリスト
           setRootMember(null);
           setListData(data.list || []);
           setTotalCount(data.totalCount ?? null);
           setSearchMessage(data.message ?? null);
-          setViewMode("list"); // 自動的にリスト表示に切り替え
-        } else if (viewMode === "tree") {
-          setRootMember(data.root);
-          setListData(data.list || []);
-          setTotalCount(null);
+          setViewMode("list");
         } else {
+          setRootMember(data.root ?? null);
           setListData(data.list || []);
           setTotalCount(null);
         }
       } else {
-        const errData = await res.json().catch(() => ({}));
-        alert(errData.error ?? "会員が見つかりませんでした");
+        const err = await res.json().catch(() => ({}));
+        setErrorMsg(err.error ?? "会員が見つかりませんでした");
         setRootMember(null);
         setListData([]);
       }
-    } catch (error) {
-      console.error("Error fetching organization:", error);
-      alert("エラーが発生しました");
+    } catch (e) {
+      setErrorMsg("通信エラーが発生しました");
     }
     setLoading(false);
   };
 
   const handleDownloadDownlineReport = async () => {
-    if (!reportSearchCode) {
-      alert("対象会員コードを入力してください");
-      return;
-    }
-
+    if (!reportSearchCode) { alert("対象会員コードを入力してください"); return; }
     try {
-      const res = await fetch(
-        `/api/admin/mlm-organization/downline-report?memberCode=${reportSearchCode}&type=${reportOrgType}`
-      );
+      const res = await fetch(`/api/admin/mlm-organization/downline-report?memberCode=${reportSearchCode}&type=${reportOrgType}`);
       if (res.ok) {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `downline_report_${reportSearchCode}_${reportOrgType}_${new Date().toISOString().slice(0, 10)}.csv`;
-        link.click();
-        alert("ダウンロードしました");
-      } else {
-        alert("レポート生成に失敗しました");
-      }
-    } catch (error) {
-      console.error("Error downloading report:", error);
-      alert("エラーが発生しました");
-    }
+        const a = document.createElement("a");
+        a.href = url; a.download = `downline_${reportSearchCode}_${reportOrgType}.csv`; a.click();
+      } else { alert("レポート生成に失敗しました"); }
+    } catch { alert("エラーが発生しました"); }
   };
 
   const handleDownloadPurchaseReport = async () => {
-    if (!purchaseSearchCode || !purchaseStartMonth || !purchaseEndMonth) {
-      alert("すべての項目を入力してください");
-      return;
-    }
-
+    if (!purchaseSearchCode || !purchaseStartMonth || !purchaseEndMonth) { alert("すべての項目を入力してください"); return; }
     try {
-      const res = await fetch(
-        `/api/admin/mlm-organization/purchase-report?memberCode=${purchaseSearchCode}&type=${purchaseOrgType}&startMonth=${purchaseStartMonth}&endMonth=${purchaseEndMonth}`
-      );
+      const res = await fetch(`/api/admin/mlm-organization/purchase-report?memberCode=${purchaseSearchCode}&type=${purchaseOrgType}&startMonth=${purchaseStartMonth}&endMonth=${purchaseEndMonth}`);
       if (res.ok) {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `purchase_report_${purchaseSearchCode}_${purchaseStartMonth}_${purchaseEndMonth}.csv`;
-        link.click();
-        alert("ダウンロードしました");
-      } else {
-        alert("レポート生成に失敗しました");
-      }
-    } catch (error) {
-      console.error("Error downloading report:", error);
-      alert("エラーが発生しました");
-    }
+        const a = document.createElement("a");
+        a.href = url; a.download = `purchase_${purchaseSearchCode}_${purchaseStartMonth}_${purchaseEndMonth}.csv`; a.click();
+      } else { alert("レポート生成に失敗しました"); }
+    } catch { alert("エラーが発生しました"); }
   };
 
   const handleDownloadReferralReport = async () => {
-    if (!refStartDate || !refEndDate) {
-      alert("期間を入力してください");
-      return;
-    }
-
+    if (!refStartDate || !refEndDate) { alert("期間を入力してください"); return; }
     try {
-      const res = await fetch(
-        `/api/admin/mlm-organization/referral-report?startDate=${refStartDate}&endDate=${refEndDate}&sortType=${refSortType}`
-      );
+      const res = await fetch(`/api/admin/mlm-organization/referral-report?startDate=${refStartDate}&endDate=${refEndDate}&sortType=${refSortType}`);
       if (res.ok) {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `referral_report_${refStartDate}_${refEndDate}.csv`;
-        link.click();
-        alert("ダウンロードしました");
-      } else {
-        alert("レポート生成に失敗しました");
-      }
-    } catch (error) {
-      console.error("Error downloading report:", error);
-      alert("エラーが発生しました");
-    }
+        const a = document.createElement("a");
+        a.href = url; a.download = `referral_${refStartDate}_${refEndDate}.csv`; a.click();
+      } else { alert("レポート生成に失敗しました"); }
+    } catch { alert("エラーが発生しました"); }
   };
 
-  // ステータスラベル・カラー取得（全種類対応）
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "active": return "活動中";
-      case "autoship": return "オートシップ";
-      case "withdrawn": return "退会";
-      case "midCancel": return "クーリングオフ";
-      case "lapsed": return "失効";
-      case "suspended": return "停止";
-      default: return status;
-    }
-  };
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active": return "text-green-600 font-semibold";
-      case "autoship": return "text-blue-600 font-semibold";
-      case "withdrawn": return "text-red-600";
-      case "midCancel": return "text-orange-600";
-      case "lapsed": return "text-gray-500";
-      case "suspended": return "text-yellow-600";
-      default: return "text-gray-600";
-    }
-  };
   const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case "active": return "bg-green-100 text-green-800";
-      case "autoship": return "bg-blue-100 text-blue-800";
-      case "withdrawn": return "bg-red-100 text-red-800";
-      case "midCancel": return "bg-orange-100 text-orange-800";
-      case "lapsed": return "bg-gray-100 text-gray-800";
-      case "suspended": return "bg-yellow-100 text-yellow-800";
-      default: return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const renderTreeNode = (node: MemberNode, depth: number = 0): JSX.Element => {
-    const indent = depth * 40;
-    const hasChildren = node.directDownlines && node.directDownlines.length > 0;
-
-    // レベル別の色設定（Phase 7: レベル別色分け）
-    const getLevelColor = (level: number) => {
-      switch (level) {
-        case 0: return "bg-gray-400"; // レベルなし
-        case 1: return "bg-blue-500"; // LV.1
-        case 2: return "bg-green-500"; // LV.2
-        case 3: return "bg-yellow-500"; // LV.3
-        case 4: return "bg-purple-500"; // LV.4
-        case 5: return "bg-red-500"; // LV.5
-        default: return "bg-gray-400";
-      }
+    const m: Record<string, string> = {
+      active: "bg-emerald-100 text-emerald-800",
+      autoship: "bg-blue-100 text-blue-800",
+      withdrawn: "bg-red-100 text-red-800",
+      midCancel: "bg-orange-100 text-orange-800",
+      lapsed: "bg-gray-100 text-gray-800",
+      suspended: "bg-yellow-100 text-yellow-800",
     };
-
-    const getLevelLabel = (level: number) => {
-      switch (level) {
-        case 0: return "未設定";
-        case 1: return "LV.1";
-        case 2: return "LV.2";
-        case 3: return "LV.3";
-        case 4: return "LV.4";
-        case 5: return "LV.5";
-        default: return `LV.${level}`;
-      }
-    };
-
-    return (
-      <div key={node.id} className="mb-2">
-        <div
-          className="flex items-center gap-3 p-3 bg-white rounded-lg shadow hover:shadow-md transition"
-          style={{ marginLeft: `${indent}px` }}
-        >
-          <div className={`w-10 h-10 ${getLevelColor(node.level)} text-white rounded-full flex items-center justify-center font-bold text-xs`}>
-            {getLevelLabel(node.level)}
-          </div>
-          <div className="flex-1">
-            <div className="font-semibold text-gray-800">
-              {node.memberCode} - {node.name}
-            </div>
-            <div className="text-xs text-gray-500 space-y-1">
-              <div>
-                ステータス:{" "}
-                <span className={getStatusColor(node.status)}>
-                  {getStatusLabel(node.status)}
-                </span>
-              </div>
-              {(node.lastMonthPoints !== undefined || node.currentMonthPoints !== undefined) && (
-                <div className="flex gap-3 mt-1">
-                  {node.lastMonthPoints !== undefined && (
-                    <span className="text-purple-600 font-medium">
-                      先月: {node.lastMonthPoints.toLocaleString()}pt
-                    </span>
-                  )}
-                  {node.currentMonthPoints !== undefined && (
-                    <span className="text-pink-600 font-medium">
-                      今月: {node.currentMonthPoints.toLocaleString()}pt
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          {hasChildren && (
-            <div className="text-sm text-gray-600">
-              <i className="fas fa-users mr-1"></i>
-              {node.directDownlines!.length}名
-            </div>
-          )}
-        </div>
-        {hasChildren && (
-          <div className="mt-2">
-            {node.directDownlines!.map((child) => renderTreeNode(child, depth + 1))}
-          </div>
-        )}
-      </div>
-    );
+    return m[status] ?? "bg-gray-100 text-gray-800";
   };
 
   return (
     <main className="space-y-6">
       {/* ヘッダー */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-800">
-          <i className="fas fa-sitemap mr-2"></i>
-          組織図・リスト
-        </h1>
-        <p className="mt-2 text-gray-600">
-          MLM組織のマトリックス・ユニレベル構造を表示します
-        </p>
+        <h1 className="text-2xl font-bold text-slate-800">🌐 組織図・リスト</h1>
+        <p className="mt-1 text-sm text-slate-500">会員コードを入力してツリーを表示。未入力で全会員リスト表示（最大500件）</p>
       </div>
 
-      {/* 組織図表示 */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
-          <i className="fas fa-chart-tree mr-2"></i>
-          組織図表示
-        </h2>
+      {/* 組織図表示エリア */}
+      <div className="rounded-3xl bg-white shadow-sm p-6 space-y-4">
+        <h2 className="text-base font-bold text-slate-800">組織図表示</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        {/* 検索コントロール */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              検索タイプ
-            </label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">検索タイプ</label>
             <select
               value={searchType}
               onChange={(e) => setSearchType(e.target.value as typeof searchType)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800"
             >
               <option value="memberCode">会員コード</option>
               <option value="name">氏名</option>
@@ -319,148 +283,121 @@ export default function MlmOrganizationPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              検索キーワード
-            </label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">検索キーワード</label>
             <input
               type="text"
               value={searchCode}
               onChange={(e) => setSearchCode(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               placeholder={
-                searchType === "memberCode" ? "例: 123456-01" :
+                searchType === "memberCode" ? "例: 10234001" :
                 searchType === "name" ? "例: 山田太郎" :
-                searchType === "email" ? "例: user@example.com" :
-                "例: 090-1234-5678"
+                searchType === "email" ? "例: user@example.com" : "例: 090-1234-5678"
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-300"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              組織区分
-            </label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">組織区分</label>
             <div className="flex gap-2">
-              <button
-                onClick={() => setOrgType("matrix")}
-                className={`flex-1 px-3 py-2 rounded-lg font-semibold transition ${
-                  orgType === "matrix"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
+              <button onClick={() => setOrgType("matrix")}
+                className={`flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition ${orgType === "matrix" ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>
                 マトリックス
               </button>
-              <button
-                onClick={() => setOrgType("unilevel")}
-                className={`flex-1 px-3 py-2 rounded-lg font-semibold transition ${
-                  orgType === "unilevel"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
+              <button onClick={() => setOrgType("unilevel")}
+                className={`flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition ${orgType === "unilevel" ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>
                 ユニレベル
               </button>
             </div>
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              表示形式
-            </label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">表示形式</label>
             <div className="flex gap-2">
-              <button
-                onClick={() => setViewMode("tree")}
-                className={`flex-1 px-3 py-2 rounded-lg font-semibold transition ${
-                  viewMode === "tree"
-                    ? "bg-green-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                ツリー
+              <button onClick={() => setViewMode("tree")}
+                className={`flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition ${viewMode === "tree" ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>
+                🌲 ツリー
               </button>
-              <button
-                onClick={() => setViewMode("list")}
-                className={`flex-1 px-3 py-2 rounded-lg font-semibold transition ${
-                  viewMode === "list"
-                    ? "bg-green-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                リスト
+              <button onClick={() => setViewMode("list")}
+                className={`flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition ${viewMode === "list" ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}>
+                📋 リスト
               </button>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <button
-            onClick={handleSearch}
-            disabled={loading}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold disabled:opacity-50"
-          >
-            <i className="fas fa-search mr-2"></i>
-            {loading ? "検索中..." : "組織図を表示"}
-          </button>
-          <p className="text-sm text-gray-500">
-            ※ 会員コード入力で個別ツリー表示 / 未入力で全会員リスト表示（最大500件）
-          </p>
-        </div>
+        <button
+          onClick={handleSearch}
+          disabled={loading}
+          className="rounded-xl bg-violet-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-violet-700 transition disabled:opacity-50"
+        >
+          {loading ? "🔍 検索中..." : "🔍 組織図を表示"}
+        </button>
 
-        {/* 組織図表示エリア */}
-        {viewMode === "tree" && rootMember && (
-          <div className="mt-6">
-            <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-              <h3 className="font-bold text-gray-800 mb-2">
-                <i className="fas fa-info-circle mr-2"></i>
-                {orgType === "matrix" ? "マトリックス組織図" : "ユニレベル組織図"}
-              </h3>
-              <p className="text-sm text-gray-600">
-                {orgType === "matrix"
-                  ? "直下のマトリックス配置を表示しています"
-                  : "紹介ラインのユニレベル構造を表示しています"}
-              </p>
-            </div>
-            {renderTreeNode(rootMember)}
+        {/* エラー */}
+        {errorMsg && (
+          <div className="rounded-2xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            ⚠️ {errorMsg}
           </div>
         )}
 
+        {/* メッセージ */}
         {searchMessage && (
-          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-            <i className="fas fa-info-circle mr-2"></i>
-            {searchMessage}（全体件数: {totalCount?.toLocaleString()}件）
+          <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+            ℹ️ {searchMessage}（全体件数: {totalCount?.toLocaleString()}件）
           </div>
         )}
 
-        {viewMode === "list" && listData.length > 0 && (
-          <div className="mt-6">
-            <div className="mb-4 p-4 bg-green-50 rounded-lg">
-              <h3 className="font-bold text-gray-800 mb-2">
-                <i className="fas fa-list mr-2"></i>
-                リスト表示（{listData.length}名表示 / 全{totalCount ?? listData.length}名）
-              </h3>
+        {/* ─── ビジュアルツリー表示 ─── */}
+        {viewMode === "tree" && rootMember && !loading && (
+          <div className="mt-4">
+            <div className="mb-3 flex items-center gap-3">
+              <span className="text-sm font-bold text-slate-700">
+                {orgType === "matrix" ? "🔷 マトリックス組織図" : "🔶 ユニレベル組織図"} — {rootMember.name}
+              </span>
+              {/* レベル凡例 */}
+              <div className="flex gap-1 flex-wrap">
+                {[0,1,2,3,4,5].map(lv => (
+                  <span key={lv} className={`${LEVEL_COLOR[lv]} text-white text-[9px] px-1.5 py-0.5 rounded-full`}>LV.{lv}</span>
+                ))}
+              </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-800 text-white">
-                  <tr>
-                    <th className="px-4 py-3 text-left">レベル</th>
-                    <th className="px-4 py-3 text-left">会員コード</th>
-                    <th className="px-4 py-3 text-left">氏名</th>
-                    <th className="px-4 py-3 text-center">ステータス</th>
+            {/* スクロール可能なビジュアルツリー */}
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 overflow-auto" style={{ maxHeight: "70vh" }}>
+              <VisualTree root={rootMember} />
+            </div>
+            <p className="text-xs text-slate-400 mt-2">※ ノード左上の −/+ ボタンで折りたたみ可能</p>
+          </div>
+        )}
+
+        {/* ─── リスト表示 ─── */}
+        {(viewMode === "list" || (viewMode === "tree" && !rootMember)) && listData.length > 0 && !loading && (
+          <div className="mt-4">
+            <div className="mb-3 text-sm font-bold text-slate-700">
+              📋 リスト表示（{listData.length}件 / 全 {totalCount ?? listData.length}件）
+            </div>
+            <div className="overflow-x-auto rounded-2xl border border-slate-100">
+              <table className="w-full text-sm min-w-[500px]">
+                <thead>
+                  <tr className="bg-slate-800 text-white">
+                    <th className="px-4 py-3 text-left text-xs font-semibold">LV</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold">会員コード</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold">氏名</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold">ステータス</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {listData.map((member) => (
-                    <tr key={member.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-semibold text-blue-600">
-                        LV{member.level}
+                <tbody className="divide-y divide-slate-100">
+                  {listData.map((m) => (
+                    <tr key={m.id} className="hover:bg-violet-50 transition">
+                      <td className="px-4 py-2.5">
+                        <span className={`${LEVEL_COLOR[m.level] ?? "bg-gray-400"} text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full`}>
+                          LV.{m.level}
+                        </span>
                       </td>
-                      <td className="px-4 py-3">{member.memberCode}</td>
-                      <td className="px-4 py-3">{member.name}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadgeColor(member.status)}`}
-                        >
-                          {getStatusLabel(member.status)}
+                      <td className="px-4 py-2.5 text-xs text-slate-700">{m.memberCode}</td>
+                      <td className="px-4 py-2.5 text-xs font-medium text-slate-800">{m.name}</td>
+                      <td className="px-4 py-2.5 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${getStatusBadgeColor(m.status)}`}>
+                          {STATUS_LABEL[m.status] ?? m.status}
                         </span>
                       </td>
                     </tr>
@@ -471,200 +408,106 @@ export default function MlmOrganizationPage() {
           </div>
         )}
 
-        {!loading && !rootMember && listData.length === 0 && (
-          <div className="mt-6 p-8 bg-gray-50 rounded-lg text-center text-gray-500">
-            「組織図を表示」ボタンをクリックしてください（会員コード未入力で全体表示）
+        {/* 初期状態 */}
+        {!loading && !rootMember && listData.length === 0 && !errorMsg && (
+          <div className="mt-6 rounded-2xl bg-slate-50 py-12 text-center text-slate-400 text-sm">
+            🔍 会員コードを入力して「組織図を表示」ボタンを押してください
           </div>
         )}
       </div>
 
-      {/* ダウンラインレポート */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
-          <i className="fas fa-download mr-2"></i>
-          ダウンラインレポート
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* ─── ダウンラインレポート ─── */}
+      <div className="rounded-3xl bg-white shadow-sm p-6 space-y-3">
+        <h2 className="text-base font-bold text-slate-800">📥 ダウンラインレポート CSV出力</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              対象会員コード
-            </label>
-            <input
-              type="text"
-              value={reportSearchCode}
-              onChange={(e) => setReportSearchCode(e.target.value)}
-              placeholder="例: 123456-01"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-xs font-semibold text-slate-600 mb-1">対象会員コード</label>
+            <input type="text" value={reportSearchCode} onChange={(e) => setReportSearchCode(e.target.value)}
+              placeholder="例: 10234001"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              組織区分
-            </label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">組織区分</label>
             <div className="flex gap-2">
-              <button
-                onClick={() => setReportOrgType("matrix")}
-                className={`flex-1 px-3 py-2 rounded-lg font-semibold transition text-sm ${
-                  reportOrgType === "matrix"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                マトリックス
-              </button>
-              <button
-                onClick={() => setReportOrgType("unilevel")}
-                className={`flex-1 px-3 py-2 rounded-lg font-semibold transition text-sm ${
-                  reportOrgType === "unilevel"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                ユニレベル
-              </button>
+              <button onClick={() => setReportOrgType("matrix")}
+                className={`flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition ${reportOrgType === "matrix" ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-700"}`}>マトリックス</button>
+              <button onClick={() => setReportOrgType("unilevel")}
+                className={`flex-1 rounded-xl px-3 py-2 text-sm font-semibold transition ${reportOrgType === "unilevel" ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-700"}`}>ユニレベル</button>
             </div>
           </div>
           <div className="flex items-end">
-            <button
-              onClick={handleDownloadDownlineReport}
-              className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
-            >
-              <i className="fas fa-file-excel mr-2"></i>
-              CSV出力
+            <button onClick={handleDownloadDownlineReport}
+              className="w-full rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 transition">
+              📥 CSV出力
             </button>
           </div>
         </div>
       </div>
 
-      {/* 購入レポート */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
-          <i className="fas fa-shopping-cart mr-2"></i>
-          購入レポート
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      {/* ─── 購入レポート ─── */}
+      <div className="rounded-3xl bg-white shadow-sm p-6 space-y-3">
+        <h2 className="text-base font-bold text-slate-800">🛒 購入レポート CSV出力</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              対象会員コード
-            </label>
-            <input
-              type="text"
-              value={purchaseSearchCode}
-              onChange={(e) => setPurchaseSearchCode(e.target.value)}
-              placeholder="例: 123456-01"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-xs font-semibold text-slate-600 mb-1">対象会員コード</label>
+            <input type="text" value={purchaseSearchCode} onChange={(e) => setPurchaseSearchCode(e.target.value)}
+              placeholder="例: 10234001"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              開始月
-            </label>
-            <input
-              type="month"
-              value={purchaseStartMonth}
-              onChange={(e) => setPurchaseStartMonth(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-xs font-semibold text-slate-600 mb-1">開始月</label>
+            <input type="month" value={purchaseStartMonth} onChange={(e) => setPurchaseStartMonth(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              終了月
-            </label>
-            <input
-              type="month"
-              value={purchaseEndMonth}
-              onChange={(e) => setPurchaseEndMonth(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-xs font-semibold text-slate-600 mb-1">終了月</label>
+            <input type="month" value={purchaseEndMonth} onChange={(e) => setPurchaseEndMonth(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              組織区分
-            </label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPurchaseOrgType("matrix")}
-                className={`flex-1 px-2 py-2 rounded-lg font-semibold transition text-xs ${
-                  purchaseOrgType === "matrix"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                M
-              </button>
-              <button
-                onClick={() => setPurchaseOrgType("unilevel")}
-                className={`flex-1 px-2 py-2 rounded-lg font-semibold transition text-xs ${
-                  purchaseOrgType === "unilevel"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                U
-              </button>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">組織区分</label>
+            <div className="flex gap-1">
+              <button onClick={() => setPurchaseOrgType("matrix")}
+                className={`flex-1 rounded-xl px-2 py-2 text-xs font-semibold transition ${purchaseOrgType === "matrix" ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-700"}`}>M</button>
+              <button onClick={() => setPurchaseOrgType("unilevel")}
+                className={`flex-1 rounded-xl px-2 py-2 text-xs font-semibold transition ${purchaseOrgType === "unilevel" ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-700"}`}>U</button>
             </div>
           </div>
           <div className="flex items-end">
-            <button
-              onClick={handleDownloadPurchaseReport}
-              className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
-            >
-              <i className="fas fa-file-excel mr-2"></i>
-              CSV出力
+            <button onClick={handleDownloadPurchaseReport}
+              className="w-full rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 transition">
+              📥 CSV出力
             </button>
           </div>
         </div>
       </div>
 
-      {/* 紹介実績積算ダウンロード */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">
-          <i className="fas fa-users mr-2"></i>
-          紹介実績積算ダウンロード
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* ─── 紹介実績レポート ─── */}
+      <div className="rounded-3xl bg-white shadow-sm p-6 space-y-3">
+        <h2 className="text-base font-bold text-slate-800">👥 紹介実績積算ダウンロード</h2>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              対象期間開始
-            </label>
-            <input
-              type="date"
-              value={refStartDate}
-              onChange={(e) => setRefStartDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-xs font-semibold text-slate-600 mb-1">対象期間開始</label>
+            <input type="date" value={refStartDate} onChange={(e) => setRefStartDate(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              対象期間終了
-            </label>
-            <input
-              type="date"
-              value={refEndDate}
-              onChange={(e) => setRefEndDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-xs font-semibold text-slate-600 mb-1">対象期間終了</label>
+            <input type="date" value={refEndDate} onChange={(e) => setRefEndDate(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">
-              ソート・タイプ
-            </label>
-            <select
-              value={refSortType}
-              onChange={(e) => setRefSortType(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
+            <label className="block text-xs font-semibold text-slate-600 mb-1">ソートタイプ</label>
+            <select value={refSortType} onChange={(e) => setRefSortType(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
               <option value="clean">クリーンタイプ</option>
               <option value="standard">スタンダード</option>
             </select>
           </div>
           <div className="flex items-end">
-            <button
-              onClick={handleDownloadReferralReport}
-              className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold"
-            >
-              <i className="fas fa-download mr-2"></i>
-              ダウンロード
+            <button onClick={handleDownloadReferralReport}
+              className="w-full rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700 transition">
+              📥 ダウンロード
             </button>
           </div>
         </div>

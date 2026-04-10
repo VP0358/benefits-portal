@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
         orConditions.push({ user: { postalCode: { contains: search } } });
       }
       if (searchField === "all" || searchField === "nickname") {
-        orConditions.push({ mlmRegistration: { nickname: { contains: search } } });
+        orConditions.push({ user: { mlmRegistration: { nickname: { contains: search } } } });
       }
       if (searchField === "birthDate") {
         // 生年月日は日付文字列で部分一致（例: "1990-01"）
@@ -100,12 +100,12 @@ export async function GET(req: NextRequest) {
               email: true,
               phone: true,
               postalCode: true,
-            },
-          },
-          mlmRegistration: {
-            select: {
-              nickname: true,
-              birthDate: true,
+              mlmRegistration: {
+                select: {
+                  nickname: true,
+                  birthDate: true,
+                },
+              },
             },
           },
           upline: {
@@ -154,8 +154,8 @@ export async function GET(req: NextRequest) {
       userEmail:           m.user.email,
       userPhone:           m.user.phone ?? null,
       userPostalCode:      m.user.postalCode ?? null,
-      nickname:            m.mlmRegistration?.nickname ?? null,
-      birthDate:           m.birthDate?.toISOString() ?? m.mlmRegistration?.birthDate ?? null,
+      nickname:            m.user.mlmRegistration?.nickname ?? null,
+      birthDate:           m.birthDate?.toISOString() ?? m.user.mlmRegistration?.birthDate ?? null,
       downlineCount:       m._count.downlines,
       referralCount:       m._count.referrals,
       createdAt:           m.createdAt.toISOString(),
