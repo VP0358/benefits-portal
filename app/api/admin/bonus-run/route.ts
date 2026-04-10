@@ -179,7 +179,8 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    // 確定済みボーナスは削除不可
+    const force = searchParams.get("force") === "true";
+
     const bonusRun = await prisma.bonusRun.findUnique({
       where: { bonusMonth },
     });
@@ -191,9 +192,10 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    if (bonusRun.status === "confirmed") {
+    // 確定済みは force=true のみ削除可（通常UIからの誤操作防止）
+    if (bonusRun.status === "confirmed" && !force) {
       return NextResponse.json(
-        { error: "Cannot delete confirmed bonus run" },
+        { error: "確定済みのボーナス計算です。強制削除する場合は force=true を指定してください" },
         { status: 403 }
       );
     }

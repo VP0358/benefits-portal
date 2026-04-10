@@ -3,15 +3,12 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 import { NextRequest, NextResponse } from "next/server";
-
-
-
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 /**
  * GET /api/admin/bonus-shortages?bonusMonth=2026-02
- * 指定月の過不足金一覧を取得
+ * 指定月の過不足金一覧を取得（bonusMonth省略時は全件）
  */
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -22,18 +19,12 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const bonusMonth = searchParams.get("bonusMonth");
 
-  if (!bonusMonth) {
-    return NextResponse.json({ error: "bonusMonth required" }, { status: 400 });
-  }
-
   try {
     const shortages = await prisma.bonusShortagePayment.findMany({
-      where: { bonusMonth },
+      where: bonusMonth ? { bonusMonth } : undefined,
       include: {
         mlmMember: {
-          include: {
-            user: true,
-          },
+          include: { user: true },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -60,7 +51,7 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/admin/bonus-shortages
- * 過不足金を新規登録
+ * 過不足金を新規登録（memberCodeベース）
  */
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -70,19 +61,32 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { bonusMonth, mlmMemberId, amount, comment } = body;
+    const { bonusMonth, memberCode, amount, comment } = body;
 
-    if (!bonusMonth || !mlmMemberId || amount == null) {
+    if (!bonusMonth || !memberCode || amount == null) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "bonusMonth, memberCode, amount は必須です" },
         { status: 400 }
+      );
+    }
+
+    // 会員コードからMLMメンバーを検索
+    const mlmMember = await prisma.mlmMember.findUnique({
+      where: { memberCode },
+      include: { user: true },
+    });
+
+    if (!mlmMember) {
+      return NextResponse.json(
+        { error: `会員コード「${memberCode}」が見つかりません` },
+        { status: 404 }
       );
     }
 
     const shortage = await prisma.bonusShortagePayment.create({
       data: {
         bonusMonth,
-        mlmMemberId: BigInt(mlmMemberId),
+        mlmMemberId: mlmMember.id,
         amount: Number(amount),
         comment: comment || "",
       },
@@ -91,50 +95,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       shortageId: shortage.id.toString(),
+      memberName: mlmMember.user.name,
     });
   } catch (error) {
     console.error("Error creating bonus shortage:", error);
     return NextResponse.json(
       { error: "Failed to create shortage" },
-      { status: 500 }
-    );
-  }
-}
-
-/**
- * PUT /api/admin/bonus-shortages
- * 過不足金を更新
- */
-export async function PUT(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user || session.user.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  try {
-    const body = await req.json();
-    const { id, amount, comment } = body;
-
-    if (!id) {
-      return NextResponse.json({ error: "Missing id" }, { status: 400 });
-    }
-
-    const shortage = await prisma.bonusShortagePayment.update({
-      where: { id: BigInt(id) },
-      data: {
-        amount: amount != null ? Number(amount) : undefined,
-        comment: comment !== undefined ? comment : undefined,
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      shortageId: shortage.id.toString(),
-    });
-  } catch (error) {
-    console.error("Error updating bonus shortage:", error);
-    return NextResponse.json(
-      { error: "Failed to update shortage" },
       { status: 500 }
     );
   }
@@ -154,7 +120,7 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get("id");
 
   if (!id) {
-    return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    return NextResponse.json({ error: "id が必要です" }, { status: 400 });
   }
 
   try {
