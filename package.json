@@ -20,6 +20,8 @@
     "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "^7.6.0",
     "bcryptjs": "^3.0.3",
+    "csv-parse": "^6.2.1",
+    "iconv-lite": "^0.7.2",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
     "lucide-react": "^1.7.0",

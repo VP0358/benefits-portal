@@ -152,6 +152,41 @@ export default function MlmOrganizationPage() {
     }
   };
 
+  // ステータスラベル・カラー取得（全種類対応）
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "active": return "活動中";
+      case "autoship": return "オートシップ";
+      case "withdrawn": return "退会";
+      case "midCancel": return "クーリングオフ";
+      case "lapsed": return "失効";
+      case "suspended": return "停止";
+      default: return status;
+    }
+  };
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "active": return "text-green-600 font-semibold";
+      case "autoship": return "text-blue-600 font-semibold";
+      case "withdrawn": return "text-red-600";
+      case "midCancel": return "text-orange-600";
+      case "lapsed": return "text-gray-500";
+      case "suspended": return "text-yellow-600";
+      default: return "text-gray-600";
+    }
+  };
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case "active": return "bg-green-100 text-green-800";
+      case "autoship": return "bg-blue-100 text-blue-800";
+      case "withdrawn": return "bg-red-100 text-red-800";
+      case "midCancel": return "bg-orange-100 text-orange-800";
+      case "lapsed": return "bg-gray-100 text-gray-800";
+      case "suspended": return "bg-yellow-100 text-yellow-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
+  };
+
   const renderTreeNode = (node: MemberNode, depth: number = 0): JSX.Element => {
     const indent = depth * 40;
     const hasChildren = node.directDownlines && node.directDownlines.length > 0;
@@ -197,14 +232,8 @@ export default function MlmOrganizationPage() {
             <div className="text-xs text-gray-500 space-y-1">
               <div>
                 ステータス:{" "}
-                <span
-                  className={
-                    node.status === "active"
-                      ? "text-green-600 font-semibold"
-                      : "text-red-600"
-                  }
-                >
-                  {node.status === "active" ? "アクティブ" : "非アクティブ"}
+                <span className={getStatusColor(node.status)}>
+                  {getStatusLabel(node.status)}
                 </span>
               </div>
               {(node.lastMonthPoints !== undefined || node.currentMonthPoints !== undefined) && (
@@ -408,13 +437,9 @@ export default function MlmOrganizationPage() {
                       <td className="px-4 py-3">{member.name}</td>
                       <td className="px-4 py-3 text-center">
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            member.status === "active"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800"
-                          }`}
+                          className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadgeColor(member.status)}`}
                         >
-                          {member.status === "active" ? "アクティブ" : "非アクティブ"}
+                          {getStatusLabel(member.status)}
                         </span>
                       </td>
                     </tr>
