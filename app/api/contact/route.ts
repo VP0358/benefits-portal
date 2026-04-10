@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { sendContactNotificationEmail } from "@/lib/mailer";
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,6 +19,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "必須項目が不足しています" }, { status: 400 });
     }
 
+    // 会員コードを取得（ログイン中の場合）
+    let memberCode: string | null = null;
+    if (session?.user?.id) {
+      const user = await prisma.user.findUnique({
+        where: { id: BigInt(session.user.id) },
+        select: { memberCode: true },
+      });
+      memberCode = user?.memberCode ?? null;
+    }
+
     const inquiry = await prisma.contactInquiry.create({
       data: {
         name,
@@ -28,6 +39,17 @@ export async function POST(req: NextRequest) {
         userId:    session?.user?.id ? BigInt(session.user.id) : null,
       },
     });
+
+    // 管理者へのメール通知（非同期・エラーでも返答は成功扱い）
+    sendContactNotificationEmail({
+      inquiryId:  inquiry.id.toString(),
+      name,
+      phone:      phone ?? "",
+      email,
+      menuTitle:  menuTitle ?? null,
+      content,
+      memberCode,
+    }).catch(err => console.error("[contact] notification email failed:", err));
 
     return NextResponse.json({ ok: true, id: inquiry.id.toString() }, { status: 201 });
   } catch (err) {

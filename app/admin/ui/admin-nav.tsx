@@ -4,6 +4,16 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useTransition, useEffect, useCallback } from "react";
 import SignOutButton from "@/app/components/sign-out-button";
 
+// グループごとのカラー設定
+// color: [通常テキスト, アクティブテキスト, アクティブ背景, アイコン通常, アイコンアクティブ]
+const groupColors: Record<string, { text: string; activeText: string; activeBg: string; icon: string; activeIcon: string; border: string }> = {
+  mlm:    { text: "text-blue-300",   activeText: "text-blue-200",   activeBg: "bg-blue-900/40",   icon: "text-blue-400",   activeIcon: "text-blue-300",   border: "border-blue-800/60" },
+  mobile: { text: "text-emerald-300",activeText: "text-emerald-200",activeBg: "bg-emerald-900/40",icon: "text-emerald-400",activeIcon: "text-emerald-300",border: "border-emerald-800/60" },
+  travel: { text: "text-purple-300", activeText: "text-purple-200", activeBg: "bg-purple-900/40", icon: "text-purple-400", activeIcon: "text-purple-300", border: "border-purple-800/60" },
+  export: { text: "text-amber-300",  activeText: "text-amber-200",  activeBg: "bg-amber-900/40",  icon: "text-amber-400",  activeIcon: "text-amber-300",  border: "border-amber-800/60" },
+  other:  { text: "text-slate-300",  activeText: "text-slate-200",  activeBg: "bg-slate-800/60",  icon: "text-slate-400",  activeIcon: "text-slate-300",  border: "border-slate-700/60" },
+}
+
 // メニュー項目をグループ化
 const menuGroups = [
   {
@@ -214,6 +224,7 @@ export default function AdminNav() {
         {menuGroups.map((group) => {
           const isOpen = openGroups.has(group.id);
           const hasActive = group.items.some(item => isActive(item.href));
+          const c = groupColors[group.id] ?? groupColors.other;
 
           return (
             <div key={group.id} className="mb-1">
@@ -221,19 +232,21 @@ export default function AdminNav() {
               <button
                 onClick={() => toggleGroup(group.id)}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
-                  hasActive ? "text-violet-200 bg-gray-800" : "text-gray-300 hover:text-white hover:bg-gray-800/60"
+                  hasActive
+                    ? `${c.activeText} ${c.activeBg}`
+                    : `${c.text} hover:text-white hover:bg-gray-800/60`
                 }`}
               >
                 <span className="flex items-center gap-2.5">
-                  <i className={`${group.icon} w-4 text-center text-sm ${hasActive ? "text-violet-400" : "text-gray-500"}`}></i>
-                  <span className="text-sm font-bold">{group.title}</span>
+                  <i className={`${group.icon} w-4 text-center text-sm ${hasActive ? c.activeIcon : c.icon}`}></i>
+                  <span className="text-sm font-bold tracking-wide">{group.title}</span>
                 </span>
-                <i className={`fas fa-chevron-${isOpen ? "up" : "down"} text-xs opacity-50`}></i>
+                <i className={`fas fa-chevron-${isOpen ? "up" : "down"} text-xs opacity-60`}></i>
               </button>
 
               {/* グループアイテム */}
               {isOpen && (
-                <div className="mt-1 ml-2 space-y-0.5 border-l border-gray-800 pl-2">
+                <div className={`mt-1 ml-2 space-y-0.5 border-l-2 ${c.border} pl-2`}>
                   {group.items.map((item) => (
                     <button
                       key={item.href}

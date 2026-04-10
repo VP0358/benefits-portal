@@ -586,3 +586,135 @@ FAX.050-3385-7788
     return { success: false, error: err };
   }
 }
+
+/** 相談窓口 受信通知メール（管理者向け） */
+export async function sendContactNotificationEmail({
+  inquiryId,
+  name,
+  phone,
+  email,
+  menuTitle,
+  content,
+  memberCode,
+}: {
+  inquiryId: string;
+  name: string;
+  phone?: string;
+  email: string;
+  menuTitle?: string | null;
+  content: string;
+  memberCode?: string | null;
+}) {
+  const NOTIFY_TO = process.env.CONTACT_NOTIFY_EMAIL ?? "info@c-p.link";
+  const subject = `【VIOLA Pure 相談窓口】新しいお問い合わせが届きました（${name} 様）`;
+
+  const textBody = `
+VIOLA Pure 相談窓口に新しいお問い合わせが届きました。
+
+────────────────────────
+受付ID   : ${inquiryId}
+氏名     : ${name}
+${memberCode ? `会員コード: ${memberCode}` : ""}
+電話番号 : ${phone || "未入力"}
+メール   : ${email}
+${menuTitle ? `メニュー  : ${menuTitle}` : ""}
+────────────────────────
+【お問い合わせ内容】
+${content}
+────────────────────────
+
+管理画面から確認・返信できます:
+https://www.viola-pure.xyz/admin/contacts
+
+このメールはVIOLA Pure管理システムより自動送信されています。
+`.trim();
+
+  const htmlBody = `<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 20px;">
+    <tr><td align="center">
+      <table width="580" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.08);">
+
+        <!-- ヘッダー -->
+        <tr>
+          <td style="background:#1e293b;padding:24px 36px;">
+            <div style="color:#ffffff;font-size:18px;font-weight:700;letter-spacing:1px;">VIOLA Pure</div>
+            <div style="color:#94a3b8;font-size:12px;margin-top:3px;">相談窓口 新着通知</div>
+          </td>
+        </tr>
+
+        <!-- タイトル -->
+        <tr>
+          <td style="padding:28px 36px 20px;">
+            <div style="background:#fef3c7;border-left:4px solid #f59e0b;border-radius:6px;padding:14px 18px;margin-bottom:24px;">
+              <div style="font-size:14px;font-weight:700;color:#92400e;">📬 新しいお問い合わせが届きました</div>
+            </div>
+
+            <!-- 送信者情報テーブル -->
+            <table cellpadding="0" cellspacing="0" style="width:100%;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:20px;">
+              <tr style="background:#f8fafc;">
+                <td style="padding:10px 16px;font-size:12px;font-weight:700;color:#64748b;width:120px;border-bottom:1px solid #e2e8f0;">受付ID</td>
+                <td style="padding:10px 16px;font-size:13px;color:#1e293b;border-bottom:1px solid #e2e8f0;">${inquiryId}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 16px;font-size:12px;font-weight:700;color:#64748b;background:#f8fafc;border-bottom:1px solid #e2e8f0;">氏名</td>
+                <td style="padding:10px 16px;font-size:13px;font-weight:600;color:#1e293b;border-bottom:1px solid #e2e8f0;">${name} 様</td>
+              </tr>
+              ${memberCode ? `<tr style="background:#f8fafc;"><td style="padding:10px 16px;font-size:12px;font-weight:700;color:#64748b;border-bottom:1px solid #e2e8f0;">会員コード</td><td style="padding:10px 16px;font-size:13px;color:#1e293b;border-bottom:1px solid #e2e8f0;">${memberCode}</td></tr>` : ""}
+              <tr ${memberCode ? "" : 'style="background:#f8fafc;"'}>
+                <td style="padding:10px 16px;font-size:12px;font-weight:700;color:#64748b;border-bottom:1px solid #e2e8f0;${memberCode ? "background:#f8fafc;" : ""}">メールアドレス</td>
+                <td style="padding:10px 16px;font-size:13px;color:#1e293b;border-bottom:1px solid #e2e8f0;"><a href="mailto:${email}" style="color:#2563eb;">${email}</a></td>
+              </tr>
+              <tr ${memberCode ? "" : 'style="background:#f8fafc;"'}>
+                <td style="padding:10px 16px;font-size:12px;font-weight:700;color:#64748b;${memberCode ? "" : "background:#f8fafc;"}border-bottom:1px solid #e2e8f0;">電話番号</td>
+                <td style="padding:10px 16px;font-size:13px;color:#1e293b;border-bottom:1px solid #e2e8f0;">${phone || "未入力"}</td>
+              </tr>
+              ${menuTitle ? `<tr style="background:#f8fafc;"><td style="padding:10px 16px;font-size:12px;font-weight:700;color:#64748b;">メニュー</td><td style="padding:10px 16px;font-size:13px;color:#1e293b;">${menuTitle}</td></tr>` : ""}
+            </table>
+
+            <!-- お問い合わせ内容 -->
+            <div style="margin-bottom:24px;">
+              <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">お問い合わせ内容</div>
+              <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px 18px;font-size:14px;color:#334155;line-height:1.8;white-space:pre-wrap;">${content.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+            </div>
+
+            <!-- 管理画面ボタン -->
+            <div style="text-align:center;">
+              <a href="https://www.viola-pure.xyz/admin/contacts"
+                style="display:inline-block;background:#1e293b;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-size:13px;font-weight:600;">
+                管理画面で確認する →
+              </a>
+            </div>
+          </td>
+        </tr>
+
+        <!-- フッター -->
+        <tr>
+          <td style="background:#f8fafc;padding:16px 36px;border-top:1px solid #e2e8f0;text-align:center;">
+            <p style="margin:0;font-size:11px;color:#94a3b8;">このメールはVIOLA Pure管理システムより自動送信されています。</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
+
+  try {
+    const resend = getResend();
+    const result = await resend.emails.send({
+      from: `VIOLA Pure 相談窓口 <${FROM_ADDRESS}>`,
+      to: NOTIFY_TO,
+      subject,
+      text: textBody,
+      html: htmlBody,
+    });
+    return { success: true, id: result.data?.id };
+  } catch (err) {
+    console.error("[mailer] sendContactNotificationEmail error:", err);
+    return { success: false, error: err };
+  }
+}
