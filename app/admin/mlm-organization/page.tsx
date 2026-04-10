@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 
 type OrgType = "matrix" | "unilevel";
 
@@ -524,6 +524,91 @@ export default function MlmOrganizationPage() {
   const [refSortType, setRefSortType]               = useState("clean");
 
   const treeScrollRef = useRef<HTMLDivElement>(null);
+  const treeContentRef = useRef<HTMLDivElement>(null);
+
+  // ズーム・パン状態
+  const [treeScale, setTreeScale] = useState(1);
+  const [treePan, setTreePan] = useState({ x: 0, y: 0 });
+  const isDragging = useRef(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+  const panStart = useRef({ x: 0, y: 0 });
+  const lastTouchDist = useRef<number | null>(null);
+  const lastTouchScale = useRef(1);
+
+  // ズームリセット（rootMember変化時）
+  useEffect(() => {
+    if (rootMember) {
+      setTreeScale(1);
+      setTreePan({ x: 0, y: 0 });
+    }
+  }, [rootMember]);
+
+  const handleTreeWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setTreeScale(s => Math.min(3, Math.max(0.2, s + delta)));
+  }, []);
+
+  const handleTreeMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    isDragging.current = true;
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    panStart.current = { ...treePan };
+    e.preventDefault();
+  }, [treePan]);
+
+  const handleTreeMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDragging.current) return;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    setTreePan({ x: panStart.current.x + dx, y: panStart.current.y + dy });
+  }, []);
+
+  const handleTreeMouseUp = useCallback(() => {
+    isDragging.current = false;
+  }, []);
+
+  const handleTreeTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1) {
+      isDragging.current = true;
+      dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      panStart.current = { ...treePan };
+      lastTouchDist.current = null;
+    } else if (e.touches.length === 2) {
+      isDragging.current = false;
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      lastTouchDist.current = Math.sqrt(dx * dx + dy * dy);
+      lastTouchScale.current = treeScale;
+    }
+  }, [treePan, treeScale]);
+
+  const handleTreeTouchMove = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (e.touches.length === 1 && isDragging.current) {
+      const dx = e.touches[0].clientX - dragStart.current.x;
+      const dy = e.touches[0].clientY - dragStart.current.y;
+      setTreePan({ x: panStart.current.x + dx, y: panStart.current.y + dy });
+    } else if (e.touches.length === 2 && lastTouchDist.current !== null) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const newScale = Math.min(3, Math.max(0.2, lastTouchScale.current * (dist / lastTouchDist.current)));
+      setTreeScale(newScale);
+    }
+  }, []);
+
+  const handleTreeTouchEnd = useCallback(() => {
+    isDragging.current = false;
+    lastTouchDist.current = null;
+  }, []);
+
+  const handleZoomIn  = useCallback(() => setTreeScale(s => Math.min(3, s + 0.15)), []);
+  const handleZoomOut = useCallback(() => setTreeScale(s => Math.max(0.2, s - 0.15)), []);
+  const handleZoomFit = useCallback(() => {
+    setTreeScale(1);
+    setTreePan({ x: 0, y: 0 });
+  }, []);
 
   // ─── ツリー取得（内部共通） ───
   const fetchTree = useCallback(async (code: string, limit: number, currentOrgType: OrgType) => {
@@ -804,23 +889,65 @@ export default function MlmOrganizationPage() {
         {/* ─── ビジュアルツリー ─── */}
         {viewMode === "tree" && rootMember && !loading && (
           <div className="mt-2">
-            {/* 凡例 */}
-            <div className="flex flex-wrap items-center gap-1.5 mb-3">
-              {[0, 1, 2, 3, 4, 5].map(lv => (
-                <span key={lv} className={`${LEVEL_COLOR[lv] ?? "bg-gray-400"} text-white text-[9px] px-2 py-0.5 rounded-full`}>
-                  LV.{lv}
-                </span>
-              ))}
-              <span className="text-[9px] text-slate-400 ml-1">各カードをタップで詳細・紹介者を確認できます</span>
+            {/* 凡例 + ズームコントロール */}
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[0, 1, 2, 3, 4, 5].map(lv => (
+                  <span key={lv} className={`${LEVEL_COLOR[lv] ?? "bg-gray-400"} text-white text-[9px] px-2 py-0.5 rounded-full`}>
+                    LV.{lv}
+                  </span>
+                ))}
+                <span className="text-[9px] text-slate-400 ml-1">各カードをタップで詳細・紹介者を確認できます</span>
+              </div>
+              {/* ズームボタン群 */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-slate-500 mr-1">倍率: {Math.round(treeScale * 100)}%</span>
+                <button onClick={handleZoomOut}
+                  className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 text-sm font-bold hover:bg-slate-200 transition flex items-center justify-center"
+                  title="縮小">－</button>
+                <button onClick={handleZoomFit}
+                  className="px-2 h-7 rounded-lg bg-violet-100 border border-violet-200 text-violet-700 text-[10px] font-bold hover:bg-violet-200 transition"
+                  title="フィット">フィット</button>
+                <button onClick={handleZoomIn}
+                  className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 text-sm font-bold hover:bg-slate-200 transition flex items-center justify-center"
+                  title="拡大">＋</button>
+              </div>
             </div>
 
-            {/* スクロールエリア（縦横両方） */}
+            {/* ズーム・パンエリア */}
             <div
               ref={treeScrollRef}
-              className="rounded-2xl border border-slate-100 bg-gradient-to-b from-slate-50 to-white"
-              style={{ maxHeight: "70vh", overflowX: "auto", overflowY: "auto", WebkitOverflowScrolling: "touch" }}
+              className="rounded-2xl border border-slate-100 bg-gradient-to-b from-slate-50 to-white select-none"
+              style={{
+                height: "70vh",
+                overflow: "hidden",
+                cursor: isDragging.current ? "grabbing" : "grab",
+                position: "relative",
+                touchAction: "none",
+              }}
+              onWheel={handleTreeWheel}
+              onMouseDown={handleTreeMouseDown}
+              onMouseMove={handleTreeMouseMove}
+              onMouseUp={handleTreeMouseUp}
+              onMouseLeave={handleTreeMouseUp}
+              onTouchStart={handleTreeTouchStart}
+              onTouchMove={handleTreeTouchMove}
+              onTouchEnd={handleTreeTouchEnd}
             >
-              <div className="inline-flex flex-col items-center px-8 pt-6 pb-10" style={{ minWidth: "max-content", width: "max-content" }}>
+              <div
+                ref={treeContentRef}
+                style={{
+                  transform: `translate(${treePan.x}px, ${treePan.y}px) scale(${treeScale})`,
+                  transformOrigin: "top center",
+                  display: "inline-flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  padding: "24px 32px 40px",
+                  minWidth: "max-content",
+                  width: "100%",
+                  willChange: "transform",
+                }}
+              >
                 <TreeNode
                   node={rootMember}
                   depth={0}
@@ -832,7 +959,7 @@ export default function MlmOrganizationPage() {
             </div>
 
             <p className="text-xs text-slate-400 mt-2">
-              ※ 縦横スクロール対応。「▼ 次の {STEP} 段を表示」ボタンで段数を展開。カードタップで詳細・紹介者確認。
+              ※ ドラッグ/スワイプでパン、マウスホイール/ピンチでズーム、ボタンで拡大縮小・フィット。カードタップで詳細確認。
             </p>
           </div>
         )}

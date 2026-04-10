@@ -115,7 +115,7 @@ export default function BonusReportCenterPage() {
   // タブ管理
   const [activeTab, setActiveTab] = useState<"results" | "reports" | "summary">("results");
   const [resultsSubTab, setResultsSubTab] = useState<"all" | "payment">("all");
-  const [reportsSubTab, setReportsSubTab] = useState<"webfricom" | "levelChanges" | "carryover" | "adjustments">("webfricom");
+  const [reportsSubTab, setReportsSubTab] = useState<"webfricom" | "levelChanges" | "carryover" | "adjustments" | "payments" | "purchases">("webfricom");
 
   // データ状態
   const [bonusRun, setBonusRun] = useState<BonusRunInfo | null>(null);
@@ -125,6 +125,14 @@ export default function BonusReportCenterPage() {
   const [adjustmentList, setAdjustmentList] = useState<AdjustmentRecord[]>([]);
   const [summaryList, setSummaryList] = useState<MonthSummary[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // CAP調整率（デフォルト2%）
+  const [capAdjRate, setCapAdjRate] = useState<number>(2);
+  const [savingCapRate, setSavingCapRate] = useState(false);
+
+  // 備考
+  const [bonusNote, setBonusNote] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
 
   // 検索
   const [searchQuery, setSearchQuery] = useState("");
@@ -149,11 +157,107 @@ export default function BonusReportCenterPage() {
         const data = await res.json();
         setBonusRun(data.bonusRun);
         setResults(data.results || []);
+        // CAP調整率を反映
+        if (data.bonusRun?.paymentAdjustmentRate != null) {
+          setCapAdjRate(data.bonusRun.paymentAdjustmentRate);
+        }
+        // 備考を反映
+        if (data.bonusRun?.note) {
+          setBonusNote(data.bonusRun.note || "");
+        }
       }
     } catch (error) {
       console.error("Error fetching bonus results:", error);
     }
     setLoading(false);
+  };
+
+  // CAP調整率保存
+  const handleSaveCapRate = async () => {
+    if (!bonusRun) return;
+    setSavingCapRate(true);
+    try {
+      const res = await fetch("/api/admin/bonus-run", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bonusMonth: selectedMonth, paymentAdjustmentRate: capAdjRate }),
+      });
+      if (res.ok) {
+        alert("✅ CAP調整率を保存しました");
+        await fetchResultsData();
+      } else {
+        const data = await res.json();
+        alert(`❌ エラー: ${data.error}`);
+      }
+    } catch {
+      alert("❌ エラーが発生しました");
+    } finally {
+      setSavingCapRate(false);
+    }
+  };
+
+  // 備考保存
+  const handleSaveNote = async () => {
+    if (!bonusRun) return;
+    setSavingNote(true);
+    try {
+      const res = await fetch("/api/admin/bonus-run", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bonusMonth: selectedMonth, note: bonusNote }),
+      });
+      if (res.ok) {
+        alert("✅ 備考を保存しました");
+      } else {
+        const data = await res.json();
+        alert(`❌ エラー: ${data.error}`);
+      }
+    } catch {
+      alert("❌ エラーが発生しました");
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  // ボーナス明細PDFダウンロード（会員毎）
+  const handleDownloadStatementPDF = async (memberCode: string) => {
+    try {
+      const res = await fetch(`/api/admin/bonus-reports/statement-pdf?bonusMonth=${selectedMonth}&memberCode=${memberCode}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `bonus_statement_${memberCode}_${selectedMonth}.pdf`;
+        link.click();
+      } else {
+        alert("PDFの生成に失敗しました");
+      }
+    } catch {
+      alert("エラーが発生しました");
+    }
+  };
+
+  // 支払調書CSVダウンロード
+  const handleDownloadPaymentSlip = () => {
+    const paymentTargets = results.filter((r) => r.paymentAmount > 0);
+    const headers = ["会員コード", "会員名", "法人名", "支払額", "源泉所得税", "手取り額"];
+    const rows = paymentTargets.map((r) => [
+      r.memberCode,
+      r.memberName,
+      r.companyName || "",
+      r.paymentAmount,
+      r.withholdingTax,
+      r.paymentAmount - r.withholdingTax,
+    ]);
+    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const bom = "\uFEFF";
+    const blob = new Blob([bom + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `payment_slip_${selectedMonth}.csv`;
+    link.click();
   };
 
   const fetchReportsData = async () => {
@@ -219,7 +323,7 @@ export default function BonusReportCenterPage() {
       r.memberCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.memberName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.companyName?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesTab = resultsSubTab === "all" || (resultsSubTab === "payment" && r.paymentAmount > 0);
+    const matchesTab = resultsSubTab === "all" || (resultsSubTab === "payment" && r.paymentAmount > 4000);
     return matchesSearch && matchesTab;
   });
 
@@ -374,28 +478,96 @@ export default function BonusReportCenterPage() {
 
                 {/* サマリーカード */}
                 {bonusRun && (
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="bg-blue-50 rounded-lg p-4">
-                      <p className="text-xs text-blue-600 font-semibold">計算状況</p>
-                      <p className="text-lg font-bold text-blue-900">
-                        {bonusRun.status === "confirmed" ? "✅ 確定済み" : "⏳ 未確定"}
-                      </p>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-blue-50 rounded-lg p-4">
+                        <p className="text-xs text-blue-600 font-semibold">計算状況</p>
+                        <p className="text-lg font-bold text-blue-900">
+                          {bonusRun.status === "confirmed" ? "✅ 確定済み" : "⏳ 未確定"}
+                        </p>
+                      </div>
+                      <div className="bg-green-50 rounded-lg p-4">
+                        <p className="text-xs text-green-600 font-semibold">対象会員数</p>
+                        <p className="text-lg font-bold text-green-900">{bonusRun.totalMembers}人</p>
+                      </div>
+                      <div className="bg-purple-50 rounded-lg p-4">
+                        <p className="text-xs text-purple-600 font-semibold">ボーナス総額</p>
+                        <p className="text-lg font-bold text-purple-900">
+                          ¥{bonusRun.totalBonusAmount.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="bg-orange-50 rounded-lg p-4">
+                        <p className="text-xs text-orange-600 font-semibold">CAP調整額</p>
+                        <p className="text-lg font-bold text-orange-900">
+                          ¥{(bonusRun.capAdjustmentAmount || 0).toLocaleString()}
+                        </p>
+                      </div>
                     </div>
-                    <div className="bg-green-50 rounded-lg p-4">
-                      <p className="text-xs text-green-600 font-semibold">対象会員数</p>
-                      <p className="text-lg font-bold text-green-900">{bonusRun.totalMembers}人</p>
+
+                    {/* CAP調整率 & 備考 */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* CAP調整率 */}
+                      <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                        <i className="fas fa-percentage text-amber-600"></i>
+                        <label className="text-sm font-semibold text-amber-800 whitespace-nowrap">CAP調整率</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number" min="0" max="100" step="0.1"
+                            value={capAdjRate}
+                            onChange={(e) => setCapAdjRate(parseFloat(e.target.value) || 0)}
+                            className="w-20 border border-amber-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+                          />
+                          <span className="text-sm text-amber-700">%</span>
+                        </div>
+                        <span className="text-xs text-amber-600">（デフォルト: 2%）</span>
+                        <button
+                          onClick={handleSaveCapRate}
+                          disabled={savingCapRate}
+                          className="ml-auto bg-amber-500 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-amber-600 transition disabled:opacity-50"
+                        >
+                          {savingCapRate ? "保存中..." : "保存"}
+                        </button>
+                      </div>
+
+                      {/* 備考 */}
+                      <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+                        <i className="fas fa-comment text-slate-500"></i>
+                        <label className="text-sm font-semibold text-slate-700 whitespace-nowrap">備考</label>
+                        <input
+                          type="text"
+                          value={bonusNote}
+                          onChange={(e) => setBonusNote(e.target.value)}
+                          placeholder="明細に表示される備考を入力..."
+                          className="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        />
+                        <button
+                          onClick={handleSaveNote}
+                          disabled={savingNote || !bonusRun}
+                          className="bg-slate-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-slate-700 transition disabled:opacity-50"
+                        >
+                          {savingNote ? "保存中..." : "保存"}
+                        </button>
+                      </div>
                     </div>
-                    <div className="bg-purple-50 rounded-lg p-4">
-                      <p className="text-xs text-purple-600 font-semibold">ボーナス総額</p>
-                      <p className="text-lg font-bold text-purple-900">
-                        ¥{bonusRun.totalBonusAmount.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="bg-orange-50 rounded-lg p-4">
-                      <p className="text-xs text-orange-600 font-semibold">CAP調整額</p>
-                      <p className="text-lg font-bold text-orange-900">
-                        ¥{(bonusRun.capAdjustmentAmount || 0).toLocaleString()}
-                      </p>
+
+                    {/* 支払調書・全明細PDFボタン */}
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        onClick={handleDownloadPaymentSlip}
+                        disabled={results.filter((r) => r.paymentAmount > 0).length === 0}
+                        className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
+                      >
+                        <i className="fas fa-file-invoice-dollar"></i>
+                        支払調書 CSV
+                      </button>
+                      <button
+                        onClick={handleExportResultCSV}
+                        disabled={filteredResults.length === 0}
+                        className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition disabled:opacity-50"
+                      >
+                        <i className="fas fa-download"></i>
+                        CSVエクスポート
+                      </button>
                     </div>
                   </div>
                 )}
@@ -405,30 +577,40 @@ export default function BonusReportCenterPage() {
                 )}
 
                 {/* サブタブ */}
-                <div className="border-b">
-                  <nav className="flex space-x-4">
+                <div className="border-b overflow-x-auto">
+                  <nav className="flex space-x-1 min-w-max">
                     <button
                       onClick={() => setResultsSubTab("all")}
-                      className={`pb-2 px-1 font-semibold text-sm border-b-2 transition ${
+                      className={`pb-2 px-3 font-semibold text-sm border-b-2 transition whitespace-nowrap ${
                         resultsSubTab === "all"
                           ? "border-violet-600 text-violet-600"
                           : "border-transparent text-gray-500 hover:text-gray-700"
                       }`}
                     >
-                      全取得者一覧（{results.length}件）
+                      <i className="fas fa-users mr-1 text-xs"></i>
+                      取得者一覧（{results.length}件）
                     </button>
                     <button
                       onClick={() => setResultsSubTab("payment")}
-                      className={`pb-2 px-1 font-semibold text-sm border-b-2 transition ${
+                      className={`pb-2 px-3 font-semibold text-sm border-b-2 transition whitespace-nowrap ${
                         resultsSubTab === "payment"
                           ? "border-violet-600 text-violet-600"
                           : "border-transparent text-gray-500 hover:text-gray-700"
                       }`}
                     >
-                      支払対象者一覧（{results.filter((r) => r.paymentAmount > 0).length}件）
+                      <i className="fas fa-money-bill-wave mr-1 text-xs"></i>
+                      支払対象者（{results.filter((r) => r.paymentAmount > 4000).length}件）
+                      <span className="ml-1 text-[10px] text-orange-500">※4,000円超</span>
                     </button>
                   </nav>
                 </div>
+                {/* 支払対象者の繰越ルール説明 */}
+                {resultsSubTab === "payment" && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 text-xs text-orange-700">
+                    <i className="fas fa-info-circle mr-1"></i>
+                    支払額が4,000円以下の会員は繰越となり、累計が4,000円を超えた月に支払対象となります。
+                  </div>
+                )}
 
                 {/* 検索 */}
                 <input
@@ -447,7 +629,8 @@ export default function BonusReportCenterPage() {
                     <table className="w-full text-xs min-w-[3500px]">
                       <thead className="bg-gray-800 text-white">
                         <tr>
-                          <th className="px-3 py-3 text-left font-semibold sticky left-0 bg-gray-800 z-10">会員ID</th>
+                          <th className="px-3 py-3 text-left font-semibold sticky left-0 bg-gray-800 z-10">操作</th>
+                          <th className="px-3 py-3 text-left font-semibold sticky left-16 bg-gray-800 z-10">会員ID</th>
                           <th className="px-3 py-3 text-left font-semibold">会員名</th>
                           <th className="px-3 py-3 text-left font-semibold">法人名</th>
                           <th className="px-3 py-3 text-right font-semibold">ダイレクトB</th>
@@ -490,7 +673,16 @@ export default function BonusReportCenterPage() {
                       <tbody className="divide-y divide-gray-200 bg-white">
                         {filteredResults.map((r) => (
                           <tr key={r.id} className="hover:bg-stone-50">
-                            <td className="px-3 py-2 font-mono text-xs sticky left-0 bg-white">{r.memberCode}</td>
+                            <td className="px-2 py-2 sticky left-0 bg-white z-10">
+                              <button
+                                onClick={() => handleDownloadStatementPDF(r.memberCode)}
+                                className="text-[10px] bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 transition whitespace-nowrap"
+                                title="明細PDFダウンロード"
+                              >
+                                <i className="fas fa-file-pdf mr-1"></i>PDF
+                              </button>
+                            </td>
+                            <td className="px-3 py-2 font-mono text-xs sticky left-16 bg-white z-10">{r.memberCode}</td>
                             <td className="px-3 py-2">{r.memberName}</td>
                             <td className="px-3 py-2 text-gray-600">{r.companyName || "-"}</td>
                             <td className="px-3 py-2 text-right">¥{r.directBonus.toLocaleString()}</td>
@@ -561,24 +753,26 @@ export default function BonusReportCenterPage() {
                 </div>
 
                 {/* サブタブ */}
-                <div className="border-b">
-                  <nav className="flex space-x-4">
+                <div className="border-b overflow-x-auto">
+                  <nav className="flex space-x-1 min-w-max">
                     {[
                       { key: "webfricom", label: "Webフリコム出力", icon: "fas fa-file-export" },
-                      { key: "levelChanges", label: `昇格・降格者（${levelChanges.length}件）`, icon: "fas fa-level-up-alt" },
+                      { key: "levelChanges", label: `昇格・降格（${levelChanges.length}件）`, icon: "fas fa-level-up-alt" },
                       { key: "carryover", label: `繰越金（${carryoverList.length}件）`, icon: "fas fa-redo" },
                       { key: "adjustments", label: `調整金（${adjustmentList.length}件）`, icon: "fas fa-adjust" },
+                      { key: "payments", label: "支払調書", icon: "fas fa-file-invoice-dollar" },
+                      { key: "purchases", label: "購入実績", icon: "fas fa-shopping-cart" },
                     ].map((tab) => (
                       <button
                         key={tab.key}
                         onClick={() => setReportsSubTab(tab.key as typeof reportsSubTab)}
-                        className={`pb-2 px-1 font-semibold text-sm border-b-2 transition ${
+                        className={`pb-2 px-3 font-semibold text-sm border-b-2 transition whitespace-nowrap ${
                           reportsSubTab === tab.key
                             ? "border-violet-600 text-violet-600"
                             : "border-transparent text-gray-500 hover:text-gray-700"
                         }`}
                       >
-                        <i className={`${tab.icon} mr-1`}></i>
+                        <i className={`${tab.icon} mr-1 text-xs`}></i>
                         {tab.label}
                       </button>
                     ))}
@@ -679,6 +873,112 @@ export default function BonusReportCenterPage() {
                                 <td className="p-3 text-gray-600">{r.companyName || "-"}</td>
                                 <td className="p-3">{r.memberName}</td>
                                 <td className="p-3 text-right font-semibold">¥{r.amount.toLocaleString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 支払調書 */}
+                {reportsSubTab === "payments" && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm text-gray-600">
+                        支払対象者（4,000円超）: <span className="font-bold text-indigo-700">{results.filter((r) => r.paymentAmount > 4000).length}件</span>
+                      </p>
+                      <button
+                        onClick={handleDownloadPaymentSlip}
+                        disabled={results.filter((r) => r.paymentAmount > 4000).length === 0}
+                        className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 text-sm font-semibold"
+                      >
+                        <i className="fas fa-download mr-2"></i>
+                        支払調書 CSV出力
+                      </button>
+                    </div>
+                    {results.filter((r) => r.paymentAmount > 4000).length === 0 ? (
+                      <p className="text-gray-500 text-center py-8">支払調書データがありません</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-indigo-900 text-white">
+                            <tr>
+                              <th className="text-left p-3">会員コード</th>
+                              <th className="text-left p-3">会員名</th>
+                              <th className="text-left p-3">法人名</th>
+                              <th className="text-right p-3">支払額</th>
+                              <th className="text-right p-3">源泉所得税</th>
+                              <th className="text-right p-3">手取り額</th>
+                              <th className="text-center p-3">明細PDF</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {results.filter((r) => r.paymentAmount > 4000).map((r) => (
+                              <tr key={r.id} className="hover:bg-indigo-50">
+                                <td className="p-3 font-mono text-xs">{r.memberCode}</td>
+                                <td className="p-3">{r.memberName}</td>
+                                <td className="p-3 text-gray-600">{r.companyName || "-"}</td>
+                                <td className="p-3 text-right font-semibold text-green-700">¥{r.paymentAmount.toLocaleString()}</td>
+                                <td className="p-3 text-right text-red-600">¥{r.withholdingTax.toLocaleString()}</td>
+                                <td className="p-3 text-right font-bold text-indigo-900">¥{(r.paymentAmount - r.withholdingTax).toLocaleString()}</td>
+                                <td className="p-3 text-center">
+                                  <button
+                                    onClick={() => handleDownloadStatementPDF(r.memberCode)}
+                                    className="text-xs bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 transition"
+                                  >
+                                    <i className="fas fa-file-pdf mr-1"></i>PDF
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 購入実績 */}
+                {reportsSubTab === "purchases" && (
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-600">
+                      {selectedMonth}の会員購入実績（自己購入ポイントが記録されている会員）
+                    </p>
+                    {results.filter((r) => r.selfPurchasePoints > 0).length === 0 ? (
+                      <p className="text-gray-500 text-center py-8">購入実績データがありません</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-green-800 text-white">
+                            <tr>
+                              <th className="text-left p-3">会員コード</th>
+                              <th className="text-left p-3">会員名</th>
+                              <th className="text-right p-3">自己購入PT</th>
+                              <th className="text-right p-3">グループPT</th>
+                              <th className="text-right p-3">直下ACT</th>
+                              <th className="text-center p-3">ACT</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {results
+                              .filter((r) => r.selfPurchasePoints > 0)
+                              .sort((a, b) => b.selfPurchasePoints - a.selfPurchasePoints)
+                              .map((r) => (
+                              <tr key={r.id} className="hover:bg-green-50">
+                                <td className="p-3 font-mono text-xs">{r.memberCode}</td>
+                                <td className="p-3">{r.memberName}</td>
+                                <td className="p-3 text-right font-semibold text-green-700">{r.selfPurchasePoints}pt</td>
+                                <td className="p-3 text-right">{r.groupPoints}pt</td>
+                                <td className="p-3 text-right">{r.directActiveCount}</td>
+                                <td className="p-3 text-center">
+                                  {r.isActive ? (
+                                    <span className="text-green-600 font-bold">○</span>
+                                  ) : (
+                                    <span className="text-gray-400">-</span>
+                                  )}
+                                </td>
                               </tr>
                             ))}
                           </tbody>

@@ -219,6 +219,10 @@ export default function BonusCalculatePage() {
   const adjustmentFileRef = useRef<HTMLInputElement>(null);
   const shortageFileRef = useRef<HTMLInputElement>(null);
 
+  // 支払調整率（デフォルト2%）
+  const [paymentAdjustmentRate, setPaymentAdjustmentRate] = useState<number>(2);
+  const [updatingRate, setUpdatingRate] = useState(false);
+
   // モーダル制御
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
   const [showShortageModal, setShowShortageModal] = useState(false);
@@ -247,6 +251,10 @@ export default function BonusCalculatePage() {
       const data = await res.json();
       if (res.ok) {
         setBonusRun(data.bonusRun);
+        // 支払調整率を反映
+        if (data.bonusRun?.paymentAdjustmentRate != null) {
+          setPaymentAdjustmentRate(data.bonusRun.paymentAdjustmentRate);
+        }
         // 結果も取得
         if (data.bonusRun) {
           const resDetail = await fetch(
@@ -312,6 +320,30 @@ export default function BonusCalculatePage() {
     fetchSavingsConfig();
   }, [fetchAdjustments, fetchShortages, fetchSavingsConfig]);
 
+  // 支払調整率を保存
+  const handleUpdatePaymentRate = async () => {
+    if (!bonusRun) return;
+    setUpdatingRate(true);
+    try {
+      const res = await fetch("/api/admin/bonus-run", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bonusMonth: selectedMonth, paymentAdjustmentRate }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert("✅ 支払調整率を更新しました");
+        await fetchBonusRun();
+      } else {
+        alert(`❌ エラー: ${data.error}`);
+      }
+    } catch (err: any) {
+      alert(`❌ エラー: ${err.message}`);
+    } finally {
+      setUpdatingRate(false);
+    }
+  };
+
   // ボーナス計算実行
   const handleExecute = async () => {
     if (!selectedMonth) return;
@@ -322,7 +354,7 @@ export default function BonusCalculatePage() {
       const res = await fetch("/api/admin/bonus-run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bonusMonth: selectedMonth }),
+        body: JSON.stringify({ bonusMonth: selectedMonth, paymentAdjustmentRate }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -479,34 +511,68 @@ export default function BonusCalculatePage() {
             <i className="fas fa-calendar mr-2"></i>
             対象月選択
           </h2>
-          <div className="flex items-center gap-4">
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {monthOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={handleExecute}
-              disabled={executing || loading || !!bonusRun}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50"
-            >
-              {executing ? "実行中..." : "ボーナス計算実行"}
-            </button>
-            {bonusRun && bonusRun.status !== "confirmed" && (
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="bg-red-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-red-700 transition disabled:opacity-50"
+          <div className="space-y-3">
+            <div className="flex items-center gap-4 flex-wrap">
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {deleting ? "削除中..." : "計算削除"}
+                {monthOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleExecute}
+                disabled={executing || loading || !!bonusRun}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50"
+              >
+                {executing ? "実行中..." : "ボーナス計算実行"}
               </button>
-            )}
+              {bonusRun && bonusRun.status !== "confirmed" && (
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="bg-red-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-red-700 transition disabled:opacity-50"
+                >
+                  {deleting ? "削除中..." : "計算削除"}
+                </button>
+              )}
+            </div>
+            {/* 支払調整率 */}
+            <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              <i className="fas fa-percentage text-amber-600"></i>
+              <label className="text-sm font-semibold text-amber-800 whitespace-nowrap">支払調整率</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={paymentAdjustmentRate}
+                  onChange={(e) => setPaymentAdjustmentRate(parseFloat(e.target.value) || 0)}
+                  className="w-24 border border-amber-300 rounded-lg px-3 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+                />
+                <span className="text-sm text-amber-700">%</span>
+              </div>
+              <span className="text-xs text-amber-600">（デフォルト: 2%）</span>
+              {bonusRun && (
+                <button
+                  onClick={handleUpdatePaymentRate}
+                  disabled={updatingRate}
+                  className="ml-2 bg-amber-500 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-amber-600 transition disabled:opacity-50"
+                >
+                  {updatingRate ? "保存中..." : "調整率を保存"}
+                </button>
+              )}
+              {bonusRun?.paymentAdjustmentRate != null && (
+                <span className="text-xs text-amber-600 ml-1">
+                  現在の保存値: {bonusRun.paymentAdjustmentRate}%
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

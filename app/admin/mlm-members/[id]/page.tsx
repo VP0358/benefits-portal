@@ -187,9 +187,26 @@ export default function MlmMemberDetailPage() {
   // 初期パスワード表示（新規登録直後のみ）
   const [initialPassword, setInitialPassword] = useState<string | null>(null);
 
+  // ボーナス明細タブ
+  const [bonusStatements, setBonusStatements] = useState<Array<{
+    bonusMonth: string;
+    paymentAmount: number;
+    directBonus: number;
+    unilevelBonus: number;
+    structureBonus: number;
+    savingsBonus: number;
+    adjustmentAmount: number;
+    withholdingTax: number;
+    carryoverAmount: number;
+    isPublished: boolean;
+    note: string | null;
+  }>>([]);
+  const [bonusStatementsLoading, setBonusStatementsLoading] = useState(false);
+  const [publishingMonth, setPublishingMonth] = useState<string | null>(null);
+
   // モーダル管理
   const [editSection, setEditSection] = useState<
-    "basic" | "registration" | "bank" | "level" | "autoship" | null
+    "basic" | "registration" | "bank" | "level" | "autoship" | "bonusStatement" | null
   >(null);
 
   // 編集フォームの一時データ
@@ -222,6 +239,67 @@ export default function MlmMemberDetailPage() {
     }
     fetchMember();
   }, [fetchMember, memberId]);
+
+  // ボーナス明細データ取得
+  const fetchBonusStatements = useCallback(async () => {
+    if (!member) return;
+    setBonusStatementsLoading(true);
+    try {
+      const res = await fetch(`/api/admin/bonus-results/member-statements?memberCode=${member.memberCode}`);
+      if (res.ok) {
+        const data = await res.json();
+        setBonusStatements(data.statements || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch bonus statements:", e);
+    }
+    setBonusStatementsLoading(false);
+  }, [member]);
+
+  // ボーナス明細公開/非公開切替
+  const handleTogglePublish = async (bonusMonth: string, currentlyPublished: boolean) => {
+    setPublishingMonth(bonusMonth);
+    try {
+      const res = await fetch("/api/admin/bonus-results/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memberCode: member?.memberCode,
+          bonusMonth,
+          isPublished: !currentlyPublished,
+        }),
+      });
+      if (res.ok) {
+        await fetchBonusStatements();
+      } else {
+        const data = await res.json();
+        alert(`❌ エラー: ${data.error}`);
+      }
+    } catch {
+      alert("❌ エラーが発生しました");
+    } finally {
+      setPublishingMonth(null);
+    }
+  };
+
+  // ボーナス明細PDFダウンロード
+  const handleDownloadBonusStatementPDF = async (bonusMonth: string) => {
+    try {
+      const res = await fetch(`/api/admin/bonus-reports/statement-pdf?bonusMonth=${bonusMonth}&memberCode=${member?.memberCode}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `bonus_statement_${member?.memberCode}_${bonusMonth}.pdf`;
+        link.click();
+      } else {
+        alert("PDFの生成に失敗しました");
+      }
+    } catch {
+      alert("❌ エラーが発生しました");
+    }
+  };
 
   // 編集モーダルを開く
   const openEdit = (section: typeof editSection) => {
@@ -634,6 +712,87 @@ export default function MlmMemberDetailPage() {
 
       {/* ─── 購入履歴 ─── */}
       <PurchasePanel memberCode={m.memberCode} />
+
+      {/* ─── ボーナス明細 ─── */}
+      <section className="bg-white rounded-2xl shadow-sm p-5">
+        <div className="flex items-center justify-between mb-4 border-b pb-2">
+          <h2 className="text-base font-bold text-slate-800">
+            <i className="fas fa-file-invoice-dollar mr-2 text-slate-600"></i>ボーナス明細
+          </h2>
+          <button
+            onClick={fetchBonusStatements}
+            disabled={bonusStatementsLoading}
+            className="flex items-center gap-1 px-3 py-1.5 bg-violet-600 text-white text-xs font-bold rounded-lg hover:bg-violet-700 transition disabled:opacity-50"
+          >
+            <i className="fas fa-sync text-[10px]"></i>
+            {bonusStatementsLoading ? "読込中..." : "読み込む"}
+          </button>
+        </div>
+
+        {bonusStatements.length === 0 && !bonusStatementsLoading && (
+          <p className="text-slate-400 text-sm text-center py-6">
+            「読み込む」ボタンを押してボーナス明細を表示してください
+          </p>
+        )}
+        {bonusStatementsLoading && (
+          <div className="text-center py-6 text-slate-500 text-sm">読み込み中...</div>
+        )}
+        {bonusStatements.length > 0 && (
+          <div className="overflow-x-auto rounded-xl border border-slate-100">
+            <table className="w-full text-sm min-w-[700px]">
+              <thead className="bg-slate-800 text-white">
+                <tr>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold">対象月</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold">支払額</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold">ダイレクト</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold">ユニレベル</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold">組織構築</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold">貯金B</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold">繰越金</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold">源泉税</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold">公開</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {bonusStatements.map((stmt) => (
+                  <tr key={stmt.bonusMonth} className="hover:bg-violet-50 transition">
+                    <td className="px-4 py-2.5 font-semibold text-slate-800">{stmt.bonusMonth}</td>
+                    <td className="px-4 py-2.5 text-right font-bold text-emerald-700">¥{stmt.paymentAmount.toLocaleString()}</td>
+                    <td className="px-4 py-2.5 text-right text-slate-700">¥{stmt.directBonus.toLocaleString()}</td>
+                    <td className="px-4 py-2.5 text-right text-slate-700">¥{stmt.unilevelBonus.toLocaleString()}</td>
+                    <td className="px-4 py-2.5 text-right text-slate-700">¥{stmt.structureBonus.toLocaleString()}</td>
+                    <td className="px-4 py-2.5 text-right text-green-600">¥{stmt.savingsBonus.toLocaleString()}</td>
+                    <td className="px-4 py-2.5 text-right text-blue-600">¥{stmt.carryoverAmount.toLocaleString()}</td>
+                    <td className="px-4 py-2.5 text-right text-red-600">¥{stmt.withholdingTax.toLocaleString()}</td>
+                    <td className="px-4 py-2.5 text-center">
+                      <button
+                        onClick={() => handleTogglePublish(stmt.bonusMonth, stmt.isPublished)}
+                        disabled={publishingMonth === stmt.bonusMonth}
+                        className={`px-2 py-1 text-[10px] font-bold rounded-full transition ${
+                          stmt.isPublished
+                            ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                            : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                        } disabled:opacity-50`}
+                      >
+                        {stmt.isPublished ? "公開中" : "非公開"}
+                      </button>
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <button
+                        onClick={() => handleDownloadBonusStatementPDF(stmt.bonusMonth)}
+                        className="text-[10px] bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 transition"
+                      >
+                        <i className="fas fa-file-pdf mr-1"></i>PDF
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       {/* ─── 組織図 ─── */}
       <section className="bg-white rounded-2xl shadow-sm p-5">

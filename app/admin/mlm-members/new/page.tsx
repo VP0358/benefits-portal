@@ -71,6 +71,9 @@ export default function MlmMemberNewPage() {
     autoshipStartDate: "",
     paymentMethod: "credit_card" as "credit_card" | "bank_transfer" | "bank_payment",
     
+    // 概要書面番号
+    disclosureDocNumber: "",
+    
     // その他
     note: "",
   });
@@ -349,6 +352,24 @@ export default function MlmMemberNewPage() {
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                概要書面番号
+                <span className="text-xs text-gray-500 ml-2">（任意）</span>
+              </label>
+              <input
+                type="text"
+                name="disclosureDocNumber"
+                value={formData.disclosureDocNumber}
+                onChange={handleInputChange}
+                placeholder="例: DOC-2026-001"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                <i className="fas fa-file-alt mr-1"></i>
+                特定商取引法に基づく概要書面の番号を入力してください
+              </p>
             </div>
           </div>
         </div>

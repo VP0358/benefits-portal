@@ -331,6 +331,8 @@ export async function POST(req: NextRequest) {
           city: data.city || null,
           address1: data.address1 || null,
           address2: data.address2 || null,
+          // 概要書面番号
+          disclosureDocNumber: data.disclosureDocNumber || null,
         },
       });
 

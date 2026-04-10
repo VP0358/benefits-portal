@@ -115,6 +115,53 @@ export async function POST(req: NextRequest) {
 }
 
 /**
+ * PATCH /api/admin/bonus-run
+ * ボーナス計算の支払調整率を更新
+ */
+export async function PATCH(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+    const { bonusMonth, paymentAdjustmentRate } = body;
+
+    if (!bonusMonth) {
+      return NextResponse.json({ error: "bonusMonth required" }, { status: 400 });
+    }
+
+    const bonusRun = await prisma.bonusRun.findUnique({ where: { bonusMonth } });
+    if (!bonusRun) {
+      return NextResponse.json({ error: "Bonus run not found" }, { status: 404 });
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (paymentAdjustmentRate != null) {
+      updateData.paymentAdjustmentRate = Number(paymentAdjustmentRate);
+    }
+    if (body.note !== undefined) {
+      updateData.note = body.note || null;
+    }
+
+    const updated = await prisma.bonusRun.update({
+      where: { bonusMonth },
+      data: updateData,
+    });
+
+    return NextResponse.json({
+      success: true,
+      paymentAdjustmentRate: updated.paymentAdjustmentRate,
+      message: "支払調整率を更新しました",
+    });
+  } catch (error) {
+    console.error("Error updating payment adjustment rate:", error);
+    return NextResponse.json({ error: "Failed to update" }, { status: 500 });
+  }
+}
+
+/**
  * DELETE /api/admin/bonus-run?bonusMonth=2026-02
  * ボーナス計算を削除
  */
