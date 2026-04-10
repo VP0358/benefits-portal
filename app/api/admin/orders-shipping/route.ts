@@ -303,6 +303,17 @@ export async function PATCH(request: NextRequest) {
       case "setPaidAt":
         updateData = { paidAt: value ? new Date(value) : null, paymentStatus: "paid" }
         break
+      case "setShippedAt":
+        updateData = { shippingStatus: "shipped" }
+        // ShippingLabel の shippedAt を更新
+        await prisma.shippingLabel.updateMany({
+          where: { orderId: { in: ids.map(BigInt) } },
+          data: { shippedAt: value ? new Date(value) : new Date(), status: "shipped" },
+        })
+        break
+      case "setOrderedAt":
+        updateData = { orderedAt: value ? new Date(value) : new Date() }
+        break
       default:
         return NextResponse.json({ success: false, error: "Unknown action" }, { status: 400 })
     }

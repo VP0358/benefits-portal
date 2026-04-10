@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import { useRouter } from "next/navigation"
 import {
   Search, RefreshCw, ChevronDown, ChevronUp, Download, Upload,
   Package, CheckSquare, Square, Truck, CreditCard, AlertCircle,
@@ -107,6 +108,7 @@ function offsetMonth(dateStr: string, offset: number) {
 
 // ─── メインコンポーネント ───────────────────────────────
 export default function OrdersShippingPage() {
+  const router = useRouter()
   const today = new Date()
   const { start: mStart, end: mEnd } = getThisMonthRange()
 
@@ -141,6 +143,7 @@ export default function OrdersShippingPage() {
   const [bulkAction,    setBulkAction]    = useState("")
   const [bulkNote,      setBulkNote]      = useState("")
   const [bulkPaidDate,  setBulkPaidDate]  = useState(today.toISOString().split("T")[0])
+  const [bulkDateType,  setBulkDateType]  = useState("paidAt") // paidAt / shippedAt / orderedAt
   const [bulkProcessing, setBulkProcessing] = useState(false)
 
   // CSV取込
@@ -259,9 +262,14 @@ export default function OrdersShippingPage() {
     finally  { setBulkProcessing(false) }
   }
 
-  const handleSetPaidDate = async () => {
+  const handleSetBulkDate = async () => {
     if (selected.size === 0) { alert("伝票を選択してください"); return }
-    await bulkPatch("setPaidAt", bulkPaidDate)
+    const actionMap: Record<string, string> = {
+      paidAt:    "setPaidAt",
+      shippedAt: "setShippedAt",
+      orderedAt: "setOrderedAt",
+    }
+    await bulkPatch(actionMap[bulkDateType] || "setPaidAt", bulkPaidDate)
     fetchSummary(); fetchOrders()
   }
 
@@ -269,6 +277,13 @@ export default function OrdersShippingPage() {
     if (selected.size === 0) { alert("伝票を選択してください"); return }
     await bulkPatch("setShippingStatus", "shipped")
     fetchSummary(); fetchOrders()
+  }
+
+  // 納品書ページへ遷移（選択IDをクエリパラメータで渡す）
+  const handleGoDeliveryNote = (type: "delivery" | "receipt" = "delivery") => {
+    if (selected.size === 0) { alert("伝票を選択してください"); return }
+    const ids = Array.from(selected).join(",")
+    router.push(`/admin/orders-shipping/delivery-note?ids=${ids}&type=${type}`)
   }
 
   // ─── CSV出力 ─────────────────────────────────────────
@@ -497,14 +512,21 @@ export default function OrdersShippingPage() {
               一括入力実行
             </button>
           </div>
-          {/* 入金日設定 */}
+          {/* 日付一括設定 */}
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-gray-500 whitespace-nowrap">振替伝票の</span>
-            <span className="text-xs text-gray-500">入金日</span>
+            <select
+              value={bulkDateType}
+              onChange={e => setBulkDateType(e.target.value)}
+              className="border border-gray-300 rounded px-2 py-1 text-sm min-w-[90px]"
+            >
+              <option value="paidAt">入金日</option>
+              <option value="shippedAt">発送日</option>
+              <option value="orderedAt">注文日</option>
+            </select>
             <span className="text-xs text-gray-500">を</span>
             <input type="date" value={bulkPaidDate} onChange={e => setBulkPaidDate(e.target.value)}
               className="border border-gray-300 rounded px-2 py-1 text-sm" />
-            <button onClick={handleSetPaidDate}
+            <button onClick={handleSetBulkDate}
               className="px-3 py-1.5 bg-gray-100 border border-gray-300 rounded text-sm hover:bg-gray-200">
               にする
             </button>
@@ -519,10 +541,18 @@ export default function OrdersShippingPage() {
               className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-400 rounded text-sm hover:bg-gray-50">
               <Download className="w-3.5 h-3.5" />伝票CSV出力
             </button>
-            <button className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-400 rounded text-sm hover:bg-gray-50">
+            {/* 納品書ボタン → 納品書・出庫リストページへ遷移 */}
+            <button
+              onClick={() => handleGoDeliveryNote("delivery")}
+              className="flex items-center gap-1 px-3 py-1.5 bg-white border border-indigo-400 text-indigo-700 rounded text-sm hover:bg-indigo-50 font-medium"
+              title="選択した伝票の納品書・出庫リストページへ移動">
               <FileText className="w-3.5 h-3.5" />納品書
             </button>
-            <button className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-400 rounded text-sm hover:bg-gray-50">
+            {/* 領収書ボタン → 同じページへ遷移（領収書タブ） */}
+            <button
+              onClick={() => handleGoDeliveryNote("receipt")}
+              className="flex items-center gap-1 px-3 py-1.5 bg-white border border-green-400 text-green-700 rounded text-sm hover:bg-green-50 font-medium"
+              title="選択した伝票の領収書を作成・ダウンロード">
               <FileText className="w-3.5 h-3.5" />領収書
             </button>
             <button onClick={handleSetShipped}
