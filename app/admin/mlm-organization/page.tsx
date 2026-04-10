@@ -24,6 +24,8 @@ export default function MlmOrganizationPage() {
   const [loading, setLoading] = useState(false);
   const [rootMember, setRootMember] = useState<MemberNode | null>(null);
   const [listData, setListData] = useState<MemberNode[]>([]);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
+  const [searchMessage, setSearchMessage] = useState<string | null>(null);
 
   // ダウンラインレポート用
   const [reportSearchCode, setReportSearchCode] = useState("");
@@ -42,10 +44,11 @@ export default function MlmOrganizationPage() {
 
   const handleSearch = async () => {
     setLoading(true);
+    setSearchMessage(null);
     try {
-      // searchCode が空の場合はクエリパラメータを付けずに全体表示
       const params = new URLSearchParams({ type: orgType });
-      if (searchCode.trim()) {
+      const isSearchEmpty = !searchCode.trim();
+      if (!isSearchEmpty) {
         params.set(searchType, searchCode.trim());
       }
       
@@ -54,13 +57,24 @@ export default function MlmOrganizationPage() {
       );
       if (res.ok) {
         const data = await res.json();
-        if (viewMode === "tree") {
+        // 検索条件なし（全体）の場合はリストのみ返ってくる
+        if (isSearchEmpty) {
+          setRootMember(null);
+          setListData(data.list || []);
+          setTotalCount(data.totalCount ?? null);
+          setSearchMessage(data.message ?? null);
+          setViewMode("list"); // 自動的にリスト表示に切り替え
+        } else if (viewMode === "tree") {
           setRootMember(data.root);
+          setListData(data.list || []);
+          setTotalCount(null);
         } else {
           setListData(data.list || []);
+          setTotalCount(null);
         }
       } else {
-        alert("会員が見つかりませんでした");
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error ?? "会員が見つかりませんでした");
         setRootMember(null);
         setListData([]);
       }
@@ -387,7 +401,7 @@ export default function MlmOrganizationPage() {
             {loading ? "検索中..." : "組織図を表示"}
           </button>
           <p className="text-sm text-gray-500">
-            ※ 会員コード未入力で「組織図を表示」を押すと全体組織図を表示します
+            ※ 会員コード入力で個別ツリー表示 / 未入力で全会員リスト表示（最大500件）
           </p>
         </div>
 
@@ -409,12 +423,19 @@ export default function MlmOrganizationPage() {
           </div>
         )}
 
+        {searchMessage && (
+          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            <i className="fas fa-info-circle mr-2"></i>
+            {searchMessage}（全体件数: {totalCount?.toLocaleString()}件）
+          </div>
+        )}
+
         {viewMode === "list" && listData.length > 0 && (
           <div className="mt-6">
             <div className="mb-4 p-4 bg-green-50 rounded-lg">
               <h3 className="font-bold text-gray-800 mb-2">
                 <i className="fas fa-list mr-2"></i>
-                リスト表示（全{listData.length}名）
+                リスト表示（{listData.length}名表示 / 全{totalCount ?? listData.length}名）
               </h3>
             </div>
             <div className="overflow-x-auto">

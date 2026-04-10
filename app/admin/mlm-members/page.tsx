@@ -309,9 +309,11 @@ export default function MlmMembersPage() {
   const [status, setStatus] = useState("");
   const [editTarget, setEditTarget] = useState<MlmMemberRow | null>(null);
   const [page, setPage] = useState(1);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const fetchMembers = useCallback(async () => {
     setLoading(true);
+    setApiError(null);
     try {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -323,8 +325,16 @@ export default function MlmMembersPage() {
       });
       const res = await fetch(`/api/admin/mlm-members?${params}`);
       const data = await res.json();
-      setMembers(data.members ?? []);
-      setTotal(data.total ?? 0);
+      if (!res.ok) {
+        setApiError(data.error ?? `APIエラー (HTTP ${res.status})`);
+        setMembers([]);
+        setTotal(0);
+      } else {
+        setMembers(data.members ?? []);
+        setTotal(data.total ?? 0);
+      }
+    } catch (e) {
+      setApiError(`ネットワークエラー: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setLoading(false);
     }
@@ -468,6 +478,13 @@ export default function MlmMembersPage() {
           </div>
         </div>
       </div>
+
+      {/* APIエラー表示 */}
+      {apiError && (
+        <div className="rounded-2xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          <strong>エラー:</strong> {apiError}
+        </div>
+      )}
 
       {/* テーブル */}
       <div className="rounded-3xl bg-white shadow-sm overflow-x-auto">

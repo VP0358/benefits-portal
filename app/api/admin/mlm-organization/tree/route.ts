@@ -115,35 +115,34 @@ export async function GET(req: NextRequest) {
         });
       }
     } else {
-      // ★ 検索条件なし → 全体組織図：上位（uplineId=null）の会員を全取得してツリー/リストを返す
-      const rootMembers = await prisma.mlmMember.findMany({
-        where: { uplineId: null },
-        include: { user: { select: { name: true } } },
+      // ★ 検索条件なし → 全会員フラットリストを返す（再帰ツリーはタイムアウトするため使わない）
+      const allMembers = await prisma.mlmMember.findMany({
+        include: {
+          user: { select: { name: true } },
+        },
         orderBy: { memberCode: "asc" },
+        take: 500, // 上限500件
       });
 
-      if (type === "matrix") {
-        // 複数ルートのツリーを並べて返す
-        const roots = await Promise.all(rootMembers.map(m => buildMatrixTree(m.id, 0)));
-        const list  = await Promise.all(rootMembers.map(m => getMatrixList(m.id)));
-        return NextResponse.json({
-          root: roots.length === 1 ? roots[0] : { id: "root", memberCode: "（全体）", name: "全体", level: -1, status: "active", directDownlines: roots.filter(Boolean) },
-          list: list.flat(),
-        }, { status: 200 });
-      } else {
-        // ユニレベル（referrerId=null の会員を起点）
-        const uniRootMembers = await prisma.mlmMember.findMany({
-          where: { referrerId: null },
-          include: { user: { select: { name: true } } },
-          orderBy: { memberCode: "asc" },
-        });
-        const roots = await Promise.all(uniRootMembers.map(m => buildUnilevelTree(m.id, 0)));
-        const list  = await Promise.all(uniRootMembers.map(m => getUnilevelList(m.id)));
-        return NextResponse.json({
-          root: roots.length === 1 ? roots[0] : { id: "root", memberCode: "（全体）", name: "全体", level: -1, status: "active", directDownlines: roots.filter(Boolean) },
-          list: list.flat(),
-        }, { status: 200 });
-      }
+      const list = allMembers.map(m => ({
+        id: m.id.toString(),
+        memberCode: m.memberCode,
+        name: m.user.name,
+        level: m.currentLevel,
+        status: m.status,
+        uplineId: m.uplineId?.toString() ?? null,
+        referrerId: m.referrerId?.toString() ?? null,
+        lastMonthPoints: 0,
+        currentMonthPoints: 0,
+        directDownlines: [],
+      }));
+
+      return NextResponse.json({
+        root: null,
+        list,
+        totalCount: await prisma.mlmMember.count(),
+        message: "全体表示は会員コードを入力して検索してください",
+      }, { status: 200 });
     }
 
     if (!targetMember) {

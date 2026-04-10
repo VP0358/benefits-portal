@@ -163,8 +163,9 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ members: rows, total }, { status: 200 });
   } catch (error) {
-    console.error("Error fetching MLM members:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error("Error fetching MLM members:", errMsg);
+    return NextResponse.json({ error: "Internal server error", detail: errMsg }, { status: 500 });
   }
 }
 
