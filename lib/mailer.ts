@@ -596,6 +596,7 @@ export async function sendContactNotificationEmail({
   menuTitle,
   content,
   memberCode,
+  notifyTo,
 }: {
   inquiryId: string;
   name: string;
@@ -604,8 +605,14 @@ export async function sendContactNotificationEmail({
   menuTitle?: string | null;
   content: string;
   memberCode?: string | null;
+  /** 通知先メールアドレス（複数可）。未指定時は CONTACT_NOTIFY_EMAIL 環境変数 → info@c-p.link */
+  notifyTo?: string[];
 }) {
-  const NOTIFY_TO = process.env.CONTACT_NOTIFY_EMAIL ?? "info@c-p.link";
+  // 通知先: 引数 > 環境変数 > デフォルト
+  const NOTIFY_TO: string[] =
+    notifyTo && notifyTo.length > 0
+      ? notifyTo
+      : [(process.env.CONTACT_NOTIFY_EMAIL ?? "info@c-p.link")];
   const subject = `【VIOLA Pure 相談窓口】新しいお問い合わせが届きました（${name} 様）`;
 
   const textBody = `
@@ -707,7 +714,7 @@ https://www.viola-pure.xyz/admin/contacts
     const resend = getResend();
     const result = await resend.emails.send({
       from: `VIOLA Pure 相談窓口 <${FROM_ADDRESS}>`,
-      to: NOTIFY_TO,
+      to: NOTIFY_TO,   // string[] — Resend は配列対応
       subject,
       text: textBody,
       html: htmlBody,

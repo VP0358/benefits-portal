@@ -120,6 +120,13 @@ export default function AdminAccountPanel() {
       {/* メール変更 */}
       <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
         <h2 className="text-sm font-bold text-slate-700 border-b pb-2">ログインID（メールアドレス）の変更</h2>
+        <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800">
+          <span className="mt-0.5 text-base leading-none">📬</span>
+          <span>
+            ここで設定したメールアドレスが<strong>相談窓口の通知先</strong>になります。<br />
+            会員からお問い合わせが届いた際、登録中の全管理者メールアドレス宛に通知メールが送信されます。
+          </span>
+        </div>
         <div>
           <label className="mb-1.5 block text-xs font-semibold text-slate-700">新しいメールアドレス</label>
           <input

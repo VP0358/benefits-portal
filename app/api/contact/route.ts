@@ -40,6 +40,16 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // 全管理者のメールアドレスを取得して通知先リストを作成
+    const adminEmails = await prisma.admin.findMany({
+      select: { email: true },
+    }).then(admins => admins.map(a => a.email));
+
+    // フォールバック: 管理者が取得できない場合は環境変数 or デフォルト
+    const notifyTo = adminEmails.length > 0
+      ? adminEmails
+      : [(process.env.CONTACT_NOTIFY_EMAIL ?? "info@c-p.link")];
+
     // 管理者へのメール通知（非同期・エラーでも返答は成功扱い）
     sendContactNotificationEmail({
       inquiryId:  inquiry.id.toString(),
@@ -49,6 +59,7 @@ export async function POST(req: NextRequest) {
       menuTitle:  menuTitle ?? null,
       content,
       memberCode,
+      notifyTo,
     }).catch(err => console.error("[contact] notification email failed:", err));
 
     return NextResponse.json({ ok: true, id: inquiry.id.toString() }, { status: 201 });
