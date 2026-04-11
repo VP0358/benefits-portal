@@ -32,31 +32,25 @@ const menuGroups = [
     ]
   },
   {
-    id: "mobile",
-    title: "携帯契約",
-    icon: "fas fa-mobile-alt",
-    color: "#34d399",        // エメラルド
-    bgColor: "rgba(52,211,153,0.10)",
-    borderColor: "rgba(52,211,153,0.28)",
-    labelColor: "#6ee7b7",
+    id: "welfare",
+    title: "福利厚生",
+    icon: "fas fa-heart",
+    color: "#f472b6",        // ピンク
+    bgColor: "rgba(244,114,182,0.10)",
+    borderColor: "rgba(244,114,182,0.28)",
+    labelColor: "#f9a8d4",
     items: [
-      { href: "/admin/vp-phone", label: "VP未来phone申し込み", icon: "fas fa-mobile-alt" },
-      { href: "/admin/vp-phone/stats", label: "携帯契約統計", icon: "fas fa-chart-bar" },
-      { href: "/admin/contracts", label: "携帯契約一覧", icon: "fas fa-file-contract" },
-      { href: "/admin/referral-rewards", label: "紹介者報酬計算", icon: "fas fa-gift" },
-    ]
-  },
-  {
-    id: "travel",
-    title: "格安旅行",
-    icon: "fas fa-plane",
-    color: "#60a5fa",        // スカイブルー
-    bgColor: "rgba(96,165,250,0.10)",
-    borderColor: "rgba(96,165,250,0.28)",
-    labelColor: "#93c5fd",
-    items: [
-      { href: "/admin/travel-subscriptions", label: "旅行サブスク一覧", icon: "fas fa-plane" },
+      // 携帯契約
+      { href: "/admin/vp-phone",              label: "VP未来phone申し込み", icon: "fas fa-mobile-alt" },
+      { href: "/admin/vp-phone/stats",        label: "携帯契約統計",       icon: "fas fa-chart-bar" },
+      { href: "/admin/contracts",             label: "携帯契約一覧",       icon: "fas fa-file-contract" },
+      { href: "/admin/referral-rewards",      label: "紹介者報酬計算",     icon: "fas fa-gift" },
+      // 格安旅行
+      { href: "/admin/travel-subscriptions",       label: "旅行サブスク一覧", icon: "fas fa-plane" },
       { href: "/admin/travel-subscriptions/stats", label: "旅行サブスク統計", icon: "fas fa-chart-bar" },
+      // 福利厚生メニュー管理
+      { href: "/admin/menus",     label: "福利厚生メニュー管理", icon: "fas fa-list" },
+      { href: "/admin/menus/new", label: "新規メニュー追加",     icon: "fas fa-plus-circle" },
     ]
   },
   {
