@@ -89,6 +89,7 @@ export async function PATCH(
       if (data.deliveryPostalCode  !== undefined) regUpdate.deliveryPostalCode  = data.deliveryPostalCode || null;
       if (data.deliveryAddress     !== undefined) regUpdate.deliveryAddress     = data.deliveryAddress || null;
       if (data.deliveryName        !== undefined) regUpdate.deliveryName        = data.deliveryName || null;
+      if (data.deliveryPhone       !== undefined) regUpdate.deliveryPhone       = data.deliveryPhone || null;
 
       // MlmRegistration が存在しなければ作成
       await prisma.mlmRegistration.upsert({

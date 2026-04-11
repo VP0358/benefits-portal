@@ -67,6 +67,7 @@ type MemberDetail = {
       deliveryPostalCode: string | null;
       deliveryAddress: string | null;
       deliveryName: string | null;
+      deliveryPhone: string | null;
     } | null;
   };
   referrer: { id: string; memberCode: string; user: { name: string }; companyName: string | null } | null;
@@ -324,6 +325,7 @@ export default function MlmMemberDetailPage() {
     if (section === "basic") {
       Object.assign(d, {
         name: m.user.name, nameKana: m.user.nameKana ?? "",
+        disclosureDocNumber: r?.disclosureDocNumber ?? "",
         email: m.user.email, phone: m.user.phone ?? "",
         mobile: m.mobile ?? "", companyName: m.companyName ?? "",
         companyNameKana: m.companyNameKana ?? "",
@@ -339,11 +341,16 @@ export default function MlmMemberDetailPage() {
         note: m.note ?? "", newPassword: "",
       });
     } else if (section === "registration") {
+      // 配送先未設定の場合は基本情報からフォールバック
+      const fallbackPostal = m.user.postalCode ?? "";
+      const fallbackAddress = [m.prefecture, m.city, m.address1, m.address2].filter(Boolean).join(" ");
+      const fallbackName = m.companyName || m.user.name || "";
+      const fallbackPhone = m.mobile || m.user.phone || "";
       Object.assign(d, {
-        disclosureDocNumber: r?.disclosureDocNumber ?? "",
-        deliveryPostalCode: r?.deliveryPostalCode ?? "",
-        deliveryAddress: r?.deliveryAddress ?? "",
-        deliveryName: r?.deliveryName ?? "",
+        deliveryPostalCode: r?.deliveryPostalCode || fallbackPostal,
+        deliveryAddress: r?.deliveryAddress || fallbackAddress,
+        deliveryName: r?.deliveryName || fallbackName,
+        deliveryPhone: r?.deliveryPhone || fallbackPhone,
       });
     } else if (section === "bank") {
       Object.assign(d, {
@@ -415,6 +422,18 @@ export default function MlmMemberDetailPage() {
         setEditSection(null);
         setSaving(false);
         return;
+      }
+
+      // basic セクション保存時は disclosureDocNumber も registration として別途保存
+      if (editSection === "basic" && editData.disclosureDocNumber !== undefined) {
+        await fetch(`/api/admin/mlm-members/${memberId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            section: "registration",
+            disclosureDocNumber: editData.disclosureDocNumber,
+          }),
+        });
       }
 
       const res = await fetch(`/api/admin/mlm-members/${memberId}`, {
@@ -533,6 +552,7 @@ export default function MlmMemberDetailPage() {
             <InfoRow label="性別"          value={m.gender === "male" ? "男性" : m.gender === "female" ? "女性" : m.gender === "other" ? "その他" : null} />
           </div>
           <div>
+            <InfoRow label="概要書面番号" value={r?.disclosureDocNumber} />
             <InfoRow label="メールアドレス" value={m.user.email} />
             <InfoRow label="電話番号"       value={m.user.phone} />
             <InfoRow label="携帯電話"       value={m.mobile} />
@@ -566,19 +586,36 @@ export default function MlmMemberDetailPage() {
         </div>
       </section>
 
-      {/* ─── 概要書面・配送先 ─── */}
+      {/* ─── 配送先住所 ─── */}
       <section className="bg-white rounded-2xl shadow-sm p-5">
-        <SectionHeader title="概要書面・配送先住所" icon="fas fa-file-alt" onEdit={() => openEdit("registration")} />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-          <div>
-            <InfoRow label="概要書面番号" value={r?.disclosureDocNumber} />
-          </div>
-          <div>
-            <InfoRow label="配送先郵便番号" value={r?.deliveryPostalCode} />
-            <InfoRow label="配送先住所"     value={r?.deliveryAddress} />
-            <InfoRow label="配送先名義"     value={r?.deliveryName} />
-          </div>
-        </div>
+        <SectionHeader title="配送先住所" icon="fas fa-truck" onEdit={() => openEdit("registration")} />
+        {/* 配送先未設定の場合は基本情報からフォールバック表示 */}
+        {(() => {
+          const hasDelivery = r?.deliveryPostalCode || r?.deliveryAddress;
+          const dispPostal  = r?.deliveryPostalCode || m.user.postalCode;
+          const dispAddress = r?.deliveryAddress    || [m.prefecture, m.city, m.address1, m.address2].filter(Boolean).join(" ");
+          const dispName    = r?.deliveryName       || m.companyName || m.user.name;
+          const dispPhone   = r?.deliveryPhone || m.mobile || m.user.phone;
+          return (
+            <>
+              {!hasDelivery && (
+                <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-1.5 mb-3">
+                  ※ 配送先住所が未設定のため、基本情報の住所を表示しています
+                </p>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+                <div>
+                  <InfoRow label="配送先郵便番号" value={dispPostal} />
+                  <InfoRow label="配送先住所"     value={dispAddress} />
+                </div>
+                <div>
+                  <InfoRow label="配送先名義"     value={dispName} />
+                  <InfoRow label="配送先電話番号" value={dispPhone} />
+                </div>
+              </div>
+            </>
+          );
+        })()}
       </section>
 
       {/* ─── 銀行口座情報 ─── */}
@@ -765,10 +802,10 @@ export default function MlmMemberDetailPage() {
       {/* ─── 購入履歴 ─── */}
       <PurchasePanel
         memberCode={m.memberCode}
-        memberName={m.user.name}
-        memberPostal={m.user.postalCode || ""}
-        memberAddress={m.user.address || ""}
-        memberPhone={m.user.phone || ""}
+        memberName={m.companyName || m.user.name}
+        memberPostal={r?.deliveryPostalCode || m.user.postalCode || ""}
+        memberAddress={r?.deliveryAddress || [m.prefecture, m.city, m.address1, m.address2].filter(Boolean).join(" ") || m.user.address || ""}
+        memberPhone={r?.deliveryPhone || m.mobile || m.user.phone || ""}
       />
 
       {/* ─── ボーナス明細 ─── */}
@@ -908,6 +945,9 @@ export default function MlmMemberDetailPage() {
                 <option value="other">その他</option>
               </select>
             </FormField>
+            <div className="md:col-span-2">
+              <FormField label="概要書面番号"><input className={inputCls} value={String(editData.disclosureDocNumber ?? "")} onChange={e => set("disclosureDocNumber", e.target.value)} placeholder="例: 2024-001" /></FormField>
+            </div>
             <FormField label="メールアドレス" required><input type="email" className={inputCls} value={String(editData.email ?? "")} onChange={e => set("email", e.target.value)} /></FormField>
             <FormField label="電話番号"><input className={inputCls} value={String(editData.phone ?? "")} onChange={e => set("phone", e.target.value)} /></FormField>
             <FormField label="携帯電話"><input className={inputCls} value={String(editData.mobile ?? "")} onChange={e => set("mobile", e.target.value)} /></FormField>
@@ -947,16 +987,19 @@ export default function MlmMemberDetailPage() {
         </EditModal>
       )}
 
-      {/* 概要書面・配送先 編集 */}
+      {/* 配送先住所 編集 */}
       {editSection === "registration" && (
-        <EditModal title="概要書面・配送先住所を編集" onClose={() => setEditSection(null)} onSave={handleSave} saving={saving}>
+        <EditModal title="配送先住所を編集" onClose={() => setEditSection(null)} onSave={handleSave} saving={saving}>
+          <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2 mb-1">
+            未入力の場合は基本情報（住所・郵便番号・電話番号）が配送先として使用されます
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <FormField label="概要書面番号"><input className={inputCls} value={String(editData.disclosureDocNumber ?? "")} onChange={e => set("disclosureDocNumber", e.target.value)} /></FormField>
-            <FormField label="配送先郵便番号"><input className={inputCls} value={String(editData.deliveryPostalCode ?? "")} onChange={e => set("deliveryPostalCode", e.target.value)} /></FormField>
+            <FormField label="配送先郵便番号"><input className={inputCls} value={String(editData.deliveryPostalCode ?? "")} onChange={e => set("deliveryPostalCode", e.target.value)} placeholder="基本情報の郵便番号を使用" /></FormField>
+            <FormField label="配送先名義（宛名）"><input className={inputCls} value={String(editData.deliveryName ?? "")} onChange={e => set("deliveryName", e.target.value)} placeholder="基本情報の氏名/法人名を使用" /></FormField>
             <div className="md:col-span-2">
-              <FormField label="配送先住所"><input className={inputCls} value={String(editData.deliveryAddress ?? "")} onChange={e => set("deliveryAddress", e.target.value)} /></FormField>
+              <FormField label="配送先住所"><input className={inputCls} value={String(editData.deliveryAddress ?? "")} onChange={e => set("deliveryAddress", e.target.value)} placeholder="基本情報の住所を使用" /></FormField>
             </div>
-            <FormField label="配送先名義（宛名）"><input className={inputCls} value={String(editData.deliveryName ?? "")} onChange={e => set("deliveryName", e.target.value)} /></FormField>
+            <FormField label="配送先電話番号"><input className={inputCls} value={String(editData.deliveryPhone ?? "")} onChange={e => set("deliveryPhone", e.target.value)} placeholder="基本情報の電話番号を使用" /></FormField>
           </div>
         </EditModal>
       )}

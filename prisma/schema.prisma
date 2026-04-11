@@ -601,6 +601,7 @@ model MlmRegistration {
   deliveryPostalCode  String?   @db.VarChar(10)
   deliveryAddress     String?   @db.VarChar(500)
   deliveryName        String?   @db.VarChar(255)  // 宛名（法人名など）
+  deliveryPhone       String?   @db.VarChar(50)   // 配送先電話番号
   // 同意・確認
   agreedToTerms       Boolean   @default(false)
   agreedAt            DateTime?
