@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/app/api/admin/route-guard";
+import { getMlmDisplayName } from "@/lib/mlm-display-name";
 
 /** GET: オートシップ実行一覧 */
 export async function GET() {
@@ -118,7 +119,7 @@ export async function POST(request: Request) {
         targetMonth,
         paymentMethod: paymentMethod as "credit_card" | "bank_transfer",
         memberCode: m.memberCode,
-        memberName: m.user.name,
+        memberName: getMlmDisplayName(m.user.name, m.companyName),
         memberNameKana: m.user.nameKana ?? null,
         memberPhone: m.user.phone ?? null,
         memberEmail: m.user.email ?? null,

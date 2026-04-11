@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getMlmDisplayName } from "@/lib/mlm-display-name";
 
 /**
  * GET /api/admin/bonus-reports/carryover?bonusMonth=2026-02
@@ -46,7 +47,7 @@ export async function GET(req: NextRequest) {
 
     const carryover = results.map((r) => ({
       memberCode: r.mlmMember.memberCode,
-      memberName: r.mlmMember.user.name,
+      memberName: getMlmDisplayName(r.mlmMember.user.name, r.mlmMember.companyName),
       companyName: r.mlmMember.companyName,
       amount: r.carryoverAmount,
     }));

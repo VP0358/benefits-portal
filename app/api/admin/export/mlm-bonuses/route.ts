@@ -6,6 +6,7 @@ import { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/app/api/admin/route-guard";
+import { getMlmDisplayName } from "@/lib/mlm-display-name";
 
 function csvEscape(value: unknown) {
   const str = String(value ?? "");
@@ -115,7 +116,7 @@ export async function GET(req: NextRequest) {
       // 新規エントリ（-01ポジション情報を使用）
       mergedMap.set(baseCode, {
         memberCode: `${baseCode}-01`,
-        name: result.mlmMember.user.name,
+        name: getMlmDisplayName(result.mlmMember.user.name, result.mlmMember.companyName),
         email: result.mlmMember.user.email,
         bankCode: result.mlmMember.bankCode ?? "",
         branchCode: result.mlmMember.branchCode ?? "",
@@ -150,7 +151,7 @@ export async function GET(req: NextRequest) {
     });
     if (primaryMember) {
       entry.memberCode = primaryMemberCode;
-      entry.name = primaryMember.user.name;
+      entry.name = getMlmDisplayName(primaryMember.user.name, primaryMember.companyName);
       entry.email = primaryMember.user.email;
       const reg = primaryMember.user.mlmRegistration;
       entry.bankCode = primaryMember.bankCode ?? entry.bankCode;

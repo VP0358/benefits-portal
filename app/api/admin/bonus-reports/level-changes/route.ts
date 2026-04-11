@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getMlmDisplayName } from "@/lib/mlm-display-name";
 
 /**
  * GET /api/admin/bonus-reports/level-changes?bonusMonth=2026-02
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest) {
       .filter((r) => r.previousTitleLevel !== r.newTitleLevel)
       .map((r) => ({
         memberCode: r.mlmMember.memberCode,
-        memberName: r.mlmMember.user.name,
+        memberName: getMlmDisplayName(r.mlmMember.user.name, r.mlmMember.companyName),
         previousLevel: r.previousTitleLevel,
         newLevel: r.newTitleLevel,
         changeType:

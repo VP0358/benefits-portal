@@ -5,6 +5,7 @@ export const revalidate = 0
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getMlmDisplayName } from "@/lib/mlm-display-name";
 
 export async function GET() {
   const session = await auth();
@@ -31,6 +32,7 @@ export async function GET() {
         user: {
           select: { name: true, email: true, createdAt: true },
         },
+        // 法人名取得（companyNameはmlmMemberのフィールド、selectなし）
         // 当月・先月の購入
         purchases: {
           orderBy: { purchasedAt: "desc" },
@@ -89,7 +91,7 @@ export async function GET() {
         return {
           id: m.id.toString(),
           memberCode: m.memberCode,
-          name: m.user.name,
+          name: getMlmDisplayName(m.user.name, m.companyName),
           memberType: m.memberType,
           status: m.status,
           currentLevel: m.currentLevel,

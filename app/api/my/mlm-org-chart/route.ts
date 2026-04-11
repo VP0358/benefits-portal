@@ -113,7 +113,7 @@ async function buildMatrixNode(
 
   return {
     id: m.user.id.toString(),
-    name: m.user.name,
+    name: (m as { companyName?: string | null }).companyName || m.user.name,
     memberCode: m.user.memberCode,
     avatarUrl: m.user.avatarUrl,
     mlmMemberCode: m.memberCode,
@@ -176,7 +176,7 @@ async function buildUniNode(
 
   return {
     id: m.user.id.toString(),
-    name: m.user.name,
+    name: (m as { companyName?: string | null }).companyName || m.user.name,
     memberCode: m.user.memberCode,
     avatarUrl: m.user.avatarUrl,
     mlmMemberCode: m.memberCode,
@@ -197,6 +197,7 @@ const userSelect = { id: true, name: true, memberCode: true, avatarUrl: true } a
 const memberFields = {
   id: true, memberCode: true, memberType: true, status: true,
   currentLevel: true, titleLevel: true, contractDate: true, forceActive: true,
+  companyName: true,
 } as const;
 
 function buildDownlineInclude(depth: number): object {
@@ -330,7 +331,7 @@ export async function GET() {
 
     const meInfo = {
       id: me.user.id.toString(),
-      name: me.user.name,
+      name: me.companyName || me.user.name,
       memberCode: me.user.memberCode,
       avatarUrl: me.user.avatarUrl,
       mlmMemberCode: me.memberCode,
@@ -341,12 +342,12 @@ export async function GET() {
       selfPoints: mySelfPoints,
       // 直上者（マトリックス）
       upline: me.upline ? {
-        name: me.upline.user.name,
+        name: me.upline.companyName || me.upline.user.name,
         memberCode: me.upline.memberCode,
       } : null,
       // 紹介者（ユニレベル）
       referrer: me.referrer ? {
-        name: me.referrer.user.name,
+        name: me.referrer.companyName || me.referrer.user.name,
         memberCode: me.referrer.memberCode,
       } : null,
     };

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getMlmDisplayName } from "@/lib/mlm-display-name";
 
 /**
  * GET /api/admin/bonus-results/detail?bonusMonth=2026-02
@@ -55,7 +56,7 @@ export async function GET(req: NextRequest) {
     const results = bonusRun.results.map((r) => ({
       id: r.id.toString(),
       memberCode: r.mlmMember.memberCode,
-      memberName: r.mlmMember.user.name,
+      memberName: getMlmDisplayName(r.mlmMember.user.name, r.mlmMember.companyName),
       companyName: r.mlmMember.companyName,
       status: r.mlmMember.status,
 

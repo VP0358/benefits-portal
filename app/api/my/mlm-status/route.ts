@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { LEVEL_LABELS } from "@/lib/mlm-bonus";
+import { getMlmDisplayName } from "@/lib/mlm-display-name";
 
 export async function GET() {
   const session = await auth();
@@ -77,7 +78,7 @@ export async function GET() {
     return NextResponse.json({
       // 基本
       memberCode: mlmMember.memberCode,
-      name: user.name,
+      name: getMlmDisplayName(user.name, mlmMember.companyName),
       status: mlmMember.status,
       memberType: mlmMember.memberType,
       // レベル

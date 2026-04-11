@@ -5,6 +5,7 @@ export const revalidate = 0
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/app/api/admin/route-guard";
+import { getMlmDisplayName } from "@/lib/mlm-display-name";
 
 /**
  * GET: 対象月・支払い方法で対象になるオートシップ有効会員の一覧を返す
@@ -54,7 +55,7 @@ export async function GET(req: NextRequest) {
     members: filtered.map(m => ({
       id: m.id.toString(),
       memberCode: m.memberCode,
-      memberName: m.user.name,
+      memberName: getMlmDisplayName(m.user.name, m.companyName),
       memberPhone: m.user.phone ?? null,
       memberEmail: m.user.email ?? null,
       paymentMethod: paymentMethod,

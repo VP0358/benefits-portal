@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from '@/lib/prisma';
 import { generateMemberCode } from "@/lib/mlm-utils";
+import { getMlmDisplayName } from "@/lib/mlm-display-name";
 import bcrypt from "bcryptjs";
 
 // 初期パスワード：全会員一律「0000」
@@ -157,7 +158,7 @@ export async function GET(req: NextRequest) {
       autoshipSuspendMonths: m.autoshipSuspendMonths,
       paymentMethod:       m.paymentMethod,
       savingsPoints:       m.savingsPoints,
-      userName:            m.user.name,
+      userName:            getMlmDisplayName(m.user.name, m.companyName),
       userEmail:           m.user.email,
       userPhone:           m.user.phone ?? null,
       userPostalCode:      m.user.postalCode ?? null,
