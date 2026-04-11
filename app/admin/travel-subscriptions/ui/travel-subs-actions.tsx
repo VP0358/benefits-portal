@@ -347,11 +347,58 @@ export default function TravelSubsActions({ mode, users, subId, currentStatus, s
     );
   }
 
+  // ── クイックステータス変更ハンドラ ──
+  async function handleQuickStatus(newStatus: string) {
+    if (!subId) return;
+    if (!confirm(`ステータスを「${STATUS_OPTIONS.find(o=>o.value===newStatus)?.label ?? newStatus}」に変更しますか？`)) return;
+    setSaving(true);
+    setError("");
+    const res = await fetch(`/api/admin/travel-subscriptions/${subId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    setSaving(false);
+    if (!res.ok) {
+      const d = await res.json().catch(() => null);
+      setError(d?.error ?? "変更に失敗しました");
+      return;
+    }
+    router.refresh();
+  }
+
   // ════════════════════════════════════════
   // アクションモード（編集・解約）
   // ════════════════════════════════════════
   return (
-    <div className="flex gap-1">
+    <div className="flex flex-col gap-1">
+      {/* クイックステータス変更ボタン */}
+      {currentStatus !== "canceled" && (
+        <div className="flex flex-wrap gap-1 mb-0.5">
+          {currentStatus !== "active" && (
+            <button type="button" onClick={() => handleQuickStatus("active")} disabled={saving}
+              className="rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50"
+              style={{ background: "rgba(16,185,129,0.10)", color: "#10b981", border: "1px solid rgba(16,185,129,0.30)" }}>
+              ✅ 有効にする
+            </button>
+          )}
+          {currentStatus !== "pending" && (
+            <button type="button" onClick={() => handleQuickStatus("pending")} disabled={saving}
+              className="rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50"
+              style={{ background: "rgba(245,158,11,0.10)", color: "#d97706", border: "1px solid rgba(245,158,11,0.30)" }}>
+              ⏳ 審査待ち
+            </button>
+          )}
+          {currentStatus !== "suspended" && (
+            <button type="button" onClick={() => handleQuickStatus("suspended")} disabled={saving}
+              className="rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:opacity-50"
+              style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.25)" }}>
+              ⏸ 停止中
+            </button>
+          )}
+        </div>
+      )}
+      <div className="flex gap-1">
       {currentStatus !== "canceled" && (
         <>
           <button type="button"
@@ -365,6 +412,8 @@ export default function TravelSubsActions({ mode, users, subId, currentStatus, s
           </button>
         </>
       )}
+
+      {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
 
       {showEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 overflow-y-auto">
@@ -463,6 +512,7 @@ export default function TravelSubsActions({ mode, users, subId, currentStatus, s
           </div>
         </div>
       )}
+      </div>{/* end inner flex gap-1 */}
     </div>
   );
 }

@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 // ── デザイントークン
 const GOLD       = "#c9a84c";
 const GOLD_LIGHT = "#e8c96a";
-const ORANGE     = "#d4703a";
+const GOLD_DARK  = "#a88830";
 const NAVY       = "#0a1628";
 const NAVY_CARD  = "#0d1e38";
 const NAVY_CARD2 = "#122444";
@@ -14,308 +14,300 @@ const NAVY_CARD3 = "#162c50";
 const PAGE_BG    = "#eee8e0";
 const LINEN      = "#f5f0e8";
 
-/* ─── 型定義 ─── */
-type TravelInfo = {
-  id: string; planName: string; level: number; pricingTier: string;
-  monthlyFee: number; status: string; forceStatus: string;
-  startedAt: string | null; confirmedAt: string | null; createdAt: string;
+// ── ステータス設定（4種類）
+const STATUS_CONFIG: Record<string, {
+  label: string; desc: string;
+  bg: string; text: string; border: string; dot: string;
+  icon: string;
+}> = {
+  active: {
+    label: "有効",
+    desc: "期限内に入金が確認されました。サービスをご利用いただけます。",
+    bg: "rgba(52,211,153,0.12)", text: "#34d399", border: "rgba(52,211,153,0.30)", dot: "#34d399",
+    icon: "✅",
+  },
+  pending: {
+    label: "審査待ち",
+    desc: "入金確認後、管理側で審査を行い「有効」に変更されます。しばらくお待ちください。",
+    bg: `${GOLD}14`, text: GOLD_LIGHT, border: `${GOLD}30`, dot: GOLD,
+    icon: "⏳",
+  },
+  canceled: {
+    label: "解約済み",
+    desc: "解約申請が受理されました。サービスのご利用はできません。",
+    bg: "rgba(107,114,128,0.10)", text: "#9ca3af", border: "rgba(107,114,128,0.25)", dot: "#9ca3af",
+    icon: "🚫",
+  },
+  suspended: {
+    label: "停止中",
+    desc: "期限内に入金が確認できなかったため、一時停止中です。ご入金後に担当者へご連絡ください。",
+    bg: "rgba(248,113,113,0.10)", text: "#f87171", border: "rgba(248,113,113,0.28)", dot: "#f87171",
+    icon: "⏸",
+  },
 };
 
-type TreeNode = {
-  id: string; name: string; memberCode: string; depth: number;
-  travel: TravelInfo | null; children: TreeNode[]; childCount: number;
+type TravelSub = {
+  id: string;
+  planName: string;
+  level: number;
+  pricingTier: string;
+  monthlyFee: number;
+  status: string;
+  forceStatus: string;
+  startedAt: string | null;
+  confirmedAt: string | null;
 };
 
-type ApiResponse = {
-  root: { id: string; name: string; memberCode: string; isMe: boolean };
-  tree: TreeNode;
-  stats: { totalMembers: number; active: number; pending: number };
-};
-
-/* ─── ステータス設定 ─── */
-const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; border: string; dot: string }> = {
-  active:    { label: "有効",     bg: "rgba(52,211,153,0.12)",  text: "#34d399", border: "rgba(52,211,153,0.28)", dot: "#34d399" },
-  pending:   { label: "審査待ち", bg: `${GOLD}12`,              text: GOLD_LIGHT, border: `${GOLD}28`,            dot: GOLD },
-  canceled:  { label: "解約済",   bg: "rgba(107,114,128,0.10)", text: "#9ca3af", border: "rgba(107,114,128,0.22)",dot: "#9ca3af" },
-  suspended: { label: "停止中",   bg: "rgba(248,113,113,0.10)", text: "#f87171", border: "rgba(248,113,113,0.25)",dot: "#f87171" },
-};
-
-const PRICING_TIER_LABEL: Record<string, string> = {
-  early: "早期特別", standard: "標準",
+type ApiData = {
+  displayStatus: "active" | "inactive" | "none";
+  sub: TravelSub | null;
 };
 
 function fmtDate(iso: string | null) {
   if (!iso) return "—";
   const d = new Date(iso);
-  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}`;
+  return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
 }
 
-/* ─── ステータスバッジ ─── */
-function StatusBadge({ status, forceStatus }: { status: string; forceStatus: string }) {
-  const effectiveStatus =
-    forceStatus === "forced_active"   ? "active" :
-    forceStatus === "forced_inactive" ? "suspended" : status;
-  const cfg = STATUS_CONFIG[effectiveStatus] ?? { label: effectiveStatus, bg: "rgba(156,163,175,0.12)", text: "#9ca3af", border: "rgba(156,163,175,0.25)", dot: "#9ca3af" };
-  return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold font-jp"
-      style={{ background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }}>
-      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.dot }}/>
-      {cfg.label}
-      {forceStatus !== "none" && <span style={{ opacity: 0.6 }}>（強制）</span>}
-    </span>
-  );
+// 実効ステータスを計算（forceStatus優先）
+function getEffectiveStatus(sub: TravelSub): string {
+  if (sub.forceStatus === "forced_active")   return "active";
+  if (sub.forceStatus === "forced_inactive") return "suspended";
+  return sub.status;
 }
 
-/* ─── メンバーカード ─── */
-function MemberCard({ node, onDrillDown }: { node: TreeNode; onDrillDown: (node: TreeNode) => void }) {
-  const travel = node.travel;
-  const hasChildren = node.childCount > 0;
+export default function TravelStatusPage() {
+  const [data, setData]     = useState<ApiData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]   = useState("");
 
-  return (
-    <div className="rounded-2xl overflow-hidden transition-all hover:scale-[1.01] active:scale-[0.99]"
-      style={{
-        background: `linear-gradient(150deg,${NAVY_CARD} 0%,${NAVY_CARD2} 100%)`,
-        border: `1px solid ${GOLD}20`,
-        boxShadow: "0 4px 16px rgba(10,22,40,0.16)",
-        cursor: hasChildren ? "pointer" : "default",
-      }}
-      onClick={() => hasChildren && onDrillDown(node)}>
-
-      <div className="p-4">
-        {/* ヘッダー */}
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="flex-1 min-w-0">
-            <p className="font-bold font-jp text-white text-sm leading-tight truncate">{node.name}</p>
-            <p className="text-[10px] font-label mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>{node.memberCode}</p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {hasChildren && (
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full font-label"
-                style={{ background: "rgba(147,197,253,0.15)", color: "#93c5fd", border: "1px solid rgba(147,197,253,0.25)" }}>
-                配下 {node.childCount}名
-              </span>
-            )}
-            {hasChildren && (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                style={{ color: `${GOLD}55` }}>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
-              </svg>
-            )}
-          </div>
-        </div>
-
-        {/* 格安旅行情報 */}
-        {travel ? (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <StatusBadge status={travel.status} forceStatus={travel.forceStatus}/>
-              <span className="text-xs px-2 py-0.5 rounded-full font-label"
-                style={{ background: "rgba(147,197,253,0.12)", color: "#93c5fd", border: "1px solid rgba(147,197,253,0.22)" }}>
-                {PRICING_TIER_LABEL[travel.pricingTier] ?? travel.pricingTier}
-              </span>
-              <span className="text-xs px-2 py-0.5 rounded-full font-label"
-                style={{ background: `${GOLD}12`, color: GOLD_LIGHT, border: `1px solid ${GOLD}22` }}>
-                Lv.{travel.level}
-              </span>
-            </div>
-            <p className="text-sm font-semibold font-jp" style={{ color: "rgba(255,255,255,0.85)" }}>{travel.planName}</p>
-            <p className="text-xs font-jp">
-              <span style={{ color: "rgba(255,255,255,0.35)" }}>月額：</span>
-              <span className="font-bold" style={{ color: GOLD_LIGHT }}>¥{travel.monthlyFee.toLocaleString()}</span>
-            </p>
-            <div className="flex gap-3 text-[10px] font-label flex-wrap" style={{ color: "rgba(255,255,255,0.30)" }}>
-              <span>申込：{fmtDate(travel.createdAt)}</span>
-              {travel.startedAt && <span>開始：{fmtDate(travel.startedAt)}</span>}
-              {travel.confirmedAt && <span>確認：{fmtDate(travel.confirmedAt)}</span>}
-            </div>
-          </div>
-        ) : (
-          <p className="text-xs font-jp italic" style={{ color: "rgba(255,255,255,0.25)" }}>格安旅行 申込なし</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ─── パンくずリスト ─── */
-function Breadcrumb({ stack, onJump }: { stack: { id: string; name: string }[]; onJump: (index: number) => void }) {
-  if (stack.length <= 1) return null;
-  return (
-    <div className="flex items-center gap-1 flex-wrap text-sm mb-4">
-      {stack.map((item, i) => (
-        <span key={item.id} className="flex items-center gap-1">
-          {i > 0 && <span style={{ color: `${GOLD}40` }}>›</span>}
-          <button onClick={() => onJump(i)}
-            className="px-2.5 py-1 rounded-lg transition text-xs font-jp font-semibold"
-            style={i === stack.length - 1
-              ? { background: `linear-gradient(135deg,#0d9488,#14b8a6)`, color: "white" }
-              : { color: "#5eead4", background: "rgba(94,234,212,0.08)", border: "1px solid rgba(94,234,212,0.18)" }}>
-            {i === 0 ? "自分" : item.name}
-          </button>
-        </span>
-      ))}
-    </div>
-  );
-}
-
-/* ─── メインコンポーネント ─── */
-export default function TravelReferralsPage() {
-  const [data,      setData]      = useState<ApiResponse | null>(null);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState("");
-  const [nodeStack, setNodeStack] = useState<TreeNode[]>([]);
-
-  const fetchTree = useCallback(async (rootId?: string) => {
-    setLoading(true); setError("");
-    try {
-      const url = rootId ? `/api/my/travel-tree?rootId=${rootId}` : "/api/my/travel-tree";
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("データ取得に失敗しました");
-      const json: ApiResponse = await res.json();
-      setData(json);
-      setNodeStack([json.tree]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "エラーが発生しました");
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    fetch("/api/my/travel-subscription")
+      .then(r => r.json())
+      .then((d: ApiData) => { setData(d); setLoading(false); })
+      .catch(() => { setError("データの取得に失敗しました"); setLoading(false); });
   }, []);
 
-  useEffect(() => { fetchTree(); }, [fetchTree]);
-
-  function drillDown(node: TreeNode) { setNodeStack(prev => [...prev, node]); }
-  function jumpTo(index: number)     { setNodeStack(prev => prev.slice(0, index + 1)); }
-
-  const currentNode     = nodeStack[nodeStack.length - 1] ?? null;
-  const breadcrumbStack = nodeStack.map(n => ({ id: n.id, name: n.name }));
+  const sub = data?.sub ?? null;
+  const effectiveStatus = sub ? getEffectiveStatus(sub) : null;
+  const statusCfg = effectiveStatus ? (STATUS_CONFIG[effectiveStatus] ?? null) : null;
 
   return (
-    <div className="min-h-screen pb-10" style={{ background: PAGE_BG }}>
+    <div className="min-h-screen pb-20" style={{ background: PAGE_BG }}>
 
       {/* 背景グロー */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden" aria-hidden>
-        <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full opacity-[0.13]"
+        <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full opacity-[0.14]"
           style={{ background: `radial-gradient(circle,${GOLD}55,transparent 70%)` }}/>
-        <div className="absolute bottom-0 left-0 w-80 h-80 rounded-full opacity-[0.06]"
-          style={{ background: "radial-gradient(circle,#5eead4,transparent 70%)" }}/>
+        <div className="absolute bottom-10 -left-10 w-64 h-64 rounded-full opacity-[0.07]"
+          style={{ background: `radial-gradient(circle,${NAVY}44,transparent 70%)` }}/>
       </div>
 
       {/* ヘッダー */}
       <header className="sticky top-0 z-20"
-        style={{ background: "rgba(245,240,232,0.96)", backdropFilter: "blur(20px) saturate(160%)", borderBottom: `1px solid rgba(201,168,76,0.22)`, boxShadow: "0 2px 16px rgba(10,22,40,0.08),0 1px 0 rgba(255,255,255,0.80) inset" }}>
+        style={{
+          background: "rgba(245,240,232,0.96)",
+          backdropFilter: "blur(20px) saturate(160%)",
+          borderBottom: `1px solid rgba(201,168,76,0.22)`,
+          boxShadow: "0 2px 16px rgba(10,22,40,0.08),0 1px 0 rgba(255,255,255,0.80) inset",
+        }}>
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center gap-3">
-          <Link href="/dashboard" className="flex items-center gap-1.5 transition" style={{ color: "rgba(10,22,40,0.55)" }}>
+          <Link href="/dashboard"
+            className="flex items-center gap-1.5 transition"
+            style={{ color: "rgba(10,22,40,0.55)" }}>
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
             </svg>
             <span className="text-sm font-jp">戻る</span>
           </Link>
           <div className="flex items-center gap-2 ml-1">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: "#5eead4" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+              style={{ color: "#93c5fd" }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
             </svg>
-            <h1 className="text-base font-semibold font-jp" style={{ color: NAVY }}>旅行紹介ツリー</h1>
+            <h1 className="text-base font-semibold font-jp" style={{ color: NAVY }}>格安旅行 登録状況確認</h1>
           </div>
-          <div className="flex-1 h-px ml-2" style={{ background: "linear-gradient(90deg,rgba(94,234,212,0.35),transparent)" }}/>
+          <div className="flex-1 h-px ml-2"
+            style={{ background: "linear-gradient(90deg,rgba(147,197,253,0.35),transparent)" }}/>
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-4 py-5 space-y-4 relative">
+      <main className="max-w-lg mx-auto px-4 py-6 space-y-5 relative">
 
         {/* ローディング */}
         {loading && (
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <div className="flex flex-col items-center justify-center py-24 gap-3">
             <div className="w-8 h-8 border-2 rounded-full animate-spin"
-              style={{ borderColor: "rgba(94,234,212,0.25)", borderTopColor: "#5eead4" }}/>
-            <p className="text-sm font-jp" style={{ color: "rgba(94,234,212,0.60)" }}>読み込み中...</p>
+              style={{ borderColor: `${GOLD}25`, borderTopColor: GOLD }}/>
+            <p className="text-sm font-jp" style={{ color: `${GOLD}60` }}>読み込み中...</p>
           </div>
         )}
 
         {/* エラー */}
         {!loading && error && (
-          <div className="rounded-2xl p-5 text-center"
+          <div className="rounded-2xl p-6 text-center"
             style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.20)" }}>
+            <p className="text-4xl mb-3">⚠️</p>
             <p className="font-medium font-jp text-sm" style={{ color: "#f87171" }}>{error}</p>
-            <button onClick={() => fetchTree()}
-              className="mt-3 px-4 py-2 rounded-xl text-sm font-bold text-white"
-              style={{ background: "rgba(239,68,68,0.40)", border: "1px solid rgba(248,113,113,0.35)" }}>
-              再試行
+            <button onClick={() => { setLoading(true); fetch("/api/my/travel-subscription").then(r=>r.json()).then(d=>{setData(d);setLoading(false);}).catch(()=>{setError("データの取得に失敗しました");setLoading(false);}); }}
+              className="mt-4 px-5 py-2 rounded-xl text-sm font-bold text-white"
+              style={{ background: `linear-gradient(135deg,${GOLD_DARK},${GOLD})` }}>
+              再読み込み
             </button>
           </div>
         )}
 
-        {/* データ表示 */}
-        {!loading && !error && data && currentNode && (
+        {/* 未登録 */}
+        {!loading && !error && data?.displayStatus === "none" && (
+          <div className="rounded-3xl overflow-hidden"
+            style={{
+              background: `linear-gradient(150deg,${NAVY_CARD} 0%,${NAVY_CARD2} 55%,${NAVY_CARD3} 100%)`,
+              border: `1px solid ${GOLD}28`,
+              boxShadow: "0 12px 40px rgba(10,22,40,0.22)",
+            }}>
+            <div className="h-0.5" style={{ background: `linear-gradient(90deg,transparent,${GOLD}80,transparent)` }}/>
+            <div className="p-8 text-center">
+              <div className="text-5xl mb-4">✈️</div>
+              <p className="text-lg font-bold font-jp text-white mb-2">未登録</p>
+              <p className="text-sm font-jp mb-6" style={{ color: "rgba(255,255,255,0.45)" }}>
+                格安旅行サービスへのご登録がまだです。<br/>
+                ダッシュボードから申し込みができます。
+              </p>
+              <Link href="/dashboard"
+                className="inline-block px-6 py-3 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02]"
+                style={{ background: `linear-gradient(135deg,${GOLD_DARK},${GOLD},${GOLD_LIGHT})` }}>
+                ダッシュボードへ戻る
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* 登録済み：ステータス表示 */}
+        {!loading && !error && sub && statusCfg && (
           <>
-            {/* 統計カード */}
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: "総紹介人数", value: data.stats.totalMembers, color: GOLD_LIGHT, bg: `${GOLD}10`, border: `${GOLD}22` },
-                { label: "有効契約",   value: data.stats.active,       color: "#5eead4",  bg: "rgba(94,234,212,0.08)", border: "rgba(94,234,212,0.22)" },
-                { label: "審査中",     value: data.stats.pending,      color: "#fde68a",  bg: "rgba(251,191,36,0.08)", border: "rgba(251,191,36,0.22)" },
-              ].map(item => (
-                <div key={item.label} className="rounded-2xl p-3 text-center"
-                  style={{ background: item.bg, border: `1px solid ${item.border}`, boxShadow: "0 4px 12px rgba(10,22,40,0.12)" }}>
-                  <p className="text-2xl font-bold" style={{ color: item.color }}>{item.value}</p>
-                  <p className="text-[10px] font-jp mt-0.5" style={{ color: "rgba(255,255,255,0.40)" }}>{item.label}</p>
+            {/* メインステータスカード */}
+            <div className="rounded-3xl overflow-hidden"
+              style={{
+                background: `linear-gradient(150deg,${NAVY_CARD} 0%,${NAVY_CARD2} 55%,${NAVY_CARD3} 100%)`,
+                border: `1px solid ${statusCfg.border}`,
+                boxShadow: `0 12px 40px rgba(10,22,40,0.22),0 0 0 1px ${statusCfg.text}10 inset`,
+              }}>
+              {/* 上部カラーライン */}
+              <div className="h-1" style={{ background: `linear-gradient(90deg,transparent,${statusCfg.dot}90,${statusCfg.dot},${statusCfg.dot}90,transparent)` }}/>
+
+              <div className="p-6">
+                {/* ステータス大バッジ */}
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <p className="text-[9px] font-label tracking-[0.28em] mb-1" style={{ color: `${GOLD}60` }}>TRAVEL SERVICE STATUS</p>
+                    <h2 className="text-2xl font-bold font-jp text-white leading-none">{sub.planName}</h2>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className="text-3xl">{statusCfg.icon}</span>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold font-jp"
+                      style={{ background: statusCfg.bg, color: statusCfg.text, border: `1px solid ${statusCfg.border}` }}>
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: statusCfg.dot }}/>
+                      {statusCfg.label}
+                    </span>
+                  </div>
                 </div>
-              ))}
+
+                {/* ステータス説明 */}
+                <div className="rounded-2xl p-4 mb-5"
+                  style={{ background: `${statusCfg.text}08`, border: `1px solid ${statusCfg.border}` }}>
+                  <p className="text-sm font-jp leading-relaxed" style={{ color: `${statusCfg.text}CC` }}>
+                    {statusCfg.desc}
+                  </p>
+                </div>
+
+                {/* プラン詳細 */}
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: "レベル", value: `Lv.${sub.level}` },
+                    { label: "月額料金", value: `¥${sub.monthlyFee.toLocaleString()}` },
+                    { label: "プランタイプ", value: sub.pricingTier === "early" ? "早期特別料金" : "標準料金" },
+                    { label: "確認日", value: fmtDate(sub.confirmedAt) },
+                  ].map(item => (
+                    <div key={item.label} className="rounded-xl p-3"
+                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                      <p className="text-[10px] font-label tracking-wider mb-1" style={{ color: `${GOLD}55` }}>
+                        {item.label}
+                      </p>
+                      <p className="text-sm font-bold text-white">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 開始日 */}
+                {sub.startedAt && (
+                  <div className="mt-3 rounded-xl p-3 flex items-center gap-3"
+                    style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: `${GOLD}60` }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    <div>
+                      <p className="text-[10px] font-label" style={{ color: `${GOLD}55` }}>サービス開始日</p>
+                      <p className="text-sm font-bold text-white">{fmtDate(sub.startedAt)}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* パンくず */}
-            <Breadcrumb stack={breadcrumbStack} onJump={jumpTo}/>
-
-            {/* 現在の起点情報 */}
-            {nodeStack.length > 1 && (
-              <div className="rounded-2xl p-3 flex items-center gap-3"
-                style={{ background: "rgba(94,234,212,0.07)", border: "1px solid rgba(94,234,212,0.20)" }}>
-                <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
-                  style={{ background: "rgba(94,234,212,0.18)", color: "#5eead4" }}>
-                  {currentNode.name.charAt(0)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold font-jp text-sm truncate" style={{ color: "#5eead4" }}>{currentNode.name}</p>
-                  <p className="text-[10px] font-label" style={{ color: "rgba(94,234,212,0.55)" }}>{currentNode.memberCode}</p>
-                </div>
-                <span className="text-xs font-jp font-medium flex-shrink-0" style={{ color: "rgba(94,234,212,0.70)" }}>
-                  配下 {currentNode.childCount}名
-                </span>
+            {/* ステータス一覧カード（説明） */}
+            <div className="rounded-2xl overflow-hidden"
+              style={{ background: LINEN, border: "1px solid rgba(201,168,76,0.20)" }}>
+              <div className="px-5 py-4" style={{ borderBottom: "1px solid rgba(201,168,76,0.14)" }}>
+                <p className="text-[9px] font-label tracking-[0.26em] mb-0.5" style={{ color: `${GOLD_DARK}80` }}>STATUS GUIDE</p>
+                <p className="text-sm font-semibold font-jp" style={{ color: NAVY }}>ステータスについて</p>
               </div>
-            )}
-
-            {/* 子一覧 */}
-            {currentNode.children.length === 0 ? (
-              <div className="rounded-2xl p-10 text-center"
-                style={{ background: `${NAVY_CARD}80`, border: `2px dashed ${GOLD}15` }}>
-                <p className="text-4xl mb-3">✈️</p>
-                <p className="text-sm font-jp" style={{ color: "rgba(255,255,255,0.30)" }}>
-                  {nodeStack.length === 1 ? "まだ紹介した会員がいません" : "この会員の配下はいません"}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-xs font-jp px-1" style={{ color: "rgba(255,255,255,0.35)" }}>
-                  {nodeStack.length === 1 ? "直接紹介した会員" : `${currentNode.name} の紹介会員`}
-                  （{currentNode.children.length}名）
-                </p>
-                {currentNode.children.map(child => (
-                  <MemberCard key={child.id} node={child} onDrillDown={drillDown}/>
-                ))}
-              </div>
-            )}
-
-            {/* ステータス凡例 */}
-            <div className="rounded-2xl px-4 py-3"
-              style={{ background: LINEN, border: "1px solid rgba(201,168,76,0.18)" }}>
-              <p className="text-xs font-semibold font-jp mb-2" style={{ color: `${NAVY}60` }}>ステータス凡例</p>
-              <div className="flex flex-wrap gap-2">
+              <div className="divide-y" style={{ borderColor: "rgba(201,168,76,0.10)" }}>
                 {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
-                  <span key={key} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold font-jp"
-                    style={{ background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }}>
-                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.dot }}/>
-                    {cfg.label}
-                  </span>
+                  <div key={key}
+                    className="px-5 py-4 flex items-start gap-3"
+                    style={{
+                      background: key === effectiveStatus ? `${cfg.text}06` : "transparent",
+                    }}>
+                    <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: cfg.dot }}/>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-bold font-jp" style={{ color: cfg.text }}>
+                          {cfg.icon} {cfg.label}
+                        </span>
+                        {key === effectiveStatus && (
+                          <span className="text-[9px] font-label px-2 py-0.5 rounded-full"
+                            style={{ background: `${cfg.text}18`, color: cfg.text, border: `1px solid ${cfg.border}` }}>
+                            現在のステータス
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs font-jp leading-relaxed" style={{ color: "rgba(10,22,40,0.55)" }}>
+                        {cfg.desc}
+                      </p>
+                    </div>
+                  </div>
                 ))}
+              </div>
+            </div>
+
+            {/* お問い合わせ案内 */}
+            <div className="rounded-2xl p-4 flex items-start gap-3"
+              style={{
+                background: `linear-gradient(145deg,${NAVY_CARD} 0%,${NAVY_CARD2} 100%)`,
+                border: `1px solid ${GOLD}20`,
+              }}>
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: `${GOLD}15`, border: `1px solid ${GOLD}30` }}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: GOLD }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-bold font-jp text-white mb-1">お問い合わせ</p>
+                <p className="text-xs font-jp leading-relaxed" style={{ color: "rgba(255,255,255,0.45)" }}>
+                  ステータス変更や解約のご希望は担当者にお問い合わせください。<br/>
+                  入金確認後のステータス変更は管理側で手動対応いたします。
+                </p>
               </div>
             </div>
           </>

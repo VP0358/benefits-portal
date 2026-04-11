@@ -4,6 +4,7 @@ import ReferralManager from "./ui/referral-manager";
 import ContractForm from "./ui/contract-form";
 import ContractList from "./ui/contract-list";
 import ManualPointAdjuster from "./ui/manual-point-adjuster";
+import TravelStatusPanel from "./ui/travel-status-panel";
 import Link from "next/link";
 
 // 2026年4月末：特別キャンペーン対象の契約期限
@@ -14,7 +15,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
   let userId: bigint;
   try { userId = BigInt(id); } catch { notFound(); return; }
 
-  const [user, referrerOptions, mlmMember] = await Promise.all([
+  const [user, referrerOptions, mlmMember, travelSub] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -44,6 +45,15 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
         contractDate: true,
       },
     }),
+    prisma.travelSubscription.findFirst({
+      where: { userId: userId, status: { not: "canceled" } },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true, planName: true, level: true, pricingTier: true,
+        monthlyFee: true, status: true, forceStatus: true,
+        startedAt: true, confirmedAt: true, canceledAt: true, note: true,
+      },
+    }),
   ]);
 
   if (!user) notFound();
@@ -56,6 +66,21 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
   }));
 
   const referrerItems = referrerOptions.map(item => ({ id: item.id.toString(), name: item.name, email: item.email }));
+
+  // 旅行サブスクデータシリアライズ
+  const travelSubData = travelSub ? {
+    id: travelSub.id.toString(),
+    planName: travelSub.planName,
+    level: travelSub.level,
+    pricingTier: travelSub.pricingTier,
+    monthlyFee: Number(travelSub.monthlyFee),
+    status: travelSub.status,
+    forceStatus: travelSub.forceStatus,
+    startedAt: travelSub.startedAt?.toISOString() ?? null,
+    confirmedAt: travelSub.confirmedAt?.toISOString() ?? null,
+    canceledAt: travelSub.canceledAt?.toISOString() ?? null,
+    note: travelSub.note ?? null,
+  } : null;
 
   // 配当条件チェック
   const isMlmMember = !!mlmMember;
@@ -168,6 +193,17 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
               </div>
             ))}
           </div>
+        </section>
+
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-stone-800">✈️ 格安旅行サブスク</h2>
+            <Link href="/admin/travel-subscriptions"
+              className="text-xs text-slate-500 hover:text-slate-700 underline">
+              一覧ページ →
+            </Link>
+          </div>
+          <TravelStatusPanel sub={travelSubData} userId={user!.id.toString()} />
         </section>
 
         <section className="rounded-3xl bg-white p-6 shadow-sm">
