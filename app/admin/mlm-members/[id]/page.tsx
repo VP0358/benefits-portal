@@ -805,7 +805,13 @@ export default function MlmMemberDetailPage() {
       </section>
 
       {/* ─── 購入履歴 ─── */}
-      <PurchasePanel memberCode={m.memberCode} />
+      <PurchasePanel
+        memberCode={m.memberCode}
+        memberName={m.user.name}
+        memberPostal={m.user.postalCode || ""}
+        memberAddress={m.user.address || ""}
+        memberPhone={m.user.phone || ""}
+      />
 
       {/* ─── ボーナス明細 ─── */}
       <section className="bg-white rounded-2xl shadow-sm p-5">
