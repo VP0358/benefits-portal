@@ -318,11 +318,12 @@ function RegisterForm() {
         <form onSubmit={onSubmit} className="space-y-5">
 
           {/* ═══════════════════════════════════
-              ① 基本情報（必須）
+              ① 基本情報
           ═══════════════════════════════════ */}
           <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
             <SectionTitle title="基本情報" required />
 
+            {/* 氏名・フリガナ */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="氏名" required>
                 <input
@@ -345,6 +346,26 @@ function RegisterForm() {
               </Field>
             </div>
 
+            {/* 法人名（任意） */}
+            <Field label="法人名" optional>
+              <input
+                placeholder="例: 株式会社〇〇"
+                className={inputCls}
+                value={form.companyName}
+                onChange={e => setForm({ ...form, companyName: e.target.value })}
+              />
+            </Field>
+
+            <Field label="法人名（カナ）" optional>
+              <input
+                placeholder="例: カブシキガイシャ〇〇"
+                className={inputCls}
+                value={form.companyNameKana}
+                onChange={e => setForm({ ...form, companyNameKana: e.target.value })}
+              />
+            </Field>
+
+            {/* 生年月日・性別 */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="生年月日" required>
                 <input
@@ -371,6 +392,7 @@ function RegisterForm() {
               </Field>
             </div>
 
+            {/* メールアドレス */}
             <Field label="メールアドレス" required>
               <input
                 required
@@ -382,6 +404,18 @@ function RegisterForm() {
               />
             </Field>
 
+            {/* 電話番号（任意） */}
+            <Field label="電話番号" optional>
+              <input
+                type="tel"
+                placeholder="例: 03-1234-5678"
+                className={inputCls}
+                value={form.phone}
+                onChange={e => setForm({ ...form, phone: e.target.value })}
+              />
+            </Field>
+
+            {/* 携帯電話 */}
             <Field label="携帯電話" required>
               <input
                 required
@@ -393,6 +427,7 @@ function RegisterForm() {
               />
             </Field>
 
+            {/* 郵便番号・住所 */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="郵便番号" required hint="7桁入力で住所を自動入力します">
                 <input
@@ -417,9 +452,11 @@ function RegisterForm() {
               />
             </Field>
 
+            {/* 紹介者ID・紹介者名 */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="紹介者ID" required={false} optional hint="紹介者の会員IDを入力">
+              <Field label="紹介者ID" required hint="紹介者の会員IDを入力">
                 <input
+                  required
                   placeholder="例: M12345678"
                   className={inputCls}
                   value={form.referrerId}
@@ -427,8 +464,9 @@ function RegisterForm() {
                 />
               </Field>
 
-              <Field label="紹介者名" optional>
+              <Field label="紹介者名" required>
                 <input
+                  required
                   placeholder="例: 田中 花子"
                   className={inputCls}
                   value={form.referrerName}
@@ -439,45 +477,10 @@ function RegisterForm() {
           </div>
 
           {/* ═══════════════════════════════════
-              ② 基本情報（任意）
+              ② 配送先住所（必須）
           ═══════════════════════════════════ */}
           <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
-            <SectionTitle title="基本情報（法人・任意）" />
-
-            <Field label="法人名" optional>
-              <input
-                placeholder="例: 株式会社〇〇"
-                className={inputCls}
-                value={form.companyName}
-                onChange={e => setForm({ ...form, companyName: e.target.value })}
-              />
-            </Field>
-
-            <Field label="法人名（カナ）" optional>
-              <input
-                placeholder="例: カブシキガイシャ〇〇"
-                className={inputCls}
-                value={form.companyNameKana}
-                onChange={e => setForm({ ...form, companyNameKana: e.target.value })}
-              />
-            </Field>
-
-            <Field label="電話番号" optional>
-              <input
-                type="tel"
-                placeholder="例: 03-1234-5678"
-                className={inputCls}
-                value={form.phone}
-                onChange={e => setForm({ ...form, phone: e.target.value })}
-              />
-            </Field>
-          </div>
-
-          {/* ═══════════════════════════════════
-              ③ 概要書面・配送先住所（必須）
-          ═══════════════════════════════════ */}
-          <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
-            <SectionTitle title="概要書面・配送先住所" required />
+            <SectionTitle title="配送先住所" required />
 
             <div className="rounded-xl bg-blue-50 border border-blue-200 p-4 text-sm text-blue-800">
               登録住所と配送先住所が同じ場合は、以下のチェックをONにしてください。
@@ -534,7 +537,7 @@ function RegisterForm() {
           </div>
 
           {/* ═══════════════════════════════════
-              ④ 銀行口座情報
+              ③ 銀行口座情報
           ═══════════════════════════════════ */}
           <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
             <SectionTitle title="銀行口座情報（報酬振込先）" />
@@ -613,7 +616,7 @@ function RegisterForm() {
           </div>
 
           {/* ═══════════════════════════════════
-              ⑤ オートシップ情報
+              ④ オートシップ情報
           ═══════════════════════════════════ */}
           <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
             <SectionTitle title="オートシップ情報" />
@@ -663,7 +666,7 @@ function RegisterForm() {
           </div>
 
           {/* ═══════════════════════════════════
-              ⑥ 支払方法
+              ⑤ 支払方法
           ═══════════════════════════════════ */}
           <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
             <SectionTitle title="支払方法" />
@@ -728,9 +731,18 @@ function RegisterForm() {
                   <span className="text-emerald-700 font-medium">口座名義</span>
                   <span className="text-slate-800">CLAIRホールディングス株式会社</span>
                 </div>
-                <p className="text-xs text-emerald-700 mt-3 border-t border-emerald-200 pt-2">
-                  ※ 振込手数料はご負担ください。振込確認後、会員登録が有効になります。
-                </p>
+                <div className="mt-3 border-t border-emerald-200 pt-3 space-y-1">
+                  <p className="text-xs text-emerald-700">
+                    ※ 振込手数料はご負担ください。振込確認後、会員登録が有効になります。
+                  </p>
+                  <p className="text-xs font-semibold text-emerald-800">
+                    ※ 振込後、振込明細書を下記FAX番号へ必ずお送りください。
+                  </p>
+                  <div className="flex items-center gap-2 rounded-lg bg-emerald-100 px-3 py-2 mt-1">
+                    <span className="text-emerald-700 font-medium text-sm">📠 FAX番号：</span>
+                    <span className="text-emerald-900 font-bold text-sm tracking-widest">050-3385-7788</span>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -809,7 +821,7 @@ function RegisterForm() {
           </div>
 
           {/* ═══════════════════════════════════
-              ⑦ パスワード設定
+              ⑥ パスワード設定
           ═══════════════════════════════════ */}
           <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
             <SectionTitle title="パスワード設定" required />
