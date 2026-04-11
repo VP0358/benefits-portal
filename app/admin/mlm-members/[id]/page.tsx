@@ -240,6 +240,14 @@ export default function MlmMemberDetailPage() {
     fetchMember();
   }, [fetchMember, memberId]);
 
+  // member取得後にボーナス明細を自動読み込み
+  useEffect(() => {
+    if (member) {
+      fetchBonusStatements();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [member?.memberCode]);
+
   // ボーナス明細データ取得
   const fetchBonusStatements = useCallback(async () => {
     if (!member) return;
@@ -765,27 +773,47 @@ export default function MlmMemberDetailPage() {
 
       {/* ─── ボーナス明細 ─── */}
       <section className="bg-white rounded-2xl shadow-sm p-5">
-        <div className="flex items-center justify-between mb-4 border-b pb-2">
-          <h2 className="text-base font-bold text-slate-800">
-            <i className="fas fa-file-invoice-dollar mr-2 text-slate-600"></i>ボーナス明細
-          </h2>
+        <div className="flex items-center justify-between mb-3 border-b pb-2">
+          <div>
+            <h2 className="text-base font-bold text-slate-800">
+              <i className="fas fa-file-invoice-dollar mr-2 text-slate-600"></i>ボーナス明細
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              ボーナス計算後に自動反映されます。「公開」ボタンを押すと会員マイページに表示されます。
+            </p>
+          </div>
           <button
             onClick={fetchBonusStatements}
             disabled={bonusStatementsLoading}
-            className="flex items-center gap-1 px-3 py-1.5 bg-violet-600 text-white text-xs font-bold rounded-lg hover:bg-violet-700 transition disabled:opacity-50"
+            className="flex items-center gap-1 px-3 py-1.5 bg-slate-100 text-slate-600 text-xs font-semibold rounded-lg hover:bg-slate-200 transition disabled:opacity-50"
           >
-            <i className="fas fa-sync text-[10px]"></i>
-            {bonusStatementsLoading ? "読込中..." : "読み込む"}
+            <i className={`fas fa-sync text-[10px] ${bonusStatementsLoading ? "animate-spin" : ""}`}></i>
+            {bonusStatementsLoading ? "読込中..." : "更新"}
           </button>
         </div>
 
-        {bonusStatements.length === 0 && !bonusStatementsLoading && (
-          <p className="text-slate-400 text-sm text-center py-6">
-            「読み込む」ボタンを押してボーナス明細を表示してください
-          </p>
-        )}
+        {/* 凡例 */}
+        <div className="flex items-center gap-3 mb-3 text-xs">
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+            <span className="text-slate-500">公開中 = 会員マイページに表示</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+            <span className="text-slate-500">非公開 = 会員には非表示</span>
+          </span>
+        </div>
+
         {bonusStatementsLoading && (
-          <div className="text-center py-6 text-slate-500 text-sm">読み込み中...</div>
+          <div className="flex items-center justify-center py-8 gap-2 text-slate-500 text-sm">
+            <div className="w-4 h-4 border-2 border-violet-300 border-t-violet-600 rounded-full animate-spin" />
+            読み込み中...
+          </div>
+        )}
+        {!bonusStatementsLoading && bonusStatements.length === 0 && (
+          <p className="text-slate-400 text-sm text-center py-8">
+            ボーナス明細がありません（ボーナス計算後に自動表示されます）
+          </p>
         )}
         {bonusStatements.length > 0 && (
           <div className="overflow-x-auto rounded-xl border border-slate-100">
@@ -800,14 +828,19 @@ export default function MlmMemberDetailPage() {
                   <th className="px-4 py-2.5 text-right text-xs font-semibold">貯金B</th>
                   <th className="px-4 py-2.5 text-right text-xs font-semibold">繰越金</th>
                   <th className="px-4 py-2.5 text-right text-xs font-semibold">源泉税</th>
-                  <th className="px-4 py-2.5 text-center text-xs font-semibold">公開</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold">会員公開</th>
                   <th className="px-4 py-2.5 text-center text-xs font-semibold">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {bonusStatements.map((stmt) => (
-                  <tr key={stmt.bonusMonth} className="hover:bg-violet-50 transition">
-                    <td className="px-4 py-2.5 font-semibold text-slate-800">{stmt.bonusMonth}</td>
+                  <tr key={stmt.bonusMonth} className={`hover:bg-violet-50 transition ${stmt.isPublished ? "" : "bg-slate-50/50"}`}>
+                    <td className="px-4 py-2.5 font-semibold text-slate-800">
+                      {stmt.bonusMonth}
+                      {stmt.runStatus === "confirmed" && (
+                        <span className="ml-1.5 text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-semibold">確定</span>
+                      )}
+                    </td>
                     <td className="px-4 py-2.5 text-right font-bold text-emerald-700">¥{stmt.paymentAmount.toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-right text-slate-700">¥{stmt.directBonus.toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-right text-slate-700">¥{stmt.unilevelBonus.toLocaleString()}</td>
@@ -819,13 +852,17 @@ export default function MlmMemberDetailPage() {
                       <button
                         onClick={() => handleTogglePublish(stmt.bonusMonth, stmt.isPublished)}
                         disabled={publishingMonth === stmt.bonusMonth}
-                        className={`px-2 py-1 text-[10px] font-bold rounded-full transition ${
+                        className={`px-3 py-1 text-[11px] font-bold rounded-full transition disabled:opacity-50 ${
                           stmt.isPublished
-                            ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
-                            : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                        } disabled:opacity-50`}
+                            ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border border-emerald-300"
+                            : "bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-300"
+                        }`}
                       >
-                        {stmt.isPublished ? "公開中" : "非公開"}
+                        {publishingMonth === stmt.bonusMonth
+                          ? "処理中..."
+                          : stmt.isPublished
+                          ? "✅ 公開中"
+                          : "🔒 非公開"}
                       </button>
                     </td>
                     <td className="px-4 py-2.5 text-center">
@@ -833,7 +870,7 @@ export default function MlmMemberDetailPage() {
                         onClick={() => handleDownloadBonusStatementPDF(stmt.bonusMonth)}
                         className="text-[10px] bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 transition"
                       >
-                        <i className="fas fa-file-pdf mr-1"></i>PDF
+                        <i className="fas fa-file-pdf mr-1"></i>明細
                       </button>
                     </td>
                   </tr>

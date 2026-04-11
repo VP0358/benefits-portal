@@ -23,11 +23,12 @@ export async function GET() {
       return NextResponse.json({ error: "MLM会員情報がありません" }, { status: 404 });
     }
 
-    // ボーナス履歴取得（確定済みのみ）
+    // ボーナス履歴取得（確定済み かつ 管理側で公開済みのもののみ）
     const results = await prisma.bonusResult.findMany({
       where: {
         mlmMemberId: mlmMember.id,
         bonusRun: { status: "confirmed" },
+        isPublished: true,
       },
       include: {
         bonusRun: {

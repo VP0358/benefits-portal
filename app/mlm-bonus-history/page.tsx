@@ -110,21 +110,14 @@ function DownloadButton({ month, isCurrentMonth }: { month: string; isCurrentMon
     if (downloading) return;
     setDownloading(true);
     try {
-      const res = await fetch(`/api/my/bonus-statement-pdf?month=${month}`);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        alert(err.error || "PDF生成に失敗しました");
-        return;
+      // 新タブでHTMLを表示（印刷→PDF保存で日本語正常表示）
+      const url = `/api/my/bonus-statement-pdf?month=${month}`;
+      const win = window.open(url, "_blank");
+      if (!win) {
+        alert("ポップアップがブロックされています。ブラウザの設定で許可してください。");
       }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `bonus-${month}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
     } catch {
-      alert("ダウンロードに失敗しました");
+      alert("開けませんでした");
     } finally {
       setDownloading(false);
     }
@@ -249,14 +242,12 @@ function BonusCard({
           <SubSection title="ボーナス種別">
             <DataRow label="ダイレクトB"   value={yen(h.directBonus)} />
             <DataRow label="ユニレベルB"   value={yen(h.unilevelBonus)} />
-            <DataRow label="ランクアップB" value={yen(h.rankUpBonus)} />
-            <DataRow label="シェアB"       value={yen(h.shareBonus)} />
             <DataRow label="組織構築B"     value={yen(h.structureBonus)} />
             <DataRow label="貯金B"         value={yen(h.savingsBonus)} />
             <DataRow label="繰越金"        value={yen(h.carryoverAmount)} />
             <DataRow label="調整金"        value={yen(h.adjustmentAmount)} />
             <DataRow label="他ポジション"  value={yen(h.otherPositionAmount)} />
-            <DataRow label="総支払報酬"    value={yen(h.totalBonus)} gold />
+            <DataRow label="支払調整前取得額" value={yen(h.totalBonus)} gold />
           </SubSection>
 
           {/* 支払い計算 */}
