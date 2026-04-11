@@ -105,8 +105,6 @@ export async function GET(req: NextRequest) {
   <tr><th>項目</th><th style="text-align:right">金額</th></tr>
   <tr><td>ダイレクトボーナス</td><td class="amount">${yen(result.directBonus ?? 0)}</td></tr>
   <tr><td>ユニレベルボーナス</td><td class="amount">${yen(result.unilevelBonus ?? 0)}</td></tr>
-  <tr><td>ランクアップボーナス</td><td class="amount">${yen(result.rankUpBonus ?? 0)}</td></tr>
-  <tr><td>シェアボーナス</td><td class="amount">${yen(result.shareBonus ?? 0)}</td></tr>
   <tr><td>組織構築ボーナス</td><td class="amount">${yen(result.structureBonus ?? 0)}</td></tr>
   <tr><td>貯金ボーナス</td><td class="amount">${yen(result.savingsBonus ?? 0)}</td></tr>
   <tr><td>繰越金</td><td class="amount">${yen(result.carryoverAmount ?? 0)}</td></tr>
@@ -132,9 +130,12 @@ export async function GET(req: NextRequest) {
 
 ${note ? `<div class="section-title">備考</div><div class="note-box">${note}</div>` : ""}
 
-<div style="text-align:center; margin-top: 20px;">
-  <button onclick="window.print()" style="padding: 10px 24px; background: #667eea; color: white; border: none; border-radius: 6px; font-size: 12pt; cursor: pointer;">
-    印刷 / PDFとして保存
+<div style="text-align:center; margin-top: 24px; padding: 16px; background: #f7fafc; border-top: 1px solid #e2e8f0;">
+  <p style="font-size: 9pt; color: #718096; margin-bottom: 10px;">
+    ブラウザの印刷機能（Ctrl+P / Cmd+P）を使用してPDF保存ができます
+  </p>
+  <button onclick="window.print()" style="padding: 10px 28px; background: #2b6cb0; color: white; border: none; border-radius: 6px; font-size: 11pt; cursor: pointer; font-family: inherit;">
+    📄 PDFとして保存
   </button>
 </div>
 </body>

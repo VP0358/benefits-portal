@@ -296,26 +296,13 @@ export default function MlmMemberDetailPage() {
     }
   };
 
-  // 登録完了通知書をPDFダウンロード
-  const handlePrintRegistrationNotice = async () => {
+  // 登録完了通知書を新タブで表示（印刷→PDF保存で日本語正常表示）
+  const handlePrintRegistrationNotice = () => {
     if (!member) return;
-    try {
-      const url = `/api/admin/pdf/registration-complete?memberId=${member.id}`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const blob = await res.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = blobUrl;
-        link.download = `registration_${member.memberCode}.pdf`;
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        alert(`❌ PDFの生成に失敗しました: ${err.error ?? res.status}`);
-      }
-    } catch {
-      alert("❌ 通信エラーが発生しました");
+    const url = `/api/admin/pdf/registration-complete?memberId=${member.id}`;
+    const win = window.open(url, "_blank");
+    if (!win) {
+      alert("ポップアップがブロックされました。ブラウザの設定で許可してください。");
     }
   };
 
@@ -508,7 +495,7 @@ export default function MlmMemberDetailPage() {
                 onClick={handlePrintRegistrationNotice}
                 className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition"
               >
-                📥 登録完了通知書PDF
+                📄 登録完了通知書
               </button>
               <button
                 onClick={() => {
@@ -566,7 +553,7 @@ export default function MlmMemberDetailPage() {
             onClick={handlePrintRegistrationNotice}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-300 text-blue-700 text-xs font-medium rounded-lg hover:bg-blue-100 transition"
           >
-            <i className="fas fa-file-pdf text-[11px]"></i> 登録完了通知書PDF
+            <i className="fas fa-file-alt text-[11px]"></i> 登録完了通知書
           </button>
         </div>
       </section>
