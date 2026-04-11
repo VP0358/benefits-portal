@@ -450,15 +450,18 @@ export default function AutoShipPanel() {
             <label className="block text-xs font-medium text-gray-600 mb-1">CSVファイル選択</label>
             <input
               type="file"
-              accept=".csv"
+              accept=".csv,.txt,text/plain,text/csv"
               onChange={e => setCsvImportFile(e.target.files?.[0] ?? null)}
               className="w-full text-xs file:mr-2 file:py-1.5 file:px-3 file:border-0 file:bg-green-50 file:text-green-700 file:rounded file:text-xs file:cursor-pointer"
             />
+            <p className="text-xs text-gray-400 mt-0.5">CSV・TXTファイルに対応。クレディックスCSV（ID(sendid)列を含む）自動判定。</p>
           </div>
         </div>
         <div className="mt-3 p-3 bg-yellow-50 rounded-lg text-xs text-yellow-800 border border-yellow-200 mb-3">
-          ⚠️ <strong>CSVフォーマット</strong>: ヘッダー行に「会員コード（code）」「決済結果（result/status）」列が必要です。
-          結果コード: <code className="bg-yellow-100 px-1 rounded">OK</code> または <code className="bg-yellow-100 px-1 rounded">0</code> または <code className="bg-yellow-100 px-1 rounded">1</code> = 成功、それ以外 = 失敗。
+          ⚠️ <strong>対応フォーマット</strong>:<br />
+          <span className="font-semibold">① クレディックスCSV（自動判定）</span>: ヘッダーに「ID(sendid)」列を含む形式。ファイル内全行を決済成功として処理します。<br />
+          <span className="font-semibold">② 汎用フォーマット</span>: ヘッダーに「会員コード（code）」「決済結果（result/status）」列が必要。
+          結果コード: <code className="bg-yellow-100 px-1 rounded">OK</code>/<code className="bg-yellow-100 px-1 rounded">1</code> = 成功。
         </div>
         <button
           onClick={handleDirectCsvImport}

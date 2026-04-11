@@ -26,6 +26,7 @@ type MemberNode = {
   createdAt: string;
   depth: number;
   totalDescendants: number;
+  groupPoints: number;
   hasMore: boolean;
   directDownlines: MemberNode[];
 };
@@ -217,10 +218,14 @@ function MemberDetailModal({ node, orgType, onClose, onZoom }: {
             )}
           </div>
 
-          {/* 傘下数 */}
+          {/* 傘下数・グループPT */}
           <div className="flex items-center justify-between rounded-2xl bg-violet-50 px-3 py-2.5">
             <span className="text-xs font-semibold text-violet-700">傘下会員数（全体）</span>
             <span className="text-sm font-bold text-violet-900">{node.totalDescendants} 名</span>
+          </div>
+          <div className="flex items-center justify-between rounded-2xl bg-emerald-50 px-3 py-2.5">
+            <span className="text-xs font-semibold text-emerald-700">グループPT（累計）</span>
+            <span className="text-sm font-bold text-emerald-800">{((node.groupPoints) ?? 0).toLocaleString()} pt</span>
           </div>
         </div>
 
@@ -287,9 +292,12 @@ function NodeCard({
       <span className={`inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${st.badge}`}>
         {STATUS_LABEL[node.status] ?? node.status}
       </span>
-      {/* 傘下数 */}
+      {/* 傘下数・グループPT */}
       {node.totalDescendants > 0 && (
         <div className="mt-0.5 text-[9px] text-slate-400">傘下{node.totalDescendants}名</div>
+      )}
+      {((node.groupPoints) ?? 0) > 0 && (
+        <div className="mt-0.5 text-[9px] text-emerald-600 font-semibold">G-PT: {((node.groupPoints) ?? 0).toLocaleString()}</div>
       )}
       {/* タップヒント */}
       <div className="absolute top-1 right-1 text-[8px] text-slate-300 select-none">ℹ</div>
@@ -861,6 +869,8 @@ export default function MlmOrganizationPage() {
               </span>
               <span className="text-slate-300">|</span>
               <span>傘下 <span className="font-bold text-violet-700">{rootMember.totalDescendants}</span> 名</span>
+              <span className="text-slate-300">|</span>
+              <span>グループPT: <span className="font-bold text-emerald-700">{((rootMember.groupPoints) ?? 0).toLocaleString()}</span> pt</span>
               <span className="text-slate-300">|</span>
               <span>表示 <span className="font-bold">{depthLimit}</span> 段まで</span>
               <button

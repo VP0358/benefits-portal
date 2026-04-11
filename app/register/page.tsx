@@ -490,11 +490,12 @@ function RegisterForm() {
             <Field
               label="概要書面番号"
               required
-              hint="特定商取引法に基づく概要書面の番号を入力してください"
+              hint="9桁の番号を入力してください。他の会員が使用済みの番号は登録できません"
             >
               <input
                 required
-                placeholder="例: 2024-001"
+                placeholder="例: 123456789"
+                maxLength={20}
                 className={inputCls}
                 value={form.disclosureDocNumber}
                 onChange={e => setForm({ ...form, disclosureDocNumber: e.target.value })}

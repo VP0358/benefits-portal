@@ -151,10 +151,25 @@ export async function GET(req: NextRequest) {
       : null;
     const rootReferrerCode = rootMemberFull?.referrer?.memberCode ?? null;
 
+    // ─── 傘下全員の購入ポイント合計を取得（グループポイント）───
+    // 翠彩（スミサイ）: 1個 = 150pt で流通ポイントを計算
+    const descendantIds = allDescendants.map(m => BigInt(m.id));
+    const purchaseSums = await prisma.mlmPurchase.groupBy({
+      by: ["mlmMemberId"],
+      where: { mlmMemberId: { in: descendantIds } },
+      _sum: { totalPoints: true },
+    });
+    // mlmMemberId → 累積ポイント
+    const memberPointMap = new Map<string, number>();
+    for (const ps of purchaseSums) {
+      memberPointMap.set(ps.mlmMemberId.toString(), ps._sum.totalPoints ?? 0);
+    }
+
     const rootNode = buildTreeWithDepthLimit(
       targetMember.id, allDescendants, depthLimit, type,
       idToName, idToCode,
-      rootUplineName, rootUplineCode, rootReferrerName, rootReferrerCode
+      rootUplineName, rootUplineCode, rootReferrerName, rootReferrerCode,
+      memberPointMap
     );
     const list = flattenTree(rootNode);
 
@@ -261,6 +276,7 @@ type TreeNode = FlatMember & {
   depth: number;
   directDownlines: TreeNode[];
   totalDescendants: number;
+  groupPoints: number;      // 自身 + 傘下全員の累積購入ポイント合計
   hasMore: boolean;
   uplineName: string | null;
   uplineCode: string | null;
@@ -280,6 +296,7 @@ function buildTreeWithDepthLimit(
   rootUplineCode: string | null,
   rootReferrerName: string | null,
   rootReferrerCode: string | null,
+  memberPointMap: Map<string, number> = new Map(),
 ): TreeNode {
   const map = new Map<string, TreeNode & { _allChildren: string[] }>();
   const rootIdStr = rootId.toString();
@@ -296,6 +313,7 @@ function buildTreeWithDepthLimit(
       depth: 0,
       directDownlines: [],
       totalDescendants: 0,
+      groupPoints: memberPointMap.get(m.id) ?? 0, // 初期値は自身の購入ポイント
       hasMore: false,
       uplineName: upName,
       uplineCode: upCode,
@@ -341,25 +359,30 @@ function buildTreeWithDepthLimit(
     }
   }
 
-  // totalDescendants を集計
-  const calcDescendants = (id: string): number => {
+  // totalDescendants と groupPoints を集計
+  const calcDescendantsAndPoints = (id: string): { count: number; points: number } => {
     const node = map.get(id);
-    if (!node) return 0;
-    let total = node._allChildren.length;
+    if (!node) return { count: 0, points: 0 };
+    let totalCount  = node._allChildren.length;
+    let totalPoints = memberPointMap.get(id) ?? 0; // 自身の購入ポイント
     for (const childId of node._allChildren) {
-      total += calcDescendants(childId);
+      const child = calcDescendantsAndPoints(childId);
+      totalCount  += child.count;
+      totalPoints += child.points;
     }
-    node.totalDescendants = total;
-    return total;
+    node.totalDescendants = totalCount;
+    node.groupPoints      = totalPoints;
+    return { count: totalCount, points: totalPoints };
   };
-  calcDescendants(rootIdStr);
+  calcDescendantsAndPoints(rootIdStr);
 
   const root = map.get(rootIdStr);
   return root ?? {
     id: rootIdStr, memberCode: "", name: "不明", email: "", phone: null, nickname: null,
+    companyName: null,
     level: 0, status: "unknown", parentId: null, uplineId: null, referrerId: null,
     position: 0, contractDate: null, createdAt: "",
-    depth: 0, directDownlines: [], totalDescendants: 0, hasMore: false,
+    depth: 0, directDownlines: [], totalDescendants: 0, groupPoints: 0, hasMore: false,
     uplineName: null, uplineCode: null, referrerName: null, referrerCode: null,
     _allChildren: [],
   };

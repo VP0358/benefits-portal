@@ -37,13 +37,34 @@ export async function POST(request: Request) {
   }
 
   const header    = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, "").toLowerCase());
-  const codeIdx   = header.findIndex(h => h.includes("会員") || h.includes("code") || h.includes("コード"));
-  const resultIdx = header.findIndex(h => h.includes("結果") || h.includes("result") || h.includes("status"));
-  const reasonIdx = header.findIndex(h => h.includes("理由") || h.includes("reason") || h.includes("error"));
 
-  if (codeIdx === -1 || resultIdx === -1) {
+  // ── クレディックス / 三菱UFJファクター CSVフォーマット自動判定 ──
+  // クレディックスCSV形式:
+  //   IPコード,オーダーNo,電話番号,処理日時,結果,3D認証,送信内容,E-mail,送信ID,送信パスワード,ID(sendid),SENDPOINT,処理金額,決済方法,端末種別
+  //   col[10]=ID(sendid)=会員コード, ファイル内の全行が決済成功
+  const isCredixFormat = header.some(h => h.includes("sendid") || h.includes("sendpoint"));
+
+  let codeIdx: number;
+  let resultIdx: number;
+  let reasonIdx: number;
+
+  if (isCredixFormat) {
+    // クレディックスCSV: ID(sendid)列=col[10]が会員コード
+    codeIdx   = header.findIndex(h => h.includes("sendid"));
+    resultIdx = header.findIndex(h => h.includes("結果") || h.includes("result"));
+    if (codeIdx   === -1) codeIdx   = 10; // フォールバック
+    if (resultIdx === -1) resultIdx = 4;  // フォールバック
+    reasonIdx = -1;
+  } else {
+    // 汎用フォーマット
+    codeIdx   = header.findIndex(h => h.includes("会員") || h.includes("code") || h.includes("コード"));
+    resultIdx = header.findIndex(h => h.includes("結果") || h.includes("result") || h.includes("status"));
+    reasonIdx = header.findIndex(h => h.includes("理由") || h.includes("reason") || h.includes("error"));
+  }
+
+  if (codeIdx === -1) {
     return NextResponse.json(
-      { error: "CSVの形式が正しくありません（会員コード・決済結果列が必要）" },
+      { error: "CSVの形式が正しくありません（会員コード列が見つかりません。ID(sendid)列または会員コード列が必要です）" },
       { status: 400 }
     );
   }
@@ -54,9 +75,21 @@ export async function POST(request: Request) {
     if (!line.trim()) continue;
     const cols       = line.split(",").map(c => c.trim().replace(/^"|"$/g, ""));
     const memberCode = cols[codeIdx] ?? "";
-    const result     = cols[resultIdx] ?? "";
-    const reason     = reasonIdx >= 0 ? cols[reasonIdx] : undefined;
-    const ok         = result === "OK" || result === "0" || result.toLowerCase() === "success" || result === "1";
+    if (!memberCode || memberCode === "-") continue;
+
+    let ok     = true;
+    let reason: string | undefined = undefined;
+
+    if (isCredixFormat) {
+      // クレディックスCSVはファイルに含まれる行が全て決済成功
+      // （決済失敗は別途エラーファイルで管理）
+      ok = true;
+    } else {
+      const result = cols[resultIdx] ?? "";
+      ok = result === "OK" || result === "0" || result.toLowerCase() === "success" || result === "1";
+      reason = reasonIdx >= 0 ? (cols[reasonIdx] ?? undefined) : undefined;
+    }
+
     resultMap.set(memberCode, { ok, reason });
   }
 

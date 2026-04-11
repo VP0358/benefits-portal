@@ -60,13 +60,45 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "必須項目が不足しています（氏名・メール・携帯電話・パスワード）" }, { status: 400 });
   }
 
+  // 概要書面番号の必須チェック
+  if (!disclosureDocNumber || String(disclosureDocNumber).trim() === "") {
+    return NextResponse.json({ error: "概要書面番号は必須です。" }, { status: 400 });
+  }
+
+  // 概要書面番号の重複チェック
+  const existingDisclosure = await prisma.mlmRegistration.findFirst({
+    where: { disclosureDocNumber: String(disclosureDocNumber).trim() },
+  });
+  if (existingDisclosure) {
+    return NextResponse.json(
+      { error: "この概要書面番号はすでに使用されております。別の概要書面をご利用ください。" },
+      { status: 409 }
+    );
+  }
+
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     return NextResponse.json({ error: "このメールアドレスはすでに登録されています" }, { status: 409 });
   }
 
   const hashed = await bcrypt.hash(password, 12);
-  const memberCode = "M" + Date.now().toString().slice(-8);
+
+  // 会員コード自動生成: 6桁の連番 + 枝番01 (例: 100001-01)
+  // 既存会員コードの最大値から次の番号を生成
+  const lastMember = await prisma.mlmMember.findFirst({
+    where: { memberCode: { regex: "^\\d{6}-01$" } },
+    orderBy: { memberCode: "desc" },
+  }).catch(() => null);
+
+  let nextNum = 100001;
+  if (lastMember?.memberCode) {
+    const numPart = parseInt(lastMember.memberCode.split("-")[0], 10);
+    if (!isNaN(numPart) && numPart >= 100001) {
+      nextNum = numPart + 1;
+    }
+  }
+  const memberCode = `${nextNum}-01`;
+
   const newReferralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
 
   // 紹介者を検索（URLパラメータの紹介コード経由）
