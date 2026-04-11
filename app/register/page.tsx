@@ -113,11 +113,20 @@ function RegisterForm() {
   const [done, setDone] = useState(false);
   const [countdown, setCountdown] = useState(3);
 
-  // オートシップ固定金額（表示用）
-  const AUTOSHIP_PRODUCT_PRICE = 16500;
-  const AUTOSHIP_SHIPPING_FEE = 770;
-  const AUTOSHIP_SERVICE_FEE = 440;
-  const autoshipTotal = AUTOSHIP_PRODUCT_PRICE + AUTOSHIP_SHIPPING_FEE + AUTOSHIP_SERVICE_FEE;
+  // ─── 新規登録金額（固定表示）───
+  const REG_FEE        = 3000;   // 登録料
+  const REG_PRODUCT    = 15000;  // 翠彩
+  const REG_SHIPPING   = 800;    // 送料
+  const regSubtotal    = REG_FEE + REG_PRODUCT + REG_SHIPPING; // 18800
+  const regTax         = Math.floor(regSubtotal * 0.1);        // 1880
+  const regTotal       = regSubtotal + regTax;                 // 20680
+
+  // ─── オートシップ月額金額（固定表示）───
+  const AS_PRODUCT     = 15000;  // 翠彩
+  const AS_SHIPPING    = 800;    // 送料
+  const asSubtotal     = AS_PRODUCT + AS_SHIPPING;             // 15800
+  const asTax          = Math.floor(asSubtotal * 0.1);         // 1580
+  const asTotal        = asSubtotal + asTax;                   // 17380
 
   /* ── 紹介コードから紹介者情報を取得 ── */
   useEffect(() => {
@@ -635,51 +644,110 @@ function RegisterForm() {
           {/* ═══════════════════════════════════
               ④ オートシップ情報
           ═══════════════════════════════════ */}
-          <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
+          <div className="rounded-3xl bg-white p-6 shadow-sm space-y-5">
             <SectionTitle title="オートシップ情報" />
             <p className="text-xs text-slate-500 -mt-2">毎月自動で商品が届く定期購入サービスです。</p>
 
-            <label className="flex items-center gap-3 cursor-pointer">
+            {/* ── 新規登録金額 ── */}
+            <div>
+              <h3 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                新規登録金額
+              </h3>
+              <div className="rounded-xl border border-slate-200 overflow-hidden">
+                <table className="w-full text-sm">
+                  <tbody>
+                    <tr className="border-b border-slate-100">
+                      <td className="px-4 py-2.5 text-slate-600 bg-slate-50 font-medium w-1/2">登録料</td>
+                      <td className="px-4 py-2.5 text-right text-slate-800 font-semibold">
+                        {REG_FEE.toLocaleString()}円
+                      </td>
+                    </tr>
+                    <tr className="border-b border-slate-100">
+                      <td className="px-4 py-2.5 text-slate-600 bg-slate-50 font-medium">翠彩</td>
+                      <td className="px-4 py-2.5 text-right text-slate-800 font-semibold">
+                        {REG_PRODUCT.toLocaleString()}円
+                      </td>
+                    </tr>
+                    <tr className="border-b border-slate-100">
+                      <td className="px-4 py-2.5 text-slate-600 bg-slate-50 font-medium">送料</td>
+                      <td className="px-4 py-2.5 text-right text-slate-800 font-semibold">
+                        {REG_SHIPPING.toLocaleString()}円
+                      </td>
+                    </tr>
+                    <tr className="border-b border-slate-100">
+                      <td className="px-4 py-2.5 text-slate-600 bg-slate-50 font-medium">合計</td>
+                      <td className="px-4 py-2.5 text-right text-slate-700 font-semibold">
+                        {regSubtotal.toLocaleString()}円
+                      </td>
+                    </tr>
+                    <tr className="border-b border-slate-100">
+                      <td className="px-4 py-2.5 text-slate-600 bg-slate-50 font-medium">税10%</td>
+                      <td className="px-4 py-2.5 text-right text-slate-700 font-semibold">
+                        {regTax.toLocaleString()}円
+                      </td>
+                    </tr>
+                    <tr className="bg-slate-900">
+                      <td className="px-4 py-3 text-white font-bold">合計</td>
+                      <td className="px-4 py-3 text-right text-white font-bold text-base">
+                        {regTotal.toLocaleString()}円
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* ── オートシップ申し込みチェックボックス ── */}
+            <label className="flex items-center gap-3 cursor-pointer rounded-xl border-2 border-slate-200 p-4 hover:border-emerald-300 hover:bg-emerald-50 transition-colors">
               <input
                 type="checkbox"
-                className="h-5 w-5 rounded border-slate-300 text-slate-700 focus:ring-slate-300"
+                className="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-400"
                 checked={form.autoshipEnabled}
                 onChange={e => setForm({ ...form, autoshipEnabled: e.target.checked })}
               />
-              <span className="text-sm font-medium text-slate-700">オートシップを申し込む</span>
+              <div>
+                <span className="text-sm font-bold text-slate-800">オートシップを申し込む</span>
+                <p className="text-xs text-slate-500 mt-0.5">毎月翠彩が自動で届く定期購入プランです。</p>
+              </div>
             </label>
 
-            {/* 料金表示（常に表示） */}
-            <div className="rounded-xl border border-slate-200 overflow-hidden">
-              <table className="w-full text-sm">
-                <tbody>
-                  <tr className="border-b border-slate-100">
-                    <td className="px-4 py-3 text-slate-600 bg-slate-50 font-medium w-1/2">製品価格（税込）</td>
-                    <td className="px-4 py-3 text-right text-slate-800 font-semibold">
-                      ¥{AUTOSHIP_PRODUCT_PRICE.toLocaleString()}
-                    </td>
-                  </tr>
-                  <tr className="border-b border-slate-100">
-                    <td className="px-4 py-3 text-slate-600 bg-slate-50 font-medium">送料</td>
-                    <td className="px-4 py-3 text-right text-slate-800 font-semibold">
-                      ¥{AUTOSHIP_SHIPPING_FEE.toLocaleString()}
-                    </td>
-                  </tr>
-                  <tr className="border-b border-slate-100">
-                    <td className="px-4 py-3 text-slate-600 bg-slate-50 font-medium">事務手数料</td>
-                    <td className="px-4 py-3 text-right text-slate-800 font-semibold">
-                      ¥{AUTOSHIP_SERVICE_FEE.toLocaleString()}
-                    </td>
-                  </tr>
-                  <tr className="bg-slate-900">
-                    <td className="px-4 py-3 text-white font-bold">合計金額（月額）</td>
-                    <td className="px-4 py-3 text-right text-white font-bold text-base">
-                      ¥{autoshipTotal.toLocaleString()}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            {/* ── オートシップ月額金額（チェック時のみ表示） ── */}
+            {form.autoshipEnabled && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 overflow-hidden">
+                <div className="px-4 py-2.5 bg-emerald-600 text-white text-sm font-bold flex items-center gap-1.5">
+                  <span>📦</span> オートシップ月額金額
+                </div>
+                <table className="w-full text-sm">
+                  <tbody>
+                    <tr className="border-b border-emerald-100">
+                      <td className="px-4 py-2.5 text-emerald-800 bg-emerald-50 font-medium w-1/2">翠彩</td>
+                      <td className="px-4 py-2.5 text-right text-slate-800 font-semibold">
+                        {AS_PRODUCT.toLocaleString()}円
+                      </td>
+                    </tr>
+                    <tr className="border-b border-emerald-100">
+                      <td className="px-4 py-2.5 text-emerald-800 bg-emerald-50 font-medium">送料</td>
+                      <td className="px-4 py-2.5 text-right text-slate-800 font-semibold">
+                        {AS_SHIPPING.toLocaleString()}円
+                      </td>
+                    </tr>
+                    <tr className="border-b border-emerald-100">
+                      <td className="px-4 py-2.5 text-emerald-800 bg-emerald-50 font-medium">税10%</td>
+                      <td className="px-4 py-2.5 text-right text-slate-700 font-semibold">
+                        {asTax.toLocaleString()}円
+                      </td>
+                    </tr>
+                    <tr className="bg-emerald-600">
+                      <td className="px-4 py-3 text-white font-bold">合計</td>
+                      <td className="px-4 py-3 text-right text-white font-bold text-base">
+                        {asTotal.toLocaleString()}円
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* ═══════════════════════════════════
