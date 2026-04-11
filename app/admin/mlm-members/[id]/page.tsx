@@ -282,102 +282,41 @@ export default function MlmMemberDetailPage() {
     }
   };
 
-  // ボーナス明細PDFダウンロード
+  // ボーナス明細PDF（HTML）を新タブで表示
   const handleDownloadBonusStatementPDF = async (bonusMonth: string) => {
     try {
-      const res = await fetch(`/api/admin/bonus-reports/statement-pdf?bonusMonth=${bonusMonth}&memberCode=${member?.memberCode}`);
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `bonus_statement_${member?.memberCode}_${bonusMonth}.pdf`;
-        link.click();
-      } else {
-        alert("PDFの生成に失敗しました");
+      // APIはHTMLを返すのでwindow.openで直接表示
+      const url = `/api/admin/bonus-reports/statement-pdf?bonusMonth=${bonusMonth}&memberCode=${member?.memberCode}`;
+      const win = window.open(url, "_blank");
+      if (!win) {
+        alert("ポップアップがブロックされました。ブラウザの設定で許可してください。");
       }
     } catch {
       alert("❌ エラーが発生しました");
     }
   };
 
-  // 登録完了通知書を印刷
-  const handlePrintRegistrationNotice = () => {
+  // 登録完了通知書をPDFダウンロード
+  const handlePrintRegistrationNotice = async () => {
     if (!member) return;
-    const m = member;
-    const r = m.user.mlmRegistration;
-    const today = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" });
-    const html = `<!DOCTYPE html><html lang="ja"><head>
-      <meta charset="UTF-8">
-      <title>登録完了通知書</title>
-      <style>
-        @media print { body { margin: 0; } @page { margin: 10mm; size: A4; } }
-        body { font-family: 'Noto Sans JP', 'Yu Gothic', 'Hiragino Sans', sans-serif; font-size: 12px; }
-      </style>
-    </head><body>
-      <div style="padding:36px 40px;font-family:'Noto Sans JP','Yu Gothic',sans-serif;font-size:12px;max-width:680px;margin:0 auto;">
-        <div style="text-align:center;margin-bottom:32px;border-bottom:3px solid #1d4ed8;padding-bottom:16px;">
-          <h1 style="font-size:26px;font-weight:700;color:#1d4ed8;letter-spacing:5px;margin:0 0 4px;">登録完了通知書</h1>
-          <div style="font-size:11px;color:#6b7280;letter-spacing:2px;">Registration Completion Notice</div>
-        </div>
-        <div style="text-align:right;font-size:12px;margin-bottom:24px;color:#374151;">${today}</div>
-        <div style="margin-bottom:28px;">
-          ${m.companyName ? `<div style="font-size:14px;color:#374151;margin-bottom:2px;">${m.companyName}</div>` : ""}
-          <div style="font-size:22px;font-weight:700;border-bottom:2px solid #374151;padding-bottom:6px;display:inline-block;">${m.user.name} 様</div>
-          <div style="font-size:11px;color:#6b7280;margin-top:6px;">会員コード: ${m.memberCode}</div>
-        </div>
-        <div style="font-size:13px;line-height:2.2;margin-bottom:28px;color:#374151;">
-          <p style="margin:0 0 8px;">このたびはCLAIR会員へのご登録をいただき、誠にありがとうございます。</p>
-          <p style="margin:0;">以下の内容にて登録が完了いたしましたことをお知らせいたします。</p>
-        </div>
-        <table style="width:100%;border-collapse:collapse;margin-bottom:28px;font-size:12px;">
-          <tbody>
-            <tr style="background:#eff6ff;">
-              <td style="padding:11px 18px;font-weight:600;border:1px solid #bfdbfe;width:38%;color:#1d4ed8;">会員コード</td>
-              <td style="padding:11px 18px;border:1px solid #bfdbfe;">${m.memberCode}</td>
-            </tr>
-            <tr>
-              <td style="padding:11px 18px;font-weight:600;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;">お名前</td>
-              <td style="padding:11px 18px;border:1px solid #bfdbfe;">${m.user.name}</td>
-            </tr>
-            <tr style="background:#eff6ff;">
-              <td style="padding:11px 18px;font-weight:600;border:1px solid #bfdbfe;color:#1d4ed8;">会員区分</td>
-              <td style="padding:11px 18px;border:1px solid #bfdbfe;">CLAIR会員</td>
-            </tr>
-            <tr>
-              <td style="padding:11px 18px;font-weight:600;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;">ご登録日</td>
-              <td style="padding:11px 18px;border:1px solid #bfdbfe;">${m.contractDate ? new Date(m.contractDate).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" }) : today}</td>
-            </tr>
-            <tr style="background:#eff6ff;">
-              <td style="padding:11px 18px;font-weight:600;border:1px solid #bfdbfe;color:#1d4ed8;">電話番号</td>
-              <td style="padding:11px 18px;border:1px solid #bfdbfe;">${m.user.phone || "—"}</td>
-            </tr>
-            <tr>
-              <td style="padding:11px 18px;font-weight:600;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;">メールアドレス</td>
-              <td style="padding:11px 18px;border:1px solid #bfdbfe;">${m.user.email}</td>
-            </tr>
-            ${initialPassword ? `<tr style="background:#fef3c7;"><td style="padding:11px 18px;font-weight:600;border:1px solid #fcd34d;color:#b45309;">マイページパスワード</td><td style="padding:11px 18px;border:1px solid #fcd34d;font-weight:700;font-family:monospace;font-size:16px;letter-spacing:3px;">${initialPassword}</td></tr>` : ""}
-          </tbody>
-        </table>
-        ${(r?.deliveryPostalCode || r?.deliveryAddress) ? `
-        <div style="border:1px solid #e5e7eb;border-radius:6px;padding:12px 16px;font-size:11px;margin-bottom:28px;color:#374151;">
-          <strong>お届け先:</strong> ${r.deliveryPostalCode ? `〒${r.deliveryPostalCode}　` : ""}${r.deliveryAddress || ""}
-          ${r.deliveryName ? `　${r.deliveryName}` : ""}
-        </div>
-        ` : ""}
-        <div style="text-align:right;font-size:12px;border-top:1px solid #e5e7eb;padding-top:18px;">
-          <div style="font-weight:700;font-size:15px;margin-bottom:2px;">CLAIRホールディングス株式会社</div>
-          <div style="color:#6b7280;">〒020-0026 岩手県盛岡市開運橋通5-6 第五菱和ビル5F</div>
-          <div style="color:#6b7280;">TEL: 019-681-3667</div>
-        </div>
-      </div>
-    </body></html>`;
-    const win = window.open("", "_blank", "width=900,height=700");
-    if (!win) { alert("ポップアップをブロックされました。ブラウザの設定から許可してください。"); return; }
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    setTimeout(() => { win.print(); }, 600);
+    try {
+      const url = `/api/admin/pdf/registration-complete?memberId=${member.id}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = `registration_${member.memberCode}.pdf`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(`❌ PDFの生成に失敗しました: ${err.error ?? res.status}`);
+      }
+    } catch {
+      alert("❌ 通信エラーが発生しました");
+    }
   };
 
   // 編集モーダルを開く
@@ -569,7 +508,7 @@ export default function MlmMemberDetailPage() {
                 onClick={handlePrintRegistrationNotice}
                 className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition"
               >
-                📄 登録完了通知書を印刷
+                📥 登録完了通知書PDF
               </button>
               <button
                 onClick={() => {
@@ -627,7 +566,7 @@ export default function MlmMemberDetailPage() {
             onClick={handlePrintRegistrationNotice}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-300 text-blue-700 text-xs font-medium rounded-lg hover:bg-blue-100 transition"
           >
-            <i className="fas fa-print text-[11px]"></i> 登録完了通知書を印刷
+            <i className="fas fa-file-pdf text-[11px]"></i> 登録完了通知書PDF
           </button>
         </div>
       </section>
@@ -674,26 +613,50 @@ export default function MlmMemberDetailPage() {
 
       {/* ─── レベル情報 ─── */}
       <section className="bg-white rounded-2xl shadow-sm p-5">
-        <SectionHeader title="レベル情報" icon="fas fa-chart-line" onEdit={() => openEdit("level")} />
+        <SectionHeader title="レベル情報（レベル＝タイトル）" icon="fas fa-chart-line" onEdit={() => openEdit("level")} />
+
+        {/* 概念説明 */}
+        <div className="mb-4 rounded-xl bg-blue-50 border border-blue-200 p-3 text-xs text-blue-800 space-y-1">
+          <p className="font-bold text-sm text-blue-700 mb-1">📌 レベル＝タイトル の概念</p>
+          <p>• <strong>レベル（＝タイトル）</strong>: 現在の称号・ランクを示します。レベルとタイトルは同一概念です。</p>
+          <p>• <strong>強制アクティブ</strong>: 有効時、条件達成（達成）となった場合に自動でアクティブ扱いになります。</p>
+          <p>• <strong>強制タイトル＝レベル</strong>: 有効時、該当タイトル（レベル）の達成条件が自動で満たされたと判定されます。</p>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
           <div>
-            <InfoRow label="現在レベル" value={<span className="font-bold text-blue-600 text-base">{LEVEL_LABELS[m.currentLevel] ?? m.currentLevel}</span>} />
+            <InfoRow label="現在レベル（タイトル）" value={<span className="font-bold text-blue-600 text-base">{LEVEL_LABELS[m.currentLevel] ?? m.currentLevel}</span>} />
             <InfoRow label="称号レベル" value={LEVEL_LABELS[m.titleLevel] ?? m.titleLevel} />
             <InfoRow label="強制レベル" value={m.forceLevel !== null ? LEVEL_LABELS[m.forceLevel ?? 0] : "—"} />
           </div>
           <div>
             <InfoRow label="条件達成" value={
               <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${m.conditionAchieved ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
-                {m.conditionAchieved ? "達成" : "未達成"}
+                {m.conditionAchieved ? "✅ 達成" : "未達成"}
               </span>
             } />
             <InfoRow label="強制アクティブ" value={
               <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${m.forceActive ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-600"}`}>
-                {m.forceActive ? "有効" : "無効"}
+                {m.forceActive ? "🔥 有効（条件達成でアクティブ）" : "無効"}
+              </span>
+            } />
+            <InfoRow label="強制タイトル＝レベル" value={
+              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${m.forceLevel !== null ? "bg-violet-100 text-violet-700" : "bg-gray-100 text-gray-600"}`}>
+                {m.forceLevel !== null ? `🏅 有効（${LEVEL_LABELS[m.forceLevel ?? 0]}相当で自動判定）` : "無効"}
               </span>
             } />
           </div>
         </div>
+
+        {/* 強制アクティブ+強制タイトル=レベル の組み合わせ説明 */}
+        {m.forceActive && m.forceLevel !== null && (
+          <div className="mt-3 rounded-lg bg-violet-50 border border-violet-200 px-3 py-2 text-xs text-violet-800">
+            <i className="fas fa-info-circle mr-1"></i>
+            <strong>現在の設定：</strong>
+            強制アクティブ＋強制タイトル＝レベル（{LEVEL_LABELS[m.forceLevel ?? 0]}）が有効です。
+            {LEVEL_LABELS[m.forceLevel ?? 0]}の達成条件を満たしたと判定され、条件達成時に自動でアクティブになります。
+          </div>
+        )}
       </section>
 
       {/* ─── 継続購入設定（旧オートシップ） ─── */}
@@ -1014,9 +977,15 @@ export default function MlmMemberDetailPage() {
 
       {/* レベル情報 編集 */}
       {editSection === "level" && (
-        <EditModal title="レベル情報を編集" onClose={() => setEditSection(null)} onSave={handleSave} saving={saving}>
+        <EditModal title="レベル情報を編集（レベル＝タイトル）" onClose={() => setEditSection(null)} onSave={handleSave} saving={saving}>
+          {/* 概念説明 */}
+          <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 text-xs text-blue-800 space-y-1 mb-2">
+            <p className="font-bold text-blue-700">📌 設定の意味</p>
+            <p>• <strong>強制アクティブ</strong>: ONにすると、条件達成（達成状態）になった時に自動でアクティブ扱いになります。</p>
+            <p>• <strong>強制タイトル＝レベル</strong>: 設定したレベルの達成条件を自動で満たしたと判定します。強制アクティブと組み合わせて使用します。</p>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <FormField label="現在レベル">
+            <FormField label="現在レベル（タイトル）">
               <select className={selectCls} value={String(editData.currentLevel ?? 0)} onChange={e => set("currentLevel", Number(e.target.value))}>
                 {[0,1,2,3,4,5].map(lv => <option key={lv} value={lv}>{LEVEL_LABELS[lv]}</option>)}
               </select>
@@ -1026,23 +995,41 @@ export default function MlmMemberDetailPage() {
                 {[0,1,2,3,4,5].map(lv => <option key={lv} value={lv}>{LEVEL_LABELS[lv]}</option>)}
               </select>
             </FormField>
-            <FormField label="強制レベル">
+            <FormField label="強制タイトル＝レベル（達成条件の自動判定レベル）">
               <select className={selectCls} value={String(editData.forceLevel ?? "")} onChange={e => set("forceLevel", e.target.value === "" ? null : Number(e.target.value))}>
-                <option value="">なし</option>
-                {[0,1,2,3,4,5].map(lv => <option key={lv} value={lv}>{LEVEL_LABELS[lv]}</option>)}
+                <option value="">なし（無効）</option>
+                {[1,2,3,4,5].map(lv => <option key={lv} value={lv}>{LEVEL_LABELS[lv]}相当で自動判定</option>)}
               </select>
             </FormField>
-            <div className="flex items-center gap-3 pt-5">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={Boolean(editData.conditionAchieved)} onChange={e => set("conditionAchieved", e.target.checked)} className="w-4 h-4" />
-                <span className="text-sm">条件達成</span>
+            <div className="flex flex-col gap-3 pt-2">
+              <label className="flex items-center gap-2 cursor-pointer p-2 rounded-lg border border-slate-200 hover:bg-slate-50">
+                <input type="checkbox" checked={Boolean(editData.conditionAchieved)} onChange={e => set("conditionAchieved", e.target.checked)} className="w-4 h-4 accent-green-600" />
+                <div>
+                  <span className="text-sm font-semibold">条件達成</span>
+                  <p className="text-xs text-slate-500">手動で達成状態にします</p>
+                </div>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={Boolean(editData.forceActive)} onChange={e => set("forceActive", e.target.checked)} className="w-4 h-4" />
-                <span className="text-sm">強制アクティブ</span>
+              <label className="flex items-center gap-2 cursor-pointer p-2 rounded-lg border border-slate-200 hover:bg-slate-50">
+                <input type="checkbox" checked={Boolean(editData.forceActive)} onChange={e => set("forceActive", e.target.checked)} className="w-4 h-4 accent-orange-600" />
+                <div>
+                  <span className="text-sm font-semibold">強制アクティブ</span>
+                  <p className="text-xs text-slate-500">条件達成時に自動でアクティブになります</p>
+                </div>
               </label>
             </div>
           </div>
+          {/* 設定プレビュー */}
+          {(editData.forceActive || editData.forceLevel !== null) && (
+            <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+              <strong>設定プレビュー:</strong>{" "}
+              {editData.forceActive && editData.forceLevel !== null
+                ? `強制タイトル＝${LEVEL_LABELS[Number(editData.forceLevel)]}の達成条件が満たされたと判定 → 条件達成 → 自動アクティブ`
+                : editData.forceActive
+                ? "条件達成になった場合に自動でアクティブになります"
+                : "指定レベルの達成条件を自動判定します（強制アクティブが無効のため自動アクティブにはなりません）"
+              }
+            </div>
+          )}
         </EditModal>
       )}
 

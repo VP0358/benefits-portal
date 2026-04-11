@@ -3,12 +3,11 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 import { NextRequest, NextResponse } from "next/server";
-
-
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import QRCode from "qrcode";
 
 /**
  * GET /api/admin/pdf/registration-complete?memberId=123
@@ -48,19 +47,25 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "MLM member not found" }, { status: 404 });
     }
 
-    // PDF生成
-    const doc = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4"
-    });
-
     const user = mlmMember.user;
     const reg = user.mlmRegistration;
     const memberCode = mlmMember.memberCode;
     const contractDate = mlmMember.contractDate ? new Date(mlmMember.contractDate).toLocaleDateString('ja-JP') : "-";
     const referrerName = mlmMember.referrer?.user?.name || "-";
     const referrerCode = mlmMember.referrer?.memberCode || "-";
+
+    // マイページURL
+    const myPageUrl = "https://viola-pure.jp/";
+    const loginId = memberCode.replace(/-/g, "");
+
+    // QRコード（Data URL）を生成
+    const qrDataUrl = await QRCode.toDataURL(myPageUrl, {
+      width: 120,
+      margin: 1,
+      color: { dark: "#1d4ed8", light: "#ffffff" },
+    });
+    // Base64部分だけ抽出
+    const qrBase64 = qrDataUrl.replace(/^data:image\/png;base64,/, "");
 
     // 会社情報
     const companyName = "CLAIRホールディングス株式会社";
@@ -69,94 +74,206 @@ export async function GET(req: NextRequest) {
     const companyFax = "FAX：050-3385-7788";
     const issueDate = new Date().toLocaleDateString('ja-JP');
 
-    // ヘッダー（郵便番号・住所）
-    doc.setFontSize(10);
-    doc.text(`〒${user.postalCode || ""}`, 20, 20);
-    doc.text(user.address || "", 20, 26);
+    // PDF生成
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4"
+    });
 
-    // 「重要」マーク
+    const PAGE_W = 210;
+    const MARGIN_L = 20;
+    const MARGIN_R = 20;
+    const COL_W = PAGE_W - MARGIN_L - MARGIN_R;
+
+    // ─── ヘッダー ───────────────────────────
+    // 青い帯
+    doc.setFillColor(29, 78, 216); // blue-700
+    doc.rect(0, 0, PAGE_W, 22, "F");
+
+    doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("重要", 20, 36);
-
-    // 宛名
-    doc.setFontSize(14);
-    doc.text(`${user.name || ""} 様`, 20, 46);
-
-    // 会員ID（右上）
+    doc.text("VIOLA-Pure", MARGIN_L, 12);
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(`会員ID　${memberCode}`, 140, 46);
+    doc.text("Registration Completion Notice", MARGIN_L, 18);
 
-    // タイトル
-    doc.setFontSize(16);
+    // 発行日（右上）
+    doc.setFontSize(9);
+    doc.text(`発行日: ${issueDate}`, PAGE_W - MARGIN_R, 18, { align: "right" });
+
+    // ─── タイトル ───────────────────────────
+    doc.setTextColor(30, 30, 30);
+    doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
-    doc.text("登録完了のお知らせ", 70, 60);
+    doc.text("登録完了通知書", PAGE_W / 2, 34, { align: "center" });
 
-    // 本文
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text("VIOLA-Pure会員様のご登録が完了いたしました。", PAGE_W / 2, 40, { align: "center" });
+
+    // ─── 宛名ブロック ───────────────────────
+    let y = 48;
+    doc.setTextColor(30, 30, 30);
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text("お申込みいただき誠に有難うございます。下記の通り契約完了を通知致します。", 20, 70);
-    doc.text("内容に間違いがないかご確認をお願い致します。今後ともよろしくお願い申し上げます。", 20, 76);
+    if (user.postalCode) doc.text(`〒${user.postalCode}`, MARGIN_L, y);
+    if (user.address) doc.text(user.address, MARGIN_L, y + 5);
+    y += 13;
+    if (mlmMember.companyName) {
+      doc.setFontSize(10);
+      doc.text(mlmMember.companyName, MARGIN_L, y);
+      y += 6;
+    }
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.text(`${user.name || ""}  様`, MARGIN_L, y);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(70, 70, 70);
+    doc.text(`会員コード: ${memberCode}`, MARGIN_L, y + 6);
+    y += 14;
 
-    // 詳細情報
-    let y = 90;
-    const lineHeight = 8;
+    // ─── 挨拶文 ───────────────────────────
+    doc.setFontSize(9);
+    doc.setTextColor(60, 60, 60);
+    doc.text("このたびはVIOLA-Pure会員へのご登録をいただき、誠にありがとうございます。", MARGIN_L, y);
+    y += 5;
+    doc.text("以下の内容にて登録が完了いたしましたことをお知らせいたします。内容のご確認をお願いいたします。", MARGIN_L, y);
+    y += 9;
 
-    const addField = (label: string, value: string) => {
+    // ─── セクション描画ヘルパー ───────────────
+    const drawSectionTitle = (title: string) => {
+      doc.setFillColor(239, 246, 255); // blue-50
+      doc.roundedRect(MARGIN_L, y - 3, COL_W, 8, 2, 2, "F");
+      doc.setDrawColor(147, 197, 253); // blue-300
+      doc.roundedRect(MARGIN_L, y - 3, COL_W, 8, 2, 2, "S");
+      doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
-      doc.text(label, 25, y);
+      doc.setTextColor(29, 78, 216);
+      doc.text(title, MARGIN_L + 3, y + 2);
+      doc.setTextColor(30, 30, 30);
       doc.setFont("helvetica", "normal");
-      doc.text(value, 25, y + 5);
-      y += lineHeight + 5;
+      y += 10;
     };
 
-    addField("会員ID", memberCode);
-    addField("氏名", `${user.name || ""} 様`);
-    addField("登録住所", `〒${user.postalCode || ""} ${user.address || ""}`);
-    
-    // 配送先（MlmRegistrationから）
+    const drawRow = (label: string, value: string, isAlt = false) => {
+      if (isAlt) {
+        doc.setFillColor(249, 250, 251);
+        doc.rect(MARGIN_L, y - 3, COL_W, 7, "F");
+      }
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text(label, MARGIN_L + 2, y + 1);
+      doc.setFontSize(9);
+      doc.setTextColor(30, 30, 30);
+      doc.text(value || "-", MARGIN_L + 48, y + 1);
+      doc.setDrawColor(220, 220, 220);
+      doc.line(MARGIN_L, y + 4, MARGIN_L + COL_W, y + 4);
+      y += 7;
+    };
+
+    // ─── 会員情報 ──────────────────────────
+    drawSectionTitle("■ 会員情報");
+    drawRow("会員ID", memberCode, false);
+    drawRow("氏名", `${user.name || ""}`, true);
+    drawRow("登録住所", `〒${user.postalCode || ""}  ${user.address || ""}`, false);
     const deliveryAddr = reg?.deliveryPostalCode
-      ? `〒${reg.deliveryPostalCode} ${reg.deliveryAddress || ""}`
-      : `〒${user.postalCode || ""} ${user.address || ""}`;
-    addField("配送先住所", deliveryAddr);
-    
-    // 電話番号（mlmMemberのmobileを優先）
-    const phone = mlmMember.mobile || user.phone || "";
-    addField("連絡先", `TEL ${phone}`);
-    
-    // 生年月日（MlmMemberから）
+      ? `〒${reg.deliveryPostalCode}  ${reg.deliveryAddress || ""}`
+      : `〒${user.postalCode || ""}  ${user.address || ""}`;
+    drawRow("配送先住所", deliveryAddr, true);
+    const phone = mlmMember.mobile || user.phone || "-";
+    const faxVal = "-"; // FAX未対応のため
+    drawRow("連絡先（TEL）", phone, false);
+    drawRow("連絡先（FAX）", faxVal, true);
     const birthDate = mlmMember.birthDate
       ? new Date(mlmMember.birthDate).toLocaleDateString('ja-JP')
       : "-";
-    addField("生年月日", birthDate);
-    addField("メールアドレス", user.email || "");
-    addField("契約締結日", contractDate);
-    addField("紹介者情報", `${referrerCode} ${referrerName} 様`);
+    drawRow("生年月日", birthDate, false);
+    drawRow("メールアドレス", user.email || "-", true);
+    drawRow("契約締結日", contractDate, false);
+    y += 2;
 
-    // 口座情報（MlmMemberから取得）
-    const bankInfo = mlmMember.bankName && mlmMember.bankAccountNumber
-      ? `${mlmMember.bankName}　${mlmMember.branchName || ""}　${mlmMember.accountType || "普通"}　${mlmMember.accountNumber || mlmMember.bankAccountNumber}　${mlmMember.accountHolder || ""}`
-      : (reg?.bankName && reg?.bankAccountNumber
-        ? `${reg.bankName}　${reg.bankBranch || ""}　${reg.bankAccountType || "普通"}　${reg.bankAccountNumber}　${reg.bankAccountHolder || ""}`
-        : "未登録");
-    addField("口座情報", bankInfo);
+    // ─── 紹介者情報 ───────────────────────
+    drawSectionTitle("■ 紹介者情報");
+    drawRow("紹介者ID", referrerCode, false);
+    drawRow("紹介者氏名", `${referrerName} 様`, true);
+    y += 2;
 
-    // マイページ情報
+    // ─── 口座情報 ─────────────────────────
+    drawSectionTitle("■ 口座情報（報酬振込先）");
+    const bankInfo1 = mlmMember.bankName ? `${mlmMember.bankName}  ${mlmMember.branchName || ""}` : "-";
+    const bankInfo2 = mlmMember.bankName
+      ? `${mlmMember.accountType || "普通"}  ${mlmMember.accountNumber || mlmMember.bankAccountNumber || "-"}  ${mlmMember.accountHolder || ""}`
+      : "-";
+    drawRow("金融機関・支店", bankInfo1, false);
+    drawRow("種別・番号・名義", bankInfo2, true);
+    y += 2;
+
+    // ─── マイページ情報（右側にQRコード） ──────
+    drawSectionTitle("■ マイページログイン情報");
+
+    // QRコード（右側）
+    const QR_SIZE = 28;
+    const QR_X = MARGIN_L + COL_W - QR_SIZE - 2;
+    const QR_Y = y - 4;
+    if (qrBase64) {
+      doc.addImage(qrBase64, "PNG", QR_X, QR_Y, QR_SIZE, QR_SIZE);
+      doc.setFontSize(7);
+      doc.setTextColor(100, 100, 100);
+      doc.text("マイページQR", QR_X + QR_SIZE / 2, QR_Y + QR_SIZE + 3, { align: "center" });
+    }
+
+    // テキスト情報（左側）
+    const TEXT_COL_W = COL_W - QR_SIZE - 6;
+    const drawRowNarrow = (label: string, value: string, isAlt = false) => {
+      if (isAlt) {
+        doc.setFillColor(249, 250, 251);
+        doc.rect(MARGIN_L, y - 3, TEXT_COL_W, 7, "F");
+      }
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text(label, MARGIN_L + 2, y + 1);
+      doc.setFontSize(9);
+      doc.setTextColor(30, 30, 30);
+      doc.text(value || "-", MARGIN_L + 48, y + 1);
+      doc.setDrawColor(220, 220, 220);
+      doc.line(MARGIN_L, y + 4, MARGIN_L + TEXT_COL_W, y + 4);
+      y += 7;
+    };
+
+    drawRowNarrow("マイページURL", myPageUrl, false);
+    drawRowNarrow("ログインID（会員ID）", loginId, true);
+    drawRowNarrow("初期パスワード", "0000", false);
+
+    // 初期パスワード注意書き
+    doc.setFontSize(8);
+    doc.setTextColor(180, 80, 0);
+    doc.text("※ 初回ログイン後、必ずパスワードを変更してください。", MARGIN_L + 2, y + 1);
+    y += 8;
+
+    // QRより下に空白を確保
+    const afterQR = QR_Y + QR_SIZE + 8;
+    if (y < afterQR) y = afterQR;
+    y += 4;
+
+    // ─── フッター ─────────────────────────
+    doc.setDrawColor(29, 78, 216);
+    doc.setLineWidth(0.5);
+    doc.line(MARGIN_L, y, MARGIN_L + COL_W, y);
     y += 5;
-    doc.setFont("helvetica", "bold");
-    doc.text("マイページ", 25, y);
-    doc.setFont("helvetica", "normal");
-    doc.text("https://viola-pure.jp/", 25, y + 5);
-    doc.text(`ログインID：${memberCode.replace(/-/g, "")}`, 25, y + 10);
-    doc.text(`パスワード：**********`, 25, y + 15);
 
-    // フッター（会社情報）
     doc.setFontSize(9);
-    doc.text(companyName, 20, 260);
-    doc.text(companyAddress, 20, 265);
-    doc.text(`${companyTel}　${companyFax}`, 20, 270);
-    doc.text(`発行日　　${issueDate}`, 20, 275);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 30, 30);
+    doc.text(companyName, MARGIN_L, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(80, 80, 80);
+    doc.text(companyAddress, MARGIN_L, y + 5);
+    doc.text(`${companyTel}  ${companyFax}`, MARGIN_L, y + 10);
 
     // PDFをバイナリデータとして生成
     const pdfBlob = doc.output("arraybuffer");
