@@ -44,7 +44,7 @@ export async function executeBonusCalculation(
   const members = await prisma.mlmMember.findMany({
     where: {
       status: {
-        in: ["active", "suspended"], // アクティブ・停止中の会員を対象
+        in: ["active", "autoship", "suspended"], // アクティブ・オートシップ・停止中の会員を対象
       },
     },
     include: {
