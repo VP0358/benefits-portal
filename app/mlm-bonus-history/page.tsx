@@ -21,7 +21,6 @@ type BonusHistory = {
   rankUpBonus: number;
   shareBonus: number;
   structureBonus: number;
-  savingsBonus: number;
   carryoverAmount: number;
   adjustmentAmount: number;
   otherPositionAmount: number;
@@ -243,7 +242,6 @@ function BonusCard({
             <DataRow label="ダイレクトB"   value={yen(h.directBonus)} />
             <DataRow label="ユニレベルB"   value={yen(h.unilevelBonus)} />
             <DataRow label="組織構築B"     value={yen(h.structureBonus)} />
-            <DataRow label="貯金B"         value={yen(h.savingsBonus)} />
             <DataRow label="繰越金"        value={yen(h.carryoverAmount)} />
             <DataRow label="調整金"        value={yen(h.adjustmentAmount)} />
             <DataRow label="他ポジション"  value={yen(h.otherPositionAmount)} />

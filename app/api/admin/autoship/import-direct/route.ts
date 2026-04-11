@@ -186,26 +186,30 @@ export async function POST(request: Request) {
           data:  { status: "active" },
         });
 
-        // SAVボーナス付与（貯金ボーナス設定取得）
+        // SAVボーナス付与（オートシップ時: 15,000円の5% = 750pt 固定）
         const memberRecord = memberMap.get(order.memberCode);
         if (memberRecord) {
-          const savingsConfig = await tx.savingsBonusConfig.findFirst();
-          if (savingsConfig) {
-            const savingsPoints = Math.floor(order.points * ((savingsConfig.autoshipRate ?? 5.0) / 100));
-            if (savingsPoints > 0) {
-              await tx.pointWallet.upsert({
-                where: { userId: memberRecord.userId },
-                update: {
-                  externalPointsBalance: { increment: savingsPoints },
-                  availablePointsBalance: { increment: savingsPoints },
-                },
-                create: {
-                  userId:                memberRecord.userId,
-                  externalPointsBalance: savingsPoints,
-                  availablePointsBalance: savingsPoints,
-                },
-              });
-            }
+          const AUTOSHIP_BASE = 15000;
+          const AUTOSHIP_RATE = 0.05;
+          const savingsPoints = Math.floor(AUTOSHIP_BASE * AUTOSHIP_RATE); // 750pt
+          if (savingsPoints > 0) {
+            await tx.pointWallet.upsert({
+              where: { userId: memberRecord.userId },
+              update: {
+                externalPointsBalance: { increment: savingsPoints },
+                availablePointsBalance: { increment: savingsPoints },
+              },
+              create: {
+                userId:                memberRecord.userId,
+                externalPointsBalance: savingsPoints,
+                availablePointsBalance: savingsPoints,
+              },
+            });
+            // MlmMemberの貯金ポイント累計も更新
+            await tx.mlmMember.update({
+              where: { id: memberRecord.id },
+              data: { savingsPoints: { increment: savingsPoints } },
+            });
           }
         }
 

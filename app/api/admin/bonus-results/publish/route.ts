@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 /**
  * POST /api/admin/bonus-results/publish
  * ボーナス明細の公開/非公開を切替
+ * 公開時：savingsBonusRate(3%)分の貯金ポイントを付与
  */
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -32,26 +33,85 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
 
+    // 現在の公開状態を確認
+    const currentResult = await prisma.bonusResult.findFirst({
+      where: {
+        mlmMemberId: mlmMember.id,
+        bonusMonth,
+      },
+    });
+
+    if (!currentResult) {
+      return NextResponse.json({ error: "Bonus result not found" }, { status: 404 });
+    }
+
+    const wasPublished = currentResult.isPublished ?? false;
+    const willPublish = Boolean(isPublished);
+
     // ボーナス結果の公開状態を更新
-    const updated = await prisma.bonusResult.updateMany({
+    await prisma.bonusResult.updateMany({
       where: {
         mlmMemberId: mlmMember.id,
         bonusMonth,
       },
       data: {
-        isPublished: Boolean(isPublished),
-        publishedAt: isPublished ? new Date() : null,
+        isPublished: willPublish,
+        publishedAt: willPublish ? new Date() : null,
       },
     });
 
-    if (updated.count === 0) {
-      return NextResponse.json({ error: "Bonus result not found" }, { status: 404 });
+    // 公開に切り替わった場合（非公開→公開）のみ貯金ポイントを付与
+    if (willPublish && !wasPublished) {
+      const paymentAmount = currentResult.paymentAmount ?? 0;
+
+      // 貯金ボーナス設定を取得（デフォルト3%）
+      const savingsConfig = await prisma.savingsBonusConfig.findFirst();
+      const bonusRate = savingsConfig?.bonusRate ?? 3.0;
+
+      const savingsPoints = Math.floor(paymentAmount * (bonusRate / 100));
+
+      if (savingsPoints > 0) {
+        // ポイントウォレットを更新
+        await prisma.pointWallet.upsert({
+          where: { userId: mlmMember.userId },
+          create: {
+            userId: mlmMember.userId,
+            externalPointsBalance: savingsPoints,
+            availablePointsBalance: savingsPoints,
+          },
+          update: {
+            externalPointsBalance: { increment: savingsPoints },
+            availablePointsBalance: { increment: savingsPoints },
+          },
+        });
+
+        // MLM会員の貯金ポイント累計を更新
+        await prisma.mlmMember.update({
+          where: { id: mlmMember.id },
+          data: {
+            savingsPoints: { increment: savingsPoints },
+          },
+        });
+
+        // ボーナス結果に貯金ポイント付与数を記録
+        await prisma.bonusResult.updateMany({
+          where: {
+            mlmMemberId: mlmMember.id,
+            bonusMonth,
+          },
+          data: {
+            savingsPointsAdded: savingsPoints,
+          },
+        });
+
+        console.log(`💰 貯金ポイント付与: ${memberCode} +${savingsPoints}pt (報酬${paymentAmount}円の${bonusRate}%)`);
+      }
     }
 
     return NextResponse.json({
       success: true,
-      isPublished: Boolean(isPublished),
-      message: isPublished ? "ボーナス明細を公開しました" : "ボーナス明細を非公開にしました",
+      isPublished: willPublish,
+      message: willPublish ? "ボーナス明細を公開しました" : "ボーナス明細を非公開にしました",
     });
   } catch (error) {
     console.error("Error updating bonus result publish status:", error);

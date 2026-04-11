@@ -32,7 +32,6 @@ type BonusResultRow = {
   directBonus: number;
   unilevelBonus: number;
   structureBonus: number;
-  savingsBonus: number;
   totalBonus: number;
   unilevelDetail: Record<string, number> | null;
   savingsPointsAdded: number;
@@ -101,7 +100,6 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
               <th className="py-2 px-3 text-right text-slate-600 font-semibold">ダイレクト</th>
               <th className="py-2 px-3 text-right text-slate-600 font-semibold">ユニレベル</th>
               <th className="py-2 px-3 text-right text-slate-600 font-semibold">組織構築</th>
-              <th className="py-2 px-3 text-right text-slate-600 font-semibold">貯金</th>
               <th className="py-2 px-3 text-right text-slate-600 font-semibold font-bold">合計</th>
             </tr>
           </thead>
@@ -137,7 +135,6 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
                   <td className="py-2 px-3 text-right">{yen(r.directBonus)}</td>
                   <td className="py-2 px-3 text-right">{yen(r.unilevelBonus)}</td>
                   <td className="py-2 px-3 text-right">{yen(r.structureBonus)}</td>
-                  <td className="py-2 px-3 text-right">{yen(r.savingsBonus)}</td>
                   <td className="py-2 px-3 text-right font-black text-slate-900">{yen(r.totalBonus)}</td>
                 </tr>
               );
@@ -155,9 +152,6 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
               </td>
               <td className="py-2 px-3 text-right font-bold">
                 {yen(filtered.reduce((s, r) => s + r.structureBonus, 0))}
-              </td>
-              <td className="py-2 px-3 text-right font-bold">
-                {yen(filtered.reduce((s, r) => s + r.savingsBonus, 0))}
               </td>
               <td className="py-2 px-3 text-right font-black text-violet-800 text-sm">
                 {yen(filtered.reduce((s, r) => s + r.totalBonus, 0))}

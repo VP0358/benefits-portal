@@ -28,7 +28,7 @@ type BonusResultDetail = {
   rankUpBonus: number;
   shareBonus: number;
   structureBonus: number;
-  savingsBonus: number;
+  // savingsBonus は削除（貯金ボーナスはポイント付与のみ）
 
   // 合計・調整
   bonusTotal: number;
@@ -146,7 +146,6 @@ export default function BonusResultsPage() {
       "ランクアップB",
       "シェアB",
       "組織構築B",
-      "貯金B",
       "繰越金",
       "調整金",
       "別口座",
@@ -187,7 +186,6 @@ export default function BonusResultsPage() {
       r.rankUpBonus,
       r.shareBonus,
       r.structureBonus,
-      r.savingsBonus,
       r.carryoverAmount,
       r.adjustmentAmount,
       r.otherPositionAmount,
@@ -368,7 +366,6 @@ export default function BonusResultsPage() {
                     <th className="px-3 py-3 text-right font-semibold">ランクアップB</th>
                     <th className="px-3 py-3 text-right font-semibold">シェアB</th>
                     <th className="px-3 py-3 text-right font-semibold">組織構築B</th>
-                    <th className="px-3 py-3 text-right font-semibold">貯金B</th>
                     <th className="px-3 py-3 text-right font-semibold bg-blue-900">繰越金</th>
                     <th className="px-3 py-3 text-right font-semibold bg-blue-900">調整金</th>
                     <th className="px-3 py-3 text-right font-semibold bg-blue-900">別口座</th>
@@ -430,9 +427,6 @@ export default function BonusResultsPage() {
                       </td>
                       <td className="px-3 py-2 text-right">
                         ¥{r.structureBonus.toLocaleString()}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        ¥{r.savingsBonus.toLocaleString()}
                       </td>
                       <td className="px-3 py-2 text-right bg-blue-50">
                         ¥{r.carryoverAmount.toLocaleString()}

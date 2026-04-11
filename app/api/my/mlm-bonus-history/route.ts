@@ -65,7 +65,6 @@ export async function GET() {
         rankUpBonus: r.rankUpBonus,
         shareBonus: r.shareBonus,
         structureBonus: r.structureBonus,
-        savingsBonus: r.savingsBonus,
         carryoverAmount: r.carryoverAmount,
         adjustmentAmount: r.adjustmentAmount,
         otherPositionAmount: r.otherPositionAmount,

@@ -176,15 +176,21 @@ export default function BonusSettingsPage() {
           </div>
         )}
 
-        {/* 貯金ボーナス設定 */}
+        {/* 貯金ポイント設定 */}
         <section className="rounded-2xl bg-white border border-stone-100 p-6">
           <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            💰 貯金ボーナス（SAVpt）設定
+            💰 貯金ポイント（SAVpt）設定
           </h2>
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+            ⚠️ 貯金ポイントはボーナス計算とは分離され、ポイントとして別途付与されます。
+            「登録時：登録料¥15,000の{savingsConfig.registrationRate}% = {Math.floor(15000 * savingsConfig.registrationRate / 100)}pt」
+            「オートシップ支払完了時：¥15,000の{savingsConfig.autoshipRate}% = {Math.floor(15000 * savingsConfig.autoshipRate / 100)}pt」
+            「報酬公開時：支払報酬額の{savingsConfig.bonusRate}%」
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                登録時ボーナス（%）
+                登録時ポイント付与率（%）
               </label>
               <input
                 type="number"
@@ -201,13 +207,13 @@ export default function BonusSettingsPage() {
                 max="100"
               />
               <p className="text-xs text-gray-500 mt-1">
-                新規登録時に付与される貯金ボーナス割合（デフォルト: 20%）
+                新規登録時に付与される貯金ポイント割合（デフォルト: 20%）
               </p>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                オートシップボーナス（%）
+                オートシップポイント付与率（%）
               </label>
               <input
                 type="number"
@@ -224,13 +230,13 @@ export default function BonusSettingsPage() {
                 max="100"
               />
               <p className="text-xs text-gray-500 mt-1">
-                オートシップ決済完了時に付与される割合（デフォルト: 5%）
+                オートシップ決済完了時に付与される貯金ポイント率（デフォルト: 5%）
               </p>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                ボーナス計算時（%）
+                報酬公開時ポイント付与率（%）
               </label>
               <input
                 type="number"
@@ -247,7 +253,7 @@ export default function BonusSettingsPage() {
                 max="100"
               />
               <p className="text-xs text-gray-500 mt-1">
-                毎月25日のボーナス計算時に付与される割合（デフォルト: 3%）
+                報酬公開時に支払報酬額の{savingsConfig.bonusRate}%を貯金ポイントとして付与（デフォルト: 3%）
               </p>
             </div>
           </div>
@@ -608,7 +614,7 @@ export default function BonusSettingsPage() {
           <ul className="text-xs text-yellow-700 space-y-1">
             <li>• ボーナス設定の変更は、次回以降のボーナス計算に反映されます</li>
             <li>• 既に計算済みのボーナスには影響しません</li>
-            <li>• 貯金ボーナスの割合変更は、次回付与時から適用されます</li>
+            <li>• 貯金ポイント（SAVpt）の割合変更は、次回付与時から適用されます</li>
             <li>• 一度付与された貯金ポイントは変更できません</li>
             <li>• ユニレベルボーナスの報酬段数は会員レベルにより異なります（LV1=3段、LV2=5段、LV3‑5=7段）</li>
           </ul>

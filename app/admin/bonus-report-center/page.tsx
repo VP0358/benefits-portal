@@ -28,7 +28,6 @@ type BonusResultDetail = {
   rankUpBonus: number;
   shareBonus: number;
   structureBonus: number;
-  savingsBonus: number;
   bonusTotal: number;
   carryoverAmount: number;
   adjustmentAmount: number;
@@ -100,7 +99,6 @@ type MonthSummary = {
   directBonus: number;
   unilevelBonus: number;
   structureBonus: number;
-  savingsBonus: number;
   bonusTotal: number;
   paymentTotal: number;
   totalMembers: number;
@@ -301,7 +299,6 @@ export default function BonusReportCenterPage() {
               directBonus: data.results?.reduce((acc: number, r: BonusResultDetail) => acc + r.directBonus, 0) || 0,
               unilevelBonus: data.results?.reduce((acc: number, r: BonusResultDetail) => acc + r.unilevelBonus, 0) || 0,
               structureBonus: data.results?.reduce((acc: number, r: BonusResultDetail) => acc + r.structureBonus, 0) || 0,
-              savingsBonus: data.results?.reduce((acc: number, r: BonusResultDetail) => acc + r.savingsBonus, 0) || 0,
               bonusTotal: data.bonusRun.totalBonusAmount || 0,
               paymentTotal: data.results?.reduce((acc: number, r: BonusResultDetail) => acc + r.paymentAmount, 0) || 0,
               totalMembers: data.bonusRun.totalMembers || 0,
@@ -331,7 +328,7 @@ export default function BonusReportCenterPage() {
   const handleExportResultCSV = () => {
     const headers = [
       "会員ID", "会員名", "法人名", "ダイレクトB", "ユニレベルB", "ランクアップB", "シェアB",
-      "組織構築B", "貯金B", "繰越金", "調整金", "別口座", "支払調整前取得額", "調整率", "調整額",
+      "組織構築B", "繰越金", "調整金", "別口座", "支払調整前取得額", "調整率", "調整額",
       "取得額合計", "10%消費税", "源泉所得税", "過不足金", "別口座過不足金", "事務手数料", "支払額",
       "グループACT", "グループPT", "最小ライン", "ライン数", "LV1ライン", "LV2ライン", "LV3ライン",
       "自己購入PT", "直下ACT", "前回レベル", "タイトルレベル", "当月レベル", "強制レベル", "条件",
@@ -339,7 +336,7 @@ export default function BonusReportCenterPage() {
     ];
     const rows = filteredResults.map((r) => [
       r.memberCode, r.memberName, r.companyName || "", r.directBonus, r.unilevelBonus,
-      r.rankUpBonus, r.shareBonus, r.structureBonus, r.savingsBonus, r.carryoverAmount,
+      r.rankUpBonus, r.shareBonus, r.structureBonus, r.carryoverAmount,
       r.adjustmentAmount, r.otherPositionAmount, r.amountBeforeAdjustment,
       r.paymentAdjustmentRate || "", r.paymentAdjustmentAmount, r.finalAmount,
       r.consumptionTax, r.withholdingTax, r.shortageAmount, r.otherPositionShortage,
@@ -638,7 +635,6 @@ export default function BonusReportCenterPage() {
                           <th className="px-3 py-3 text-right font-semibold">ランクアップB</th>
                           <th className="px-3 py-3 text-right font-semibold">シェアB</th>
                           <th className="px-3 py-3 text-right font-semibold">組織構築B</th>
-                          <th className="px-3 py-3 text-right font-semibold">貯金B</th>
                           <th className="px-3 py-3 text-right font-semibold bg-blue-900">繰越金</th>
                           <th className="px-3 py-3 text-right font-semibold bg-blue-900">調整金</th>
                           <th className="px-3 py-3 text-right font-semibold bg-blue-900">別口座</th>
@@ -690,7 +686,6 @@ export default function BonusReportCenterPage() {
                             <td className="px-3 py-2 text-right">¥{r.rankUpBonus.toLocaleString()}</td>
                             <td className="px-3 py-2 text-right">¥{r.shareBonus.toLocaleString()}</td>
                             <td className="px-3 py-2 text-right">¥{r.structureBonus.toLocaleString()}</td>
-                            <td className="px-3 py-2 text-right">¥{r.savingsBonus.toLocaleString()}</td>
                             <td className="px-3 py-2 text-right bg-blue-50">¥{r.carryoverAmount.toLocaleString()}</td>
                             <td className="px-3 py-2 text-right bg-blue-50">¥{r.adjustmentAmount.toLocaleString()}</td>
                             <td className="px-3 py-2 text-right bg-blue-50">¥{r.otherPositionAmount.toLocaleString()}</td>
@@ -1041,7 +1036,6 @@ export default function BonusReportCenterPage() {
                           <th className="text-right p-3">ダイレクトB</th>
                           <th className="text-right p-3">ユニレベルB</th>
                           <th className="text-right p-3">組織構築B</th>
-                          <th className="text-right p-3">貯金B</th>
                           <th className="text-right p-3">ボーナス総額</th>
                           <th className="text-right p-3">支払総額</th>
                         </tr>
@@ -1055,7 +1049,6 @@ export default function BonusReportCenterPage() {
                             <td className="p-3 text-right">¥{s.directBonus.toLocaleString()}</td>
                             <td className="p-3 text-right">¥{s.unilevelBonus.toLocaleString()}</td>
                             <td className="p-3 text-right">¥{s.structureBonus.toLocaleString()}</td>
-                            <td className="p-3 text-right text-green-600">¥{s.savingsBonus.toLocaleString()}</td>
                             <td className="p-3 text-right font-bold text-blue-600">¥{s.bonusTotal.toLocaleString()}</td>
                             <td className="p-3 text-right font-bold text-purple-600">¥{s.paymentTotal.toLocaleString()}</td>
                           </tr>

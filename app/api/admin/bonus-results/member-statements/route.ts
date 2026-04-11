@@ -58,7 +58,6 @@ export async function GET(req: NextRequest) {
       directBonus: r.directBonus ?? 0,
       unilevelBonus: r.unilevelBonus ?? 0,
       structureBonus: r.structureBonus ?? 0,
-      savingsBonus: r.savingsBonus ?? 0,
       adjustmentAmount: r.adjustmentAmount ?? 0,
       withholdingTax: r.withholdingTax ?? 0,
       carryoverAmount: r.carryoverAmount ?? 0,

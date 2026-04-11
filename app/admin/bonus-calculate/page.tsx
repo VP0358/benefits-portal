@@ -18,10 +18,10 @@ type BonusRunSummary = {
 
 type BonusResultRow = {
   id: string;
-  memberId: string;
+  memberCode: string;       // APIが返す実際のフィールド名
   memberName: string;
-  memberEmail: string;
-  mlmMemberCode: string;
+  companyName: string | null;
+  status: string;
   isActive: boolean;
   selfPurchasePoints: number;
   groupPoints: number;
@@ -32,10 +32,11 @@ type BonusResultRow = {
   directBonus: number;
   unilevelBonus: number;
   structureBonus: number;
-  savingsBonus: number;
-  totalBonus: number;
+  bonusTotal: number;       // APIが返すフィールド名（totalBonusではなくbonusTotal）
+  paymentAmount: number;
+  withholdingTax: number;
+  serviceFee: number;
   unilevelDetail: Record<string, number> | null;
-  savingsPointsAdded: number;
 };
 
 type AdjustmentRow = {
@@ -57,13 +58,6 @@ type ShortageRow = {
   companyName: string | null;
   amount: number;
   comment: string | null;
-};
-
-type SavingsBonusConfig = {
-  id: string | null;
-  registrationRate: number;
-  autoshipRate: number;
-  bonusRate: number;
 };
 
 type CsvPreviewRow = {
@@ -102,7 +96,7 @@ function generateMonthOptions() {
 function ResultTable({ results }: { results: BonusResultRow[] }) {
   const [search, setSearch] = useState("");
   const filtered = results.filter(
-    (r) => r.memberName.includes(search) || r.memberEmail.includes(search) || r.mlmMemberCode.includes(search)
+    (r) => r.memberName.includes(search) || (r.companyName || "").includes(search) || r.memberCode.includes(search)
   );
 
   return (
@@ -110,16 +104,17 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
       <div className="flex items-center gap-3">
         <input
           type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder="会員名・メール・コードで検索..."
+          placeholder="会員名・法人名・会員コードで検索..."
           className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <span className="text-sm text-gray-600">{filtered.length} / {results.length} 件</span>
       </div>
       <div className="bg-white rounded-2xl border border-stone-100 overflow-x-auto">
         <table className="w-full text-xs">
-          <thead className="bg-gray-100 border-b">
+          <thead className="bg-slate-800 text-white">
             <tr>
-              <th className="text-left p-2 font-semibold">会員</th>
+              <th className="text-left p-2 font-semibold">会員コード</th>
+              <th className="text-left p-2 font-semibold">氏名/法人名</th>
               <th className="text-left p-2 font-semibold">ステータス</th>
               <th className="text-right p-2 font-semibold">自己pt</th>
               <th className="text-right p-2 font-semibold">グループpt</th>
@@ -129,20 +124,27 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
               <th className="text-right p-2 font-semibold">ダイレクト</th>
               <th className="text-right p-2 font-semibold">ユニレベル</th>
               <th className="text-right p-2 font-semibold">組織</th>
-              <th className="text-right p-2 font-semibold">貯金</th>
-              <th className="text-right p-2 font-semibold">合計</th>
+              <th className="text-right p-2 font-semibold">ボーナス合計</th>
+              <th className="text-right p-2 font-semibold">源泉税</th>
+              <th className="text-right p-2 font-semibold">支払額</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((r) => (
+            {filtered.length === 0 ? (
+              <tr><td colSpan={14} className="text-center py-8 text-gray-400">データがありません</td></tr>
+            ) : filtered.map((r) => (
               <tr key={r.id} className="border-b hover:bg-gray-50">
+                <td className="p-2 font-mono text-xs text-slate-600">{r.memberCode}</td>
                 <td className="p-2">
-                  <div className="font-medium text-gray-800">{r.memberName}</div>
-                  <div className="text-gray-500 text-[10px]">{r.mlmMemberCode}</div>
+                  <div className="font-medium text-gray-800">{r.companyName || r.memberName}</div>
+                  {r.companyName && <div className="text-gray-500 text-[10px]">{r.memberName}</div>}
                 </td>
                 <td className="p-2">
-                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold ${r.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                    {r.isActive ? "アクティブ" : "非"}
+                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold ${
+                    r.isActive ? "bg-green-100 text-green-700"
+                    : r.status === "autoship" ? "bg-blue-100 text-blue-600"
+                    : "bg-gray-100 text-gray-500"}`}>
+                    {r.isActive ? "アクティブ" : r.status === "autoship" ? "AS" : "非"}
                   </span>
                 </td>
                 <td className="p-2 text-right text-gray-700">{r.selfPurchasePoints}</td>
@@ -159,8 +161,9 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
                 <td className="p-2 text-right text-gray-800">{yen(r.directBonus)}</td>
                 <td className="p-2 text-right text-gray-800">{yen(r.unilevelBonus)}</td>
                 <td className="p-2 text-right text-gray-800">{yen(r.structureBonus)}</td>
-                <td className="p-2 text-right text-green-600">{yen(r.savingsBonus)}</td>
-                <td className="p-2 text-right font-bold text-blue-600">{yen(r.totalBonus)}</td>
+                <td className="p-2 text-right font-bold text-slate-700">{yen(r.bonusTotal)}</td>
+                <td className="p-2 text-right text-red-600">{yen(r.withholdingTax)}</td>
+                <td className="p-2 text-right font-bold text-blue-600">{yen(r.paymentAmount)}</td>
               </tr>
             ))}
           </tbody>
@@ -178,13 +181,13 @@ export default function BonusCalculatePage() {
   const [results, setResults] = useState<BonusResultRow[]>([]);
   const [adjustments, setAdjustments] = useState<AdjustmentRow[]>([]);
   const [shortages, setShortages] = useState<ShortageRow[]>([]);
-  const [savingsConfig, setSavingsConfig] = useState<SavingsBonusConfig | null>(null);
+  // savingsConfig は削除（貯金ボーナスはポイント付与のみ）
   const [loading, setLoading] = useState(false);
   const [executing, setExecuting] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   // タブ
-  const [activeTab, setActiveTab] = useState<"calculation" | "adjustment" | "shortage" | "savings">("calculation");
+  const [activeTab, setActiveTab] = useState<"calculation" | "adjustment" | "shortage">("calculation");
 
   // ページネーション
   const [adjustmentPage, setAdjustmentPage] = useState(1);
@@ -198,7 +201,7 @@ export default function BonusCalculatePage() {
   // ─── モーダル制御 ───
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
   const [showShortageModal, setShowShortageModal] = useState(false);
-  const [showSavingsConfigModal, setShowSavingsConfigModal] = useState(false);
+
   // CSV プレビューモーダル
   const [showAdjCsvModal, setShowAdjCsvModal] = useState(false);
   const [showShorCsvModal, setShowShorCsvModal] = useState(false);
@@ -250,16 +253,8 @@ export default function BonusCalculatePage() {
     } catch (err) { console.error(err); }
   }, [selectedMonth]);
 
-  const fetchSavingsConfig = useCallback(async () => {
-    try {
-      const res = await fetch("/api/admin/savings-bonus-config");
-      if (res.ok) { const data = await res.json(); setSavingsConfig(data); }
-    } catch (err) { console.error(err); }
-  }, []);
-
   useEffect(() => { fetchBonusRun(); }, [fetchBonusRun]);
   useEffect(() => { fetchAdjustments(); fetchShortages(); }, [fetchAdjustments, fetchShortages]);
-  useEffect(() => { fetchSavingsConfig(); }, [fetchSavingsConfig]);
 
   // ─── 会員コード検索（調整金） ───
   const lookupAdjMember = async () => {
@@ -564,20 +559,6 @@ export default function BonusCalculatePage() {
     finally { setCsvUploading(false); }
   };
 
-  // ─── 貯金ボーナス設定更新 ───
-  const handleUpdateSavingsConfig = async () => {
-    if (!savingsConfig) return;
-    try {
-      const res = await fetch("/api/admin/savings-bonus-config", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ registrationRate: savingsConfig.registrationRate, autoshipRate: savingsConfig.autoshipRate, bonusRate: savingsConfig.bonusRate }),
-      });
-      if (res.ok) { alert("✅ 貯金ボーナス設定を更新しました"); setShowSavingsConfigModal(false); await fetchSavingsConfig(); }
-      else { const data = await res.json(); alert(`❌ エラー: ${data.error}`); }
-    } catch (err: unknown) { alert(`❌ エラー: ${(err as Error).message}`); }
-  };
-
   // ─── CSV テンプレートダウンロード（調整金） ───
   const downloadAdjTemplate = () => {
     const csv = "\uFEFF会員コード,氏名,金額,コメント,課税区分(1=課税/0=非課税)\nVP00001,山田太郎,10000,特別調整,1\n";
@@ -698,9 +679,9 @@ export default function BonusCalculatePage() {
       {/* タブ */}
       <div className="bg-white rounded-2xl border border-stone-100" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
         <div className="flex border-b overflow-x-auto">
-          {(["calculation", "adjustment", "shortage", "savings"] as const).map((tab) => {
-            const labels = { calculation: "計算結果", adjustment: "調整金管理", shortage: "過不足金管理", savings: "貯金ボーナス設定" };
-            const icons  = { calculation: "fa-chart-line", adjustment: "fa-plus-circle", shortage: "fa-exclamation-circle", savings: "fa-piggy-bank" };
+          {(["calculation", "adjustment", "shortage"] as const).map((tab) => {
+            const labels = { calculation: "計算結果", adjustment: "調整金管理", shortage: "過不足金管理" };
+            const icons  = { calculation: "fa-chart-line", adjustment: "fa-plus-circle", shortage: "fa-exclamation-circle" };
             return (
               <button key={tab} onClick={() => setActiveTab(tab)}
                 className={`flex-1 min-w-max px-5 py-3 font-semibold text-sm transition whitespace-nowrap ${activeTab === tab ? "bg-blue-50 text-blue-700 border-b-2 border-blue-600" : "text-gray-600 hover:bg-gray-50"}`}>
@@ -721,9 +702,22 @@ export default function BonusCalculatePage() {
           {activeTab === "calculation" && (
             loading
               ? <div className="text-center py-8 text-gray-500 animate-pulse">読み込み中...</div>
-              : results.length > 0
-                ? <ResultTable results={results} />
-                : <div className="text-center py-8 text-gray-500">計算結果がありません。ボーナス計算を実行してください。</div>
+              : !bonusRun
+                ? <div className="text-center py-12 text-gray-500">
+                    <i className="fas fa-calculator text-4xl text-gray-300 mb-3 block"></i>
+                    <p className="font-semibold">ボーナス計算を実行してください</p>
+                    <p className="text-xs text-gray-400 mt-1">対象月を選択して「ボーナス計算実行」ボタンをクリックしてください</p>
+                  </div>
+                : results.length > 0
+                  ? <ResultTable results={results} />
+                  : <div className="text-center py-8 text-gray-500">
+                      <i className="fas fa-table text-4xl text-gray-300 mb-3 block"></i>
+                      <p className="font-semibold">計算結果がありません</p>
+                      <p className="text-xs text-gray-400 mt-1">データがまだ読み込まれていない場合は、
+                        <button onClick={fetchBonusRun} className="text-blue-500 underline ml-1">再読み込み</button>
+                        してください
+                      </p>
+                    </div>
           )}
 
           {/* ── 調整金管理 ── */}
@@ -871,31 +865,6 @@ export default function BonusCalculatePage() {
             </div>
           )}
 
-          {/* ── 貯金ボーナス設定 ── */}
-          {activeTab === "savings" && savingsConfig && (
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h3 className="text-base font-bold text-gray-800">貯金ボーナス設定</h3>
-                <button onClick={() => setShowSavingsConfigModal(true)}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition">
-                  <i className="fas fa-edit mr-2"></i>設定編集
-                </button>
-              </div>
-              <div className="grid grid-cols-3 gap-6 bg-gray-50 rounded-xl p-6">
-                {[
-                  { label: "登録時ボーナス率", val: savingsConfig.registrationRate, color: "text-blue-600", note: "自己購入ポイントに対する率" },
-                  { label: "オートシップボーナス率", val: savingsConfig.autoshipRate, color: "text-green-600", note: "オートシップ決済時のボーナス率" },
-                  { label: "ボーナス計算時率", val: savingsConfig.bonusRate, color: "text-purple-600", note: "月次コミッション合計に対する率" },
-                ].map((item) => (
-                  <div key={item.label}>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">{item.label}</label>
-                    <div className={`text-2xl font-bold ${item.color}`}>{item.val}%</div>
-                    <p className="text-xs text-gray-500 mt-1">{item.note}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -1126,37 +1095,6 @@ export default function BonusCalculatePage() {
         </div>
       )}
 
-      {/* ── 貯金ボーナス設定編集モーダル ── */}
-      {showSavingsConfigModal && savingsConfig && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 space-y-4 shadow-xl">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-bold text-gray-800">貯金ボーナス設定編集</h3>
-              <button onClick={() => setShowSavingsConfigModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
-            </div>
-            <div className="space-y-3">
-              {[
-                { label: "登録時ボーナス率（%）", key: "registrationRate" as const },
-                { label: "オートシップボーナス率（%）", key: "autoshipRate" as const },
-                { label: "ボーナス計算時率（%）", key: "bonusRate" as const },
-              ].map(({ label, key }) => (
-                <div key={key}>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">{label}</label>
-                  <input type="number" step="0.1" value={savingsConfig[key]}
-                    onChange={(e) => setSavingsConfig({ ...savingsConfig, [key]: parseFloat(e.target.value) })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button onClick={() => setShowSavingsConfigModal(false)}
-                className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-200">キャンセル</button>
-              <button onClick={handleUpdateSavingsConfig}
-                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">更新</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

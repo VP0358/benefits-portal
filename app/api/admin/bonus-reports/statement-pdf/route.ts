@@ -106,7 +106,6 @@ export async function GET(req: NextRequest) {
   <tr><td>ダイレクトボーナス</td><td class="amount">${yen(result.directBonus ?? 0)}</td></tr>
   <tr><td>ユニレベルボーナス</td><td class="amount">${yen(result.unilevelBonus ?? 0)}</td></tr>
   <tr><td>組織構築ボーナス</td><td class="amount">${yen(result.structureBonus ?? 0)}</td></tr>
-  <tr><td>貯金ボーナス</td><td class="amount">${yen(result.savingsBonus ?? 0)}</td></tr>
   <tr><td>繰越金</td><td class="amount">${yen(result.carryoverAmount ?? 0)}</td></tr>
   <tr><td>調整金</td><td class="amount">${yen(result.adjustmentAmount ?? 0)}</td></tr>
   <tr><td>別口座</td><td class="amount">${yen(result.otherPositionAmount ?? 0)}</td></tr>

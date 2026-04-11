@@ -34,9 +34,8 @@ export async function executeBonusCalculation(
 
   // 1. ボーナス設定を取得
   const bonusSettings = await prisma.bonusSettings.findFirst();
-  const savingsConfig = await prisma.savingsBonusConfig.findFirst();
 
-  if (!bonusSettings || !savingsConfig) {
+  if (!bonusSettings) {
     throw new Error("ボーナス設定が見つかりません");
   }
 
@@ -200,14 +199,9 @@ export async function executeBonusCalculation(
       structureBonus = Math.floor(minSeriesPoints * (rate / 100) * POINT_RATE);
     }
 
-    // 貯金ボーナス（月次コミッション3%）
-    const totalCommission = directBonus + unilevelResult.total + structureBonus;
-    const savingsBonus = Math.floor(
-      totalCommission * (savingsConfig.bonusRate / 100)
-    );
-
-    // 合計ボーナス（貯金ボーナスは支払額には含めず別途積み立て）
+    // 合計ボーナス（貯金ボーナスは月次計算に含めない：別途ポイントで管理）
     const totalBonus = directBonus + unilevelResult.total + structureBonus;
+    const savingsBonus = 0; // 貯金ボーナスはボーナス計算対象外（ポイントとして別途付与）
 
     // 支払調整
     const paymentAdjustmentAmount =
@@ -246,7 +240,7 @@ export async function executeBonusCalculation(
       directBonus,
       unilevelBonus: unilevelResult.total,
       structureBonus,
-      savingsBonus,
+      savingsBonus: 0,          // ボーナス計算には含めない
       amountBeforeAdjustment: totalBonus,
       paymentAdjustmentRate: paymentAdjustmentRate || 0,
       paymentAdjustmentAmount,
@@ -255,7 +249,7 @@ export async function executeBonusCalculation(
       serviceFee,
       paymentAmount,
       unilevelDetail: unilevelResult.detail,
-      savingsPointsAdded: savingsBonus,
+      savingsPointsAdded: 0,    // ボーナス公開時に別途付与
     });
   }
 

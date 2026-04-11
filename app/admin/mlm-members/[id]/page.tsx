@@ -195,7 +195,6 @@ export default function MlmMemberDetailPage() {
     directBonus: number;
     unilevelBonus: number;
     structureBonus: number;
-    savingsBonus: number;
     adjustmentAmount: number;
     withholdingTax: number;
     carryoverAmount: number;
@@ -862,7 +861,6 @@ export default function MlmMemberDetailPage() {
                   <th className="px-4 py-2.5 text-right text-xs font-semibold">ダイレクト</th>
                   <th className="px-4 py-2.5 text-right text-xs font-semibold">ユニレベル</th>
                   <th className="px-4 py-2.5 text-right text-xs font-semibold">組織構築</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold">貯金B</th>
                   <th className="px-4 py-2.5 text-right text-xs font-semibold">繰越金</th>
                   <th className="px-4 py-2.5 text-right text-xs font-semibold">源泉税</th>
                   <th className="px-4 py-2.5 text-center text-xs font-semibold">会員公開</th>
@@ -882,7 +880,6 @@ export default function MlmMemberDetailPage() {
                     <td className="px-4 py-2.5 text-right text-slate-700">¥{stmt.directBonus.toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-right text-slate-700">¥{stmt.unilevelBonus.toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-right text-slate-700">¥{stmt.structureBonus.toLocaleString()}</td>
-                    <td className="px-4 py-2.5 text-right text-green-600">¥{stmt.savingsBonus.toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-right text-blue-600">¥{stmt.carryoverAmount.toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-right text-red-600">¥{stmt.withholdingTax.toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-center">

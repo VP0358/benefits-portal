@@ -35,7 +35,6 @@ type BonusHistory = {
   directBonus: number;
   unilevelBonus: number;
   structureBonus: number;
-  savingsBonus: number;
   totalBonus: number;
   unilevelDetail: UnilevelDepth[];
   savingsPointsAdded: number;
@@ -145,7 +144,6 @@ function BonusCard({ h }: { h: BonusHistory }) {
                 { label: "ダイレクトボーナス", amount: h.directBonus,   desc: "直接紹介者のs1000購入" },
                 { label: "ユニレベルボーナス", amount: h.unilevelBonus, desc: "傘下7段のポイント×算出率" },
                 { label: "組織構築ボーナス",   amount: h.structureBonus,desc: "最小系列pt×3〜4%（LV.3以上）" },
-                { label: "貯金ボーナス",       amount: h.savingsBonus,  desc: "累積貯金ptの換金" },
               ].map(item => (
                 <div key={item.label} className="flex items-center gap-3 rounded-xl px-3 py-2.5"
                   style={{ background: item.amount > 0 ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)", border: `1px solid ${item.amount > 0 ? `${GOLD}18` : "rgba(255,255,255,0.04)"}` }}>

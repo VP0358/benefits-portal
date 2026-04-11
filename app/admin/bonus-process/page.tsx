@@ -233,7 +233,7 @@ export default function BonusProcessPage() {
       });
 
       if (res.ok) {
-        alert("貯金ボーナス設定を更新しました");
+        alert("貯金ポイント設定を更新しました");
         setShowSavingsConfigModal(false);
         fetchData();
       } else {
@@ -744,12 +744,16 @@ export default function BonusProcessPage() {
         )}
       </div>
 
-      {/* 貯金ボーナス設定 */}
+      {/* 貯金ポイント設定 */}
       <div className="bg-white rounded-2xl border border-stone-100 p-6">
         <h2 className="text-xl font-bold text-gray-800 mb-4">
           <i className="fas fa-piggy-bank mr-2"></i>
-          貯金ボーナス設定
+          貯金ポイント（SAVpt）設定
         </h2>
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+          ⚠️ 貯金ポイントはボーナス計算とは分離され、ポイントとして別途付与されます。
+          登録時：¥15,000の20% / オートシップ支払完了時：¥15,000の5% / 報酬公開時：支払報酬額の3%
+        </div>
         {savingsConfig && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-blue-50 p-4 rounded-lg">
@@ -914,11 +918,11 @@ export default function BonusProcessPage() {
         </div>
       )}
 
-      {/* 貯金ボーナス設定モーダル */}
+      {/* 貯金ポイント設定モーダル */}
       {showSavingsConfigModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">貯金ボーナス設定を編集</h3>
+            <h3 className="text-xl font-bold text-gray-800 mb-4">貯金ポイント設定を編集</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">

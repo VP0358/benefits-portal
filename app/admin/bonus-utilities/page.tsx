@@ -224,7 +224,7 @@ export default function BonusUtilitiesPage() {
           Bonus Utilities
         </p>
         <h1 className="text-2xl font-bold text-stone-900 tracking-tight">ボーナス管理ユーティリティ</h1>
-        <p className="text-sm text-stone-400 mt-0.5">支払調書・購入一覧・備考入力・貯金B一覧・更新履歴</p>
+        <p className="text-sm text-stone-400 mt-0.5">支払調書・購入一覧・備考入力・貯金ポイント一覧・更新履歴</p>
       </div>
 
       {/* 対象月選択 */}
@@ -297,7 +297,7 @@ export default function BonusUtilitiesPage() {
               }`}
             >
               <i className="fas fa-piggy-bank mr-1"></i>
-              貯金B一覧
+              貯金ポイント一覧
             </button>
             <button
               onClick={() => setActiveTab("updateHistory")}
@@ -525,12 +525,12 @@ export default function BonusUtilitiesPage() {
             </div>
           )}
 
-          {/* 貯金B入力内容一覧タブ */}
+          {/* 貯金ポイント一覧タブ */}
           {activeTab === "savingsInput" && (
             <div className="space-y-4">
               <h3 className="text-lg font-bold text-gray-800">
                 <i className="fas fa-piggy-bank mr-2 text-pink-600"></i>
-                貯金ボーナス入力内容一覧
+                貯金ポイント（SAVpt）一覧
               </h3>
 
               <div className="overflow-x-auto">

@@ -123,9 +123,14 @@ export async function POST(request: Request) {
       });
     }
 
-    // ポイントウォレットを自動作成
+    // ポイントウォレットを自動作成 + 登録時SAVボーナス付与（15,000円の20% = 3,000pt）
+    const REGISTRATION_SAV_POINTS = Math.floor(15000 * 0.20); // 3000pt
     await tx.pointWallet.create({
-      data: { userId: newUser.id },
+      data: {
+        userId: newUser.id,
+        externalPointsBalance: REGISTRATION_SAV_POINTS,
+        availablePointsBalance: REGISTRATION_SAV_POINTS,
+      },
     });
 
     // MlmRegistration を作成（配送先・同意情報）

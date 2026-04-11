@@ -112,48 +112,36 @@ export async function POST(request: Request, { params }: Params) {
           data: { status: "active" },
         });
 
-        // Phase 8: SAVボーナス自動付与（オートシップ決済完了時）
-        // 貯金ボーナス設定を取得
-        const savingsConfig = await tx.savingsBonusConfig.findFirst();
-        if (savingsConfig) {
-          // オートシップ決済時: 伝票合計ptの5%
-          const savingsPoints = Math.floor(
-            (order.points * order.quantity) * (savingsConfig.autoshipRate / 100)
-          );
+        // SAVボーナス自動付与（オートシップ支払完了時: 15,000円の5% = 750pt 固定）
+        {
+          const AUTOSHIP_BASE = 15000;
+          const AUTOSHIP_RATE = 0.05;
+          const savingsPoints = Math.floor(AUTOSHIP_BASE * AUTOSHIP_RATE); // 750pt
 
           if (savingsPoints > 0) {
-            // PointWalletを取得または作成
-            let pointWallet = await tx.pointWallet.findUnique({
-              where: { mlmMemberId: order.mlmMemberId },
+            const member = await tx.mlmMember.findUnique({
+              where: { id: order.mlmMemberId },
+              select: { userId: true },
             });
-
-            if (!pointWallet) {
-              pointWallet = await tx.pointWallet.create({
-                data: {
-                  mlmMemberId: order.mlmMemberId,
-                  autoPointsBalance: 0,
-                  manualPointsBalance: 0,
+            if (member) {
+              await tx.pointWallet.upsert({
+                where: { userId: member.userId },
+                update: {
+                  externalPointsBalance: { increment: savingsPoints },
+                  availablePointsBalance: { increment: savingsPoints },
+                },
+                create: {
+                  userId: member.userId,
                   externalPointsBalance: savingsPoints,
                   availablePointsBalance: savingsPoints,
                 },
               });
-            } else {
-              await tx.pointWallet.update({
-                where: { id: pointWallet.id },
-                data: {
-                  externalPointsBalance: {
-                    increment: savingsPoints,
-                  },
-                  availablePointsBalance: {
-                    increment: savingsPoints,
-                  },
-                },
+              await tx.mlmMember.update({
+                where: { id: order.mlmMemberId },
+                data: { savingsPoints: { increment: savingsPoints } },
               });
+              console.log(`💰 SAVボーナス付与（AS）: 会員${order.memberCode} +${savingsPoints}pt`);
             }
-
-            console.log(
-              `💰 SAVボーナス付与: 会員${order.memberCode} +${savingsPoints}pt（AS決済 ${order.points * order.quantity}pt × ${savingsConfig.autoshipRate}%）`
-            );
           }
         }
 
