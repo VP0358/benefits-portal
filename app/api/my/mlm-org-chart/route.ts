@@ -13,27 +13,210 @@ const ACTIVE_REQUIRED_PRODUCTS = ["1000", "1001", "1002", "2000"];
 /** 直近N ヶ月のスミサイ未購入連続月数を計算 */
 async function calcConsecutiveNonPurchase(
   mlmMemberId: bigint,
-  targetMonth: string // "YYYY-MM"
+  targetMonth: string
 ): Promise<number> {
   let consecutive = 0;
   const [y, m] = targetMonth.split("-").map(Number);
-
   for (let i = 0; i < 6; i++) {
-    // i=0が先月、i=1が2ヶ月前...
     const d = new Date(y, m - 1 - i, 1);
     const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-
     const purchases = await prisma.mlmPurchase.findMany({
-      where: {
-        mlmMemberId,
-        purchaseMonth: ym,
-        productCode: { in: ACTIVE_REQUIRED_PRODUCTS },
-      },
+      where: { mlmMemberId, purchaseMonth: ym, productCode: { in: ACTIVE_REQUIRED_PRODUCTS } },
     });
     if (purchases.length > 0) break;
     consecutive++;
   }
   return consecutive;
+}
+
+/** 当月購入pt取得とアクティブ判定 */
+async function getMemberStats(
+  mlmMemberId: bigint,
+  currentMonth: string,
+  memberType: string,
+  contractDate: Date | null,
+  forceActive: boolean
+) {
+  const purchases = await prisma.mlmPurchase.findMany({
+    where: { mlmMemberId, purchaseMonth: currentMonth },
+  });
+  const selfPoints = purchases.reduce((s, p) => s + p.totalPoints, 0);
+  const hasRequired = purchases.some((p) => ACTIVE_REQUIRED_PRODUCTS.includes(p.productCode));
+  const isActive =
+    forceActive ||
+    (memberType === "business" && contractDate != null && selfPoints >= 150 && hasRequired);
+  return { selfPoints, isActive };
+}
+
+export type NodeData = {
+  id: string;
+  name: string;
+  memberCode: string;
+  avatarUrl: string | null;
+  mlmMemberCode: string;
+  memberType: string;
+  status: string;
+  currentLevel: number;
+  titleLevel: number;
+  isActive: boolean;
+  selfPoints: number;
+  consecutiveNonPurchase: number;
+  nonPurchaseAlert: string;
+  children: NodeData[];
+};
+
+/** マトリックスツリーノード構築（downlines=直上者配下） */
+async function buildMatrixNode(
+  m: {
+    id: bigint; memberCode: string; memberType: string; status: string;
+    currentLevel: number; titleLevel: number; contractDate: Date | null;
+    forceActive: boolean;
+    user: { id: bigint; name: string; memberCode: string; avatarUrl: string | null };
+    downlines: {
+      id: bigint; memberCode: string; memberType: string; status: string;
+      currentLevel: number; titleLevel: number; contractDate: Date | null;
+      forceActive: boolean;
+      user: { id: bigint; name: string; memberCode: string; avatarUrl: string | null };
+      downlines: {
+        id: bigint; memberCode: string; memberType: string; status: string;
+        currentLevel: number; titleLevel: number; contractDate: Date | null;
+        forceActive: boolean;
+        user: { id: bigint; name: string; memberCode: string; avatarUrl: string | null };
+        downlines: {
+          id: bigint; memberCode: string; memberType: string; status: string;
+          currentLevel: number; titleLevel: number; contractDate: Date | null;
+          forceActive: boolean;
+          user: { id: bigint; name: string; memberCode: string; avatarUrl: string | null };
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          downlines: any[];
+        }[];
+      }[];
+    }[];
+  },
+  depth: number,
+  currentMonth: string
+): Promise<NodeData> {
+  const { selfPoints, isActive } = await getMemberStats(
+    m.id, currentMonth, m.memberType, m.contractDate, m.forceActive
+  );
+  const consecutive = await calcConsecutiveNonPurchase(m.id, currentMonth);
+  const alert = getNonPurchaseAlert(consecutive);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let children: NodeData[] = [];
+  if (depth < 5 && m.downlines && m.downlines.length > 0) {
+    children = await Promise.all(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      m.downlines.map((child: any) => buildMatrixNode(child, depth + 1, currentMonth))
+    );
+  }
+
+  return {
+    id: m.user.id.toString(),
+    name: m.user.name,
+    memberCode: m.user.memberCode,
+    avatarUrl: m.user.avatarUrl,
+    mlmMemberCode: m.memberCode,
+    memberType: m.memberType,
+    status: m.status,
+    currentLevel: m.currentLevel,
+    titleLevel: m.titleLevel,
+    isActive,
+    selfPoints,
+    consecutiveNonPurchase: consecutive,
+    nonPurchaseAlert: alert,
+    children,
+  };
+}
+
+/** ユニレベルツリーノード構築（referrals=自分が紹介した人） */
+async function buildUniNode(
+  m: {
+    id: bigint; memberCode: string; memberType: string; status: string;
+    currentLevel: number; titleLevel: number; contractDate: Date | null;
+    forceActive: boolean;
+    user: { id: bigint; name: string; memberCode: string; avatarUrl: string | null };
+    referrals: {
+      id: bigint; memberCode: string; memberType: string; status: string;
+      currentLevel: number; titleLevel: number; contractDate: Date | null;
+      forceActive: boolean;
+      user: { id: bigint; name: string; memberCode: string; avatarUrl: string | null };
+      referrals: {
+        id: bigint; memberCode: string; memberType: string; status: string;
+        currentLevel: number; titleLevel: number; contractDate: Date | null;
+        forceActive: boolean;
+        user: { id: bigint; name: string; memberCode: string; avatarUrl: string | null };
+        referrals: {
+          id: bigint; memberCode: string; memberType: string; status: string;
+          currentLevel: number; titleLevel: number; contractDate: Date | null;
+          forceActive: boolean;
+          user: { id: bigint; name: string; memberCode: string; avatarUrl: string | null };
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          referrals: any[];
+        }[];
+      }[];
+    }[];
+  },
+  depth: number,
+  currentMonth: string
+): Promise<NodeData> {
+  const { selfPoints, isActive } = await getMemberStats(
+    m.id, currentMonth, m.memberType, m.contractDate, m.forceActive
+  );
+  const consecutive = await calcConsecutiveNonPurchase(m.id, currentMonth);
+  const alert = getNonPurchaseAlert(consecutive);
+
+  let children: NodeData[] = [];
+  if (depth < 5 && m.referrals && m.referrals.length > 0) {
+    children = await Promise.all(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      m.referrals.map((child: any) => buildUniNode(child, depth + 1, currentMonth))
+    );
+  }
+
+  return {
+    id: m.user.id.toString(),
+    name: m.user.name,
+    memberCode: m.user.memberCode,
+    avatarUrl: m.user.avatarUrl,
+    mlmMemberCode: m.memberCode,
+    memberType: m.memberType,
+    status: m.status,
+    currentLevel: m.currentLevel,
+    titleLevel: m.titleLevel,
+    isActive,
+    selfPoints,
+    consecutiveNonPurchase: consecutive,
+    nonPurchaseAlert: alert,
+    children,
+  };
+}
+
+// Prismaのネスト include ヘルパー
+const userSelect = { id: true, name: true, memberCode: true, avatarUrl: true } as const;
+const memberFields = {
+  id: true, memberCode: true, memberType: true, status: true,
+  currentLevel: true, titleLevel: true, contractDate: true, forceActive: true,
+} as const;
+
+function buildDownlineInclude(depth: number): object {
+  if (depth <= 0) return {};
+  return {
+    include: {
+      user: { select: userSelect },
+      downlines: buildDownlineInclude(depth - 1),
+    },
+  };
+}
+
+function buildReferralsInclude(depth: number): object {
+  if (depth <= 0) return {};
+  return {
+    include: {
+      user: { select: userSelect },
+      referrals: buildReferralsInclude(depth - 1),
+    },
+  };
 }
 
 export async function GET() {
@@ -45,20 +228,80 @@ export async function GET() {
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
   try {
-    // 自分のMLM会員情報取得
+    // 自分のMLM会員情報（マトリックス5段 + ユニレベル5段）
     const me = await prisma.mlmMember.findUnique({
       where: { userId },
-      include: {
-        user: { select: { id: true, name: true, memberCode: true, avatarUrl: true } },
+      select: {
+        ...memberFields,
+        user: { select: userSelect },
+        upline: {
+          select: {
+            ...memberFields,
+            user: { select: userSelect },
+          },
+        },
+        referrer: {
+          select: {
+            ...memberFields,
+            user: { select: userSelect },
+          },
+        },
+        // マトリックス配下（5段）
         downlines: {
-          include: {
-            user: { select: { id: true, name: true, memberCode: true, avatarUrl: true } },
+          select: {
+            ...memberFields,
+            user: { select: userSelect },
             downlines: {
-              include: {
-                user: { select: { id: true, name: true, memberCode: true, avatarUrl: true } },
+              select: {
+                ...memberFields,
+                user: { select: userSelect },
                 downlines: {
-                  include: {
-                    user: { select: { id: true, name: true, memberCode: true, avatarUrl: true } },
+                  select: {
+                    ...memberFields,
+                    user: { select: userSelect },
+                    downlines: {
+                      select: {
+                        ...memberFields,
+                        user: { select: userSelect },
+                        downlines: {
+                          select: {
+                            ...memberFields,
+                            user: { select: userSelect },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        // ユニレベル配下（5段）
+        referrals: {
+          select: {
+            ...memberFields,
+            user: { select: userSelect },
+            referrals: {
+              select: {
+                ...memberFields,
+                user: { select: userSelect },
+                referrals: {
+                  select: {
+                    ...memberFields,
+                    user: { select: userSelect },
+                    referrals: {
+                      select: {
+                        ...memberFields,
+                        user: { select: userSelect },
+                        referrals: {
+                          select: {
+                            ...memberFields,
+                            user: { select: userSelect },
+                          },
+                        },
+                      },
+                    },
                   },
                 },
               },
@@ -72,106 +315,51 @@ export async function GET() {
       return NextResponse.json({ error: "MLM会員情報がありません" }, { status: 404 });
     }
 
-    // 当月の自分の購入pt取得
-    const myPurchases = await prisma.mlmPurchase.findMany({
-      where: { mlmMemberId: me.id, purchaseMonth: currentMonth },
-    });
-    const mySelfPoints = myPurchases.reduce((s, p) => s + p.totalPoints, 0);
-    const myHasRequiredProduct = myPurchases.some((p) =>
-      ACTIVE_REQUIRED_PRODUCTS.includes(p.productCode)
+    // 自分のアクティブ・ポイント
+    const { selfPoints: mySelfPoints, isActive: myIsActive } = await getMemberStats(
+      me.id, currentMonth, me.memberType, me.contractDate, me.forceActive
     );
-    const myIsActive =
-      me.forceActive ||
-      (me.memberType === "business" &&
-        me.contractDate != null &&
-        mySelfPoints >= 150 &&
-        myHasRequiredProduct);
 
-    // 直下ダウンライン情報を構築（最大3段まで表示）
-    type NodeData = {
-      id: string;
-      name: string;
-      memberCode: string;
-      avatarUrl: string | null;
-      mlmMemberCode: string;
-      memberType: string;
-      status: string;
-      currentLevel: number;
-      titleLevel: number;
-      isActive: boolean;
-      selfPoints: number;
-      consecutiveNonPurchase: number;
-      nonPurchaseAlert: string;
-      children: NodeData[];
+    // マトリックスダウンライン構築
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const matrixDownlines = await Promise.all((me.downlines as any[]).map((d) => buildMatrixNode(d, 1, currentMonth)));
+
+    // ユニレベルダウンライン構築
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const uniDownlines = await Promise.all((me.referrals as any[]).map((d) => buildUniNode(d, 1, currentMonth)));
+
+    const meInfo = {
+      id: me.user.id.toString(),
+      name: me.user.name,
+      memberCode: me.user.memberCode,
+      avatarUrl: me.user.avatarUrl,
+      mlmMemberCode: me.memberCode,
+      memberType: me.memberType,
+      currentLevel: me.currentLevel,
+      titleLevel: me.titleLevel,
+      isActive: myIsActive,
+      selfPoints: mySelfPoints,
+      // 直上者（マトリックス）
+      upline: me.upline ? {
+        name: me.upline.user.name,
+        memberCode: me.upline.memberCode,
+      } : null,
+      // 紹介者（ユニレベル）
+      referrer: me.referrer ? {
+        name: me.referrer.user.name,
+        memberCode: me.referrer.memberCode,
+      } : null,
     };
-
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const meNonNull = me!;
-    async function buildNode(m: typeof meNonNull.downlines[0], depth: number): Promise<NodeData> {
-      const purchases = await prisma.mlmPurchase.findMany({
-        where: { mlmMemberId: m.id, purchaseMonth: currentMonth },
-      });
-      const selfPoints = purchases.reduce((s, p) => s + p.totalPoints, 0);
-      const hasRequired = purchases.some((p) =>
-        ACTIVE_REQUIRED_PRODUCTS.includes(p.productCode)
-      );
-      const isActive =
-        (m as typeof meNonNull).forceActive ||
-        (m.memberType === "business" &&
-          (m as typeof meNonNull).contractDate != null &&
-          selfPoints >= 150 &&
-          hasRequired);
-
-      const consecutive = await calcConsecutiveNonPurchase(m.id, currentMonth);
-      const alert = getNonPurchaseAlert(consecutive);
-
-      // 子ノード（最大3段）
-      let children: NodeData[] = [];
-      if (depth < 3 && (m as typeof meNonNull).downlines) {
-        children = await Promise.all(
-          (m as typeof meNonNull).downlines.map((child: typeof meNonNull.downlines[0]) =>
-            buildNode(child, depth + 1)
-          )
-        );
-      }
-
-      return {
-        id: m.user.id.toString(),
-        name: m.user.name,
-        memberCode: m.user.memberCode,
-        avatarUrl: m.user.avatarUrl,
-        mlmMemberCode: m.memberCode,
-        memberType: m.memberType,
-        status: m.status,
-        currentLevel: m.currentLevel,
-        titleLevel: m.titleLevel,
-        isActive,
-        selfPoints,
-        consecutiveNonPurchase: consecutive,
-        nonPurchaseAlert: alert,
-        children,
-      };
-    }
-
-    const downlineNodes = await Promise.all(
-      meNonNull.downlines.map((d) => buildNode(d, 1))
-    );
 
     return NextResponse.json({
       month: currentMonth,
-      me: {
-        id: me.user.id.toString(),
-        name: me.user.name,
-        memberCode: me.user.memberCode,
-        avatarUrl: me.user.avatarUrl,
-        mlmMemberCode: me.memberCode,
-        memberType: me.memberType,
-        currentLevel: me.currentLevel,
-        titleLevel: me.titleLevel,
-        isActive: myIsActive,
-        selfPoints: mySelfPoints,
-      },
-      downlines: downlineNodes,
+      me: meInfo,
+      // マトリックス（直上者=uplineId系配下）
+      matrixDownlines,
+      // ユニレベル（紹介者=referrerId系配下）
+      uniDownlines,
+      // 後方互換
+      downlines: matrixDownlines,
     });
   } catch (e) {
     console.error("mlm-org-chart error:", e);
