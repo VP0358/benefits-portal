@@ -76,6 +76,7 @@ function RegisterForm() {
     address: "",
     referrerId: "",
     referrerName: "",
+    disclosureDocNumber: "",
     // 基本情報（任意）
     companyName: "",
     companyNameKana: "",
@@ -200,6 +201,7 @@ function RegisterForm() {
         address: form.address,
         referralCode: refCode || undefined,
         referrerId: form.referrerId || undefined,
+        disclosureDocNumber: form.disclosureDocNumber || undefined,
         // 任意
         companyName: form.companyName || undefined,
         companyNameKana: form.companyNameKana || undefined,
@@ -474,6 +476,21 @@ function RegisterForm() {
                 />
               </Field>
             </div>
+
+            {/* 概要書面番号 */}
+            <Field
+              label="概要書面番号"
+              required
+              hint="特定商取引法に基づく概要書面の番号を入力してください"
+            >
+              <input
+                required
+                placeholder="例: 2024-001"
+                className={inputCls}
+                value={form.disclosureDocNumber}
+                onChange={e => setForm({ ...form, disclosureDocNumber: e.target.value })}
+              />
+            </Field>
           </div>
 
           {/* ═══════════════════════════════════

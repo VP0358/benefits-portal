@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     postalCode,
     address,
     referralCode,
+    disclosureDocNumber,
     // 任意
     companyName,
     companyNameKana,
@@ -132,6 +133,7 @@ export async function POST(request: Request) {
       data: {
         userId: newUser.id,
         birthDate: birthDate ?? null,
+        disclosureDocNumber: disclosureDocNumber ?? null,
         deliveryPostalCode: deliveryPostalCode ?? null,
         deliveryAddress: deliveryAddress ?? null,
         deliveryName: deliveryName ?? null,
