@@ -42,6 +42,19 @@ interface Summary {
   outboxCounts: Record<number, number>
 }
 
+// 未処理伝票テーブルの固定列定義
+const SUMMARY_COLS: { key: string; label: string }[] = [
+  { key: "bank_transfer", label: "振替(銀行)" },
+  { key: "postal_transfer", label: "振替(郵便)" },
+  { key: "bank_payment",  label: "振込" },
+  { key: "cod",           label: "代引/売掛" },
+  { key: "cash",          label: "現金/(他)" },
+  { key: "card",          label: "カード" },
+  { key: "stop_shipping", label: "発送停止" },
+  { key: "refund",        label: "返金" },
+  { key: "cod_ng",        label: "代引(NG)" },
+]
+
 // ─── 定数 ─────────────────────────────────────────────
 const PM_LABELS: Record<string,string> = {
   bank_transfer: "口座振替", card: "カード", credit_card: "カード",
@@ -138,6 +151,14 @@ export default function OrdersShippingPage() {
   const [moveTargetOutbox, setMoveTargetOutbox]  = useState(1)
   const [moveFromOutbox,   setMoveFromOutbox]    = useState(1)
   const [moveToOutbox,     setMoveToOutbox]      = useState(2)
+  const [outboxOrders,     setOutboxOrders]      = useState<Order[] | null>(null)
+  const [outboxLoading,    setOutboxLoading]     = useState(false)
+  const [displayedOutbox,  setDisplayedOutbox]   = useState<number | null>(null)
+
+  // 未処理伝票クリック → 対象伝票一覧
+  const [summaryFilterLabel, setSummaryFilterLabel] = useState<string | null>(null)
+  const [summaryOrders,      setSummaryOrders]      = useState<Order[] | null>(null)
+  const [summaryOrdersLoading, setSummaryOrdersLoading] = useState(false)
 
   // 一括処理
   const [bulkAction,    setBulkAction]    = useState("")
@@ -223,14 +244,54 @@ export default function OrdersShippingPage() {
     fetchOrders()
   }
   const showOutbox = async (outbox: number) => {
-    setLoading(true)
+    setOutboxLoading(true)
+    setDisplayedOutbox(outbox)
+    setOutboxOrders(null)
     try {
       const res  = await fetch(`/api/admin/orders-shipping?outboxNo=${outbox}`)
       const data = await res.json()
-      setOrders(data.orders || [])
-      setSearched(true)
+      setOutboxOrders(data.orders || [])
     } catch { alert("取得エラー") }
-    finally  { setLoading(false) }
+    finally  { setOutboxLoading(false) }
+  }
+
+  // 未処理伝票セルクリック → 対象伝票を取得・表示
+  const showSummaryOrders = async (pm: string, statusType: "unpaid" | "unshipped", period: "thisMonth" | "lastMonth") => {
+    setSummaryOrdersLoading(true)
+    setSummaryOrders(null)
+    const now = new Date()
+    let y = now.getFullYear(), m = now.getMonth()
+    if (period === "lastMonth") { m -= 1; if (m < 0) { m = 11; y-- } }
+    const start = new Date(y, m, 1).toISOString().split("T")[0]
+    const end   = new Date(y, m + 1, 0).toISOString().split("T")[0]
+    const p = new URLSearchParams()
+    p.set("startDate", start); p.set("endDate", end); p.set("dateType", "orderedAt")
+
+    // カラムキーをAPIの支払方法にマッピング
+    const pmApiMap: Record<string, string> = {
+      bank_transfer:  "bank_transfer",
+      postal_transfer: "bank_transfer", // 郵便振替もbank_transfer扱い
+      bank_payment:   "bank_payment",
+      cod:            "cod",
+      cash:           "cash",
+      card:           "card",
+      stop_shipping:  "stop_shipping",
+      refund:         "refund",
+      cod_ng:         "cod_ng",
+    }
+    if (pmApiMap[pm]) p.set("paymentMethod", pmApiMap[pm])
+    if (statusType === "unpaid")    p.set("paymentStatus",  "unpaid")
+    if (statusType === "unshipped") p.set("shippingStatus", "unshipped")
+
+    const col = SUMMARY_COLS.find(c => c.key === pm)
+    const label = `${period === "thisMonth" ? "当月" : "先月"} ${col?.label || pm} ${statusType === "unpaid" ? "未入金" : "未発送"}`
+    setSummaryFilterLabel(label)
+    try {
+      const res  = await fetch(`/api/admin/orders-shipping?${p}`)
+      const data = await res.json()
+      setSummaryOrders(data.orders || [])
+    } catch { alert("取得エラー") }
+    finally { setSummaryOrdersLoading(false) }
   }
 
   // ─── 一括処理 ────────────────────────────────────────
@@ -491,10 +552,10 @@ export default function OrdersShippingPage() {
               ))}
             </select>
             <button onClick={() => showOutbox(selectedOutbox)}
-              className="px-3 py-1.5 bg-blue-100 text-blue-700 border border-blue-300 rounded text-sm hover:bg-blue-200">
+              className="px-3 py-1.5 bg-blue-100 text-blue-700 border border-blue-300 rounded text-sm hover:bg-blue-200 font-medium">
               を表示する
             </button>
-            <span className="text-gray-400">|</span>
+            <span className="text-gray-300">|</span>
             <select value={moveTargetOutbox} onChange={e => setMoveTargetOutbox(Number(e.target.value))}
               className="border border-gray-300 rounded px-2 py-1 text-sm">
               {outboxOptions(moveTargetOutbox)}
@@ -525,6 +586,106 @@ export default function OrdersShippingPage() {
             </button>
           </div>
         </div>
+
+        {/* BOX内容テーブル */}
+        {(outboxOrders !== null || outboxLoading) && displayedOutbox !== null && (
+          <div className="border-t border-gray-100">
+            <div className="bg-blue-50 px-4 py-2 flex items-center justify-between">
+              <span className="text-sm font-semibold text-blue-800 flex items-center gap-2">
+                <Box className="w-4 h-4" />
+                出庫BOX{displayedOutbox} の内容
+                {outboxOrders && <span className="ml-2 text-xs font-normal text-blue-600">（{outboxOrders.length}件）</span>}
+              </span>
+              <button onClick={() => { setOutboxOrders(null); setDisplayedOutbox(null) }}
+                className="text-xs text-gray-400 hover:text-gray-600 px-2 py-0.5 rounded hover:bg-gray-100">✕ 閉じる</button>
+            </div>
+            {outboxLoading ? (
+              <div className="p-4 text-center text-gray-400 text-sm">
+                <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-1" />読み込み中...
+              </div>
+            ) : outboxOrders && outboxOrders.length === 0 ? (
+              <div className="p-4 text-center text-gray-400 text-sm">
+                <Package className="w-8 h-8 text-gray-200 mx-auto mb-1" />
+                出庫BOX{displayedOutbox} に伝票はありません
+              </div>
+            ) : outboxOrders && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs border-collapse min-w-[800px]">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50 text-gray-500 text-left">
+                      <th className="px-3 py-2">種別</th>
+                      <th className="px-3 py-2">注文日</th>
+                      <th className="px-3 py-2">入金日</th>
+                      <th className="px-3 py-2">会員ID</th>
+                      <th className="px-3 py-2">氏名/配送先</th>
+                      <th className="px-3 py-2">支払方法</th>
+                      <th className="px-3 py-2">ステイタス</th>
+                      <th className="px-3 py-2 text-right">金額</th>
+                      <th className="px-3 py-2">備考</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {outboxOrders.map((order, idx) => (
+                      <tr key={order.id} className={`border-b border-gray-100 ${idx % 2 === 0 ? "" : "bg-gray-50/50"}`}>
+                        <td className="px-3 py-2">
+                          <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-700">{order.slipTypeLabel}</span>
+                        </td>
+                        <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{order.orderedAt.slice(0,10)}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {order.paidAt
+                            ? <span className="text-green-700">{order.paidAt.slice(0,10)}</span>
+                            : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600 font-mono">{order.memberCode}</td>
+                        <td className="px-3 py-2">
+                          <div className="font-medium text-gray-800">{order.memberName}</div>
+                          {order.shippingLabel && (
+                            <div className="text-gray-400">{order.shippingLabel.recipientName}</div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`px-1.5 py-0.5 rounded ${
+                            order.paymentMethod === "card" || order.paymentMethod === "credit_card"
+                              ? "bg-blue-50 text-blue-700"
+                              : order.paymentMethod === "bank_transfer"
+                              ? "bg-yellow-50 text-yellow-700"
+                              : order.paymentMethod === "bank_payment"
+                              ? "bg-green-50 text-green-700"
+                              : order.paymentMethod === "cod"
+                              ? "bg-orange-50 text-orange-700"
+                              : "bg-gray-100 text-gray-600"
+                          }`}>
+                            {order.paymentMethodLabel}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-col gap-0.5">
+                            <span className={`px-1.5 py-0.5 rounded w-fit ${
+                              order.paymentStatus === "paid" ? "bg-green-100 text-green-700"
+                              : order.paymentStatus === "ignored" ? "bg-gray-100 text-gray-500"
+                              : "bg-red-50 text-red-600"
+                            }`}>
+                              {order.paymentStatus === "paid" ? "入金済" : order.paymentStatus === "ignored" ? "無視" : "未入金"}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded w-fit ${
+                              order.shippingStatus === "shipped" ? "bg-green-100 text-green-700"
+                              : order.shippingStatus === "ignored" ? "bg-gray-100 text-gray-500"
+                              : "bg-orange-50 text-orange-600"
+                            }`}>
+                              {order.shippingStatus === "shipped" ? "発送済" : order.shippingStatus === "ignored" ? "無視" : "未発送"}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-right font-medium text-gray-800">¥{order.totalAmount.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-gray-500 max-w-[120px] truncate">{order.note || ""}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ══════════════════════════════════════════════
@@ -610,12 +771,7 @@ export default function OrdersShippingPage() {
               <Upload className="w-3.5 h-3.5" />振替結果CSV取込
               <input ref={debitInputRef} type="file" accept=".csv" className="hidden" onChange={handleDebitImport} />
             </label>
-            {/* 振替伝票の入金日削除 */}
-            <button onClick={handleClearBankTransferPaidAt}
-              className="flex items-center gap-1 px-3 py-1.5 bg-white border border-red-300 text-red-600 rounded text-sm hover:bg-red-50"
-              title="選択した口座振替伝票の入金日をクリアして未入金に戻す">
-              <AlertCircle className="w-3.5 h-3.5" />振替入金日削除
-            </button>
+
           </div>
         </div>
       </div>
@@ -624,20 +780,24 @@ export default function OrdersShippingPage() {
           未処理伝票サマリー
       ══════════════════════════════════════════════ */}
       <div className="rounded-2xl bg-white border border-stone-100 overflow-hidden" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
-        <div className="bg-blue-600 px-4 py-2 text-white font-semibold text-sm flex items-center justify-between">
+        {/* ヘッダ：翌月以降未入金 / 未入金合計 / 未発送合計 */}
+        <div className="bg-blue-600 px-4 py-2 text-white font-semibold text-sm flex flex-wrap items-center justify-between gap-2">
           <span className="flex items-center gap-2"><AlertCircle className="w-4 h-4" />未処理伝票</span>
           {summary && (
-            <div className="flex gap-4 text-xs">
-              <button onClick={() => { setPaymentStatus("unpaid"); setStartDate(""); setEndDate(""); fetchOrders() }}
-                className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded">
-                当月以前未入金（{summary.prevUnpaidCount}件）
+            <div className="flex flex-wrap gap-2 text-xs">
+              <button
+                onClick={() => { setPaymentStatus("unpaid"); setStartDate(""); setEndDate(""); fetchOrders(); setSearched(true) }}
+                className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded whitespace-nowrap">
+                翌月以降未入金（{summary.prevUnpaidCount}件）
               </button>
-              <button onClick={() => { setPaymentStatus("unpaid"); fetchOrders() }}
-                className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded">
+              <button
+                onClick={() => { setPaymentStatus("unpaid"); setPaymentMethod(""); const { start, end } = getThisMonthRange(); setStartDate(start); setEndDate(end); setTimeout(fetchOrders, 0); setSearched(true) }}
+                className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded whitespace-nowrap">
                 未入金（{summary.totalUnpaid}件）
               </button>
-              <button onClick={() => { setShippingStatus("unshipped"); fetchOrders() }}
-                className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded">
+              <button
+                onClick={() => { setShippingStatus("unshipped"); setPaymentMethod(""); const { start, end } = getThisMonthRange(); setStartDate(start); setEndDate(end); setTimeout(fetchOrders, 0); setSearched(true) }}
+                className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded whitespace-nowrap">
                 未発送（{summary.totalUnshipped}件）
               </button>
             </div>
@@ -650,49 +810,176 @@ export default function OrdersShippingPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-16"></th>
-                  <th className="px-3 py-2 text-left text-gray-500 font-medium w-20"></th>
-                  {summary.paymentMethods.map(pm => (
-                    <th key={pm} className="px-3 py-2 text-center text-gray-600 font-medium">
-                      {PM_SUMMARY_LABELS[pm] || pm}
+                <tr className="bg-gray-100 border-b-2 border-gray-300">
+                  <th className="px-3 py-2 text-gray-600 font-bold text-center border-r border-gray-200 w-12"></th>
+                  <th className="px-3 py-2 text-gray-600 font-bold text-center border-r border-gray-200 w-14"></th>
+                  {SUMMARY_COLS.map(col => (
+                    <th key={col.key} className="px-3 py-2 text-center text-gray-700 font-bold border-r border-gray-200 whitespace-nowrap text-xs">
+                      {col.label}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {[
-                  { label: "当月", rowLabel: "未入金",  data: summary.thisMonth.unpaid },
-                  { label: "",    rowLabel: "未発送",  data: summary.thisMonth.unshipped },
-                  { label: "先月", rowLabel: "未入金",  data: summary.lastMonth.unpaid },
-                  { label: "",    rowLabel: "未発送",  data: summary.lastMonth.unshipped },
-                ].map((row, ri) => (
-                  <tr key={ri} className={`border-b border-gray-100 ${ri % 2 === 0 ? "" : "bg-gray-50/50"}`}>
-                    <td className="px-3 py-2 text-gray-700 font-medium text-xs">{row.label}</td>
-                    <td className="px-3 py-2 text-gray-600 text-xs">{row.rowLabel}</td>
-                    {summary.paymentMethods.map(pm => (
-                      <td key={pm} className="px-3 py-2 text-center">
-                        {(row.data[pm] || 0) > 0 ? (
-                          <span className="text-blue-600 font-medium cursor-pointer hover:underline"
-                            onClick={() => {
-                              setPaymentMethod(pm)
-                              setPaymentStatus(row.rowLabel === "未入金" ? "unpaid" : "")
-                              setShippingStatus(row.rowLabel === "未発送" ? "unshipped" : "")
-                              fetchOrders()
-                            }}>
-                            {row.data[pm]}件
-                          </span>
-                        ) : (
-                          <span className="text-gray-300">—</span>
-                        )}
+                {/* 当月 */}
+                {([
+                  { statusType: "unpaid"    as const, rowLabel: "未入金", rowBg: "bg-red-50/30",    isFirst: true,  period: "thisMonth" as const, monthLabel: "当月" },
+                  { statusType: "unshipped" as const, rowLabel: "未発送", rowBg: "bg-orange-50/20", isFirst: false, period: "thisMonth" as const, monthLabel: "当月" },
+                  { statusType: "unpaid"    as const, rowLabel: "未入金", rowBg: "bg-red-50/20",    isFirst: true,  period: "lastMonth" as const, monthLabel: "先月" },
+                  { statusType: "unshipped" as const, rowLabel: "未発送", rowBg: "",                isFirst: false, period: "lastMonth" as const, monthLabel: "先月" },
+                ]).map((row, ri) => {
+                  const data = summary[row.period][row.statusType]
+                  return (
+                    <tr key={ri} className={`border-b border-gray-100 ${row.rowBg}`}>
+                      {row.isFirst && (
+                        <td
+                          className="px-4 py-2.5 text-gray-700 font-bold text-center border-r border-gray-200 whitespace-nowrap bg-gray-50 text-sm"
+                          rowSpan={2}
+                        >
+                          {row.monthLabel}
+                        </td>
+                      )}
+                      <td className={`px-3 py-2.5 font-semibold text-center border-r border-gray-200 whitespace-nowrap text-xs ${
+                        row.statusType === "unpaid" ? "text-red-600" : "text-orange-600"
+                      }`}>
+                        {row.rowLabel}
                       </td>
-                    ))}
-                  </tr>
-                ))}
+                      {SUMMARY_COLS.map(col => {
+                        const apiKeys: string[] = col.key === "postal_transfer"
+                          ? ["postal_transfer"]
+                          : col.key === "cash"
+                          ? ["cash", "convenience"]
+                          : col.key === "stop_shipping"
+                          ? ["stop_shipping"]
+                          : col.key === "refund"
+                          ? ["refund"]
+                          : col.key === "cod_ng"
+                          ? ["cod_ng"]
+                          : [col.key]
+                        const count = apiKeys.reduce((sum, k) => sum + (data[k] || 0), 0)
+                        return (
+                          <td key={col.key} className="px-3 py-2.5 text-center border-r border-gray-100">
+                            {count > 0 ? (
+                              <button
+                                className={`font-bold text-xs hover:underline transition-colors ${
+                                  row.statusType === "unpaid" ? "text-red-600 hover:text-red-800" : "text-orange-600 hover:text-orange-800"
+                                }`}
+                                onClick={() => showSummaryOrders(col.key, row.statusType, row.period)}>
+                                {count}件
+                              </button>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
         ) : null}
+
+        {/* 未処理伝票クリック → 対象伝票一覧 */}
+        {(summaryOrders !== null || summaryOrdersLoading) && (
+          <div className="border-t border-gray-200">
+            <div className="bg-amber-50 px-4 py-2 flex items-center justify-between">
+              <span className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                {summaryFilterLabel} の伝票一覧
+                {summaryOrders && <span className="ml-2 text-xs font-normal text-amber-600">（{summaryOrders.length}件）</span>}
+              </span>
+              <button onClick={() => { setSummaryOrders(null); setSummaryFilterLabel(null) }}
+                className="text-xs text-gray-400 hover:text-gray-600 px-2 py-0.5 rounded hover:bg-gray-100">✕ 閉じる</button>
+            </div>
+            {summaryOrdersLoading ? (
+              <div className="p-4 text-center text-gray-400 text-sm">
+                <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-1" />読み込み中...
+              </div>
+            ) : summaryOrders && summaryOrders.length === 0 ? (
+              <div className="p-4 text-center text-gray-400 text-sm">
+                <Package className="w-8 h-8 text-gray-200 mx-auto mb-1" />
+                該当する伝票はありません
+              </div>
+            ) : summaryOrders && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs border-collapse min-w-[800px]">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-amber-50/60 text-gray-500 text-left">
+                      <th className="px-3 py-2">種別</th>
+                      <th className="px-3 py-2">注文日</th>
+                      <th className="px-3 py-2">入金日</th>
+                      <th className="px-3 py-2">会員ID</th>
+                      <th className="px-3 py-2">氏名/配送先</th>
+                      <th className="px-3 py-2">支払方法</th>
+                      <th className="px-3 py-2">ステイタス</th>
+                      <th className="px-3 py-2 text-right">金額</th>
+                      <th className="px-3 py-2">備考</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summaryOrders.map((order, idx) => (
+                      <tr key={order.id} className={`border-b border-gray-100 ${idx % 2 === 0 ? "" : "bg-gray-50/50"}`}>
+                        <td className="px-3 py-2">
+                          <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-700">{order.slipTypeLabel}</span>
+                        </td>
+                        <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{order.orderedAt.slice(0,10)}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {order.paidAt
+                            ? <span className="text-green-700">{order.paidAt.slice(0,10)}</span>
+                            : <span className="text-red-400 font-medium">未入金</span>}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600 font-mono">{order.memberCode}</td>
+                        <td className="px-3 py-2">
+                          <div className="font-medium text-gray-800">{order.memberName}</div>
+                          {order.shippingLabel && (
+                            <div className="text-gray-400">{order.shippingLabel.recipientName}</div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`px-1.5 py-0.5 rounded ${
+                            order.paymentMethod === "card" || order.paymentMethod === "credit_card"
+                              ? "bg-blue-50 text-blue-700"
+                              : order.paymentMethod === "bank_transfer"
+                              ? "bg-yellow-50 text-yellow-700"
+                              : order.paymentMethod === "bank_payment"
+                              ? "bg-green-50 text-green-700"
+                              : order.paymentMethod === "cod"
+                              ? "bg-orange-50 text-orange-700"
+                              : "bg-gray-100 text-gray-600"
+                          }`}>
+                            {order.paymentMethodLabel}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-col gap-0.5">
+                            <span className={`px-1.5 py-0.5 rounded w-fit ${
+                              order.paymentStatus === "paid" ? "bg-green-100 text-green-700"
+                              : order.paymentStatus === "ignored" ? "bg-gray-100 text-gray-500"
+                              : "bg-red-50 text-red-600"
+                            }`}>
+                              {order.paymentStatus === "paid" ? "入金済" : order.paymentStatus === "ignored" ? "無視" : "未入金"}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded w-fit ${
+                              order.shippingStatus === "shipped" ? "bg-green-100 text-green-700"
+                              : order.shippingStatus === "ignored" ? "bg-gray-100 text-gray-500"
+                              : "bg-orange-50 text-orange-600"
+                            }`}>
+                              {order.shippingStatus === "shipped" ? "発送済" : order.shippingStatus === "ignored" ? "無視" : "未発送"}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-right font-medium text-gray-800">¥{order.totalAmount.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-gray-500 max-w-[120px] truncate">{order.note || ""}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ══════════════════════════════════════════════
