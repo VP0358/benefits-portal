@@ -177,6 +177,10 @@ export default function BonusRunPage() {
   const [loading, setLoading] = useState(false);
   const [calculating, setCalculating] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishStatus, setPublishStatus] = useState<{
+    total: number; published: number; unpublished: number; allPublished: boolean;
+  } | null>(null);
   const [targetMonth, setTargetMonth] = useState(getPrevMonth());
   const [closingDate, setClosingDate] = useState("");
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
@@ -201,7 +205,52 @@ export default function BonusRunPage() {
     setDetail(data);
   }, []);
 
+  // 公開状態を取得
+  const fetchPublishStatus = useCallback(async (month: string) => {
+    try {
+      const res = await fetch(`/api/admin/bonus-results/publish-all?bonusMonth=${month}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPublishStatus(data);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // 一括公開 / 一括非公開
+  const handleBulkPublish = async (isPublished: boolean) => {
+    if (!targetMonth) return;
+    const action = isPublished ? "全会員に公開" : "全会員から非公開に";
+    if (!confirm(`${targetMonth}のボーナス明細を${action}します。よろしいですか？`)) return;
+    setPublishing(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/bonus-results/publish-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bonusMonth: targetMonth, isPublished }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMsg({ type: "err", text: data.error ?? "操作に失敗しました" });
+        return;
+      }
+      setMsg({ type: "ok", text: data.message });
+      await fetchPublishStatus(targetMonth);
+    } catch {
+      setMsg({ type: "err", text: "通信エラーが発生しました" });
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   useEffect(() => { fetchRuns(); }, [fetchRuns]);
+
+  // 対象月が変わったら公開状態を再取得
+  useEffect(() => {
+    if (targetMonth) fetchPublishStatus(targetMonth);
+  }, [targetMonth, fetchPublishStatus]);
 
   // ボーナス計算実行
   const handleCalculate = async (mode: "calculate" | "confirm") => {
@@ -231,6 +280,7 @@ export default function BonusRunPage() {
       setMsg({ type: "ok", text: data.message });
       await fetchRuns();
       await fetchDetail(targetMonth);
+      await fetchPublishStatus(targetMonth);
     } catch {
       setMsg({ type: "err", text: "通信エラーが発生しました" });
     } finally {
@@ -316,6 +366,88 @@ export default function BonusRunPage() {
         </div>
       </div>
 
+      {/* ━━━ 会員マイページへの公開管理 ━━━ */}
+      <div className="rounded-2xl bg-white border border-stone-100 p-6 space-y-4">
+        <div>
+          <h2 className="text-sm font-bold text-slate-700">📢 会員マイページへの公開管理</h2>
+          <p className="text-xs text-slate-500 mt-1">
+            ボーナス明細は確定後も非公開状態です。下記ボタンで会員のマイページ（MLMメニュー→ボーナス履歴）に反映させます。
+          </p>
+        </div>
+
+        {/* 公開状態サマリー */}
+        {publishStatus && (
+          <div className={`rounded-xl border px-4 py-3 flex items-center gap-4 ${
+            publishStatus.allPublished
+              ? "bg-emerald-50 border-emerald-200"
+              : publishStatus.published > 0
+              ? "bg-amber-50 border-amber-200"
+              : "bg-slate-50 border-slate-200"
+          }`}>
+            <div className="text-2xl">
+              {publishStatus.allPublished ? "✅" : publishStatus.published > 0 ? "⚠️" : "🔒"}
+            </div>
+            <div className="flex-1">
+              <div className={`text-sm font-bold ${
+                publishStatus.allPublished ? "text-emerald-700"
+                : publishStatus.published > 0 ? "text-amber-700"
+                : "text-slate-600"
+              }`}>
+                {publishStatus.allPublished
+                  ? "全員公開済み"
+                  : publishStatus.published > 0
+                  ? `一部公開中（${publishStatus.published}/${publishStatus.total}件）`
+                  : "未公開（全員非公開）"
+                }
+              </div>
+              <div className="text-xs text-slate-500 mt-0.5">
+                {targetMonth} ／ 公開: {publishStatus.published}件 ／ 非公開: {publishStatus.unpublished}件 ／ 合計: {publishStatus.total}件
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-3">
+          {/* 一括公開ボタン */}
+          <button
+            onClick={() => handleBulkPublish(true)}
+            disabled={publishing || publishStatus?.allPublished}
+            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+          >
+            {publishing ? (
+              <><span className="animate-spin">⏳</span> 処理中...</>
+            ) : (
+              <><span>📢</span> 全員に一括公開</>
+            )}
+          </button>
+
+          {/* 一括非公開ボタン */}
+          <button
+            onClick={() => handleBulkPublish(false)}
+            disabled={publishing || publishStatus?.published === 0}
+            className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition"
+          >
+            <span>🔒</span> 一括非公開に戻す
+          </button>
+
+          {/* 公開状態を再読み込み */}
+          <button
+            onClick={() => fetchPublishStatus(targetMonth)}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-4 py-2.5 text-xs text-slate-500 hover:bg-slate-50 transition"
+          >
+            🔄 状態を更新
+          </button>
+        </div>
+
+        <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-xs text-blue-800 space-y-1">
+          <p className="font-bold">📌 公開の流れ</p>
+          <p>① 計算実行（下書き）→ 内容を確認</p>
+          <p>② 計算して確定 → 称号レベル・貯金ptが更新される</p>
+          <p>③ <strong>全員に一括公開</strong> → 会員のマイページ「ボーナス履歴」に反映される</p>
+          <p className="text-blue-600">※ 公開ボタンを押すまで会員には表示されません</p>
+        </div>
+      </div>
+
       {/* ━━━ 計算結果詳細 ━━━ */}
       {detail && (
         <div className="rounded-2xl bg-white border border-stone-100 p-6 space-y-4">
@@ -365,11 +497,15 @@ export default function BonusRunPage() {
               return (
                 <button
                   key={run.id}
-                  onClick={() => fetchDetail(run.bonusMonth)}
+                  onClick={() => {
+                    setTargetMonth(run.bonusMonth);
+                    fetchDetail(run.bonusMonth);
+                    fetchPublishStatus(run.bonusMonth);
+                  }}
                   className={`w-full flex items-center gap-4 rounded-2xl border ${st.border} ${st.bg} px-4 py-3 text-left hover:opacity-90 transition`}
                 >
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className={`text-sm font-bold ${st.text}`}>{run.bonusMonth}</span>
                       <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${st.bg} ${st.text} ${st.border}`}>
                         {st.label}
