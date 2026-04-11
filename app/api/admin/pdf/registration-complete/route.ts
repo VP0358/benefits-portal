@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
       : (reg?.bankAccountNumber ? `${reg.bankAccountType || "普通"}　${reg.bankAccountNumber}　${reg.bankAccountHolder || ""}` : "");
 
     // マイページURL & QRコード
-    const myPageUrl = "https://viola-pure.jp/";
+    const myPageUrl = "https://viola-pure.xyz/";
     const qrDataUrl = await QRCode.toDataURL(myPageUrl, {
       width: 140,
       margin: 1,
