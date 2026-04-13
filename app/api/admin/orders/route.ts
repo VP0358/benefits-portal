@@ -2,9 +2,7 @@
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-import { NextResponse } from "next/server";
-
-
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/app/api/admin/route-guard";
 
@@ -33,4 +31,19 @@ export async function GET() {
       items: order.items.map(item => ({ ...item, id: item.id.toString(), orderId: item.orderId.toString(), productId: item.productId.toString() })),
     }))
   );
+}
+
+// 注文削除
+export async function DELETE(req: NextRequest) {
+  const guard = await requireAdmin();
+  if (guard.error) return guard.error;
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+  try {
+    await prisma.order.delete({ where: { id: BigInt(id) } });
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
+  }
 }

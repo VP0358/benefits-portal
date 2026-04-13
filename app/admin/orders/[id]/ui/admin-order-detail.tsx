@@ -76,6 +76,16 @@ export default function AdminOrderDetail({ orderId }: { orderId: string }) {
     await fetchOrder();
   }
 
+  async function deleteOrder() {
+    if (!confirm("この注文を完全に削除しますか？\nこの操作は取り消せません。")) return;
+    setError(""); setMessage("");
+    const res = await fetch(`/api/admin/orders?id=${orderId}`, { method: "DELETE" });
+    if (!res.ok) { const r = await res.json().catch(()=>null); setError(r?.error || "削除に失敗しました。"); return; }
+    setMessage("注文を削除しました。");
+    // 削除後は注文管理一覧へ戻る
+    setTimeout(() => { window.location.href = "/admin/orders"; }, 1200);
+  }
+
   if (loading) return <div className="text-slate-700">読み込み中...</div>;
   if (error && !data) return <p className="text-sm text-red-600">{error}</p>;
   if (!data) return null;
@@ -152,14 +162,28 @@ export default function AdminOrderDetail({ orderId }: { orderId: string }) {
       <div className="space-y-2">
         <label className="block text-sm font-medium">納品書PDF</label>
         <a
-          href={`/admin/print/invoice?orderId=${orderId}`}
+          href={`/admin/orders-shipping/delivery-note?ids=${orderId}&type=delivery`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 rounded-xl bg-blue-50 border border-blue-500 px-5 py-3 text-sm font-medium text-blue-700 hover:bg-blue-100 transition"
         >
           <i className="fas fa-file-pdf"></i>
-          納品書を印刷
+          納品書PDFダウンロード
         </a>
+      </div>
+
+      {/* 注文削除 */}
+      <div className="rounded-2xl border border-red-200 p-4 space-y-3 bg-red-50/30">
+        <label className="block text-sm font-medium text-red-700">注文削除</label>
+        <p className="text-xs text-red-500">この操作は取り消せません。注文に関連する全データが削除されます。</p>
+        <button
+          type="button"
+          onClick={deleteOrder}
+          className="rounded-xl bg-red-600 px-5 py-3 text-sm text-white hover:bg-red-500 transition whitespace-nowrap flex items-center gap-2"
+        >
+          <i className="fas fa-trash text-xs"></i>
+          この注文を削除
+        </button>
       </div>
     </div>
   );

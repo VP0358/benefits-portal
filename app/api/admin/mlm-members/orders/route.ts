@@ -331,3 +331,172 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }
+
+// ── PUT: 伝票更新 ────────────────────────────────────────────────
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const {
+      orderId,
+      orderedAt,
+      shippedAt,
+      paidAt,
+      slipType,
+      paymentMethod,
+      deliveryDate,
+      deliveryTime,
+      bundleTargetId,
+      autoshipNo,
+      deliverySlipNo,
+      taxMethod,
+      paymentHolder,
+      ordererMemberId,
+      ordererCompany,
+      ordererName,
+      ordererPostal,
+      ordererPrefecture,
+      ordererCity,
+      ordererBuilding,
+      ordererPhone,
+      ordererNote,
+      ordererNoteSlip,
+      detailName,
+      recipientCompany,
+      recipientName,
+      recipientPostal,
+      recipientPrefecture,
+      recipientCity,
+      recipientBuilding,
+      recipientPhone,
+      deliveryCenter,
+      items,
+      afterCreateOutbox,
+    } = body;
+
+    if (!orderId) {
+      return NextResponse.json({ error: "orderId is required" }, { status: 400 });
+    }
+
+    const orderIdBig = BigInt(orderId);
+
+    // 商品合計計算
+    let subtotal8 = 0;
+    let subtotal10 = 0;
+
+    if (items && Array.isArray(items)) {
+      for (const item of items) {
+        const lineAmt = (item.unitPrice || 0) * (item.quantity || 1);
+        if (item.taxRate === 8) {
+          subtotal8 += lineAmt;
+        } else {
+          subtotal10 += lineAmt;
+        }
+      }
+    }
+
+    const tax8 = Math.floor(subtotal8 * 0.08);
+    const tax10 = Math.floor(subtotal10 * 0.10);
+    const subtotalAmount = subtotal8 + subtotal10;
+    const totalAmount = subtotalAmount + tax8 + tax10;
+
+    // Order更新
+    await prisma.order.update({
+      where: { id: orderIdBig },
+      data: {
+        slipType: slipType || "one_time",
+        paymentMethod: paymentMethod || "other",
+        paymentStatus: paidAt ? "paid" : "unpaid",
+        shippingStatus: shippedAt ? "shipped" : "unshipped",
+        outboxNo: afterCreateOutbox != null ? Number(afterCreateOutbox) : undefined,
+        orderedAt: orderedAt ? new Date(orderedAt) : undefined,
+        paidAt: paidAt ? new Date(paidAt) : null,
+        note: ordererNote ?? undefined,
+        noteSlip: ordererNoteSlip ?? undefined,
+        subtotalAmount,
+        totalAmount,
+      },
+    });
+
+    // OrderItems削除→再作成
+    if (items && Array.isArray(items)) {
+      await prisma.orderItem.deleteMany({ where: { orderId: orderIdBig } });
+      for (const item of items) {
+        if (!item.productId) continue;
+        const lineAmount = (item.unitPrice || 0) * (item.quantity || 1);
+        await prisma.orderItem.create({
+          data: {
+            orderId: orderIdBig,
+            productId: BigInt(item.productId),
+            productName: item.productName || "",
+            unitPrice: item.unitPrice || 0,
+            quantity: item.quantity || 1,
+            lineAmount,
+          },
+        });
+      }
+    }
+
+    // ShippingLabel更新
+    const fullRecipientAddress = [recipientPrefecture || "", recipientCity || "", recipientBuilding || ""]
+      .filter(Boolean).join(" ");
+    const fullOrdererAddress = [ordererPrefecture || "", ordererCity || "", ordererBuilding || ""]
+      .filter(Boolean).join(" ");
+
+    const existingLabel = await prisma.shippingLabel.findUnique({ where: { orderId: orderIdBig } });
+    if (existingLabel) {
+      await prisma.shippingLabel.update({
+        where: { orderId: orderIdBig },
+        data: {
+          ordererName: ordererName || undefined,
+          legalEntityName: ordererCompany || null,
+          ordererPhone: ordererPhone || null,
+          recipientName: recipientName || ordererName || undefined,
+          recipientPhone: recipientPhone || ordererPhone || "",
+          recipientPostal: recipientPostal || ordererPostal || "",
+          recipientAddress: fullRecipientAddress || fullOrdererAddress || "",
+          recipientCompany: recipientCompany || null,
+          deliveryTime: deliveryTime || null,
+          deliveryCenter: deliveryCenter || null,
+          desiredDeliveryDate: deliveryDate ? new Date(deliveryDate) : null,
+          autoshipNo: autoshipNo || null,
+          shippedAt: shippedAt ? new Date(shippedAt) : null,
+          itemDescription: items?.map((i: { productName: string }) => i.productName).join(", ") || "",
+          itemCount: items?.length || 0,
+        },
+      });
+    }
+
+    return NextResponse.json({ success: true, orderId, totalAmount });
+  } catch (error) {
+    console.error("❌ MLM member orders PUT error:", error);
+    return NextResponse.json({ error: String(error) }, { status: 500 });
+  }
+}
+
+// ── DELETE: 伝票削除 ─────────────────────────────────────────────
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const orderId = searchParams.get("orderId");
+
+    if (!orderId) {
+      return NextResponse.json({ error: "orderId is required" }, { status: 400 });
+    }
+
+    const orderIdBig = BigInt(orderId);
+
+    // 存在確認
+    const order = await prisma.order.findUnique({ where: { id: orderIdBig } });
+    if (!order) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    // 削除（CASCADEで関連データも削除）
+    await prisma.order.delete({ where: { id: orderIdBig } });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("❌ MLM member orders DELETE error:", error);
+    return NextResponse.json({ error: String(error) }, { status: 500 });
+  }
+}

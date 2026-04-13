@@ -269,6 +269,22 @@ async function getSummary() {
   })
 }
 
+// 伝票削除
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get("id")
+    if (!id) return NextResponse.json({ success: false, error: "id required" }, { status: 400 })
+    await prisma.order.delete({ where: { id: BigInt(id) } })
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("Order delete error:", error)
+    return NextResponse.json({ success: false, error: String(error) }, { status: 500 })
+  } finally {
+    await prisma.$disconnect()
+  }
+}
+
 // 一括更新（出庫BOX移動・入金日設定・発送ステータス変更等）
 export async function PATCH(request: NextRequest) {
   try {

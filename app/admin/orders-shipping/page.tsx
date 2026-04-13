@@ -167,6 +167,16 @@ export default function OrdersShippingPage() {
   const [bulkDateType,  setBulkDateType]  = useState("paidAt") // paidAt / shippedAt / orderedAt
   const [bulkProcessing, setBulkProcessing] = useState(false)
 
+  // 伝票編集モーダル
+  const [editModalOrder, setEditModalOrder] = useState<Order | null>(null)
+  const [editModalForm,  setEditModalForm]  = useState<{
+    orderedAt: string; paidAt: string; shippedAt: string
+    slipType: string; paymentMethod: string
+    note: string; noteSlip: string; outboxNo: number
+  } | null>(null)
+  const [editModalSubmitting, setEditModalSubmitting] = useState(false)
+  const [deletingOrderId,     setDeletingOrderId]     = useState<number | null>(null)
+
   // CSV取込
   const yamotoInputRef = useRef<HTMLInputElement>(null)
   const debitInputRef  = useRef<HTMLInputElement>(null)
@@ -223,25 +233,52 @@ export default function OrdersShippingPage() {
     setSelected(selected.size === orders.length ? new Set() : new Set(orders.map(o => o.id)))
 
   // ─── 出庫BOX操作 ────────────────────────────────────
+  // チェックした伝票を指定BOXへ入れる
   const putToOutbox = async (outbox: number) => {
     if (selected.size === 0) { alert("伝票を選択してください"); return }
     await bulkPatch("setOutbox", outbox, Array.from(selected))
     fetchSummary()
     fetchOrders()
   }
-  const removeFromOutbox = async (outbox: number) => {
-    const ids = orders.filter(o => o.outboxNo === outbox).map(o => o.id)
-    if (ids.length === 0) { alert("対象伝票がありません"); return }
+  // チェックした伝票をBOXから出す（outboxNo=0 に設定）
+  const removeSelectedFromOutbox = async () => {
+    if (selected.size === 0) { alert("伝票を選択してください"); return }
+    const ids = Array.from(selected)
+    if (!confirm(`選択した${ids.length}件の伝票を出庫BOXから出しますか？`)) return
     await bulkPatch("setOutbox", 0, ids)
     fetchSummary()
     fetchOrders()
   }
+  // 指定BOXの全件をBOXから出す（選択に関係なく全件）
+  const removeAllFromOutbox = async (outbox: number) => {
+    const ids = outboxOrders
+      ? outboxOrders.filter(o => o.outboxNo === outbox).map(o => o.id)
+      : orders.filter(o => o.outboxNo === outbox).map(o => o.id)
+    if (ids.length === 0) { alert("対象伝票がありません"); return }
+    if (!confirm(`出庫BOX${outbox} の全${ids.length}件をBOXから出しますか？`)) return
+    await bulkPatch("setOutbox", 0, ids)
+    fetchSummary()
+    fetchOrders()
+    if (displayedOutbox === outbox) showOutbox(outbox)
+  }
+  // チェックした伝票を別のBOXへ移動
+  const moveSelectedToOutbox = async (to: number) => {
+    if (selected.size === 0) { alert("伝票を選択してください"); return }
+    const ids = Array.from(selected)
+    await bulkPatch("setOutbox", to, ids)
+    fetchSummary()
+    fetchOrders()
+  }
+  // 指定BOXの全件を別BOXへ移動
   const moveAllInOutbox = async (from: number, to: number) => {
-    const ids = orders.filter(o => o.outboxNo === from).map(o => o.id)
+    const ids = outboxOrders
+      ? outboxOrders.filter(o => o.outboxNo === from).map(o => o.id)
+      : orders.filter(o => o.outboxNo === from).map(o => o.id)
     if (ids.length === 0) { alert("対象伝票がありません"); return }
     await bulkPatch("setOutbox", to, ids)
     fetchSummary()
     fetchOrders()
+    if (displayedOutbox === from) showOutbox(from)
   }
   const showOutbox = async (outbox: number) => {
     setOutboxLoading(true)
@@ -345,6 +382,110 @@ export default function OrdersShippingPage() {
     if (selected.size === 0) { alert("伝票を選択してください"); return }
     const ids = Array.from(selected).join(",")
     router.push(`/admin/orders-shipping/delivery-note?ids=${ids}&type=${type}`)
+  }
+
+  // ─── 伝票編集モーダルを開く ──────────────────────────
+  const openEditModal = (order: Order, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setEditModalOrder(order)
+    setEditModalForm({
+      orderedAt: order.orderedAt.slice(0, 10),
+      paidAt: order.paidAt ? order.paidAt.slice(0, 10) : "",
+      shippedAt: order.shippingLabel?.shippedAt ? order.shippingLabel.shippedAt.slice(0, 10) : "",
+      slipType: order.slipType,
+      paymentMethod: order.paymentMethod,
+      note: order.note || "",
+      noteSlip: order.noteSlip || "",
+      outboxNo: order.outboxNo,
+    })
+  }
+
+  // 伝票編集保存
+  const handleEditModalSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editModalOrder || !editModalForm) return
+    setEditModalSubmitting(true)
+    try {
+      const res = await fetch("/api/admin/orders-shipping", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderIds: [editModalOrder.id],
+          action: "setOrderedAt",
+          value: editModalForm.orderedAt,
+        }),
+      })
+      if (!res.ok) { alert("注文日更新に失敗しました"); return }
+      // 入金日更新
+      if (editModalForm.paidAt) {
+        await fetch("/api/admin/orders-shipping", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderIds: [editModalOrder.id], action: "setPaidAt", value: editModalForm.paidAt }),
+        })
+      } else {
+        await fetch("/api/admin/orders-shipping", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderIds: [editModalOrder.id], action: "clearPaidAt", value: null }),
+        })
+      }
+      // 発送日更新
+      if (editModalForm.shippedAt) {
+        await fetch("/api/admin/orders-shipping", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderIds: [editModalOrder.id], action: "setShippedAt", value: editModalForm.shippedAt }),
+        })
+      }
+      // 備考更新
+      await fetch("/api/admin/orders-shipping", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderIds: [editModalOrder.id], action: "setNote", value: editModalForm.note }),
+      })
+      await fetch("/api/admin/orders-shipping", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderIds: [editModalOrder.id], action: "setNoteSlip", value: editModalForm.noteSlip }),
+      })
+      // 出庫BOX更新
+      await fetch("/api/admin/orders-shipping", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderIds: [editModalOrder.id], action: "setOutbox", value: editModalForm.outboxNo }),
+      })
+      alert("伝票を更新しました")
+      setEditModalOrder(null)
+      setEditModalForm(null)
+      fetchSummary()
+      fetchOrders()
+    } finally {
+      setEditModalSubmitting(false)
+    }
+  }
+
+  // 伝票削除
+  const handleDeleteOrder = async (orderId: number, orderNumber: string) => {
+    if (!confirm(`伝票「${orderNumber}」を削除しますか？\nこの操作は取り消せません。`)) return
+    setDeletingOrderId(orderId)
+    try {
+      const res = await fetch(`/api/admin/orders-shipping?id=${orderId}`, { method: "DELETE" })
+      if (!res.ok) { const d = await res.json(); alert(d.error || "削除に失敗しました"); return }
+      setEditModalOrder(null)
+      setEditModalForm(null)
+      fetchSummary()
+      fetchOrders()
+    } finally {
+      setDeletingOrderId(null)
+    }
+  }
+
+  // チェック済み伝票の納品書一括PDF出力
+  const handleBulkDeliveryNote = () => {
+    if (selected.size === 0) { alert("伝票を選択してください"); return }
+    const ids = Array.from(selected).join(",")
+    window.open(`/admin/orders-shipping/delivery-note?ids=${ids}&type=delivery`, "_blank")
   }
 
   // ─── クロネコヤマトB2CSV出力 ──────────────────────────
@@ -542,48 +683,80 @@ export default function OrdersShippingPage() {
         <div className="bg-blue-600 px-4 py-2 text-white font-semibold text-sm flex items-center gap-2">
           <Box className="w-4 h-4" />出庫BOX
         </div>
-        <div className="p-4 space-y-2">
-          {/* 表示・に入れる・から出す */}
-          <div className="flex flex-wrap items-center gap-2">
-            <select value={selectedOutbox} onChange={e => setSelectedOutbox(Number(e.target.value))}
-              className="border border-gray-300 rounded px-2 py-1 text-sm">
-              {Array.from({length:10},(_,i)=>i+1).map(n=>(
-                <option key={n} value={n}>出庫BOX{n}：({summary?.outboxCounts[n]??0})</option>
-              ))}
-            </select>
-            <button onClick={() => showOutbox(selectedOutbox)}
-              className="px-3 py-1.5 bg-blue-100 text-blue-700 border border-blue-300 rounded text-sm hover:bg-blue-200 font-medium">
-              を表示する
-            </button>
-            <span className="text-gray-300">|</span>
-            <select value={moveTargetOutbox} onChange={e => setMoveTargetOutbox(Number(e.target.value))}
-              className="border border-gray-300 rounded px-2 py-1 text-sm">
-              {outboxOptions(moveTargetOutbox)}
-            </select>
-            <button onClick={() => putToOutbox(moveTargetOutbox)}
-              className="px-3 py-1.5 bg-green-100 text-green-700 border border-green-300 rounded text-sm hover:bg-green-200 flex items-center gap-1">
-              <ArrowRight className="w-3 h-3" />に入れる
-            </button>
-            <button onClick={() => removeFromOutbox(selectedOutbox)}
-              className="px-3 py-1.5 bg-orange-100 text-orange-700 border border-orange-300 rounded text-sm hover:bg-orange-200">
-              から出す
-            </button>
+        <div className="p-4 space-y-3">
+          {/* ── チェック選択伝票への操作 ── */}
+          <div className="border border-blue-200 rounded-lg p-3 bg-blue-50/40 space-y-2">
+            <div className="text-xs font-semibold text-blue-700 flex items-center gap-1 mb-1">
+              <CheckSquare className="w-3.5 h-3.5" />チェック選択した伝票への操作
+              {selected.size > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 bg-blue-600 text-white rounded text-[10px]">{selected.size}件選択中</span>
+              )}
+            </div>
+            {/* BOXへ入れる */}
+            <div className="flex flex-wrap items-center gap-2">
+              <select value={moveTargetOutbox} onChange={e => setMoveTargetOutbox(Number(e.target.value))}
+                className="border border-gray-300 rounded px-2 py-1 text-xs bg-white">
+                {outboxOptions(moveTargetOutbox)}
+              </select>
+              <button onClick={() => putToOutbox(moveTargetOutbox)}
+                className="px-3 py-1.5 bg-green-600 text-white border border-green-700 rounded text-xs hover:bg-green-700 flex items-center gap-1 font-medium">
+                <ArrowRight className="w-3 h-3" />チェック伝票を入れる
+              </button>
+              <button onClick={removeSelectedFromOutbox}
+                className="px-3 py-1.5 bg-orange-500 text-white border border-orange-600 rounded text-xs hover:bg-orange-600 font-medium">
+                チェック伝票をBOXから出す
+              </button>
+              <button onClick={() => moveSelectedToOutbox(moveToOutbox)}
+                className="px-3 py-1.5 bg-purple-600 text-white border border-purple-700 rounded text-xs hover:bg-purple-700 flex items-center gap-1 font-medium">
+                <ArrowRight className="w-3 h-3" />チェック伝票を
+                <select value={moveToOutbox} onChange={e => { e.stopPropagation(); setMoveToOutbox(Number(e.target.value)) }}
+                  className="border border-purple-400 rounded px-1 py-0.5 text-xs bg-purple-100 text-purple-800 ml-0.5"
+                  onClick={e => e.stopPropagation()}>
+                  {Array.from({length:10},(_,i)=>i+1).map(n=>(
+                    <option key={n} value={n}>BOX{n}({summary?.outboxCounts[n]??0})</option>
+                  ))}
+                </select>
+                へ移動
+              </button>
+            </div>
           </div>
-          {/* 全件移動 */}
-          <div className="flex flex-wrap items-center gap-2">
-            <select value={moveFromOutbox} onChange={e => setMoveFromOutbox(Number(e.target.value))}
-              className="border border-gray-300 rounded px-2 py-1 text-sm">
-              {outboxOptions(moveFromOutbox)}
-            </select>
-            <span className="text-gray-500">→</span>
-            <select value={moveToOutbox} onChange={e => setMoveToOutbox(Number(e.target.value))}
-              className="border border-gray-300 rounded px-2 py-1 text-sm">
-              {outboxOptions(moveToOutbox)}
-            </select>
-            <button onClick={() => moveAllInOutbox(moveFromOutbox, moveToOutbox)}
-              className="px-3 py-1.5 bg-purple-100 text-purple-700 border border-purple-300 rounded text-sm hover:bg-purple-200">
-              へ全件移動する
-            </button>
+
+          {/* ── BOX全体の操作 ── */}
+          <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+            <div className="text-xs font-semibold text-gray-600 mb-1">BOX全体の操作</div>
+            {/* BOX表示 */}
+            <div className="flex flex-wrap items-center gap-2">
+              <select value={selectedOutbox} onChange={e => setSelectedOutbox(Number(e.target.value))}
+                className="border border-gray-300 rounded px-2 py-1 text-xs bg-white">
+                {Array.from({length:10},(_,i)=>i+1).map(n=>(
+                  <option key={n} value={n}>出庫BOX{n}：({summary?.outboxCounts[n]??0})</option>
+                ))}
+              </select>
+              <button onClick={() => showOutbox(selectedOutbox)}
+                className="px-3 py-1.5 bg-blue-100 text-blue-700 border border-blue-300 rounded text-xs hover:bg-blue-200 font-medium">
+                を表示する
+              </button>
+              <button onClick={() => removeAllFromOutbox(selectedOutbox)}
+                className="px-3 py-1.5 bg-orange-100 text-orange-700 border border-orange-300 rounded text-xs hover:bg-orange-200">
+                の全件をBOXから出す
+              </button>
+            </div>
+            {/* 全件移動 */}
+            <div className="flex flex-wrap items-center gap-2">
+              <select value={moveFromOutbox} onChange={e => setMoveFromOutbox(Number(e.target.value))}
+                className="border border-gray-300 rounded px-2 py-1 text-xs bg-white">
+                {outboxOptions(moveFromOutbox)}
+              </select>
+              <span className="text-gray-500">→</span>
+              <select value={moveToOutbox} onChange={e => setMoveToOutbox(Number(e.target.value))}
+                className="border border-gray-300 rounded px-2 py-1 text-xs bg-white">
+                {outboxOptions(moveToOutbox)}
+              </select>
+              <button onClick={() => moveAllInOutbox(moveFromOutbox, moveToOutbox)}
+                className="px-3 py-1.5 bg-purple-100 text-purple-700 border border-purple-300 rounded text-xs hover:bg-purple-200">
+                へ全件移動する
+              </button>
+            </div>
           </div>
         </div>
 
@@ -749,6 +922,13 @@ export default function OrdersShippingPage() {
               className="flex items-center gap-1 px-3 py-1.5 bg-white border border-indigo-400 text-indigo-700 rounded text-sm hover:bg-indigo-50 font-medium"
               title="選択した伝票の納品書・出庫リストページへ移動">
               <FileText className="w-3.5 h-3.5" />納品書
+            </button>
+            {/* 納品書PDF一括ダウンロード */}
+            <button
+              onClick={handleBulkDeliveryNote}
+              className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white border border-indigo-700 rounded text-sm hover:bg-indigo-700 font-medium"
+              title="選択した伝票の納品書PDFを一括ダウンロード">
+              <Download className="w-3.5 h-3.5" />納品書PDF一括出力
             </button>
             {/* 領収書ボタン → 同じページへ遷移（領収書タブ） */}
             <button
@@ -1001,7 +1181,7 @@ export default function OrdersShippingPage() {
               )}
               <span className="text-xs text-gray-500">計 {orders.length}件</span>
             </div>
-            <div className="flex gap-1">
+            <div className="flex gap-1 flex-wrap">
               <button onClick={exportCSV}
                 className="flex items-center gap-1 text-xs px-3 py-1 border border-gray-300 rounded hover:bg-gray-50">
                 <Download className="w-3.5 h-3.5" />CSV出力
@@ -1011,6 +1191,14 @@ export default function OrdersShippingPage() {
                 title="ヤマトB2クラウド取込用CSV">
                 <Download className="w-3.5 h-3.5" />ヤマトCSV
               </button>
+              {selected.size > 0 && (
+                <button
+                  onClick={handleBulkDeliveryNote}
+                  className="flex items-center gap-1 text-xs px-3 py-1 bg-indigo-600 text-white border border-indigo-700 rounded hover:bg-indigo-700 font-medium"
+                  title="チェックした伝票の納品書PDFを一括ダウンロード">
+                  <Download className="w-3.5 h-3.5" />納品書PDF一括出力（{selected.size}件）
+                </button>
+              )}
             </div>
           </div>
 
@@ -1063,9 +1251,11 @@ export default function OrdersShippingPage() {
                             {order.slipTypeLabel}
                           </span>
                         </td>
-                        {/* 注文日 */}
-                        <td className="px-2 py-2 text-gray-700 whitespace-nowrap">
-                          {order.orderedAt.slice(0,10)}
+                        {/* 注文日（クリックで伝票編集モーダル） */}
+                        <td className="px-2 py-2 whitespace-nowrap" onClick={e => openEditModal(order, e)}>
+                          <span className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium">
+                            {order.orderedAt.slice(0,10)}
+                          </span>
                         </td>
                         {/* 入金日 */}
                         <td className="px-2 py-2 whitespace-nowrap">
@@ -1244,6 +1434,26 @@ export default function OrdersShippingPage() {
                                       発送無視
                                     </button>
                                   </div>
+                                  {/* 伝票編集・削除 */}
+                                  <div className="flex flex-wrap gap-1 pt-1 border-t border-gray-100">
+                                    <button
+                                      onClick={e => openEditModal(order, e)}
+                                      className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs hover:bg-orange-200 flex items-center gap-0.5">
+                                      <i className="fas fa-edit text-[10px]" />伝票を編集
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteOrder(order.id, order.orderNumber)}
+                                      disabled={deletingOrderId === order.id}
+                                      className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 disabled:opacity-50 flex items-center gap-0.5">
+                                      <i className="fas fa-trash text-[10px]" />
+                                      {deletingOrderId === order.id ? "削除中..." : "この伝票を削除"}
+                                    </button>
+                                    <button
+                                      onClick={() => window.open(`/admin/orders-shipping/delivery-note?ids=${order.id}&type=delivery`, "_blank")}
+                                      className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs hover:bg-indigo-200 flex items-center gap-0.5">
+                                      <i className="fas fa-file-pdf text-[10px]" />納品書PDF
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -1256,6 +1466,145 @@ export default function OrdersShippingPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════
+          伝票編集モーダル（注文日クリックで開く）
+      ═══════════════════════════════════════════════ */}
+      {editModalOrder && editModalForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 overflow-y-auto py-8">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+            {/* モーダルヘッダ */}
+            <div className="bg-orange-600 text-white px-5 py-3 flex items-center justify-between">
+              <div>
+                <span className="font-bold text-sm">伝票編集</span>
+                <span className="ml-3 text-orange-200 text-xs font-mono">{editModalOrder.orderNumber}</span>
+              </div>
+              <button onClick={() => { setEditModalOrder(null); setEditModalForm(null) }}
+                className="text-white hover:text-orange-200 text-lg font-bold">✕</button>
+            </div>
+
+            <form onSubmit={handleEditModalSave} className="p-5 space-y-3">
+              {/* 会員情報 */}
+              <div className="bg-gray-50 rounded-lg px-3 py-2 text-xs text-gray-600">
+                <span className="font-medium">{editModalOrder.memberCode}</span>
+                <span className="mx-2 text-gray-400">/</span>
+                <span>{editModalOrder.memberName}</span>
+                <span className="ml-3 px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">{editModalOrder.slipTypeLabel}</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                {/* 注文日 */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-medium text-red-600">注文日</label>
+                  <input type="date" value={editModalForm.orderedAt}
+                    onChange={e => setEditModalForm(f => f ? { ...f, orderedAt: e.target.value } : f)}
+                    className="border border-gray-300 rounded px-2 py-1 text-xs bg-blue-50 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                </div>
+                {/* 入金日 */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-medium text-gray-600">入金日</label>
+                  <input type="date" value={editModalForm.paidAt}
+                    onChange={e => setEditModalForm(f => f ? { ...f, paidAt: e.target.value } : f)}
+                    className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                </div>
+                {/* 発送日 */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-medium text-gray-600">発送日</label>
+                  <input type="date" value={editModalForm.shippedAt}
+                    onChange={e => setEditModalForm(f => f ? { ...f, shippedAt: e.target.value } : f)}
+                    className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                </div>
+                {/* 出庫BOX */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-medium text-gray-600">出庫BOX</label>
+                  <select value={editModalForm.outboxNo}
+                    onChange={e => setEditModalForm(f => f ? { ...f, outboxNo: Number(e.target.value) } : f)}
+                    className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400">
+                    <option value={0}>なし</option>
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
+                      <option key={n} value={n}>出庫BOX{n}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* 支払方法 */}
+              <div className="flex flex-col gap-1 text-xs">
+                <label className="text-[11px] font-medium text-gray-600">支払方法</label>
+                <select value={editModalForm.paymentMethod}
+                  onChange={e => setEditModalForm(f => f ? { ...f, paymentMethod: e.target.value } : f)}
+                  className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400">
+                  {[
+                    { value: "postal_transfer", label: "振替（郵便）" },
+                    { value: "bank_transfer", label: "振替（銀行）" },
+                    { value: "bank_payment", label: "振込み" },
+                    { value: "cod", label: "代引き" },
+                    { value: "card", label: "カード" },
+                    { value: "cash", label: "現金" },
+                    { value: "convenience", label: "コンビニ" },
+                    { value: "other", label: "その他" },
+                    { value: "accounts_receivable", label: "売掛" },
+                    { value: "cod_ng", label: "代引NG" },
+                    { value: "stop_shipping", label: "発送停止" },
+                    { value: "refund", label: "返金" },
+                  ].map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+              </div>
+
+              {/* 備考 */}
+              <div className="flex flex-col gap-1 text-xs">
+                <label className="text-[11px] font-medium text-gray-600">備考</label>
+                <input value={editModalForm.note}
+                  onChange={e => setEditModalForm(f => f ? { ...f, note: e.target.value } : f)}
+                  className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+              </div>
+              <div className="flex flex-col gap-1 text-xs">
+                <label className="text-[11px] font-medium text-gray-600">備考（納品書）</label>
+                <input value={editModalForm.noteSlip}
+                  onChange={e => setEditModalForm(f => f ? { ...f, noteSlip: e.target.value } : f)}
+                  className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+              </div>
+
+              {/* 商品明細（参照用） */}
+              <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600 space-y-1">
+                <div className="font-medium text-gray-700 mb-1.5">商品明細</div>
+                {editModalOrder.items.map(item => (
+                  <div key={item.id} className="flex justify-between">
+                    <span>{item.productName} × {item.quantity}</span>
+                    <span className="font-medium">¥{item.lineAmount.toLocaleString()}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between border-t border-gray-200 pt-1 font-semibold text-gray-800">
+                  <span>合計</span>
+                  <span>¥{editModalOrder.totalAmount.toLocaleString()}</span>
+                </div>
+              </div>
+
+              {/* フッタボタン */}
+              <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                <button type="button"
+                  onClick={() => handleDeleteOrder(editModalOrder.id, editModalOrder.orderNumber)}
+                  disabled={deletingOrderId === editModalOrder.id}
+                  className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 disabled:opacity-50 flex items-center gap-1">
+                  <i className="fas fa-trash text-[10px]" />
+                  {deletingOrderId === editModalOrder.id ? "削除中..." : "この伝票を削除"}
+                </button>
+                <div className="flex gap-2">
+                  <button type="button"
+                    onClick={() => { setEditModalOrder(null); setEditModalForm(null) }}
+                    className="px-4 py-2 border border-gray-300 text-gray-600 text-xs rounded hover:bg-gray-100">
+                    キャンセル
+                  </button>
+                  <button type="submit" disabled={editModalSubmitting}
+                    className="px-6 py-2 bg-orange-600 text-white text-xs font-bold rounded hover:bg-orange-700 disabled:opacity-50">
+                    {editModalSubmitting ? "更新中..." : "更新する"}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
