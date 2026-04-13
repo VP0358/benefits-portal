@@ -374,9 +374,12 @@ export default function MlmMemberDetailPage() {
       Object.assign(d, {
         autoshipEnabled: m.autoshipEnabled,
         autoshipStartDate: m.autoshipStartDate ? m.autoshipStartDate.slice(0, 10) : "",
-        autoshipStopDate: m.autoshipStopDate ? m.autoshipStopDate.slice(0, 10) : "",
+        // 停止日は常に空欄でモーダルを開く（手動入力時のみ保存）
+        autoshipStopDate: "",
         autoshipSuspendMonths: m.autoshipSuspendMonths ?? "",
         paymentMethod: m.paymentMethod,
+        // 現在の停止日をDBから表示用に保持（読み取り専用）
+        _currentStopDate: m.autoshipStopDate ? m.autoshipStopDate.slice(0, 10) : "",
       });
     }
     setEditData(d);
@@ -387,8 +390,13 @@ export default function MlmMemberDetailPage() {
     if (!editSection) return;
     setSaving(true);
     try {
+      // autoship セクション保存時は表示専用フィールド(_currentStopDate)を除外
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { _currentStopDate, ...cleanEditData } = editData as Record<string, unknown> & { _currentStopDate?: unknown };
+      const dataToSend = editSection === "autoship" ? cleanEditData : editData;
+
       // bank は basic + registration に分けて送信
-      let payload: Record<string, unknown> = { section: editSection, ...editData };
+      let payload: Record<string, unknown> = { section: editSection, ...dataToSend };
 
       if (editSection === "bank") {
         // 報酬振込先 (MlmMember.bank*)
@@ -1100,15 +1108,57 @@ export default function MlmMemberDetailPage() {
       {/* 継続購入設定 編集 */}
       {editSection === "autoship" && (
         <EditModal title="継続購入設定を編集" onClose={() => setEditSection(null)} onSave={handleSave} saving={saving}>
+          {/* 有効条件の説明 */}
+          <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 text-xs text-blue-800 space-y-1 mb-1">
+            <p className="font-bold text-blue-700">📌 継続購入の有効条件</p>
+            <p>• <strong>継続購入を有効にするチェックあり</strong> ＋ <strong>開始日あり</strong> ＋ <strong>停止日なし（空欄）</strong> → 毎月継続購入が有効</p>
+            <p>• <strong>停止日を入力した場合</strong>: 翌月以降その日付以降は停止されます</p>
+            <p>• 停止日は手動で入力した場合のみ反映されます。空欄のまま保存すると停止日はクリアされます</p>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="md:col-span-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={Boolean(editData.autoshipEnabled)} onChange={e => set("autoshipEnabled", e.target.checked)} className="w-4 h-4" />
-                <span className="text-sm font-semibold">継続購入を有効にする</span>
+              <label className="flex items-center gap-2 cursor-pointer p-2 rounded-lg border border-slate-200 hover:bg-slate-50">
+                <input type="checkbox" checked={Boolean(editData.autoshipEnabled)} onChange={e => set("autoshipEnabled", e.target.checked)} className="w-4 h-4 accent-blue-600" />
+                <div>
+                  <span className="text-sm font-semibold">継続購入を有効にする</span>
+                  <p className="text-xs text-slate-500">開始日あり・停止日なしの場合、毎月自動的に継続購入が有効になります</p>
+                </div>
               </label>
             </div>
-            <FormField label="開始日"><input type="date" className={inputCls} value={String(editData.autoshipStartDate ?? "")} onChange={e => set("autoshipStartDate", e.target.value)} /></FormField>
-            <FormField label="停止日"><input type="date" className={inputCls} value={String(editData.autoshipStopDate ?? "")} onChange={e => set("autoshipStopDate", e.target.value)} /></FormField>
+            <FormField label="開始日">
+              <input type="date" className={inputCls} value={String(editData.autoshipStartDate ?? "")} onChange={e => set("autoshipStartDate", e.target.value)} />
+            </FormField>
+            <FormField label="停止日">
+              <div className="space-y-1">
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="date"
+                    className={inputCls}
+                    value={String(editData.autoshipStopDate ?? "")}
+                    onChange={e => set("autoshipStopDate", e.target.value)}
+                    placeholder="空欄 = 停止なし（継続中）"
+                  />
+                  {editData.autoshipStopDate && (
+                    <button
+                      type="button"
+                      onClick={() => set("autoshipStopDate", "")}
+                      className="shrink-0 px-2 py-1 text-xs text-red-600 border border-red-300 rounded hover:bg-red-50"
+                    >
+                      クリア
+                    </button>
+                  )}
+                </div>
+                {/* 現在DBに保存されている停止日を表示 */}
+                {editData._currentStopDate ? (
+                  <p className="text-xs text-amber-600">
+                    ⚠️ 現在の停止日: <strong>{String(editData._currentStopDate)}</strong>
+                    　空欄で保存すると停止日がクリアされます
+                  </p>
+                ) : (
+                  <p className="text-xs text-green-600">✅ 現在の停止日: 未設定（継続中）</p>
+                )}
+              </div>
+            </FormField>
             <FormField label="停止月（カンマ区切り例: 2025-01,2025-02）">
               <input className={inputCls} value={String(editData.autoshipSuspendMonths ?? "")} onChange={e => set("autoshipSuspendMonths", e.target.value)} placeholder="2025-01,2025-02" />
             </FormField>
@@ -1119,6 +1169,23 @@ export default function MlmMemberDetailPage() {
                 <option value="bank_payment">銀行振込</option>
               </select>
             </FormField>
+          </div>
+          {/* 有効状態プレビュー */}
+          <div className={`mt-2 rounded-lg px-3 py-2 text-xs ${
+            editData.autoshipEnabled && editData.autoshipStartDate && !editData.autoshipStopDate
+              ? "bg-green-50 border border-green-200 text-green-800"
+              : editData.autoshipEnabled && editData.autoshipStopDate
+              ? "bg-amber-50 border border-amber-200 text-amber-800"
+              : "bg-gray-50 border border-gray-200 text-gray-600"
+          }`}>
+            <strong>設定プレビュー: </strong>
+            {editData.autoshipEnabled && editData.autoshipStartDate && !editData.autoshipStopDate
+              ? `✅ 毎月継続購入が有効（${String(editData.autoshipStartDate)} 開始・停止日なし）`
+              : editData.autoshipEnabled && editData.autoshipStopDate
+              ? `⏹️ ${String(editData.autoshipStopDate)} 以降停止予定`
+              : !editData.autoshipEnabled
+              ? "❌ 継続購入無効"
+              : "⚠️ 開始日を入力してください"}
           </div>
         </EditModal>
       )}

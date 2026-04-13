@@ -273,7 +273,7 @@ export async function POST(req: NextRequest) {
       // 1. User作成
       const user = await tx.user.create({
         data: {
-          memberCode: data.memberCode,
+          memberCode: memberCode,  // 自動生成済みの会員コードを使用
           name: data.name,
           nameKana: data.nameKana || null,
           email: data.email,
@@ -296,7 +296,7 @@ export async function POST(req: NextRequest) {
       const mlmMember = await tx.mlmMember.create({
         data: {
           userId: user.id,
-          memberCode: data.memberCode,
+          memberCode: memberCode,  // 自動生成済みの会員コードを使用
           memberType: data.memberType || "business",
           status: data.status || "active",
           uplineId,
@@ -336,6 +336,20 @@ export async function POST(req: NextRequest) {
           disclosureDocNumber: data.disclosureDocNumber || null,
         },
       });
+
+      // 3. MlmRegistration 作成（概要書面番号を含む）
+      if (data.disclosureDocNumber) {
+        await tx.mlmRegistration.upsert({
+          where: { userId: user.id },
+          create: {
+            userId: user.id,
+            disclosureDocNumber: data.disclosureDocNumber,
+          },
+          update: {
+            disclosureDocNumber: data.disclosureDocNumber,
+          },
+        });
+      }
 
       return { user, mlmMember };
     });

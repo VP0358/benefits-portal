@@ -17,24 +17,27 @@ export async function GET(req: NextRequest) {
       orderBy: { productCode: "asc" },
     });
 
-    // BigIntをstringに変換 & snake_caseに統一
+    // BigIntをstringに変換 & フロントエンドに合わせたフォーマット
     const serializedProducts = products.map((p) => ({
       id: p.id.toString(),
       product_code: p.productCode,
       name: p.name,
-      description: p.description,
+      description: p.description ?? null,
       price: p.price,
-      cost: p.cost,
+      cost: 0, // スキーマにcostフィールドなし
       pv: p.pv,
-      status: p.status,
+      // isActive → status に変換（フロントエンド互換）
+      status: p.isActive ? "active" : "inactive",
+      isRegistration: p.isRegistration,
       created_at: p.createdAt.toISOString(),
       updated_at: p.updatedAt.toISOString(),
     }));
 
     return NextResponse.json({ products: serializedProducts });
-  } catch (error: any) {
-    console.error("❌ 商品一覧取得エラー:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error("❌ 商品一覧取得エラー:", errMsg);
+    return NextResponse.json({ error: errMsg }, { status: 500 });
   }
 }
 
@@ -50,7 +53,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { product_code, name, description, price, cost, pv, status } = body;
+    const { product_code, name, description, price, pv, status } = body;
 
     // バリデーション
     if (!product_code || !name || price == null) {
@@ -78,30 +81,30 @@ export async function POST(req: NextRequest) {
         productCode: product_code,
         name,
         description: description || null,
-        price,
-        cost: cost || 0,
-        pv: pv || 0,
-        status: status || "active",
+        price: Number(price),
+        pv: Number(pv) || 0,
+        isActive: status !== "inactive", // statusが"inactive"でなければアクティブ
       },
     });
 
-    // BigIntをstringに変換 & snake_caseに統一
     const serializedProduct = {
       id: product.id.toString(),
       product_code: product.productCode,
       name: product.name,
       description: product.description,
       price: product.price,
-      cost: product.cost,
+      cost: 0,
       pv: product.pv,
-      status: product.status,
+      status: product.isActive ? "active" : "inactive",
+      isRegistration: product.isRegistration,
       created_at: product.createdAt.toISOString(),
       updated_at: product.updatedAt.toISOString(),
     };
 
     return NextResponse.json({ product: serializedProduct }, { status: 201 });
-  } catch (error: any) {
-    console.error("❌ 商品追加エラー:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error("❌ 商品追加エラー:", errMsg);
+    return NextResponse.json({ error: errMsg }, { status: 500 });
   }
 }

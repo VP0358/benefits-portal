@@ -6,47 +6,58 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/app/api/admin/route-guard";
 import { prisma } from "@/lib/prisma";
 
-const initialProducts = [
+// MLM商品マスタの初期データ（要件で指定された商品）
+const mlmInitialProducts = [
   {
-    code: '1000',
+    productCode: '1000',
     name: '[新規]VIOLA Pure 翠彩-SUMISAI-',
-    price: 0,
-    description: '新規会員向けVIOLA Pure 翠彩',
+    price: 16500,
+    pv: 150,
+    description: '新規会員向けVIOLA Pure 翠彩-SUMISAI-',
     isActive: true,
+    isRegistration: true,
   },
   {
-    code: '2000',
+    productCode: '2000',
     name: 'VIOLA Pure 翠彩-SUMISAI-',
-    price: 0,
-    description: '通常版VIOLA Pure 翠彩',
+    price: 16500,
+    pv: 150,
+    description: '通常版VIOLA Pure 翠彩-SUMISAI-',
     isActive: true,
+    isRegistration: false,
   },
   {
-    code: '4000',
+    productCode: '4000',
     name: '出荷事務手数料',
-    price: 0,
-    description: '出荷時の事務手数料',
+    price: 880,
+    pv: 0,
+    description: '出荷時の事務手数料（税込）',
     isActive: true,
+    isRegistration: false,
   },
   {
-    code: '5000',
+    productCode: '5000',
     name: '概要書面1部',
-    price: 0,
-    description: '概要書面',
+    price: 550,
+    pv: 0,
+    description: '概要書面（1部）',
     isActive: true,
+    isRegistration: false,
   },
   {
-    code: 's1000',
+    productCode: 's1000',
     name: '登録料',
-    price: 0,
-    description: '新規登録時の登録料',
+    price: 3300,
+    pv: 0,
+    description: '新規登録時の登録料（5口）',
     isActive: true,
+    isRegistration: true,
   },
 ];
 
 /**
  * POST /api/admin/products/seed
- * 商品マスタ初期データ投入
+ * MLM商品マスタ初期データ投入
  */
 export async function POST() {
   const guard = await requireAdmin();
@@ -55,44 +66,72 @@ export async function POST() {
   try {
     const results = [];
 
-    for (const product of initialProducts) {
-      // 既存チェック
-      const existing = await prisma.product.findFirst({
-        where: { code: product.code },
-      });
-
-      if (existing) {
-        results.push({
-          code: product.code,
+    for (const product of mlmInitialProducts) {
+      // upsert: 既存なら更新、なければ作成
+      const upserted = await prisma.mlmProduct.upsert({
+        where: { productCode: product.productCode },
+        create: product,
+        update: {
           name: product.name,
-          status: 'skipped',
-          message: '既に存在します',
-        });
-        continue;
-      }
-
-      // 作成
-      const created = await prisma.product.create({
-        data: product,
+          price: product.price,
+          pv: product.pv,
+          description: product.description,
+          isActive: product.isActive,
+          isRegistration: product.isRegistration,
+        },
       });
 
       results.push({
-        code: created.code,
-        name: created.name,
-        status: 'created',
-        message: '作成しました',
+        productCode: upserted.productCode,
+        name: upserted.name,
+        price: upserted.price,
+        pv: upserted.pv,
+        status: 'upserted',
+        message: `商品コード ${upserted.productCode} を登録/更新しました`,
       });
     }
 
     return NextResponse.json({
-      message: '商品マスタデータ投入完了',
+      message: 'MLM商品マスタデータ投入完了',
       results,
+      total: results.length,
     });
-  } catch (error) {
-    console.error("Error seeding products:", error);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error("Error seeding MLM products:", errMsg);
     return NextResponse.json(
-      { error: "初期データ投入に失敗しました" },
+      { error: "初期データ投入に失敗しました", detail: errMsg },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * GET /api/admin/products/seed
+ * 現在のMLM商品マスタ一覧を返す（確認用）
+ */
+export async function GET() {
+  const guard = await requireAdmin();
+  if (guard.error) return guard.error;
+
+  try {
+    const products = await prisma.mlmProduct.findMany({
+      orderBy: { productCode: 'asc' },
+    });
+
+    return NextResponse.json({
+      products: products.map(p => ({
+        productCode: p.productCode,
+        name: p.name,
+        price: p.price,
+        pv: p.pv,
+        isActive: p.isActive,
+        isRegistration: p.isRegistration,
+      })),
+      total: products.length,
+    });
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: errMsg }, { status: 500 });
   }
 }

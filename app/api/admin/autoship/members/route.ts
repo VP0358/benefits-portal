@@ -24,8 +24,13 @@ export async function GET(req: NextRequest) {
   }
 
   // オートシップ有効会員を取得
+  // 条件: autoshipEnabled=true かつ 退会でない かつ 開始日あり
   const allMembers = await prisma.mlmMember.findMany({
-    where: { autoshipEnabled: true, status: { not: "withdrawn" } },
+    where: {
+      autoshipEnabled: true,
+      status: { not: "withdrawn" },
+      autoshipStartDate: { not: null }, // 開始日が設定されていること
+    },
     include: {
       user: {
         select: { name: true, nameKana: true, phone: true, email: true, postalCode: true },
@@ -36,10 +41,25 @@ export async function GET(req: NextRequest) {
     },
   });
 
+  // 対象月の翌月1日を計算（停止日が翌月以降なら当月は有効）
+  const [year, month] = targetMonth.split("-").map(Number);
+  const targetMonthStart = new Date(`${targetMonth}-01`);
+  // 翌月1日 = 停止日がこれ以降なら当月は有効
+  const nextMonthStart = new Date(year, month, 1); // month は0-indexedではないので month = 翌月
+
   // 対象月・支払方法でフィルタ
   const filtered = allMembers.filter(m => {
-    // stopDate チェック
-    if (m.autoshipStopDate && m.autoshipStopDate <= new Date(`${targetMonth}-01`)) return false;
+    // 開始日が対象月より後なら除外
+    if (m.autoshipStartDate && m.autoshipStartDate > targetMonthStart) return false;
+
+    // stopDate チェック: 停止日が対象月の翌月より前（= 対象月中に停止）なら除外
+    // 停止日が翌月以降なら当月は有効
+    if (m.autoshipStopDate) {
+      // 停止日 <= 対象月の末日 (= 翌月1日より前) の場合は除外
+      if (m.autoshipStopDate < nextMonthStart) return false;
+    }
+    // 停止日が空欄（null）= 停止予定なし → 継続有効
+
     // suspend月チェック
     if (m.autoshipSuspendMonths) {
       const months = m.autoshipSuspendMonths.split(",").map(s => s.trim());

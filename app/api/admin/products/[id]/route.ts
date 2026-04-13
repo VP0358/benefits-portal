@@ -19,7 +19,7 @@ export async function PUT(
     const resolvedParams = await params;
     const { id } = resolvedParams;
     const body = await req.json();
-    const { product_code, name, description, price, cost, pv, status } = body;
+    const { product_code, name, description, price, pv, status } = body;
 
     // バリデーション
     if (!product_code || !name || price == null) {
@@ -51,19 +51,25 @@ export async function PUT(
         productCode: product_code,
         name,
         description: description || null,
-        price,
-        cost: cost || 0,
-        pv: pv || 0,
-        status: status || "active",
+        price: Number(price),
+        pv: Number(pv) || 0,
+        isActive: status !== "inactive",
       },
     });
 
     // BigIntをstringに変換
     const serializedProduct = {
-      ...product,
       id: product.id.toString(),
-      createdAt: product.createdAt.toISOString(),
-      updatedAt: product.updatedAt.toISOString(),
+      product_code: product.productCode,
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      cost: 0,
+      pv: product.pv,
+      status: product.isActive ? "active" : "inactive",
+      isRegistration: product.isRegistration,
+      created_at: product.createdAt.toISOString(),
+      updated_at: product.updatedAt.toISOString(),
     };
 
     return NextResponse.json({ product: serializedProduct });

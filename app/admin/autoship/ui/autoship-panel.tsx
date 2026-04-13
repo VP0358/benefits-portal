@@ -327,6 +327,35 @@ export default function AutoShipPanel() {
     }
   }
 
+  /* ─── DB自動取込（ファイルなし：オートシップ有効会員を全員取込） ─── */
+  async function handleAutoImportFromDb() {
+    setCsvImportLoading(true);
+    setCsvImportResult(null);
+    setMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append("targetMonth", csvImportMonth);
+      fd.append("paymentMethod", csvImportPm);
+      fd.append("noFile", "true");
+      const res = await fetch("/api/admin/autoship/import-direct", {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "取込失敗");
+      setCsvImportResult({ paidCount: data.paidCount, failedCount: data.failedCount, newRunId: data.runId });
+      setMsg({
+        type: "success",
+        text: `DB自動取込完了: 対象月 ${csvImportMonth} のオートシップ有効会員 ${data.paidCount} 件を当月アクティブに反映しました。`,
+      });
+      loadRuns();
+    } catch (e: unknown) {
+      setMsg({ type: "error", text: e instanceof Error ? e.message : "取込失敗" });
+    } finally {
+      setCsvImportLoading(false);
+    }
+  }
+
   /* ═══ レンダー ═══ */
   return (
     <div className="space-y-6">
@@ -463,13 +492,23 @@ export default function AutoShipPanel() {
           <span className="font-semibold">② 汎用フォーマット</span>: ヘッダーに「会員コード（code）」「決済結果（result/status）」列が必要。
           結果コード: <code className="bg-yellow-100 px-1 rounded">OK</code>/<code className="bg-yellow-100 px-1 rounded">1</code> = 成功。
         </div>
-        <button
-          onClick={handleDirectCsvImport}
-          disabled={!csvImportFile || csvImportLoading}
-          className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition"
-        >
-          {csvImportLoading ? "取り込み中…" : "📤 CSVをインポートして当月アクティブ反映"}
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={handleDirectCsvImport}
+            disabled={!csvImportFile || csvImportLoading}
+            className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition"
+          >
+            {csvImportLoading ? "取り込み中…" : "📤 CSVをインポートして当月アクティブ反映"}
+          </button>
+          <button
+            onClick={handleAutoImportFromDb}
+            disabled={csvImportLoading}
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition"
+            title="CSVファイルなし：DBのオートシップ有効会員を対象月・支払方法でフィルタして全員アクティブ反映"
+          >
+            {csvImportLoading ? "取り込み中…" : "🗄️ DB会員から当月アクティブ反映（CSVなし）"}
+          </button>
+        </div>
         {csvImportResult && (
           <div className="mt-3 p-3 bg-green-50 rounded-lg text-sm border border-green-200">
             <p className="font-semibold text-green-800">✅ インポート完了</p>

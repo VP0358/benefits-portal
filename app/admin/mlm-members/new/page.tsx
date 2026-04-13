@@ -216,12 +216,7 @@ export default function MlmMemberNewPage() {
     setLoading(true);
 
     try {
-      // バリデーション
-      if (!formData.memberCode) {
-        alert("会員コードを入力してください");
-        setLoading(false);
-        return;
-      }
+      // バリデーション（会員コードは空欄でも自動生成されるためチェック不要）
       if (!formData.name) {
         alert("氏名を入力してください");
         setLoading(false);
