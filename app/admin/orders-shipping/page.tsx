@@ -162,6 +162,12 @@ export default function OrdersShippingPage() {
   const [summaryFilterLabel, setSummaryFilterLabel] = useState<string | null>(null)
   const [summaryOrders,      setSummaryOrders]      = useState<Order[] | null>(null)
   const [summaryOrdersLoading, setSummaryOrdersLoading] = useState(false)
+  // 未処理伝票一覧のチェックボックス選択
+  const [summarySelected, setSummarySelected] = useState<Set<number>>(new Set())
+  // 未処理伝票一覧の一括処理
+  const [summaryBulkNote,      setSummaryBulkNote]      = useState("")
+  const [summaryBulkPaidDate,  setSummaryBulkPaidDate]  = useState(today.toISOString().split("T")[0])
+  const [summaryBulkProcessing, setSummaryBulkProcessing] = useState(false)
 
   // 一括処理
   const [bulkAction,    setBulkAction]    = useState("")
@@ -253,6 +259,68 @@ export default function OrdersShippingPage() {
     setSelected(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
   const toggleAll = () =>
     setSelected(selected.size === orders.length ? new Set() : new Set(orders.map(o => o.id)))
+
+  // ─── 未処理伝票一覧の選択 ────────────────────────────
+  const toggleSummarySelect = (id: number) =>
+    setSummarySelected(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+  const toggleSummaryAll = () =>
+    setSummarySelected(prev =>
+      summaryOrders && prev.size === summaryOrders.length
+        ? new Set()
+        : new Set((summaryOrders || []).map(o => o.id))
+    )
+
+  // 未処理伝票一覧内での一括処理（bulkPatch後に一覧を再取得）
+  const summaryBulkPatch = async (action: string, value: unknown, ids?: number[]) => {
+    const targetIds = ids ?? Array.from(summarySelected)
+    if (targetIds.length === 0) { alert("伝票を選択してください"); return }
+    setSummaryBulkProcessing(true)
+    try {
+      const res = await fetch("/api/admin/orders-shipping", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderIds: targetIds, action, value }),
+      })
+      if (!res.ok) { alert("更新に失敗しました"); return }
+      // 一覧を再取得して表示を更新
+      if (summaryOrders) {
+        // summaryのカウントを再取得
+        const updated = await fetch("/api/admin/orders-shipping?summaryOnly=true")
+        const d = await updated.json()
+        if (d.summary) setSummary(d.summary)
+        // summaryOrders をローカルで状態更新
+        setSummaryOrders(prev => {
+          if (!prev) return prev
+          return prev.map(o => {
+            if (!targetIds.includes(o.id)) return o
+            const updated = { ...o }
+            if (action === "setPaymentStatus") {
+              updated.paymentStatus = value as PaymentStatus
+              if (value === "paid") updated.paidAt = new Date().toISOString()
+            }
+            if (action === "setPaidAt") {
+              updated.paidAt = value ? new Date(value as string).toISOString() : null
+              updated.paymentStatus = "paid"
+            }
+            if (action === "clearPaidAt") {
+              updated.paidAt = null
+              updated.paymentStatus = "unpaid"
+            }
+            if (action === "setShippingStatus") {
+              updated.shippingStatus = value as ShippingStatus
+            }
+            if (action === "setNote") updated.note = value as string
+            if (action === "setNoteSlip") updated.noteSlip = value as string
+            return updated
+          })
+        })
+      }
+      setSummarySelected(new Set())
+      fetchSummary()
+    } finally {
+      setSummaryBulkProcessing(false)
+    }
+  }
 
   // ─── 出庫BOX操作 ────────────────────────────────────
   // チェックした伝票を指定BOXへ入れる
@@ -459,11 +527,32 @@ export default function OrdersShippingPage() {
       })
       if (!res.ok) { const d = await res.json(); alert(d.error || "伝票更新に失敗しました"); return }
       alert("伝票を更新しました")
+      const savedOrderId = editModalOrder.id
+      const savedForm = editModalForm
       setEditModalOrder(null)
       setEditModalForm(null)
       setEditModalItems([])
       fetchSummary()
       fetchOrders()
+      // summaryOrders内の対象伝票もローカル更新
+      setSummaryOrders(prev => {
+        if (!prev) return prev
+        return prev.map(o => {
+          if (o.id !== savedOrderId) return o
+          return {
+            ...o,
+            orderedAt: savedForm.orderedAt ? new Date(savedForm.orderedAt).toISOString() : o.orderedAt,
+            paidAt: savedForm.paidAt ? new Date(savedForm.paidAt).toISOString() : null,
+            paymentStatus: savedForm.paidAt ? "paid" : "unpaid",
+            shippingStatus: savedForm.shippedAt ? "shipped" : "unshipped",
+            slipType: savedForm.slipType,
+            paymentMethod: savedForm.paymentMethod,
+            note: savedForm.note,
+            noteSlip: savedForm.noteSlip,
+            outboxNo: savedForm.outboxNo,
+          }
+        })
+      })
     } finally {
       setEditModalSubmitting(false)
     }
@@ -480,6 +569,9 @@ export default function OrdersShippingPage() {
       setEditModalForm(null)
       fetchSummary()
       fetchOrders()
+      // summaryOrdersからも削除
+      setSummaryOrders(prev => prev ? prev.filter(o => o.id !== orderId) : prev)
+      setSummarySelected(prev => { const s = new Set(prev); s.delete(orderId); return s })
     } finally {
       setDeletingOrderId(null)
     }
@@ -1068,15 +1160,100 @@ export default function OrdersShippingPage() {
         {/* 未処理伝票クリック → 対象伝票一覧 */}
         {(summaryOrders !== null || summaryOrdersLoading) && (
           <div className="border-t border-gray-200">
-            <div className="bg-amber-50 px-4 py-2 flex items-center justify-between">
+            {/* ヘッダ */}
+            <div className="bg-amber-50 px-4 py-2 flex items-center justify-between flex-wrap gap-2">
               <span className="text-sm font-semibold text-amber-800 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4" />
                 {summaryFilterLabel} の伝票一覧
                 {summaryOrders && <span className="ml-2 text-xs font-normal text-amber-600">（{summaryOrders.length}件）</span>}
+                {summarySelected.size > 0 && (
+                  <span className="ml-1 px-2 py-0.5 bg-amber-600 text-white rounded text-[11px]">{summarySelected.size}件選択中</span>
+                )}
               </span>
-              <button onClick={() => { setSummaryOrders(null); setSummaryFilterLabel(null) }}
+              <button onClick={() => { setSummaryOrders(null); setSummaryFilterLabel(null); setSummarySelected(new Set()) }}
                 className="text-xs text-gray-400 hover:text-gray-600 px-2 py-0.5 rounded hover:bg-gray-100">✕ 閉じる</button>
             </div>
+
+            {/* ── 一括処理バー（チェック選択時に表示） */}
+            {summaryOrders && summaryOrders.length > 0 && (
+              <div className="bg-amber-50/70 border-b border-amber-200 px-4 py-2 flex flex-wrap items-center gap-2">
+                {/* 全選択 */}
+                <button onClick={toggleSummaryAll}
+                  className="flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 border border-amber-300 rounded px-2 py-1 bg-white hover:bg-amber-50">
+                  {summarySelected.size === summaryOrders.length
+                    ? <CheckSquare className="w-3.5 h-3.5" />
+                    : <Square className="w-3.5 h-3.5" />}
+                  全選択
+                </button>
+                <span className="text-xs text-amber-600 border-r border-amber-300 pr-2">
+                  {summarySelected.size > 0 ? `${summarySelected.size}件選択` : "チェックで選択"}
+                </span>
+                {/* 入金操作 */}
+                <button
+                  onClick={() => summaryBulkPatch("setPaymentStatus", "paid")}
+                  disabled={summarySelected.size === 0 || summaryBulkProcessing}
+                  className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 disabled:opacity-40">
+                  入金済にする
+                </button>
+                <button
+                  onClick={() => summaryBulkPatch("setPaymentStatus", "unpaid")}
+                  disabled={summarySelected.size === 0 || summaryBulkProcessing}
+                  className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 disabled:opacity-40">
+                  未入金に戻す
+                </button>
+                <button
+                  onClick={() => summaryBulkPatch("setPaymentStatus", "ignored")}
+                  disabled={summarySelected.size === 0 || summaryBulkProcessing}
+                  className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs hover:bg-gray-200 disabled:opacity-40">
+                  入金無視
+                </button>
+                <span className="border-l border-amber-300 pl-2 flex items-center gap-1">
+                  {/* 入金日設定 */}
+                  <input type="date" value={summaryBulkPaidDate}
+                    onChange={e => setSummaryBulkPaidDate(e.target.value)}
+                    className="border border-gray-300 rounded px-1.5 py-0.5 text-xs" />
+                  <button
+                    onClick={() => summaryBulkPatch("setPaidAt", summaryBulkPaidDate)}
+                    disabled={summarySelected.size === 0 || summaryBulkProcessing}
+                    className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-40">
+                    入金日セット
+                  </button>
+                </span>
+                {/* 発送操作 */}
+                <span className="border-l border-amber-300 pl-2 flex items-center gap-1">
+                  <button
+                    onClick={() => summaryBulkPatch("setShippingStatus", "shipped")}
+                    disabled={summarySelected.size === 0 || summaryBulkProcessing}
+                    className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 disabled:opacity-40">
+                    発送済にする
+                  </button>
+                  <button
+                    onClick={() => summaryBulkPatch("setShippingStatus", "unshipped")}
+                    disabled={summarySelected.size === 0 || summaryBulkProcessing}
+                    className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs hover:bg-orange-200 disabled:opacity-40">
+                    未発送に戻す
+                  </button>
+                </span>
+                {/* 備考設定 */}
+                <span className="border-l border-amber-300 pl-2 flex items-center gap-1">
+                  <input type="text" value={summaryBulkNote}
+                    onChange={e => setSummaryBulkNote(e.target.value)}
+                    placeholder="備考テキスト"
+                    className="border border-gray-300 rounded px-1.5 py-0.5 text-xs w-28" />
+                  <button
+                    onClick={async () => {
+                      await summaryBulkPatch("setNote", summaryBulkNote)
+                      setSummaryBulkNote("")
+                    }}
+                    disabled={summarySelected.size === 0 || !summaryBulkNote || summaryBulkProcessing}
+                    className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs hover:bg-purple-200 disabled:opacity-40">
+                    備考セット
+                  </button>
+                </span>
+                {summaryBulkProcessing && <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" />}
+              </div>
+            )}
+
             {summaryOrdersLoading ? (
               <div className="p-4 text-center text-gray-400 text-sm">
                 <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-1" />読み込み中...
@@ -1088,9 +1265,10 @@ export default function OrdersShippingPage() {
               </div>
             ) : summaryOrders && (
               <div className="overflow-x-auto">
-                <table className="w-full text-xs border-collapse min-w-[800px]">
+                <table className="w-full text-xs border-collapse min-w-[900px]">
                   <thead>
                     <tr className="border-b border-gray-200 bg-amber-50/60 text-gray-500 text-left">
+                      <th className="px-2 py-2 w-8"></th>
                       <th className="px-3 py-2">種別</th>
                       <th className="px-3 py-2">注文日</th>
                       <th className="px-3 py-2">入金日</th>
@@ -1100,15 +1278,35 @@ export default function OrdersShippingPage() {
                       <th className="px-3 py-2">ステイタス</th>
                       <th className="px-3 py-2 text-right">金額</th>
                       <th className="px-3 py-2">備考</th>
+                      <th className="px-3 py-2">操作</th>
                     </tr>
                   </thead>
                   <tbody>
                     {summaryOrders.map((order, idx) => (
-                      <tr key={order.id} className={`border-b border-gray-100 ${idx % 2 === 0 ? "" : "bg-gray-50/50"}`}>
+                      <tr key={order.id}
+                        className={`border-b border-gray-100 transition-colors ${
+                          summarySelected.has(order.id) ? "bg-amber-50" : idx % 2 === 0 ? "" : "bg-gray-50/50"
+                        }`}>
+                        {/* チェックボックス */}
+                        <td className="px-2 py-2" onClick={e => { e.stopPropagation(); toggleSummarySelect(order.id) }}>
+                          <button type="button" className="flex items-center">
+                            {summarySelected.has(order.id)
+                              ? <CheckSquare className="w-4 h-4 text-amber-600" />
+                              : <Square className="w-4 h-4 text-gray-300" />}
+                          </button>
+                        </td>
                         <td className="px-3 py-2">
                           <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-700">{order.slipTypeLabel}</span>
                         </td>
-                        <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{order.orderedAt.slice(0,10)}</td>
+                        {/* 注文日：クリックで編集モーダル */}
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={e => openEditModal(order, e)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer">
+                            {order.orderedAt.slice(0,10)}
+                          </button>
+                        </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           {order.paidAt
                             ? <span className="text-green-700">{order.paidAt.slice(0,10)}</span>
@@ -1155,7 +1353,29 @@ export default function OrdersShippingPage() {
                           </div>
                         </td>
                         <td className="px-3 py-2 text-right font-medium text-gray-800">¥{order.totalAmount.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-gray-500 max-w-[120px] truncate">{order.note || ""}</td>
+                        <td className="px-3 py-2 text-gray-500 max-w-[100px] truncate">{order.note || ""}</td>
+                        {/* 個別操作 */}
+                        <td className="px-2 py-2">
+                          <div className="flex flex-col gap-0.5">
+                            <button
+                              onClick={() => summaryBulkPatch("setPaymentStatus", "paid", [order.id])}
+                              disabled={summaryBulkProcessing}
+                              className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px] hover:bg-green-200 whitespace-nowrap disabled:opacity-40">
+                              入金済
+                            </button>
+                            <button
+                              onClick={() => summaryBulkPatch("setShippingStatus", "shipped", [order.id])}
+                              disabled={summaryBulkProcessing}
+                              className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] hover:bg-blue-200 whitespace-nowrap disabled:opacity-40">
+                              発送済
+                            </button>
+                            <button
+                              onClick={e => openEditModal(order, e)}
+                              className="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-[10px] hover:bg-orange-200 whitespace-nowrap">
+                              編集
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
