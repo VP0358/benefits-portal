@@ -51,6 +51,7 @@ function DeliveryNoteContent() {
   const [selectedCarrier, setSelectedCarrier] = useState("yamato")
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null)
   const [autoOpened, setAutoOpened] = useState(false)
+  const [printHTML, setPrintHTML] = useState<string | null>(null)
 
   // データ取得
   useEffect(() => {
@@ -304,7 +305,11 @@ function DeliveryNoteContent() {
   // ── 印刷/PDFウィンドウを開く ──────────────────────────
   const openPrintWindow = useCallback((html: string) => {
     const win = window.open("", "_blank", "width=900,height=700")
-    if (!win) { alert("ポップアップをブロックされました。ブラウザの設定から許可してください。"); return }
+    if (!win) {
+      // ポップアップブロック時はiframeフォールバックを使用
+      setPrintHTML(html)
+      return
+    }
     win.document.write(html)
     win.document.close()
     win.focus()
@@ -340,19 +345,28 @@ function DeliveryNoteContent() {
   // typeパラメータに応じて自動で印刷ダイアログ表示
   useEffect(() => {
     if (!autoOpened && !loading && orders.length > 0) {
-      if (typeParam === "receipt") {
-        setAutoOpened(true)
-        setTimeout(() => {
-          const html = buildReceiptHTML(orders)
-          const win = window.open("", "_blank", "width=900,height=700")
-          if (win) {
-            win.document.write(html)
-            win.document.close()
-            win.focus()
-            setTimeout(() => { win.print() }, 600)
-          }
-        }, 800)
-      }
+      setAutoOpened(true)
+      setTimeout(() => {
+        let html = ""
+        if (typeParam === "receipt") {
+          html = buildReceiptHTML(orders)
+        } else {
+          // delivery（デフォルト）
+          html = buildDeliveryNoteHTML(orders)
+        }
+        // ポップアップを試みる
+        const win = window.open("", "_blank", "width=900,height=700")
+        if (win) {
+          win.document.write(html)
+          win.document.close()
+          win.focus()
+          setTimeout(() => { win.print() }, 600)
+        } else {
+          // ポップアップがブロックされた場合: printHTMLステートに設定し
+          // IFRAMEを使って印刷
+          setPrintHTML(html)
+        }
+      }, 800)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, orders.length, typeParam])
@@ -384,6 +398,20 @@ function DeliveryNoteContent() {
 
   return (
     <div className="space-y-4 text-sm">
+      {/* ポップアップブロック時のフォールバック印刷用iframe */}
+      {printHTML && (
+        <iframe
+          key={printHTML.slice(0, 50)}
+          style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", border: "none", zIndex: 9999, background: "white" }}
+          srcDoc={printHTML}
+          onLoad={(e) => {
+            const iframe = e.target as HTMLIFrameElement
+            setTimeout(() => {
+              iframe.contentWindow?.print()
+            }, 500)
+          }}
+        />
+      )}
       {/* ── タイトル + 戻るボタン ── */}
       <div className="rounded-2xl bg-white border border-stone-100 px-5 py-4 flex items-center justify-between"
         style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
