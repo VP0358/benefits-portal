@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 /* ───────────── 型定義 ───────────── */
-type PaymentMethod = "credit_card" | "bank_transfer";
+type PaymentMethod = "credit_card" | "bank_transfer" | "bank_payment" | "cod" | "other";
 type RunStatus = "draft" | "exported" | "imported" | "completed" | "canceled";
 type OrderStatus = "pending" | "paid" | "failed" | "canceled";
 
@@ -81,9 +81,12 @@ const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
   failed: "bg-red-100 text-red-700",
   canceled: "bg-gray-200 text-gray-500",
 };
-const PM_LABELS: Record<PaymentMethod, string> = {
-  credit_card: "💳 クレジットカード (Credix)",
-  bank_transfer: "🏦 口座振替 (三菱UFJファクター)",
+const PM_LABELS: Record<string, string> = {
+  credit_card:   "💳 クレジットカード",
+  bank_transfer: "🏦 口座引き落とし",
+  bank_payment:  "🏧 銀行振込",
+  cod:           "📦 代引き",
+  other:         "📋 その他",
 };
 
 /* ───────────── ヘルパー ───────────── */
@@ -109,7 +112,7 @@ export default function AutoShipPanel() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
-  const [newPm, setNewPm] = useState<PaymentMethod>("credit_card");
+  const [newPm, setNewPm] = useState<string>("credit_card");
   const [createLoading, setCreateLoading] = useState(false);
 
   /* 詳細モーダル */
@@ -133,9 +136,9 @@ export default function AutoShipPanel() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
-  const [memberListPm, setMemberListPm] = useState<PaymentMethod>("credit_card");
+  const [memberListPm, setMemberListPm] = useState<string>("credit_card");
   const [memberListData, setMemberListData] = useState<{
-    id: string; memberCode: string; memberName: string; memberPhone: string | null; memberEmail: string | null; paymentMethod: string;
+    id: string; memberCode: string; memberName: string; memberPhone: string | null; memberEmail: string | null; paymentMethod: string; autoshipStartDate: string | null; autoshipStopDate: string | null;
   }[]>([]);
   const [memberListLoading, setMemberListLoading] = useState(false);
   const [showMemberList, setShowMemberList] = useState(false);
@@ -146,7 +149,7 @@ export default function AutoShipPanel() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
-  const [csvImportPm, setCsvImportPm] = useState<PaymentMethod>("credit_card");
+  const [csvImportPm, setCsvImportPm] = useState<string>("credit_card");
   const [csvImportLoading, setCsvImportLoading] = useState(false);
   const [csvImportResult, setCsvImportResult] = useState<{ paidCount: number; failedCount: number; newRunId?: string } | null>(null);
 
@@ -281,10 +284,8 @@ export default function AutoShipPanel() {
     setMemberListData([]);
     setMsg(null);
     try {
-      const params = new URLSearchParams({
-        targetMonth: memberListMonth,
-        paymentMethod: memberListPm,
-      });
+      const params = new URLSearchParams({ targetMonth: memberListMonth });
+      if (memberListPm) params.set("paymentMethod", memberListPm);
       const res = await fetch(`/api/admin/autoship/members?${params}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "取得失敗");
@@ -390,11 +391,15 @@ export default function AutoShipPanel() {
             <label className="block text-xs font-medium text-gray-600 mb-1">支払い方法</label>
             <select
               value={memberListPm}
-              onChange={e => setMemberListPm(e.target.value as PaymentMethod)}
+              onChange={e => setMemberListPm(e.target.value)}
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
-              <option value="credit_card">💳 クレジットカード (Credix)</option>
-              <option value="bank_transfer">🏦 口座振替 (三菱UFJファクター)</option>
+              <option value="">すべて</option>
+              <option value="credit_card">💳 クレジットカード</option>
+              <option value="bank_transfer">🏦 口座引き落とし</option>
+              <option value="bank_payment">🏧 銀行振込</option>
+              <option value="cod">📦 代引き</option>
+              <option value="other">📋 その他</option>
             </select>
           </div>
           <div className="flex items-end">
@@ -411,7 +416,7 @@ export default function AutoShipPanel() {
           <div className="mt-3">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm text-gray-600">
-                対象: <strong>{memberListMonth}</strong> / {PM_LABELS[memberListPm]} — <strong>{memberListData.length}件</strong>
+                対象: <strong>{memberListMonth}</strong> / {memberListPm ? PM_LABELS[memberListPm] ?? memberListPm : "すべての支払い方法"} — <strong>{memberListData.length}件</strong>
               </p>
               <button onClick={() => setShowMemberList(false)} className="text-xs text-gray-400 hover:text-gray-600">✕ 閉じる</button>
             </div>
@@ -425,6 +430,8 @@ export default function AutoShipPanel() {
                       <th className="px-3 py-2 text-left">電話</th>
                       <th className="px-3 py-2 text-left">メール</th>
                       <th className="px-3 py-2 text-left">支払い方法</th>
+                      <th className="px-3 py-2 text-left">開始日</th>
+                      <th className="px-3 py-2 text-left">停止日</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -434,7 +441,9 @@ export default function AutoShipPanel() {
                         <td className="px-3 py-2">{m.memberName}</td>
                         <td className="px-3 py-2 text-gray-500">{m.memberPhone ?? "—"}</td>
                         <td className="px-3 py-2 text-gray-500">{m.memberEmail ?? "—"}</td>
-                        <td className="px-3 py-2">{PM_LABELS[m.paymentMethod as PaymentMethod] ?? m.paymentMethod}</td>
+                        <td className="px-3 py-2">{PM_LABELS[m.paymentMethod] ?? m.paymentMethod}</td>
+                        <td className="px-3 py-2 text-gray-500">{m.autoshipStartDate ? new Date(m.autoshipStartDate).toLocaleDateString("ja-JP") : "—"}</td>
+                        <td className="px-3 py-2 text-gray-500">{m.autoshipStopDate ? new Date(m.autoshipStopDate).toLocaleDateString("ja-JP") : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -468,11 +477,14 @@ export default function AutoShipPanel() {
             <label className="block text-xs font-medium text-gray-600 mb-1">決済会社（支払い方法）</label>
             <select
               value={csvImportPm}
-              onChange={e => setCsvImportPm(e.target.value as PaymentMethod)}
+              onChange={e => setCsvImportPm(e.target.value)}
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
             >
-              <option value="credit_card">💳 クレジットカード (Credix)</option>
-              <option value="bank_transfer">🏦 口座振替 (三菱UFJファクター)</option>
+              <option value="credit_card">💳 クレジットカード</option>
+              <option value="bank_transfer">🏦 口座引き落とし</option>
+              <option value="bank_payment">🏧 銀行振込</option>
+              <option value="cod">📦 代引き</option>
+              <option value="other">📋 その他</option>
             </select>
           </div>
           <div>
@@ -550,11 +562,14 @@ export default function AutoShipPanel() {
               <label className="block text-xs font-medium text-gray-600 mb-1">支払い方法</label>
               <select
                 value={newPm}
-                onChange={e => setNewPm(e.target.value as PaymentMethod)}
+                onChange={e => setNewPm(e.target.value)}
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
               >
-                <option value="credit_card">💳 クレジットカード (Credix)</option>
-                <option value="bank_transfer">🏦 口座振替 (三菱UFJファクター)</option>
+                <option value="credit_card">💳 クレジットカード</option>
+                <option value="bank_transfer">🏦 口座引き落とし</option>
+                <option value="bank_payment">🏧 銀行振込</option>
+                <option value="cod">📦 代引き</option>
+                <option value="other">📋 その他</option>
               </select>
             </div>
           </div>
@@ -603,7 +618,7 @@ export default function AutoShipPanel() {
               {runs.map(r => (
                 <tr key={r.id} className="hover:bg-gray-50 transition">
                   <td className="px-4 py-3 font-medium text-gray-800">{r.targetMonth}</td>
-                  <td className="px-4 py-3 text-gray-600">{PM_LABELS[r.paymentMethod]}</td>
+                  <td className="px-4 py-3 text-gray-600">{PM_LABELS[r.paymentMethod] ?? r.paymentMethod}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${RUN_STATUS_COLORS[r.status]}`}>
                       {RUN_STATUS_LABELS[r.status]}
@@ -639,7 +654,7 @@ export default function AutoShipPanel() {
             {/* モーダルヘッダー */}
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <h2 className="text-lg font-bold text-gray-800">
-                {detail ? `${detail.targetMonth} / ${PM_LABELS[detail.paymentMethod]}` : "読み込み中…"}
+                {detail ? `${detail.targetMonth} / ${PM_LABELS[detail.paymentMethod] ?? detail.paymentMethod}` : "読み込み中…"}
               </h2>
               <button onClick={() => { setDetail(null); setImportFile(null); setImportResult(null); }} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
             </div>

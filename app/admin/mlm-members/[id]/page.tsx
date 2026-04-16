@@ -94,9 +94,11 @@ const MEMBER_TYPE_LABEL: Record<string, string> = {
   business: "ビジネス会員", preferred: "愛用会員", consumer: "愛用会員",
 };
 const PAYMENT_LABEL: Record<string, string> = {
-  credit_card: "クレジットカード（クレディックス）",
-  bank_transfer: "口座振替（三菱UFJファクター）",
-  bank_payment: "銀行振込",
+  credit_card:   "クレジットカード",
+  bank_transfer: "口座引き落とし",
+  bank_payment:  "銀行振込",
+  cod:           "代引き",
+  other:         "その他",
 };
 
 // ─── ヘルパー ────────────────────────────────────────
@@ -1164,9 +1166,11 @@ export default function MlmMemberDetailPage() {
             </FormField>
             <FormField label="支払い方法">
               <select className={selectCls} value={String(editData.paymentMethod ?? "credit_card")} onChange={e => set("paymentMethod", e.target.value)}>
-                <option value="credit_card">クレジットカード（クレディックス）</option>
-                <option value="bank_transfer">口座振替（三菱UFJファクター）</option>
+                <option value="credit_card">クレジットカード</option>
+                <option value="bank_transfer">口座引き落とし</option>
                 <option value="bank_payment">銀行振込</option>
+                <option value="cod">代引き</option>
+                <option value="other">その他</option>
               </select>
             </FormField>
           </div>
