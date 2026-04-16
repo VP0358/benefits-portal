@@ -13,8 +13,11 @@ type PaymentStatus  = "unpaid" | "paid" | "ignored"
 type ShippingStatus = "unshipped" | "shipped" | "ignored"
 
 interface OrderItem {
-  id: number; productName: string; productCode: string
+  id: number; productId: number; productName: string; productCode: string
   quantity: number; unitPrice: number; lineAmount: number
+}
+interface Product {
+  id: string; code: string; name: string; price: number
 }
 interface ShippingLabel {
   id: number; carrier: string; trackingNumber: string | null; status: string
@@ -174,8 +177,14 @@ export default function OrdersShippingPage() {
     slipType: string; paymentMethod: string
     note: string; noteSlip: string; outboxNo: number
   } | null>(null)
+  const [editModalItems, setEditModalItems] = useState<{
+    productId: string; productName: string; unitPrice: number; quantity: number
+  }[]>([])
   const [editModalSubmitting, setEditModalSubmitting] = useState(false)
   const [deletingOrderId,     setDeletingOrderId]     = useState<number | null>(null)
+
+  // 商品マスター
+  const [products, setProducts] = useState<Product[]>([])
 
   // CSV取込
   const yamotoInputRef = useRef<HTMLInputElement>(null)
@@ -225,6 +234,19 @@ export default function OrdersShippingPage() {
   }, [])
 
   useEffect(() => { fetchSummary() }, [fetchSummary])
+
+  // 商品マスター取得
+  useEffect(() => {
+    fetch("/api/admin/products")
+      .then(r => r.json())
+      .then(d => {
+        const active = (d.products || []).filter((p: Product & { status?: string; isActive?: boolean }) =>
+          p.status === "active" || p.isActive === true
+        )
+        setProducts(active)
+      })
+      .catch(() => {})
+  }, [])
 
   // ─── 選択 ───────────────────────────────────────────
   const toggleSelect = (id: number) =>
@@ -398,66 +420,48 @@ export default function OrdersShippingPage() {
       noteSlip: order.noteSlip || "",
       outboxNo: order.outboxNo,
     })
+    // 商品明細を初期セット
+    setEditModalItems(
+      order.items.length > 0
+        ? order.items.map(item => ({
+            productId: String(item.productId || ""),
+            productName: item.productName,
+            unitPrice: item.unitPrice,
+            quantity: item.quantity,
+          }))
+        : [{ productId: "", productName: "", unitPrice: 0, quantity: 1 }]
+    )
   }
 
   // 伝票編集保存
   const handleEditModalSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editModalOrder || !editModalForm) return
+    const validItems = editModalItems.filter(i => i.productId)
+    if (validItems.length === 0) { alert("商品を1つ以上選択してください"); return }
     setEditModalSubmitting(true)
     try {
       const res = await fetch("/api/admin/orders-shipping", {
-        method: "PATCH",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orderIds: [editModalOrder.id],
-          action: "setOrderedAt",
-          value: editModalForm.orderedAt,
+          orderId: editModalOrder.id,
+          orderedAt: editModalForm.orderedAt,
+          paidAt: editModalForm.paidAt || null,
+          shippedAt: editModalForm.shippedAt || null,
+          slipType: editModalForm.slipType,
+          paymentMethod: editModalForm.paymentMethod,
+          note: editModalForm.note,
+          noteSlip: editModalForm.noteSlip,
+          outboxNo: editModalForm.outboxNo,
+          items: validItems,
         }),
       })
-      if (!res.ok) { alert("注文日更新に失敗しました"); return }
-      // 入金日更新
-      if (editModalForm.paidAt) {
-        await fetch("/api/admin/orders-shipping", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderIds: [editModalOrder.id], action: "setPaidAt", value: editModalForm.paidAt }),
-        })
-      } else {
-        await fetch("/api/admin/orders-shipping", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderIds: [editModalOrder.id], action: "clearPaidAt", value: null }),
-        })
-      }
-      // 発送日更新
-      if (editModalForm.shippedAt) {
-        await fetch("/api/admin/orders-shipping", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderIds: [editModalOrder.id], action: "setShippedAt", value: editModalForm.shippedAt }),
-        })
-      }
-      // 備考更新
-      await fetch("/api/admin/orders-shipping", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderIds: [editModalOrder.id], action: "setNote", value: editModalForm.note }),
-      })
-      await fetch("/api/admin/orders-shipping", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderIds: [editModalOrder.id], action: "setNoteSlip", value: editModalForm.noteSlip }),
-      })
-      // 出庫BOX更新
-      await fetch("/api/admin/orders-shipping", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderIds: [editModalOrder.id], action: "setOutbox", value: editModalForm.outboxNo }),
-      })
+      if (!res.ok) { const d = await res.json(); alert(d.error || "伝票更新に失敗しました"); return }
       alert("伝票を更新しました")
       setEditModalOrder(null)
       setEditModalForm(null)
+      setEditModalItems([])
       fetchSummary()
       fetchOrders()
     } finally {
@@ -1474,7 +1478,7 @@ export default function OrdersShippingPage() {
       ═══════════════════════════════════════════════ */}
       {editModalOrder && editModalForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 overflow-y-auto py-8">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
             {/* モーダルヘッダ */}
             <div className="bg-orange-600 text-white px-5 py-3 flex items-center justify-between">
               <div>
@@ -1567,18 +1571,91 @@ export default function OrdersShippingPage() {
                   className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
               </div>
 
-              {/* 商品明細（参照用） */}
-              <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600 space-y-1">
-                <div className="font-medium text-gray-700 mb-1.5">商品明細</div>
-                {editModalOrder.items.map(item => (
-                  <div key={item.id} className="flex justify-between">
-                    <span>{item.productName} × {item.quantity}</span>
-                    <span className="font-medium">¥{item.lineAmount.toLocaleString()}</span>
-                  </div>
-                ))}
-                <div className="flex justify-between border-t border-gray-200 pt-1 font-semibold text-gray-800">
-                  <span>合計</span>
-                  <span>¥{editModalOrder.totalAmount.toLocaleString()}</span>
+              {/* 商品明細（編集可能） */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="bg-gray-700 text-white px-3 py-1.5 text-xs font-bold flex items-center justify-between">
+                  <span>商品明細（編集可）</span>
+                  <button type="button"
+                    onClick={() => setEditModalItems(prev => [...prev, { productId: "", productName: "", unitPrice: 0, quantity: 1 }])}
+                    className="text-xs bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded">
+                    ＋ 行追加
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-1 py-1.5 w-6"></th>
+                        <th className="px-2 py-1.5 text-left">商品</th>
+                        <th className="px-2 py-1.5 text-right w-24">単価</th>
+                        <th className="px-2 py-1.5 text-center w-16">数量</th>
+                        <th className="px-2 py-1.5 text-right w-24">小計</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {editModalItems.map((item, idx) => (
+                        <tr key={idx} className="border-b border-gray-100">
+                          <td className="px-1 py-1 text-center">
+                            <button type="button"
+                              onClick={() => setEditModalItems(prev => prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx))}
+                              className="text-gray-300 hover:text-red-500 text-base leading-none">×</button>
+                          </td>
+                          <td className="px-2 py-1">
+                            <select value={item.productId}
+                              onChange={e => {
+                                const pid = e.target.value
+                                const found = products.find(p => p.id === pid)
+                                setEditModalItems(prev => prev.map((it, i) => i === idx ? {
+                                  productId: pid,
+                                  productName: found?.name || it.productName,
+                                  unitPrice: found ? found.price : it.unitPrice,
+                                  quantity: it.quantity,
+                                } : it))
+                              }}
+                              className="border border-gray-300 rounded px-1 py-0.5 text-xs bg-white w-full focus:ring-1 focus:ring-blue-400">
+                              <option value="">{item.productName ? item.productName + "（未マッチ）" : "─ 選択 ─"}</option>
+                              {products.map(p => (
+                                <option key={p.id} value={p.id}>{p.code ? p.code + " - " : ""}{p.name}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-2 py-1">
+                            <input type="number" min={0} value={item.unitPrice}
+                              onChange={e => setEditModalItems(prev => prev.map((it, i) => i === idx ? { ...it, unitPrice: Number(e.target.value) } : it))}
+                              className="border border-gray-300 rounded px-1 py-0.5 text-xs text-right w-full" />
+                          </td>
+                          <td className="px-2 py-1">
+                            <input type="number" min={1} value={item.quantity}
+                              onChange={e => setEditModalItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) || 1 } : it))}
+                              className="border border-gray-300 rounded px-1 py-0.5 text-xs text-center w-full" />
+                          </td>
+                          <td className="px-2 py-1 text-right font-medium text-gray-700">
+                            ¥{(item.unitPrice * item.quantity).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-gray-300 bg-gray-50">
+                        <td colSpan={4} className="px-2 py-1.5 text-right font-semibold text-gray-700">合計（税別）</td>
+                        <td className="px-2 py-1.5 text-right font-bold text-gray-900">
+                          ¥{editModalItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0).toLocaleString()}
+                        </td>
+                      </tr>
+                      <tr className="bg-gray-50">
+                        <td colSpan={4} className="px-2 py-1 text-right text-gray-500 text-[11px]">消費税（10%）</td>
+                        <td className="px-2 py-1 text-right text-gray-500 text-[11px]">
+                          ¥{Math.floor(editModalItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0) * 0.1).toLocaleString()}
+                        </td>
+                      </tr>
+                      <tr className="bg-blue-50">
+                        <td colSpan={4} className="px-2 py-1.5 text-right font-bold text-blue-700">合計（税込）</td>
+                        <td className="px-2 py-1.5 text-right font-bold text-blue-700">
+                          ¥{Math.floor(editModalItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0) * 1.1).toLocaleString()}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
               </div>
 

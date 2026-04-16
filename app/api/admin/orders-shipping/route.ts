@@ -119,11 +119,12 @@ export async function GET(request: NextRequest) {
         items: {
           select: {
             id: true,
+            productId: true,
             productName: true,
             unitPrice: true,
             quantity: true,
             lineAmount: true,
-            product: { select: { code: true } }
+            product: { select: { id: true, code: true } }
           }
         },
         shippingLabel: {
@@ -175,6 +176,7 @@ export async function GET(request: NextRequest) {
         memberEmail: order.user.email,
         items: order.items.map((item) => ({
           id: Number(item.id),
+          productId: Number(item.productId),
           productName: item.productName,
           productCode: item.product?.code || "",
           quantity: item.quantity,
@@ -279,6 +281,80 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Order delete error:", error)
+    return NextResponse.json({ success: false, error: String(error) }, { status: 500 })
+  } finally {
+    await prisma.$disconnect()
+  }
+}
+
+// 伝票全体更新（商品明細含む）
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { orderId, orderedAt, paidAt, shippedAt, slipType, paymentMethod, note, noteSlip, outboxNo, items } = body
+
+    if (!orderId) {
+      return NextResponse.json({ success: false, error: "orderId is required" }, { status: 400 })
+    }
+
+    const orderIdBig = BigInt(orderId)
+
+    // 商品合計計算
+    let subtotal = 0
+    const validItems = (items || []).filter((i: { productId: string | number }) => i.productId)
+    for (const item of validItems) {
+      subtotal += (item.unitPrice || 0) * (item.quantity || 1)
+    }
+    const tax = Math.floor(subtotal * 0.1)
+    const totalAmount = subtotal + tax
+
+    // Order更新
+    await prisma.order.update({
+      where: { id: orderIdBig },
+      data: {
+        slipType: slipType || undefined,
+        paymentMethod: paymentMethod || undefined,
+        paymentStatus: paidAt ? "paid" : "unpaid",
+        shippingStatus: shippedAt ? "shipped" : "unshipped",
+        outboxNo: outboxNo != null ? Number(outboxNo) : undefined,
+        orderedAt: orderedAt ? new Date(orderedAt) : undefined,
+        paidAt: paidAt ? new Date(paidAt) : null,
+        note: note ?? undefined,
+        noteSlip: noteSlip ?? undefined,
+        ...(validItems.length > 0 ? { subtotalAmount: subtotal, totalAmount } : {}),
+      },
+    })
+
+    // 商品明細削除→再作成
+    if (validItems.length > 0) {
+      await prisma.orderItem.deleteMany({ where: { orderId: orderIdBig } })
+      for (const item of validItems) {
+        const lineAmount = (item.unitPrice || 0) * (item.quantity || 1)
+        await prisma.orderItem.create({
+          data: {
+            orderId: orderIdBig,
+            productId: BigInt(item.productId),
+            productName: item.productName || "",
+            unitPrice: item.unitPrice || 0,
+            quantity: item.quantity || 1,
+            lineAmount,
+          },
+        })
+      }
+
+      // ShippingLabel の itemDescription・itemCount 更新
+      await prisma.shippingLabel.updateMany({
+        where: { orderId: orderIdBig },
+        data: {
+          itemDescription: validItems.map((i: { productName: string }) => i.productName).join(", "),
+          itemCount: validItems.length,
+        },
+      })
+    }
+
+    return NextResponse.json({ success: true, orderId, totalAmount })
+  } catch (error) {
+    console.error("Order PUT error:", error)
     return NextResponse.json({ success: false, error: String(error) }, { status: 500 })
   } finally {
     await prisma.$disconnect()
