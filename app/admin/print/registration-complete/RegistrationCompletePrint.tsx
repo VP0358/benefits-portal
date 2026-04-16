@@ -26,7 +26,6 @@ interface Props {
 
 export default function RegistrationCompletePrint({ data }: Props) {
   useEffect(() => {
-    // ページ読み込み後に自動印刷ダイアログを表示
     const timer = setTimeout(() => {
       window.print()
     }, 500)
@@ -38,7 +37,7 @@ export default function RegistrationCompletePrint({ data }: Props) {
       <style>{`
         @page {
           size: A4 portrait;
-          margin: 10mm 12mm 10mm 12mm;
+          margin: 8mm 12mm 8mm 12mm;
         }
         *, *::before, *::after {
           box-sizing: border-box;
@@ -47,27 +46,25 @@ export default function RegistrationCompletePrint({ data }: Props) {
         }
         html, body {
           width: 100%;
-          height: 100%;
         }
         body {
           font-family: "MS Mincho", "Yu Mincho", "Hiragino Mincho ProN", serif;
-          font-size: 9pt;
+          font-size: 8.5pt;
           color: #000;
           background: #fff;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
         }
+
+        /* ── 全体コンテナ ── */
         .print-container {
           width: 186mm;
-          max-height: 277mm;
           margin: 0 auto;
-          padding: 0;
           display: flex;
           flex-direction: column;
-          overflow: hidden;
         }
 
-        /* 画面表示用スタイル */
+        /* 画面表示 */
         @media screen {
           body {
             background: #f0f0f0;
@@ -75,10 +72,9 @@ export default function RegistrationCompletePrint({ data }: Props) {
           }
           .print-container {
             background: #fff;
-            padding: 12mm;
+            padding: 10mm;
             box-shadow: 0 0 20px rgba(0,0,0,0.2);
-            margin: 70px auto 20px;
-            max-height: none;
+            margin: 65px auto 20px;
           }
           .print-btn-bar {
             display: flex;
@@ -87,9 +83,7 @@ export default function RegistrationCompletePrint({ data }: Props) {
             padding: 10px;
             background: #1e3a5f;
             position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
+            top: 0; left: 0; right: 0;
             z-index: 1000;
           }
           .print-btn {
@@ -106,7 +100,9 @@ export default function RegistrationCompletePrint({ data }: Props) {
         @media print {
           .print-btn-bar { display: none !important; }
           body { background: #fff; padding: 0; }
-          .print-container { margin: 0; max-height: none; }
+          .print-container { margin: 0; }
+          /* 改ページ禁止 */
+          .no-break { page-break-inside: avoid; }
         }
 
         /* ── ヘッダー ── */
@@ -114,46 +110,50 @@ export default function RegistrationCompletePrint({ data }: Props) {
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
-          margin-bottom: 2mm;
+          margin-bottom: 2.5mm;
+          gap: 4mm;
         }
+        .header-left { flex: 1; }
         .header-address {
           font-size: 8.5pt;
-          line-height: 1.6;
-        }
-        .header-right {
-          text-align: right;
-          font-size: 8.5pt;
-          line-height: 1.6;
+          line-height: 1.55;
+          margin-bottom: 1.5mm;
         }
         .header-important {
-          font-size: 13pt;
+          font-size: 12pt;
           font-weight: bold;
           display: inline-block;
           border: 2px solid #000;
-          padding: 0.5mm 3mm;
-          margin-bottom: 1.5mm;
+          padding: 0.3mm 3mm;
+          margin-bottom: 1mm;
         }
         .header-recipient {
-          font-size: 12pt;
+          font-size: 11.5pt;
           font-weight: bold;
-          margin-bottom: 1mm;
+        }
+        .header-right {
+          text-align: right;
+          font-size: 8pt;
+          line-height: 1.6;
+          white-space: nowrap;
+          padding-top: 1mm;
         }
 
         /* ── タイトル ── */
         .doc-title {
           text-align: center;
-          font-size: 14pt;
+          font-size: 13.5pt;
           font-weight: bold;
           border-top: 2px solid #000;
           border-bottom: 2px solid #000;
-          padding: 2mm 0;
-          margin: 2mm 0;
+          padding: 1.8mm 0;
+          margin: 0 0 2mm;
         }
 
         /* ── 本文 ── */
         .doc-body {
           font-size: 8.5pt;
-          margin: 2mm 0;
+          margin: 0 0 2mm;
           line-height: 1.6;
         }
 
@@ -161,7 +161,7 @@ export default function RegistrationCompletePrint({ data }: Props) {
         .info-table {
           width: 100%;
           border-collapse: collapse;
-          margin: 2mm 0;
+          margin-bottom: 2.5mm;
         }
         .info-table th,
         .info-table td {
@@ -169,26 +169,26 @@ export default function RegistrationCompletePrint({ data }: Props) {
           padding: 1.5mm 2.5mm;
           vertical-align: middle;
           font-size: 8.5pt;
+          line-height: 1.4;
         }
         .info-table th {
           background: #f0f0f0;
           font-weight: bold;
-          width: 32mm;
           white-space: nowrap;
+          width: 30mm;
         }
-        .info-table td {
-          word-break: break-all;
-        }
+        .info-table th.w-narrow { width: 26mm; }
+        .info-table td { word-break: break-all; }
 
         /* ── マイページ ── */
         .mypage-section {
           border: 1.5px solid #333;
-          padding: 2mm 4mm;
-          margin: 2mm 0;
+          padding: 2mm 3.5mm;
+          margin-bottom: 2.5mm;
           background: #fafafa;
         }
         .mypage-title {
-          font-size: 10pt;
+          font-size: 9.5pt;
           font-weight: bold;
           margin-bottom: 1mm;
           border-bottom: 1px solid #ccc;
@@ -196,7 +196,7 @@ export default function RegistrationCompletePrint({ data }: Props) {
         }
         .mypage-info {
           font-size: 8.5pt;
-          line-height: 1.8;
+          line-height: 1.75;
         }
         .mypage-url { color: #1a0dab; text-decoration: underline; }
         .mypage-note {
@@ -208,9 +208,9 @@ export default function RegistrationCompletePrint({ data }: Props) {
         }
         .pw-highlight {
           font-weight: bold;
-          font-size: 10.5pt;
+          font-size: 10pt;
           color: #cc0000;
-          letter-spacing: 0.1em;
+          letter-spacing: 0.08em;
         }
 
         /* ── フッター ── */
@@ -218,18 +218,18 @@ export default function RegistrationCompletePrint({ data }: Props) {
           display: flex;
           justify-content: space-between;
           align-items: flex-end;
-          margin-top: 2mm;
           padding-top: 2mm;
           border-top: 1px solid #666;
         }
         .company-footer {
-          font-size: 8pt;
+          font-size: 7.5pt;
           line-height: 1.6;
         }
         .issue-date {
           font-size: 8.5pt;
           text-align: right;
           white-space: nowrap;
+          padding-left: 4mm;
         }
       `}</style>
 
@@ -244,22 +244,21 @@ export default function RegistrationCompletePrint({ data }: Props) {
       </div>
 
       <div className="print-container">
+
         {/* ── ヘッダー ── */}
-        <div className="header-row">
-          <div>
+        <div className="header-row no-break">
+          <div className="header-left">
             <div className="header-address">
               〒{data.postalCode}<br />
               {data.address.replace(/^〒\S+\s*/, "")}
             </div>
-            <div style={{ marginTop: "1.5mm" }}>
-              <span className="header-important">重要</span>
-            </div>
+            <span className="header-important">重要</span>
             <div className="header-recipient" style={{ marginTop: "1mm" }}>
               {data.name} 様
             </div>
           </div>
           <div className="header-right">
-            <div style={{ fontWeight: "bold", fontSize: "9pt" }}>CLAIRホールディングス株式会社</div>
+            <div style={{ fontWeight: "bold", fontSize: "8.5pt" }}>CLAIRホールディングス株式会社</div>
             <div>〒020-0026 岩手県盛岡市開運橋通5-6</div>
             <div>第五菱和ビル5F</div>
             <div>TEL：019-681-3667</div>
@@ -268,54 +267,60 @@ export default function RegistrationCompletePrint({ data }: Props) {
         </div>
 
         {/* ── タイトル ── */}
-        <div className="doc-title">登録完了のお知らせ</div>
+        <div className="doc-title no-break">登録完了のお知らせ</div>
 
         {/* ── 本文 ── */}
-        <div className="doc-body">
+        <div className="doc-body no-break">
           お申込みいただき誠に有難うございます。下記の通り契約完了を通知致します。
           内容に間違いがないかご確認をお願い致します。今後ともよろしくお願い申し上げます。
         </div>
 
-        {/* ── 詳細テーブル ── */}
-        <table className="info-table">
+        {/* ── 詳細テーブル（2列レイアウト） ── */}
+        <table className="info-table no-break">
           <tbody>
+            {/* 行1: 会員ID + 契約締結日 */}
             <tr>
               <th>会員ID</th>
               <td>{data.memberCode}</td>
-              <th style={{ width: "28mm" }}>契約締結日</th>
+              <th className="w-narrow">契約締結日</th>
               <td>{data.contractDate}</td>
             </tr>
+            {/* 行2: 氏名 + 生年月日 */}
             <tr>
               <th>氏名</th>
               <td>{data.name} 様</td>
-              <th>生年月日</th>
-              <td>{data.birthDate}</td>
+              <th className="w-narrow">生年月日</th>
+              <td>{data.birthDate || "―"}</td>
             </tr>
+            {/* 行3: 登録・配送住所（全幅） */}
             <tr>
               <th>登録・配送住所</th>
               <td colSpan={3}>
                 〒{data.postalCode}　{data.address.replace(/^〒\S+\s*/, "")}
               </td>
             </tr>
+            {/* 行4: 連絡先 + 紹介者 */}
             <tr>
               <th>連絡先</th>
               <td>
                 TEL {data.phone}
-                {data.fax ? `　　FAX ${data.fax}` : ""}
+                {data.fax ? <><br />FAX {data.fax}</> : ""}
               </td>
-              <th>紹介者</th>
+              <th className="w-narrow">紹介者</th>
               <td>
                 {data.referrerCode && data.referrerName
-                  ? `${data.referrerCode} ${data.referrerName} 様`
+                  ? `${data.referrerCode}　${data.referrerName} 様`
                   : "―"}
               </td>
             </tr>
+            {/* 行5: メールアドレス + 携帯メール */}
             <tr>
               <th>メールアドレス</th>
-              <td>{data.email || "―"}</td>
-              <th>携帯Eメール</th>
-              <td>{data.mobileEmail || "―"}</td>
+              <td style={{ fontSize: "8pt" }}>{data.email || "―"}</td>
+              <th className="w-narrow">携帯Eメール</th>
+              <td style={{ fontSize: "8pt" }}>{data.mobileEmail || "―"}</td>
             </tr>
+            {/* 行6: 口座情報（あれば） */}
             {data.bankInfo && (
               <tr>
                 <th>口座情報</th>
@@ -326,12 +331,12 @@ export default function RegistrationCompletePrint({ data }: Props) {
         </table>
 
         {/* ── マイページ ── */}
-        <div className="mypage-section">
-          <div className="mypage-title">マイページ ログイン情報</div>
+        <div className="mypage-section no-break">
+          <div className="mypage-title">■ マイページ ログイン情報</div>
           <div className="mypage-info">
-            URL：<span className="mypage-url">https://viola-pure.xyz/</span>　
-            ログインID：<strong>{data.loginId}</strong>（ご自身の会員ID）　
-            初期パスワード：<span className="pw-highlight">0000</span>
+            URL：<span className="mypage-url">https://viola-pure.xyz/</span>
+            　　ログインID：<strong>{data.loginId}</strong>（ご自身の会員ID）
+            　　初期パスワード：<span className="pw-highlight">0000</span>
           </div>
           <div className="mypage-note">
             ※ 初回ログイン後、必ずマイページの「パスワード変更」からご自身でパスワードを変更してください。
@@ -339,7 +344,7 @@ export default function RegistrationCompletePrint({ data }: Props) {
         </div>
 
         {/* ── フッター ── */}
-        <div className="footer-row">
+        <div className="footer-row no-break">
           <div className="company-footer">
             CLAIRホールディングス株式会社<br />
             〒020-0026 岩手県盛岡市開運橋通5-6 第五菱和ビル5F<br />
@@ -349,6 +354,7 @@ export default function RegistrationCompletePrint({ data }: Props) {
             発行日　{data.issueDate}
           </div>
         </div>
+
       </div>
     </>
   )
