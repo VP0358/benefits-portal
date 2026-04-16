@@ -725,3 +725,245 @@ https://www.viola-pure.xyz/admin/contacts
     return { success: false, error: err };
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+/** 中古車購入申込メール（管理者通知 & お客様確認メール共用） */
+// ─────────────────────────────────────────────────────────────
+interface UsedCarData {
+  memberId: string
+  name:     string
+  phone:    string
+  email:    string
+  carType:  string
+  grade:    string
+  year:     string
+  mileage:  string
+  colors:   string
+  budget:   string
+  payment:  string
+  drive:    string
+  studless: string
+  note:     string
+}
+
+export async function sendUsedCarApplicationEmail({
+  to, isAdmin, data,
+}: {
+  to: string
+  isAdmin: boolean
+  data: UsedCarData
+}) {
+  const { name, phone, email, carType, grade, year, mileage, colors, budget, payment, drive, studless, note } = data
+
+  const rows = [
+    ["希望車種",               carType],
+    ["希望グレード",           grade],
+    ["希望年式",               year],
+    ["希望距離数",             mileage],
+    ["希望色（3色程）",        colors],
+    ["予算",                   budget],
+    ["現金 or ローン",         payment],
+    ["駆動式",                 drive  || "未選択"],
+    ["スタッドレスタイヤ",     studless || "未選択"],
+    ["その他ご要望",           note   || "なし"],
+  ]
+
+  // ── 管理者通知メール ──────────────────────────────────
+  if (isAdmin) {
+    const subject = `【中古車購入申込】${name} 様からのお申し込みが届きました`
+
+    const textBody = `
+中古車購入申込フォームに新しいお申し込みが届きました。
+
+────────────────────────────────────
+お申込者情報
+────────────────────────────────────
+お名前       : ${name}
+電話番号     : ${phone}
+メール       : ${email}
+────────────────────────────────────
+ご希望条件
+────────────────────────────────────
+${rows.map(([k, v]) => `${k.padEnd(16, "　")} : ${v}`).join("\n")}
+────────────────────────────────────
+
+このメールはVIOLA Pure福利厚生ポータルより自動送信されています。
+`.trim()
+
+    const htmlRows = rows.map(([k, v]) => `
+      <tr>
+        <td style="padding:8px 14px;font-size:13px;font-weight:600;color:#374151;background:#f9fafb;border:1px solid #e5e7eb;white-space:nowrap;width:160px;">${k}</td>
+        <td style="padding:8px 14px;font-size:13px;color:#1f2937;border:1px solid #e5e7eb;">${v || "―"}</td>
+      </tr>`).join("")
+
+    const htmlBody = `<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+        <!-- ヘッダー -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#0a1628 0%,#122444 100%);padding:28px 36px;text-align:center;">
+            <div style="font-size:28px;margin-bottom:8px;">🚗</div>
+            <div style="color:#c9a84c;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:4px;">NEW APPLICATION</div>
+            <div style="color:#ffffff;font-size:20px;font-weight:700;">中古車購入申込</div>
+            <div style="color:rgba(255,255,255,0.55);font-size:12px;margin-top:4px;">新しいお申し込みが届きました</div>
+          </td>
+        </tr>
+        <!-- お申込者情報 -->
+        <tr>
+          <td style="padding:28px 36px 20px;">
+            <div style="font-size:11px;font-weight:700;color:#c9a84c;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">お申込者情報</div>
+            <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+              <tr>
+                <td style="padding:8px 14px;font-size:13px;font-weight:600;color:#374151;background:#f9fafb;border:1px solid #e5e7eb;white-space:nowrap;width:160px;">お名前</td>
+                <td style="padding:8px 14px;font-size:14px;font-weight:700;color:#0a1628;border:1px solid #e5e7eb;">${name} 様</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 14px;font-size:13px;font-weight:600;color:#374151;background:#f9fafb;border:1px solid #e5e7eb;">電話番号</td>
+                <td style="padding:8px 14px;font-size:13px;color:#1f2937;border:1px solid #e5e7eb;">${phone}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 14px;font-size:13px;font-weight:600;color:#374151;background:#f9fafb;border:1px solid #e5e7eb;">メールアドレス</td>
+                <td style="padding:8px 14px;font-size:13px;color:#1f2937;border:1px solid #e5e7eb;">${email}</td>
+              </tr>
+            </table>
+            <div style="font-size:11px;font-weight:700;color:#c9a84c;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">ご希望条件</div>
+            <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;">
+              ${htmlRows}
+            </table>
+          </td>
+        </tr>
+        <!-- フッター -->
+        <tr>
+          <td style="background:#f8fafc;padding:16px 36px;border-top:1px solid #e2e8f0;text-align:center;">
+            <p style="margin:0;font-size:11px;color:#94a3b8;">このメールはVIOLA Pure福利厚生ポータルより自動送信されています。</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim()
+
+    const resend = getResend()
+    const result = await resend.emails.send({
+      from: `VIOLA Pure 中古車 <${FROM_ADDRESS}>`,
+      to,
+      subject,
+      text: textBody,
+      html: htmlBody,
+    })
+    return { success: true, id: result.data?.id }
+  }
+
+  // ── お客様確認メール ──────────────────────────────────
+  const subject = "【CLAIRホールディングス】中古車購入お申し込みを受け付けました"
+
+  const textBody = `
+${name} 様
+
+この度は中古車購入のお申し込みをいただき、誠にありがとうございます。
+以下の内容でお申し込みを受け付けました。
+
+────────────────────────────────────
+お申し込み内容
+────────────────────────────────────
+${rows.map(([k, v]) => `${k.padEnd(16, "　")} : ${v}`).join("\n")}
+────────────────────────────────────
+
+内容を確認の上、担当者より ${email} 宛にご連絡いたします。
+通常2〜3営業日以内にご連絡いたしますので、しばらくお待ちください。
+
+ご不明な点がございましたら、下記までお問い合わせください。
+
+Quality Of Life   -人生の質を上げよう-
+
+-----------------------------------------
+CLAIRホールディングス株式会社
+〒020-0026 岩手県盛岡市開運橋通5-6 第五菱和ビル5F
+TEL：019-681-3667　FAX：050-3385-7788
+営業時間：10:00〜18:00
+-----------------------------------------
+`.trim()
+
+  const htmlRows2 = rows.map(([k, v]) => `
+    <tr>
+      <td style="padding:8px 14px;font-size:13px;font-weight:600;color:#374151;background:#fffbf0;border:1px solid #fde68a;white-space:nowrap;width:160px;">${k}</td>
+      <td style="padding:8px 14px;font-size:13px;color:#1f2937;border:1px solid #fde68a;">${v || "―"}</td>
+    </tr>`).join("")
+
+  const htmlBody = `<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:0;background:#fdf8f0;font-family:'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf8f0;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+        <!-- ヘッダー -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#0a1628 0%,#c9a84c 100%);padding:28px 36px;text-align:center;">
+            <div style="font-size:32px;margin-bottom:8px;">🚗</div>
+            <div style="color:#fff9e6;font-size:11px;font-weight:700;letter-spacing:3px;margin-bottom:4px;">USED CAR APPLICATION</div>
+            <div style="color:#ffffff;font-size:20px;font-weight:700;">お申し込みありがとうございます</div>
+          </td>
+        </tr>
+        <!-- 本文 -->
+        <tr>
+          <td style="padding:32px 36px 24px;">
+            <p style="margin:0 0 8px;font-size:15px;color:#334155;">${name} 様</p>
+            <p style="margin:0 0 24px;font-size:14px;color:#475569;line-height:1.8;">
+              この度は中古車購入のお申し込みをいただき、誠にありがとうございます。<br />
+              以下の内容でお申し込みを受け付けました。
+            </p>
+            <!-- お申し込み内容 -->
+            <div style="font-size:11px;font-weight:700;color:#a88830;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">📋 お申し込み内容</div>
+            <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:28px;">
+              ${htmlRows2}
+            </table>
+            <!-- ご連絡について -->
+            <div style="background:#fffbf0;border:2px solid #fde68a;border-radius:12px;padding:18px 22px;margin-bottom:24px;">
+              <div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:8px;">📬 担当者よりご連絡いたします</div>
+              <p style="margin:0;font-size:13px;color:#78350f;line-height:1.8;">
+                内容確認後、<strong>${email}</strong> 宛にご連絡いたします。<br />
+                通常<strong>2〜3営業日以内</strong>にご連絡いたしますので、しばらくお待ちください。
+              </p>
+            </div>
+            <!-- キャッチコピー -->
+            <div style="background:#f0f7ea;border-left:4px solid #4ade80;border-radius:8px;padding:14px 18px;margin-bottom:28px;">
+              <p style="margin:0;font-size:14px;color:#166534;font-weight:600;">Quality Of Life</p>
+              <p style="margin:4px 0 0;font-size:12px;color:#166534;">-人生の質を上げよう-</p>
+            </div>
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 24px;"/>
+            <!-- 会社情報 -->
+            <table cellpadding="0" cellspacing="0" style="width:100%;">
+              <tr><td style="padding-bottom:3px;"><span style="font-size:13px;font-weight:700;color:#1e293b;">CLAIRホールディングス株式会社</span></td></tr>
+              <tr><td style="font-size:12px;color:#475569;line-height:1.8;">〒020-0026 岩手県盛岡市開運橋通5-6 第五菱和ビル5F<br/>TEL：019-681-3667　FAX：050-3385-7788<br/>営業時間：10:00〜18:00</td></tr>
+            </table>
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 0;"/>
+          </td>
+        </tr>
+        <!-- フッター -->
+        <tr>
+          <td style="background:#f8fafc;padding:16px 36px;text-align:center;">
+            <p style="margin:0;font-size:11px;color:#94a3b8;">このメールはVIOLA Pure福利厚生ポータルより自動送信されています。<br/>心当たりのない場合はこのメールを破棄してください。</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim()
+
+  const resend = getResend()
+  const result = await resend.emails.send({
+    from: `CLAIRホールディングス株式会社 <${FROM_ADDRESS}>`,
+    to,
+    subject,
+    text: textBody,
+    html: htmlBody,
+  })
+  return { success: true, id: result.data?.id }
+}
