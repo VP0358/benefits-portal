@@ -188,9 +188,34 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
 
     // バリデーション
-    if (!data.name || !data.email) {
+    if (!data.name) {
       return NextResponse.json(
-        { error: "必須項目が入力されていません" },
+        { error: "氏名は必須項目です" },
+        { status: 400 }
+      );
+    }
+    if (!data.email) {
+      return NextResponse.json(
+        { error: "メールアドレスは必須項目です" },
+        { status: 400 }
+      );
+    }
+    if (!data.disclosureDocNumber || !data.disclosureDocNumber.trim()) {
+      return NextResponse.json(
+        { error: "概要書面番号は必須項目です" },
+        { status: 400 }
+      );
+    }
+
+    // 概要書面番号の重複チェック
+    const existingDocNumber = await prisma.mlmRegistration.findFirst({
+      where: { disclosureDocNumber: data.disclosureDocNumber.trim() },
+      include: { user: { include: { mlmMember: { select: { memberCode: true } } } } },
+    });
+    if (existingDocNumber) {
+      const ownerCode = existingDocNumber.user?.mlmMember?.memberCode ?? "不明";
+      return NextResponse.json(
+        { error: `概要書面番号「${data.disclosureDocNumber.trim()}」は既に会員コード ${ownerCode} に登録されています。別の番号を入力してください。` },
         { status: 400 }
       );
     }
@@ -364,8 +389,35 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error("Error creating MLM member:", error);
+    // Prismaのエラーコードで詳細なメッセージを返す
+    if (error instanceof Error) {
+      // 一意制約違反
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const prismaError = error as any;
+      if (prismaError.code === "P2002") {
+        const fields: string[] = prismaError.meta?.target ?? [];
+        if (fields.includes("email") || fields.includes("User_email_key")) {
+          return NextResponse.json({ error: "このメールアドレスは既に使用されています" }, { status: 400 });
+        }
+        if (fields.includes("memberCode") || fields.includes("MlmMember_memberCode_key")) {
+          return NextResponse.json({ error: "この会員コードは既に使用されています" }, { status: 400 });
+        }
+        return NextResponse.json({ error: `重複エラー: ${fields.join(", ")} が既に存在します` }, { status: 400 });
+      }
+      // その他のPrismaエラー
+      if (prismaError.code) {
+        return NextResponse.json(
+          { error: `データベースエラーが発生しました（コード: ${prismaError.code}）: ${error.message}` },
+          { status: 500 }
+        );
+      }
+      return NextResponse.json(
+        { error: `登録に失敗しました: ${error.message}` },
+        { status: 500 }
+      );
+    }
     return NextResponse.json(
-      { error: "登録に失敗しました" },
+      { error: "登録に失敗しました（原因不明のエラー）" },
       { status: 500 }
     );
   }

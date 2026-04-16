@@ -216,7 +216,7 @@ export default function MlmMemberNewPage() {
     setLoading(true);
 
     try {
-      // バリデーション（会員コードは空欄でも自動生成されるためチェック不要）
+      // バリデーション
       if (!formData.name) {
         alert("氏名を入力してください");
         setLoading(false);
@@ -224,6 +224,11 @@ export default function MlmMemberNewPage() {
       }
       if (!formData.email) {
         alert("メールアドレスを入力してください");
+        setLoading(false);
+        return;
+      }
+      if (!formData.disclosureDocNumber || !formData.disclosureDocNumber.trim()) {
+        alert("概要書面番号は必須項目です。入力してください。");
         setLoading(false);
         return;
       }
@@ -248,12 +253,12 @@ export default function MlmMemberNewPage() {
           router.push("/admin/mlm-members");
         }
       } else {
-        const error = await res.json();
-        alert(`登録失敗: ${error.error || "不明なエラー"}`);
+        const errorData = await res.json();
+        alert(`登録失敗:\n\n${errorData.error || "不明なエラーが発生しました"}`);
       }
     } catch (error) {
       console.error("Error creating member:", error);
-      alert("エラーが発生しました");
+      alert(`通信エラーが発生しました。\n${error instanceof Error ? error.message : "ネットワーク接続を確認してください。"}`);
     }
 
     setLoading(false);
@@ -350,8 +355,8 @@ export default function MlmMemberNewPage() {
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                概要書面番号
-                <span className="text-xs text-gray-500 ml-2">（任意）</span>
+                <span className="text-red-600">*</span> 概要書面番号
+                <span className="text-xs text-red-500 ml-2">（必須）</span>
               </label>
               <input
                 type="text"
@@ -359,11 +364,16 @@ export default function MlmMemberNewPage() {
                 value={formData.disclosureDocNumber}
                 onChange={handleInputChange}
                 placeholder="例: DOC-2026-001"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                  !formData.disclosureDocNumber.trim()
+                    ? "border-red-400 bg-red-50"
+                    : "border-gray-300"
+                }`}
+                required
               />
               <p className="text-xs text-gray-500 mt-1">
                 <i className="fas fa-file-alt mr-1"></i>
-                特定商取引法に基づく概要書面の番号を入力してください
+                特定商取引法に基づく概要書面の番号を入力してください。他の会員と重複する番号は登録できません。
               </p>
             </div>
           </div>
