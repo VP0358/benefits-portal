@@ -19,7 +19,7 @@ function generateInitialPassword(): string {
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.email) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "ログインが必要です" }, { status: 401 });
   }
 
   try {
@@ -173,7 +173,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error("Error fetching MLM members:", errMsg);
-    return NextResponse.json({ error: "Internal server error", detail: errMsg }, { status: 500 });
+    return NextResponse.json({ error: "サーバーエラーが発生しました", detail: errMsg }, { status: 500 });
   }
 }
 
@@ -181,7 +181,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.email) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "ログインが必要です" }, { status: 401 });
   }
 
   try {
@@ -377,11 +377,33 @@ export async function POST(req: NextRequest) {
       return { user, mlmMember };
     });
 
+    // BigInt フィールドを文字列に変換してからレスポンス返却
+    const m = result.mlmMember;
     return NextResponse.json(
       {
         message: "MLM会員を登録しました",
-        member: { ...result.mlmMember, id: result.mlmMember.id.toString() },
-        initialPassword, // 初期パスワードを返却
+        member: {
+          id:               m.id.toString(),
+          userId:           m.userId.toString(),
+          memberCode:       m.memberCode,
+          memberType:       m.memberType,
+          status:           m.status,
+          uplineId:         m.uplineId?.toString() ?? null,
+          referrerId:       m.referrerId?.toString() ?? null,
+          matrixPosition:   m.matrixPosition,
+          currentLevel:     m.currentLevel,
+          titleLevel:       m.titleLevel,
+          conditionAchieved: m.conditionAchieved,
+          forceActive:      m.forceActive,
+          forceLevel:       m.forceLevel,
+          contractDate:     m.contractDate?.toISOString() ?? null,
+          autoshipEnabled:  m.autoshipEnabled,
+          autoshipStartDate: m.autoshipStartDate?.toISOString() ?? null,
+          paymentMethod:    m.paymentMethod,
+          createdAt:        m.createdAt.toISOString(),
+          updatedAt:        m.updatedAt.toISOString(),
+        },
+        initialPassword,
       },
       { status: 201 }
     );
