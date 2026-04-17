@@ -220,32 +220,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 会員コード生成（指定がない場合）
-    let memberCode = data.memberCode;
+    // 会員コード生成（手動入力がない場合は自動生成）
+    let memberCode = data.memberCode?.trim() || "";
+
     if (!memberCode) {
-      // 上流者が指定されている場合、その配下に追加
-      let uplineId: bigint | null = null;
-      if (data.uplineMemberCode) {
-        const upline = await prisma.mlmMember.findUnique({
-          where: { memberCode: data.uplineMemberCode },
-        });
-        if (upline) {
-          uplineId = upline.id;
-        }
+      // 自動生成：generateMemberCode 内でユニーク性を保証しているため重複チェック不要
+      memberCode = await generateMemberCode();
+    } else {
+      // 手動入力の場合のみ重複チェック
+      const existingMember = await prisma.mlmMember.findUnique({
+        where: { memberCode },
+      });
+      if (existingMember) {
+        return NextResponse.json(
+          { error: `会員コード「${memberCode}」は既に使用されています。別のコードを入力してください。` },
+          { status: 400 }
+        );
       }
-      memberCode = await generateMemberCode(uplineId);
-    }
-
-    // 会員コードの重複チェック
-    const existingMember = await prisma.mlmMember.findUnique({
-      where: { memberCode: memberCode },
-    });
-
-    if (existingMember) {
-      return NextResponse.json(
-        { error: "この会員コードは既に使用されています" },
-        { status: 400 }
-      );
     }
 
     // メールアドレスの重複チェック

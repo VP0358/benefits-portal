@@ -13,86 +13,39 @@ export function generateRandomSixDigits(): string {
 
 /**
  * 会員コードを生成（6桁-ポジション番号）
- * 例: 123456-01, 123456-02
- * 
- * @param uplineId 上流会員ID。指定すると、上流会員の基準コードを継承
- * @param position ポジション番号。未指定の場合は自動採番
+ * 例: 123456-01
+ *
+ * 新規会員は必ず独自のユニークな6桁ベースコードを新規発行する。
+ * uplineId / position は互換性のために引数として残すが使用しない。
+ *
  * @returns 会員コード（例: "123456-01"）
  */
 export async function generateMemberCode(
-  uplineId?: bigint | null,
-  position?: number
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _uplineId?: bigint | null,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _position?: number
 ): Promise<string> {
-  let baseCode: string | undefined = undefined
-  
-  // 上流会員が指定されている場合、その会員コードから基準コードを取得
-  if (uplineId) {
-    const upline = await prisma.mlmMember.findUnique({
-      where: { id: uplineId },
-      select: { memberCode: true }
+  // ユニークな6桁ベースコードを生成（衝突するまでリトライ）
+  let baseCode: string = ''
+  let isUnique = false
+
+  while (!isUnique) {
+    const candidate = generateRandomSixDigits()
+
+    // 同じ6桁コードで始まる会員が存在しないか確認
+    const existing = await prisma.mlmMember.findFirst({
+      where: { memberCode: { startsWith: candidate + '-' } },
     })
-    if (upline && upline.memberCode) {
-      const parsed = parseMemberCode(upline.memberCode)
-      baseCode = parsed.baseCode
+
+    if (!existing) {
+      isUnique = true
+      baseCode = candidate
     }
   }
-  // 基準コードが未指定の場合は新規生成
-  if (!baseCode) {
-    let newBaseCode: string
-    let isUnique = false
-    
-    // ユニークな6桁コードを生成
-    while (!isUnique) {
-      newBaseCode = generateRandomSixDigits()
-      
-      // 同じ基準コードが存在しないか確認
-      const existing = await prisma.mlmMember.findFirst({
-        where: {
-          memberCode: {
-            startsWith: newBaseCode
-          }
-        }
-      })
-      
-      if (!existing) {
-        isUnique = true
-        baseCode = newBaseCode
-      }
-    }
-  }
-  
-  // ポジション番号が未指定の場合は自動採番
-  if (position === undefined) {
-    // 同じ基準コードを持つ会員を検索
-    const members = await prisma.mlmMember.findMany({
-      where: {
-        memberCode: {
-          startsWith: baseCode
-        }
-      },
-      select: {
-        memberCode: true
-      },
-      orderBy: {
-        memberCode: 'desc'
-      }
-    })
-    
-    if (members.length === 0) {
-      // 最初のポジション
-      position = 1
-    } else {
-      // 最後のポジション番号を取得して+1
-      const lastCode = members[0].memberCode
-      const lastPosition = parseInt(lastCode.split('-')[1])
-      position = lastPosition + 1
-    }
-  }
-  
-  // ポジション番号を2桁にゼロパディング
-  const positionStr = position.toString().padStart(2, '0')
-  
-  return `${baseCode}-${positionStr}`
+
+  // ポジションは常に 01 固定（新規登録時は必ず最初の1人）
+  return `${baseCode}-01`
 }
 
 /**
