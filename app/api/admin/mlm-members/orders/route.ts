@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     const memberCode = searchParams.get("memberCode");
 
     if (!memberCode) {
-      return NextResponse.json({ error: "memberCode is required" }, { status: 400 });
+      return NextResponse.json({ error: "会員コードは必須項目です" }, { status: 400 });
     }
 
     const user = await prisma.user.findUnique({
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
       select: { id: true },
     });
     if (!user) {
-      return NextResponse.json({ error: "Member not found" }, { status: 404 });
+      return NextResponse.json({ error: "会員が見つかりません" }, { status: 404 });
     }
 
     const orders = await prisma.order.findMany({
@@ -94,7 +94,8 @@ export async function GET(request: NextRequest) {
       totalAmount: o.totalAmount,
       items: o.items.map((item) => ({
         id: item.id.toString(),
-        productId: item.productId.toString(),
+        // productId が null（商品マスター未登録）の場合は空文字列を返す
+        productId: item.productId?.toString() ?? "",
         productName: item.productName,
         productCode: (item.product as { productCode?: string })?.productCode || "",
         unitPrice: item.unitPrice,
@@ -120,7 +121,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ orders: formatted });
   } catch (error) {
     console.error("❌ MLM member orders GET error:", error);
-    return NextResponse.json({ error: "Failed to fetch orders" }, { status: 500 });
+    return NextResponse.json({ error: "伝票一覧の取得に失敗しました" }, { status: 500 });
   }
 }
 
@@ -170,7 +171,7 @@ export async function POST(request: NextRequest) {
     } = body;
 
     if (!memberCode) {
-      return NextResponse.json({ error: "memberCode is required" }, { status: 400 });
+      return NextResponse.json({ error: "会員コードは必須項目です" }, { status: 400 });
     }
 
     // 会員取得
@@ -179,7 +180,7 @@ export async function POST(request: NextRequest) {
       select: { id: true, name: true, postalCode: true, address: true, phone: true },
     });
     if (!user) {
-      return NextResponse.json({ error: "Member not found" }, { status: 404 });
+      return NextResponse.json({ error: "会員が見つかりません" }, { status: 404 });
     }
 
     // 注文番号生成
@@ -229,14 +230,16 @@ export async function POST(request: NextRequest) {
     });
 
     // OrderItems作成
+    // productId が未設定（手入力商品）の場合は null で保存（外部キー制約をスキップ）
     if (items && Array.isArray(items)) {
       for (const item of items) {
-        if (!item.productId) continue;
+        // 商品名もproductIdもない行はスキップ
+        if (!item.productName && !item.productId) continue;
         const lineAmount = (item.unitPrice || 0) * (item.quantity || 1);
         await prisma.orderItem.create({
           data: {
             orderId: order.id,
-            productId: BigInt(item.productId),
+            productId: item.productId ? BigInt(item.productId) : null,
             productName: item.productName || "",
             unitPrice: item.unitPrice || 0,
             quantity: item.quantity || 1,
@@ -295,7 +298,7 @@ export async function POST(request: NextRequest) {
       });
       if (mlmMember) {
         for (const item of items) {
-          if (!item.productId || !item.points || item.points <= 0) continue;
+          if (!item.points || item.points <= 0) continue;
           const code = item.productCode || "";
           const codeNum = parseInt(code.replace(/[^0-9]/g, ""));
           if (codeNum >= 1000 && codeNum <= 2999) {
@@ -328,7 +331,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("❌ MLM member orders POST error:", error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    const errMsg = error instanceof Error ? error.message : String(error);
+    if (errMsg.includes("Foreign key constraint") || errMsg.includes("OrderItem_productId_fkey")) {
+      return NextResponse.json(
+        { error: "商品マスターに存在しない商品IDが指定されています。商品を選択し直してください。" },
+        { status: 400 }
+      );
+    }
+    return NextResponse.json({ error: `伝票作成に失敗しました: ${errMsg}` }, { status: 500 });
   }
 }
 
@@ -374,7 +384,7 @@ export async function PUT(request: NextRequest) {
     } = body;
 
     if (!orderId) {
-      return NextResponse.json({ error: "orderId is required" }, { status: 400 });
+      return NextResponse.json({ error: "伝票IDは必須項目です" }, { status: 400 });
     }
 
     const orderIdBig = BigInt(orderId);
@@ -418,15 +428,17 @@ export async function PUT(request: NextRequest) {
     });
 
     // OrderItems削除→再作成
+    // productId が未設定（手入力商品）の場合は null で保存
     if (items && Array.isArray(items)) {
       await prisma.orderItem.deleteMany({ where: { orderId: orderIdBig } });
       for (const item of items) {
-        if (!item.productId) continue;
+        // 商品名もproductIdもない行はスキップ
+        if (!item.productName && !item.productId) continue;
         const lineAmount = (item.unitPrice || 0) * (item.quantity || 1);
         await prisma.orderItem.create({
           data: {
             orderId: orderIdBig,
-            productId: BigInt(item.productId),
+            productId: item.productId ? BigInt(item.productId) : null,
             productName: item.productName || "",
             unitPrice: item.unitPrice || 0,
             quantity: item.quantity || 1,
@@ -469,7 +481,8 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: true, orderId, totalAmount });
   } catch (error) {
     console.error("❌ MLM member orders PUT error:", error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    const errMsg = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: `伝票更新に失敗しました: ${errMsg}` }, { status: 500 });
   }
 }
 
@@ -480,7 +493,7 @@ export async function DELETE(request: NextRequest) {
     const orderId = searchParams.get("orderId");
 
     if (!orderId) {
-      return NextResponse.json({ error: "orderId is required" }, { status: 400 });
+      return NextResponse.json({ error: "伝票IDは必須項目です" }, { status: 400 });
     }
 
     const orderIdBig = BigInt(orderId);
@@ -488,7 +501,7 @@ export async function DELETE(request: NextRequest) {
     // 存在確認
     const order = await prisma.order.findUnique({ where: { id: orderIdBig } });
     if (!order) {
-      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+      return NextResponse.json({ error: "伝票が見つかりません" }, { status: 404 });
     }
 
     // 削除（CASCADEで関連データも削除）
@@ -497,6 +510,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("❌ MLM member orders DELETE error:", error);
-    return NextResponse.json({ error: String(error) }, { status: 500 });
+    const errMsg = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: `伝票削除に失敗しました: ${errMsg}` }, { status: 500 });
   }
 }

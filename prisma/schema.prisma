@@ -313,15 +313,15 @@ model Order {
 model OrderItem {
   id          BigInt   @id @default(autoincrement())
   orderId     BigInt
-  productId   BigInt
+  productId   BigInt?
   productName String   @db.VarChar(255)
   unitPrice   Int
   quantity    Int
   lineAmount  Int
   createdAt   DateTime @default(now())
 
-  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   @@index([orderId])
   @@index([productId])
