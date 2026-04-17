@@ -326,11 +326,11 @@ export async function POST(req: NextRequest) {
           status: data.status || "active",
           uplineId,
           referrerId,
-          matrixPosition: data.matrixPosition || 1,
-          currentLevel: data.currentLevel || 0,
-          titleLevel: data.titleLevel || 0,
+          matrixPosition: parseInt(data.matrixPosition) || 1,
+          currentLevel: parseInt(data.currentLevel) || 0,
+          titleLevel: parseInt(data.titleLevel) || 0,
           forceActive: data.forceActive || false,
-          forceLevel: data.forceLevel || null,
+          forceLevel: data.forceLevel ? parseInt(data.forceLevel) : null,
           contractDate: data.contractDate ? new Date(data.contractDate) : null,
           autoshipEnabled: data.autoshipEnabled || false,
           autoshipStartDate: data.autoshipStartDate
@@ -357,8 +357,6 @@ export async function POST(req: NextRequest) {
           city: data.city || null,
           address1: data.address1 || null,
           address2: data.address2 || null,
-          // 概要書面番号
-          disclosureDocNumber: data.disclosureDocNumber || null,
         },
       });
 

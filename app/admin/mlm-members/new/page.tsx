@@ -12,10 +12,173 @@ import {
   getBranchesByBankCode 
 } from "@/lib/bank-data";
 
+// ─────────────────────────────────────────────
+// 日本語エラーモーダルコンポーネント
+// ─────────────────────────────────────────────
+function ErrorModal({ message, onClose }: { message: string; onClose: () => void }) {
+  if (!message) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+        <div className="bg-red-600 px-6 py-4 flex items-center gap-3">
+          <i className="fas fa-exclamation-circle text-white text-xl"></i>
+          <h3 className="text-white font-bold text-lg">登録エラー</h3>
+        </div>
+        <div className="px-6 py-5">
+          <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{message}</p>
+        </div>
+        <div className="px-6 pb-5 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold"
+          >
+            閉じる
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// 日本語対応カスタム日付ピッカーコンポーネント
+// ─────────────────────────────────────────────
+function JapaneseDatePicker({
+  name,
+  value,
+  onChange,
+  placeholder = "年 / 月 / 日",
+}: {
+  name: string;
+  value: string;
+  onChange: (name: string, value: string) => void;
+  placeholder?: string;
+}) {
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 100 }, (_, i) => currentYear - i); // 今年から100年前まで
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+
+  const [year, setYear] = useState<string>("");
+  const [month, setMonth] = useState<string>("");
+  const [day, setDay] = useState<string>("");
+
+  // 初期値のパース
+  useEffect(() => {
+    if (value) {
+      const parts = value.split("-");
+      if (parts.length === 3) {
+        setYear(parts[0]);
+        setMonth(String(parseInt(parts[1])));
+        setDay(String(parseInt(parts[2])));
+      }
+    } else {
+      setYear("");
+      setMonth("");
+      setDay("");
+    }
+  }, [value]);
+
+  // 月の日数を計算
+  const getDaysInMonth = (y: number, m: number) => {
+    if (!y || !m) return 31;
+    return new Date(y, m, 0).getDate();
+  };
+
+  const daysInMonth = getDaysInMonth(parseInt(year), parseInt(month));
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  const handleChange = (newYear: string, newMonth: string, newDay: string) => {
+    if (newYear && newMonth && newDay) {
+      const mm = String(parseInt(newMonth)).padStart(2, "0");
+      const dd = String(parseInt(newDay)).padStart(2, "0");
+      // 日が月の最大日を超えた場合は最終日に補正
+      const maxDay = getDaysInMonth(parseInt(newYear), parseInt(newMonth));
+      const safeDay = Math.min(parseInt(newDay), maxDay);
+      const safeDd = String(safeDay).padStart(2, "0");
+      onChange(name, `${newYear}-${mm}-${safeDd}`);
+    } else {
+      onChange(name, "");
+    }
+  };
+
+  return (
+    <div className="flex gap-2 items-center">
+      {/* 年 */}
+      <div className="relative flex-1">
+        <select
+          value={year}
+          onChange={(e) => {
+            setYear(e.target.value);
+            handleChange(e.target.value, month, day);
+          }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 appearance-none bg-white pr-8"
+        >
+          <option value="">年</option>
+          {years.map((y) => (
+            <option key={y} value={y}>
+              {y}年
+            </option>
+          ))}
+        </select>
+        <i className="fas fa-chevron-down absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none"></i>
+      </div>
+      {/* 月 */}
+      <div className="relative w-24">
+        <select
+          value={month}
+          onChange={(e) => {
+            setMonth(e.target.value);
+            handleChange(year, e.target.value, day);
+          }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 appearance-none bg-white pr-8"
+        >
+          <option value="">月</option>
+          {months.map((m) => (
+            <option key={m} value={m}>
+              {m}月
+            </option>
+          ))}
+        </select>
+        <i className="fas fa-chevron-down absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none"></i>
+      </div>
+      {/* 日 */}
+      <div className="relative w-24">
+        <select
+          value={day}
+          onChange={(e) => {
+            setDay(e.target.value);
+            handleChange(year, month, e.target.value);
+          }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 appearance-none bg-white pr-8"
+          disabled={!year || !month}
+        >
+          <option value="">日</option>
+          {days.map((d) => (
+            <option key={d} value={d}>
+              {d}日
+            </option>
+          ))}
+        </select>
+        <i className="fas fa-chevron-down absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none"></i>
+      </div>
+      {/* 選択済み表示 */}
+      {value && (
+        <span className="text-xs text-gray-500 whitespace-nowrap">
+          {year}年{month}月{day}日
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// メインページ
+// ─────────────────────────────────────────────
 export default function MlmMemberNewPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [referrerInfo, setReferrerInfo] = useState<{ name: string; memberCode: string } | null>(null);
 
   // 基本情報
@@ -100,12 +263,16 @@ export default function MlmMemberNewPage() {
     }
   };
 
+  // カスタム日付ピッカー用ハンドラ
+  const handleDateChange = (name: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
   // 銀行コード入力時の処理
   const handleBankCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const code = e.target.value;
     setFormData((prev) => ({ ...prev, bankCode: code }));
     
-    // 4桁入力時に自動で銀行名を検索
     if (code.length === 4) {
       const bankName = getBankNameByCode(code);
       if (bankName) {
@@ -114,24 +281,20 @@ export default function MlmMemberNewPage() {
     }
   };
 
-  // 銀行名入力時の処理
   const handleBankNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const name = e.target.value;
     setFormData((prev) => ({ ...prev, bankName: name }));
     
-    // 完全一致時に銀行コードを自動入力
     const bankCode = getBankCodeByName(name);
     if (bankCode) {
       setFormData((prev) => ({ ...prev, bankName: name, bankCode }));
     }
   };
 
-  // 支店コード入力時の処理
   const handleBranchCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const code = e.target.value;
     setFormData((prev) => ({ ...prev, branchCode: code }));
     
-    // 3桁入力時に自動で支店名を検索
     if (code.length === 3 && formData.bankCode) {
       const branchName = getBranchNameByCode(formData.bankCode, code);
       if (branchName) {
@@ -140,12 +303,10 @@ export default function MlmMemberNewPage() {
     }
   };
 
-  // 支店名入力時の処理
   const handleBranchNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const name = e.target.value;
     setFormData((prev) => ({ ...prev, branchName: name }));
     
-    // 完全一致時に支店コードを自動入力
     if (formData.bankCode) {
       const branchCode = getBranchCodeByName(formData.bankCode, name);
       if (branchCode) {
@@ -158,14 +319,12 @@ export default function MlmMemberNewPage() {
   useEffect(() => {
     const ref = searchParams.get('ref');
     if (ref) {
-      // 紹介者コードをフォームに自動入力
       setFormData((prev) => ({
         ...prev,
         uplineMemberCode: ref,
         referrerMemberCode: ref,
       }));
 
-      // 紹介者情報を取得
       fetch(`/api/admin/mlm-members/search?memberCode=${encodeURIComponent(ref)}`)
         .then(res => res.json())
         .then(data => {
@@ -184,7 +343,7 @@ export default function MlmMemberNewPage() {
 
   const handlePostalCodeSearch = async () => {
     if (!formData.postalCode || formData.postalCode.length < 7) {
-      alert("7桁の郵便番号を入力してください");
+      setErrorMessage("7桁の郵便番号を入力してください");
       return;
     }
 
@@ -201,34 +360,34 @@ export default function MlmMemberNewPage() {
           city: result.address2,
           address1: result.address3,
         }));
-        alert("住所を自動入力しました");
       } else {
-        alert("郵便番号が見つかりませんでした");
+        setErrorMessage("郵便番号が見つかりませんでした。\n正しい7桁の郵便番号を入力してください。");
       }
     } catch (error) {
       console.error("Error searching postal code:", error);
-      alert("郵便番号検索に失敗しました");
+      setErrorMessage("郵便番号検索に失敗しました。\nネットワーク接続を確認してください。");
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMessage("");
 
     try {
-      // バリデーション
-      if (!formData.name) {
-        alert("氏名を入力してください");
+      // バリデーション（日本語エラー）
+      if (!formData.name.trim()) {
+        setErrorMessage("氏名を入力してください。");
         setLoading(false);
         return;
       }
-      if (!formData.email) {
-        alert("メールアドレスを入力してください");
+      if (!formData.email.trim()) {
+        setErrorMessage("メールアドレスを入力してください。");
         setLoading(false);
         return;
       }
       if (!formData.disclosureDocNumber || !formData.disclosureDocNumber.trim()) {
-        alert("概要書面番号は必須項目です。入力してください。");
+        setErrorMessage("概要書面番号は必須項目です。\n特定商取引法に基づく概要書面の番号を入力してください。");
         setLoading(false);
         return;
       }
@@ -241,10 +400,8 @@ export default function MlmMemberNewPage() {
 
       if (res.ok) {
         const result = await res.json();
-        // 登録した会員のIDを取得して会員詳細に即時遷移
         const newMemberId = result.member?.id?.toString();
         if (newMemberId) {
-          // 初期パスワードをセッションストレージに保存して詳細画面で表示
           if (result.initialPassword) {
             sessionStorage.setItem(`mlm_init_pw_${newMemberId}`, result.initialPassword);
           }
@@ -254,11 +411,14 @@ export default function MlmMemberNewPage() {
         }
       } else {
         const errorData = await res.json();
-        alert(`登録失敗:\n\n${errorData.error || "不明なエラーが発生しました"}`);
+        // APIからのエラーメッセージを日本語で表示
+        setErrorMessage(errorData.error || "登録に失敗しました。入力内容を確認して再度お試しください。");
       }
     } catch (error) {
       console.error("Error creating member:", error);
-      alert(`通信エラーが発生しました。\n${error instanceof Error ? error.message : "ネットワーク接続を確認してください。"}`);
+      setErrorMessage(
+        "通信エラーが発生しました。\nネットワーク接続を確認してから再度お試しください。"
+      );
     }
 
     setLoading(false);
@@ -266,6 +426,9 @@ export default function MlmMemberNewPage() {
 
   return (
     <main className="space-y-6">
+      {/* 日本語エラーモーダル */}
+      <ErrorModal message={errorMessage} onClose={() => setErrorMessage("")} />
+
       {/* ヘッダー */}
       <div>
         <h1 className="text-3xl font-bold text-gray-800">
@@ -433,15 +596,26 @@ export default function MlmMemberNewPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">生年月日</label>
-              <input
-                type="date"
+            {/* ③ 使いやすい日本語カレンダー（年・月・日セレクトボックス） */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                生年月日
+              </label>
+              <JapaneseDatePicker
                 name="birthDate"
                 value={formData.birthDate}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                onChange={handleDateChange}
               />
+              {formData.birthDate && (
+                <p className="text-xs text-gray-500 mt-1">
+                  <i className="fas fa-check-circle text-green-500 mr-1"></i>
+                  選択済み: {new Date(formData.birthDate).toLocaleDateString("ja-JP", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">性別</label>
