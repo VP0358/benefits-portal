@@ -1,6 +1,80 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+
+// ── 日本語日付ピッカー（年・月・日 セレクトボックス） ────────────────
+function SlipDatePicker({
+  value,
+  onChange,
+  className,
+  allowEmpty = false,
+  highlightBg = "",
+}: {
+  value: string;           // "YYYY-MM-DD" or ""
+  onChange: (v: string) => void;
+  className?: string;
+  allowEmpty?: boolean;    // true のとき「未設定」選択肢を表示
+  highlightBg?: string;    // 強調背景クラス（例: "bg-blue-50"）
+}) {
+  const now = new Date();
+  const curYear = now.getFullYear();
+
+  // value から年・月・日を分解
+  const parts = value ? value.split("-") : [];
+  const selYear  = parts[0] ? parseInt(parts[0]) : (allowEmpty ? 0 : curYear);
+  const selMonth = parts[1] ? parseInt(parts[1]) : (allowEmpty ? 0 : now.getMonth() + 1);
+  const selDay   = parts[2] ? parseInt(parts[2]) : (allowEmpty ? 0 : now.getDate());
+
+  // 月ごとの日数（閏年対応）
+  const daysInMonth = useMemo(() => {
+    if (!selYear || !selMonth) return 31;
+    return new Date(selYear, selMonth, 0).getDate();
+  }, [selYear, selMonth]);
+
+  const years = Array.from({ length: 11 }, (_, i) => curYear - 5 + i); // 過去5年〜未来5年
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const days   = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  const selCls = `border border-gray-300 rounded px-1 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 ${highlightBg}`;
+
+  function update(y: number, m: number, d: number) {
+    if (allowEmpty && (!y || !m || !d)) { onChange(""); return; }
+    const safeD = Math.min(d, new Date(y, m, 0).getDate());
+    onChange(`${y}-${String(m).padStart(2,"0")}-${String(safeD).padStart(2,"0")}`);
+  }
+
+  return (
+    <div className={`flex items-center gap-0.5 ${className || ""}`}>
+      {allowEmpty && (
+        <select value={selYear}
+          onChange={(e) => update(Number(e.target.value), selMonth, selDay)}
+          className={`${selCls} w-16`}>
+          <option value={0}>未設定</option>
+          {years.map((y) => <option key={y} value={y}>{y}年</option>)}
+        </select>
+      )}
+      {!allowEmpty && (
+        <select value={selYear}
+          onChange={(e) => update(Number(e.target.value), selMonth, selDay)}
+          className={`${selCls} w-16`}>
+          {years.map((y) => <option key={y} value={y}>{y}年</option>)}
+        </select>
+      )}
+      <select value={selMonth}
+        onChange={(e) => update(selYear, Number(e.target.value), selDay)}
+        className={`${selCls} w-12`}>
+        {allowEmpty && <option value={0}>月</option>}
+        {months.map((m) => <option key={m} value={m}>{m}月</option>)}
+      </select>
+      <select value={selDay}
+        onChange={(e) => update(selYear, selMonth, Number(e.target.value))}
+        className={`${selCls} w-12`}>
+        {allowEmpty && <option value={0}>日</option>}
+        {days.map((d) => <option key={d} value={d}>{d}日</option>)}
+      </select>
+    </div>
+  );
+}
 
 // ── 型定義 ────────────────────────────────────────────────────
 type Product = {
@@ -433,15 +507,15 @@ export default function PurchasePanel({
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <span className={`${lbl} w-24 text-red-600`}>注文日</span>
-              <input type="date" value={f.orderedAt} onChange={(e) => setF("orderedAt", e.target.value)} className={`${inp} ${fieldBg} w-36`} />
+              <SlipDatePicker value={f.orderedAt} onChange={(v) => setF("orderedAt", v)} highlightBg={fieldBg} />
             </div>
             <div className="flex items-center gap-2">
               <span className={`${lbl} w-24`}>発送日</span>
-              <input type="date" value={f.shippedAt} onChange={(e) => setF("shippedAt", e.target.value)} className={`${inp} w-36`} />
+              <SlipDatePicker value={f.shippedAt} onChange={(v) => setF("shippedAt", v)} allowEmpty />
             </div>
             <div className="flex items-center gap-2">
               <span className={`${lbl} w-24`}>入金日</span>
-              <input type="date" value={f.paidAt} onChange={(e) => setF("paidAt", e.target.value)} className={`${inp} w-36`} />
+              <SlipDatePicker value={f.paidAt} onChange={(v) => setF("paidAt", v)} allowEmpty />
             </div>
             <div className="flex items-center gap-2">
               <span className={`${lbl} w-24 text-red-600`}>支払方法</span>
@@ -455,7 +529,7 @@ export default function PurchasePanel({
             </div>
             <div className="flex items-center gap-2">
               <span className={`${lbl} w-24`}>配達希望日</span>
-              <input type="date" value={f.deliveryDate} onChange={(e) => setF("deliveryDate", e.target.value)} className={`${inp} w-36`} />
+              <SlipDatePicker value={f.deliveryDate} onChange={(v) => setF("deliveryDate", v)} allowEmpty />
             </div>
             <div className="flex items-center gap-2">
               <span className={`${lbl} w-24`}>配達希望時間帯</span>

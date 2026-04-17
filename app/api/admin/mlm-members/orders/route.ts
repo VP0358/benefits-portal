@@ -230,22 +230,38 @@ export async function POST(request: NextRequest) {
     });
 
     // OrderItems作成
-    // productId が未設定（手入力商品）の場合は null で保存（外部キー制約をスキップ）
+    // productId が未設定（手入力商品）の場合は productId フィールド自体を省略して保存
+    // ※ DBマイグレーション適用前でも動作するよう、null ではなくフィールド除外で対応
     if (items && Array.isArray(items)) {
       for (const item of items) {
         // 商品名もproductIdもない行はスキップ
         if (!item.productName && !item.productId) continue;
         const lineAmount = (item.unitPrice || 0) * (item.quantity || 1);
-        await prisma.orderItem.create({
-          data: {
-            orderId: order.id,
-            productId: item.productId ? BigInt(item.productId) : null,
-            productName: item.productName || "",
-            unitPrice: item.unitPrice || 0,
-            quantity: item.quantity || 1,
-            lineAmount,
-          },
-        });
+        if (item.productId) {
+          // 商品マスターから選択した場合: productId あり
+          await prisma.orderItem.create({
+            data: {
+              orderId: order.id,
+              productId: BigInt(item.productId),
+              productName: item.productName || "",
+              unitPrice: item.unitPrice || 0,
+              quantity: item.quantity || 1,
+              lineAmount,
+            },
+          });
+        } else {
+          // 手入力商品（商品マスター未登録）: productId を省略
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (prisma.orderItem as any).create({
+            data: {
+              orderId: order.id,
+              productName: item.productName || "",
+              unitPrice: item.unitPrice || 0,
+              quantity: item.quantity || 1,
+              lineAmount,
+            },
+          });
+        }
       }
     }
 
@@ -428,23 +444,38 @@ export async function PUT(request: NextRequest) {
     });
 
     // OrderItems削除→再作成
-    // productId が未設定（手入力商品）の場合は null で保存
+    // productId が未設定（手入力商品）の場合は productId フィールド自体を省略して保存
     if (items && Array.isArray(items)) {
       await prisma.orderItem.deleteMany({ where: { orderId: orderIdBig } });
       for (const item of items) {
         // 商品名もproductIdもない行はスキップ
         if (!item.productName && !item.productId) continue;
         const lineAmount = (item.unitPrice || 0) * (item.quantity || 1);
-        await prisma.orderItem.create({
-          data: {
-            orderId: orderIdBig,
-            productId: item.productId ? BigInt(item.productId) : null,
-            productName: item.productName || "",
-            unitPrice: item.unitPrice || 0,
-            quantity: item.quantity || 1,
-            lineAmount,
-          },
-        });
+        if (item.productId) {
+          // 商品マスターから選択した場合: productId あり
+          await prisma.orderItem.create({
+            data: {
+              orderId: orderIdBig,
+              productId: BigInt(item.productId),
+              productName: item.productName || "",
+              unitPrice: item.unitPrice || 0,
+              quantity: item.quantity || 1,
+              lineAmount,
+            },
+          });
+        } else {
+          // 手入力商品（商品マスター未登録）: productId を省略
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (prisma.orderItem as any).create({
+            data: {
+              orderId: orderIdBig,
+              productName: item.productName || "",
+              unitPrice: item.unitPrice || 0,
+              quantity: item.quantity || 1,
+              lineAmount,
+            },
+          });
+        }
       }
     }
 
