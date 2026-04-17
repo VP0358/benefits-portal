@@ -266,7 +266,6 @@ model Product {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  orderItems OrderItem[]
 }
 
 model Order {
@@ -320,8 +319,8 @@ model OrderItem {
   lineAmount  Int
   createdAt   DateTime @default(now())
 
-  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product? @relation(fields: [productId], references: [id], onDelete: Restrict)
+  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  mlmProduct MlmProduct? @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   @@index([orderId])
   @@index([productId])
@@ -750,6 +749,8 @@ model MlmProduct {
   isActive        Boolean  @default(true)             // 販売中フラグ
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  orderItems OrderItem[]
 
   @@map("mlm_products")
 }

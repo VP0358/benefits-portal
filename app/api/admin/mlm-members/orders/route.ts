@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
       where: { userId: user.id },
       include: {
         items: {
-          include: { product: true },
+          include: { mlmProduct: true },
         },
         shippingLabel: true,
       },
@@ -94,14 +94,13 @@ export async function GET(request: NextRequest) {
       totalAmount: o.totalAmount,
       items: o.items.map((item) => ({
         id: item.id.toString(),
-        // productId が null（商品マスター未登録）の場合は空文字列を返す
         productId: item.productId?.toString() ?? "",
         productName: item.productName,
-        productCode: (item.product as { productCode?: string })?.productCode || "",
+        productCode: item.mlmProduct?.productCode || "",
         unitPrice: item.unitPrice,
         quantity: item.quantity,
         lineAmount: item.lineAmount,
-        points: (item.product as { pv?: number })?.pv || 0,
+        points: item.mlmProduct?.pv || 0,
       })),
       shippingLabel: o.shippingLabel
         ? {
