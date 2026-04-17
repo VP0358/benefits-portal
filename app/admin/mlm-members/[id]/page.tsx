@@ -6,6 +6,94 @@ import Link from "next/link";
 import PurchasePanel from "./ui/purchase-panel";
 import OrganizationChart from "./ui/organization-chart";
 
+// ─── 日本語日付ピッカー ────────────────────────────────
+function JpDatePicker({
+  value,
+  onChange,
+  clearable = false,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  clearable?: boolean;
+}) {
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 100 }, (_, i) => currentYear + 5 - i);
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+
+  const parsed = value ? value.split("-") : [];
+  const initY = parsed[0] ?? "";
+  const initM = parsed[1] ? String(parseInt(parsed[1])) : "";
+  const initD = parsed[2] ? String(parseInt(parsed[2])) : "";
+
+  const [y, setY] = useState(initY);
+  const [m, setM] = useState(initM);
+  const [d, setD] = useState(initD);
+
+  // value が外部から変更された場合に同期
+  useEffect(() => {
+    if (!value) { setY(""); setM(""); setD(""); return; }
+    const p = value.split("-");
+    setY(p[0] ?? "");
+    setM(p[1] ? String(parseInt(p[1])) : "");
+    setD(p[2] ? String(parseInt(p[2])) : "");
+  }, [value]);
+
+  const daysInMonth = (yr: string, mo: string) => {
+    if (!yr || !mo) return 31;
+    return new Date(parseInt(yr), parseInt(mo), 0).getDate();
+  };
+  const days = Array.from({ length: daysInMonth(y, m) }, (_, i) => i + 1);
+
+  const emit = (ny: string, nm: string, nd: string) => {
+    if (ny && nm && nd) {
+      const maxD = daysInMonth(ny, nm);
+      const safeD = Math.min(parseInt(nd), maxD);
+      onChange(`${ny}-${nm.padStart(2, "0")}-${String(safeD).padStart(2, "0")}`);
+    } else {
+      onChange("");
+    }
+  };
+
+  const sel = "rounded-lg border border-slate-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white appearance-none";
+
+  return (
+    <div className="flex flex-wrap gap-2 items-center">
+      {/* 年 */}
+      <select value={y} onChange={e => { setY(e.target.value); emit(e.target.value, m, d); }}
+        className={`${sel} w-28`}>
+        <option value="">年</option>
+        {years.map(yr => <option key={yr} value={String(yr)}>{yr}年</option>)}
+      </select>
+      {/* 月 */}
+      <select value={m} onChange={e => { setM(e.target.value); emit(y, e.target.value, d); }}
+        className={`${sel} w-20`}>
+        <option value="">月</option>
+        {months.map(mo => <option key={mo} value={String(mo)}>{mo}月</option>)}
+      </select>
+      {/* 日 */}
+      <select value={d} onChange={e => { setD(e.target.value); emit(y, m, e.target.value); }}
+        className={`${sel} w-20`} disabled={!y || !m}>
+        <option value="">日</option>
+        {days.map(dy => <option key={dy} value={String(dy)}>{dy}日</option>)}
+      </select>
+      {/* クリアボタン */}
+      {clearable && value && (
+        <button type="button"
+          onClick={() => { setY(""); setM(""); setD(""); onChange(""); }}
+          className="px-2 py-1 text-xs text-red-600 border border-red-300 rounded hover:bg-red-50 transition">
+          クリア
+        </button>
+      )}
+      {/* 選択確認表示 */}
+      {value && (
+        <span className="text-xs text-slate-500">
+          ✓ {new Date(value + "T00:00:00").toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ─── 型定義 ─────────────────────────────────────────
 type MemberDetail = {
   id: string;
@@ -943,7 +1031,9 @@ export default function MlmMemberDetailPage() {
             <FormField label="フリガナ"><input className={inputCls} value={String(editData.nameKana ?? "")} onChange={e => set("nameKana", e.target.value)} /></FormField>
             <FormField label="法人名"><input className={inputCls} value={String(editData.companyName ?? "")} onChange={e => set("companyName", e.target.value)} /></FormField>
             <FormField label="法人名（カナ）"><input className={inputCls} value={String(editData.companyNameKana ?? "")} onChange={e => set("companyNameKana", e.target.value)} /></FormField>
-            <FormField label="生年月日"><input type="date" className={inputCls} value={String(editData.birthDate ?? "")} onChange={e => set("birthDate", e.target.value)} /></FormField>
+            <FormField label="生年月日">
+              <JpDatePicker value={String(editData.birthDate ?? "")} onChange={v => set("birthDate", v)} />
+            </FormField>
             <FormField label="性別">
               <select className={selectCls} value={String(editData.gender ?? "")} onChange={e => set("gender", e.target.value)}>
                 <option value="">選択</option>
@@ -979,8 +1069,12 @@ export default function MlmMemberDetailPage() {
                 <option value="midCancel">中途解約</option>
               </select>
             </FormField>
-            <FormField label="契約締結日"><input type="date" className={inputCls} value={String(editData.contractDate ?? "")} onChange={e => set("contractDate", e.target.value)} /></FormField>
-            <FormField label="初回入金日"><input type="date" className={inputCls} value={String(editData.firstPayDate ?? "")} onChange={e => set("firstPayDate", e.target.value)} /></FormField>
+            <FormField label="契約締結日">
+              <JpDatePicker value={String(editData.contractDate ?? "")} onChange={v => set("contractDate", v)} />
+            </FormField>
+            <FormField label="初回入金日">
+              <JpDatePicker value={String(editData.firstPayDate ?? "")} onChange={v => set("firstPayDate", v)} />
+            </FormField>
             <FormField label="クレジット決済ID（クレディックス）">
               <input className={inputCls} value={String(editData.creditCardId ?? "")} onChange={e => set("creditCardId", e.target.value)} placeholder="クレディックス顧客ID" />
             </FormField>
@@ -1128,26 +1222,18 @@ export default function MlmMemberDetailPage() {
               </label>
             </div>
             <FormField label="開始日">
-              <input type="date" className={inputCls} value={String(editData.autoshipStartDate ?? "")} onChange={e => set("autoshipStartDate", e.target.value)} />
+              <JpDatePicker value={String(editData.autoshipStartDate ?? "")} onChange={v => set("autoshipStartDate", v)} />
             </FormField>
             <FormField label="停止日">
               <div className="space-y-1">
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="date"
-                    className={inputCls}
+                <div>
+                  <JpDatePicker
                     value={String(editData.autoshipStopDate ?? "")}
-                    onChange={e => set("autoshipStopDate", e.target.value)}
-                    placeholder="空欄 = 停止なし（継続中）"
+                    onChange={v => set("autoshipStopDate", v)}
+                    clearable
                   />
-                  {editData.autoshipStopDate && (
-                    <button
-                      type="button"
-                      onClick={() => set("autoshipStopDate", "")}
-                      className="shrink-0 px-2 py-1 text-xs text-red-600 border border-red-300 rounded hover:bg-red-50"
-                    >
-                      クリア
-                    </button>
+                  {!editData.autoshipStopDate && (
+                    <p className="text-xs text-slate-400 mt-1">空欄 = 停止なし（継続中）</p>
                   )}
                 </div>
                 {/* 現在DBに保存されている停止日を表示 */}
