@@ -261,13 +261,14 @@ export default function AutoShipPanel() {
     memberPostal: string | null; memberAddress: string | null;
   } | null>(null);
   const [slipProducts, setSlipProducts] = useState<{ id: string; product_code: string; name: string; price: number; pv: number }[]>([]);
+  const [slipProductsLoaded, setSlipProductsLoaded] = useState(false);
+  const [slipProductsLoading, setSlipProductsLoading] = useState(false);
   const [slipForm, setSlipForm] = useState<ReturnType<typeof makeSlipForm> | null>(null);
   const [slipItems, setSlipItems] = useState<SlipItem[]>([]);
   const [slipSubmitting, setSlipSubmitting] = useState(false);
 
   /* ── 一括選択・一括伝票作成 ── */
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
-  const [bulkSlipProducts, setBulkSlipProducts] = useState<{ id: string; product_code: string; name: string; price: number; pv: number }[]>([]);
   const [showBulkSlipModal, setShowBulkSlipModal] = useState(false);
   const [bulkSlipItems, setBulkSlipItems] = useState<SlipItem[]>([
     { productId: "", productCode: "", productName: "", unitPrice: 0, quantity: 1, points: 0, taxRate: 10 },
@@ -303,6 +304,30 @@ export default function AutoShipPanel() {
   }, []);
 
   useEffect(() => { loadRuns(); }, [loadRuns]);
+
+  /* ─── 商品マスターをマウント時に事前ロード ─── */
+  const loadProductsMaster = useCallback(async () => {
+    setSlipProductsLoading(true);
+    try {
+      const res = await fetch("/api/admin/products");
+      if (!res.ok) {
+        console.error("商品マスター取得失敗:", res.status);
+        setSlipProducts([]);
+        return;
+      }
+      const data = await res.json();
+      const active = (data.products ?? []).filter((p: { status: string }) => p.status === "active");
+      setSlipProducts(active);
+      setSlipProductsLoaded(true);
+    } catch (e) {
+      console.error("商品マスター取得エラー:", e);
+      setSlipProducts([]);
+    } finally {
+      setSlipProductsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadProductsMaster(); }, [loadProductsMaster]);
 
   /* ─── 新規作成 ─── */
   async function handleCreate() {
@@ -491,20 +516,12 @@ export default function AutoShipPanel() {
     }
   }
 
-  /* ─── 商品マスター取得（伝票作成用） ─── */
-  async function loadProducts(): Promise<{ id: string; product_code: string; name: string; price: number; pv: number }[]> {
-    try {
-      const res = await fetch("/api/admin/products");
-      if (!res.ok) return [];
-      const data = await res.json();
-      return (data.products ?? []).filter((p: { status: string }) => p.status === "active");
-    } catch { return []; }
-  }
-
   /* ─── 個別伝票作成モーダルを開く ─── */
   async function openSlipModal(m: { memberCode: string; memberName: string; memberPhone: string | null; memberPostal: string | null; memberAddress: string | null }) {
-    const prods = await loadProducts();
-    setSlipProducts(prods);
+    // 商品未ロードの場合は再取得
+    if (!slipProductsLoaded && !slipProductsLoading) {
+      await loadProductsMaster();
+    }
     setSlipModalMember(m);
     const today = new Date().toISOString().split("T")[0];
     setSlipForm(makeSlipForm(m.memberCode, m.memberName, m.memberPhone || "", m.memberPostal || "", m.memberAddress || "", today));
@@ -553,8 +570,10 @@ export default function AutoShipPanel() {
   /* ─── 一括伝票作成モーダルを開く ─── */
   async function openBulkSlipModal() {
     if (selectedMemberIds.size === 0) { alert("会員を1人以上選択してください"); return; }
-    const prods = await loadProducts();
-    setBulkSlipProducts(prods);
+    // 商品未ロードの場合は再取得
+    if (!slipProductsLoaded && !slipProductsLoading) {
+      await loadProductsMaster();
+    }
     setBulkSlipItems([{ productId: "", productCode: "", productName: "", unitPrice: 0, quantity: 1, points: 0, taxRate: 10 }]);
     setBulkResult(null);
     setShowBulkSlipModal(true);
@@ -596,7 +615,7 @@ export default function AutoShipPanel() {
   }
 
   /* ─── 商品選択ヘルパー ─── */
-  function onSlipProductSelect(idx: number, productId: string, items: SlipItem[], setItems: React.Dispatch<React.SetStateAction<SlipItem[]>>, prods: typeof slipProducts) {
+  function onSlipProductSelect(idx: number, productId: string, items: SlipItem[], setItems: React.Dispatch<React.SetStateAction<SlipItem[]>>, prods: { id: string; product_code: string; name: string; price: number; pv: number }[]) {
     const product = prods.find(p => p.id === productId);
     setItems(prev => prev.map((item, i) =>
       i === idx ? {
@@ -1304,12 +1323,21 @@ export default function AutoShipPanel() {
                 </div>
               </div>
               {/* ── 商品テーブル */}
-              <SlipItemsTable
-                items={slipItems} setItems={setSlipItems}
-                products={slipProducts}
-                onProductSelect={(idx, pid) => onSlipProductSelect(idx, pid, slipItems, setSlipItems, slipProducts)}
-                calcTotals={calcTotals}
-              />
+              {slipProductsLoading ? (
+                <div className="py-6 text-center text-sm text-gray-500">⏳ 商品マスターを読み込み中…</div>
+              ) : slipProducts.length === 0 ? (
+                <div className="py-4 text-center text-sm text-red-500 border border-red-200 rounded-lg bg-red-50">
+                  ⚠️ 商品マスターを取得できませんでした。
+                  <button type="button" onClick={loadProductsMaster} className="ml-2 underline text-red-600">再読み込み</button>
+                </div>
+              ) : (
+                <SlipItemsTable
+                  items={slipItems} setItems={setSlipItems}
+                  products={slipProducts}
+                  onProductSelect={(idx, pid) => onSlipProductSelect(idx, pid, slipItems, setSlipItems, slipProducts)}
+                  calcTotals={calcTotals}
+                />
+              )}
               <div className="flex justify-end gap-3 pt-2 border-t">
                 <button type="button" onClick={() => { setSlipModalMember(null); setSlipForm(null); }}
                   className="px-5 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">キャンセル</button>
@@ -1364,12 +1392,21 @@ export default function AutoShipPanel() {
                 </div>
               </div>
               {/* 商品テーブル */}
-              <SlipItemsTable
-                items={bulkSlipItems} setItems={setBulkSlipItems}
-                products={bulkSlipProducts}
-                onProductSelect={(idx, pid) => onSlipProductSelect(idx, pid, bulkSlipItems, setBulkSlipItems, bulkSlipProducts)}
-                calcTotals={calcTotals}
-              />
+              {slipProductsLoading ? (
+                <div className="py-6 text-center text-sm text-gray-500">⏳ 商品マスターを読み込み中…</div>
+              ) : slipProducts.length === 0 ? (
+                <div className="py-4 text-center text-sm text-red-500 border border-red-200 rounded-lg bg-red-50">
+                  ⚠️ 商品マスターを取得できませんでした。
+                  <button type="button" onClick={loadProductsMaster} className="ml-2 underline text-red-600">再読み込み</button>
+                </div>
+              ) : (
+                <SlipItemsTable
+                  items={bulkSlipItems} setItems={setBulkSlipItems}
+                  products={slipProducts}
+                  onProductSelect={(idx, pid) => onSlipProductSelect(idx, pid, bulkSlipItems, setBulkSlipItems, slipProducts)}
+                  calcTotals={calcTotals}
+                />
+              )}
               {/* 結果表示 */}
               {bulkResult && (
                 <div className={`p-3 rounded-lg text-sm border ${bulkResult.failed === 0 ? "bg-green-50 border-green-200 text-green-800" : "bg-yellow-50 border-yellow-200 text-yellow-800"}`}>
