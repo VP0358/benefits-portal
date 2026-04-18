@@ -21,7 +21,7 @@ export async function POST(
           include: {
             orderItems: {
               include: {
-                product: true
+                mlmProduct: true
               }
             }
           }

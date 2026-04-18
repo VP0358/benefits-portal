@@ -22,7 +22,7 @@ export async function POST(
         user: true,
         items: {
           include: {
-            product: true
+            mlmProduct: true
           }
         },
         shippingLabel: true

@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
           include: {
             orderItems: {
               include: {
-                product: true
+                mlmProduct: true
               }
             }
           }
@@ -123,7 +123,7 @@ export async function GET(req: NextRequest) {
       // 商品
       products: label.order.orderItems.map(item => ({
         id: item.id.toString(),
-        code: item.product?.code || '',
+        code: item.mlmProduct?.code || '',
         name: item.productName,
         price: item.unitPrice,
         points: 0, // ポイントはOrderItemに無いため0
