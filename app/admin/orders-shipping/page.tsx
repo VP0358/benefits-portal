@@ -138,12 +138,15 @@ export default function OrdersShippingPage() {
   const [shippingStatus, setShippingStatus] = useState("")
   const [keyword,        setKeyword]        = useState("")
 
-  // 結果
+  // 結果 + 表示元管理
   const [orders,   setOrders]   = useState<Order[]>([])
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [loading,  setLoading]  = useState(false)
   const [searched, setSearched] = useState(false)
   const [expandedId, setExpandedId] = useState<number | null>(null)
+  // どのソースの伝票を表示中か: "search" | "outbox" | "summary"
+  const [orderSource, setOrderSource] = useState<"search" | "outbox" | "summary" | null>(null)
+  const [orderSourceLabel, setOrderSourceLabel] = useState<string>("")
 
   // サマリー
   const [summary, setSummary] = useState<Summary | null>(null)
@@ -158,13 +161,11 @@ export default function OrdersShippingPage() {
   const [outboxLoading,    setOutboxLoading]     = useState(false)
   const [displayedOutbox,  setDisplayedOutbox]   = useState<number | null>(null)
 
-  // 未処理伝票クリック → 対象伝票一覧
+  // 未処理伝票クリック（後方互換用 - 実際にはorders/orderSourceで管理）
   const [summaryFilterLabel, setSummaryFilterLabel] = useState<string | null>(null)
   const [summaryOrders,      setSummaryOrders]      = useState<Order[] | null>(null)
   const [summaryOrdersLoading, setSummaryOrdersLoading] = useState(false)
-  // 未処理伝票一覧のチェックボックス選択
   const [summarySelected, setSummarySelected] = useState<Set<number>>(new Set())
-  // 未処理伝票一覧の一括処理
   const [summaryBulkNote,      setSummaryBulkNote]      = useState("")
   const [summaryBulkPaidDate,  setSummaryBulkPaidDate]  = useState(today.toISOString().split("T")[0])
   const [summaryBulkProcessing, setSummaryBulkProcessing] = useState(false)
@@ -211,6 +212,7 @@ export default function OrdersShippingPage() {
   const fetchOrders = useCallback(async () => {
     setLoading(true)
     setSelected(new Set())
+    setExpandedId(null)
     try {
       const p = new URLSearchParams()
       if (startDate)     p.set("startDate",      startDate)
@@ -225,6 +227,15 @@ export default function OrdersShippingPage() {
       const data = await res.json()
       setOrders(data.orders || [])
       setSearched(true)
+      setOrderSource("search")
+      const parts = []
+      if (startDate || endDate) parts.push(`${startDate||""} 〜 ${endDate||""}`)
+      if (slipType) parts.push(SLIP_TYPES.find(s=>s.value===slipType)?.label||slipType)
+      if (paymentMethod) parts.push(PAYMENT_METHODS.find(p=>p.value===paymentMethod)?.label||paymentMethod)
+      if (paymentStatus) parts.push(PAY_STATUS_OPTS.find(p=>p.value===paymentStatus)?.label||paymentStatus)
+      if (shippingStatus) parts.push(SHIP_STATUS_OPTS.find(p=>p.value===shippingStatus)?.label||shippingStatus)
+      if (keyword) parts.push(`"${keyword}"`)
+      setOrderSourceLabel(parts.length > 0 ? `検索: ${parts.join(" / ")}` : "検索結果")
     } catch { alert("取得エラー") }
     finally  { setLoading(false) }
   }, [startDate, endDate, dateType, slipType, paymentMethod, paymentStatus, shippingStatus, keyword])
@@ -371,21 +382,32 @@ export default function OrdersShippingPage() {
     if (displayedOutbox === from) showOutbox(from)
   }
   const showOutbox = async (outbox: number) => {
-    setOutboxLoading(true)
+    setLoading(true)
     setDisplayedOutbox(outbox)
     setOutboxOrders(null)
+    setSelected(new Set())
+    setExpandedId(null)
     try {
       const res  = await fetch(`/api/admin/orders-shipping?outboxNo=${outbox}`)
       const data = await res.json()
-      setOutboxOrders(data.orders || [])
+      const result = data.orders || []
+      setOutboxOrders(result)
+      // メイン一覧にも反映
+      setOrders(result)
+      setSearched(true)
+      setOrderSource("outbox")
+      setOrderSourceLabel(`出庫BOX${outbox} の伝票一覧`)
     } catch { alert("取得エラー") }
-    finally  { setOutboxLoading(false) }
+    finally  { setLoading(false); setOutboxLoading(false) }
   }
 
-  // 未処理伝票セルクリック → 対象伝票を取得・表示
+  // 未処理伝票セルクリック → 対象伝票を取得・一覧表示
   const showSummaryOrders = async (pm: string, statusType: "unpaid" | "unshipped", period: "thisMonth" | "lastMonth") => {
+    setLoading(true)
     setSummaryOrdersLoading(true)
     setSummaryOrders(null)
+    setSelected(new Set())
+    setExpandedId(null)
     const now = new Date()
     let y = now.getFullYear(), m = now.getMonth()
     if (period === "lastMonth") { m -= 1; if (m < 0) { m = 11; y-- } }
@@ -397,7 +419,7 @@ export default function OrdersShippingPage() {
     // カラムキーをAPIの支払方法にマッピング
     const pmApiMap: Record<string, string> = {
       bank_transfer:  "bank_transfer",
-      postal_transfer: "bank_transfer", // 郵便振替もbank_transfer扱い
+      postal_transfer: "bank_transfer",
       bank_payment:   "bank_payment",
       cod:            "cod",
       cash:           "cash",
@@ -416,9 +438,15 @@ export default function OrdersShippingPage() {
     try {
       const res  = await fetch(`/api/admin/orders-shipping?${p}`)
       const data = await res.json()
-      setSummaryOrders(data.orders || [])
+      const result = data.orders || []
+      setSummaryOrders(result)
+      // メイン一覧にも反映
+      setOrders(result)
+      setSearched(true)
+      setOrderSource("summary")
+      setOrderSourceLabel(`未処理: ${label}`)
     } catch { alert("取得エラー") }
-    finally { setSummaryOrdersLoading(false) }
+    finally { setLoading(false); setSummaryOrdersLoading(false) }
   }
 
   // ─── 一括処理 ────────────────────────────────────────
@@ -856,105 +884,6 @@ export default function OrdersShippingPage() {
           </div>
         </div>
 
-        {/* BOX内容テーブル */}
-        {(outboxOrders !== null || outboxLoading) && displayedOutbox !== null && (
-          <div className="border-t border-gray-100">
-            <div className="bg-blue-50 px-4 py-2 flex items-center justify-between">
-              <span className="text-sm font-semibold text-blue-800 flex items-center gap-2">
-                <Box className="w-4 h-4" />
-                出庫BOX{displayedOutbox} の内容
-                {outboxOrders && <span className="ml-2 text-xs font-normal text-blue-600">（{outboxOrders.length}件）</span>}
-              </span>
-              <button onClick={() => { setOutboxOrders(null); setDisplayedOutbox(null) }}
-                className="text-xs text-gray-400 hover:text-gray-600 px-2 py-0.5 rounded hover:bg-gray-100">✕ 閉じる</button>
-            </div>
-            {outboxLoading ? (
-              <div className="p-4 text-center text-gray-400 text-sm">
-                <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-1" />読み込み中...
-              </div>
-            ) : outboxOrders && outboxOrders.length === 0 ? (
-              <div className="p-4 text-center text-gray-400 text-sm">
-                <Package className="w-8 h-8 text-gray-200 mx-auto mb-1" />
-                出庫BOX{displayedOutbox} に伝票はありません
-              </div>
-            ) : outboxOrders && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs border-collapse min-w-[800px]">
-                  <thead>
-                    <tr className="border-b border-gray-200 bg-gray-50 text-gray-500 text-left">
-                      <th className="px-3 py-2">種別</th>
-                      <th className="px-3 py-2">注文日</th>
-                      <th className="px-3 py-2">入金日</th>
-                      <th className="px-3 py-2">会員ID</th>
-                      <th className="px-3 py-2">氏名/配送先</th>
-                      <th className="px-3 py-2">支払方法</th>
-                      <th className="px-3 py-2">ステイタス</th>
-                      <th className="px-3 py-2 text-right">金額</th>
-                      <th className="px-3 py-2">備考</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {outboxOrders.map((order, idx) => (
-                      <tr key={order.id} className={`border-b border-gray-100 ${idx % 2 === 0 ? "" : "bg-gray-50/50"}`}>
-                        <td className="px-3 py-2">
-                          <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-700">{order.slipTypeLabel}</span>
-                        </td>
-                        <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{order.orderedAt.slice(0,10)}</td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          {order.paidAt
-                            ? <span className="text-green-700">{order.paidAt.slice(0,10)}</span>
-                            : <span className="text-gray-300">—</span>}
-                        </td>
-                        <td className="px-3 py-2 text-gray-600 font-mono">{order.memberCode}</td>
-                        <td className="px-3 py-2">
-                          <div className="font-medium text-gray-800">{order.memberName}</div>
-                          {order.shippingLabel && (
-                            <div className="text-gray-400">{order.shippingLabel.recipientName}</div>
-                          )}
-                        </td>
-                        <td className="px-3 py-2">
-                          <span className={`px-1.5 py-0.5 rounded ${
-                            order.paymentMethod === "card" || order.paymentMethod === "credit_card"
-                              ? "bg-blue-50 text-blue-700"
-                              : order.paymentMethod === "bank_transfer"
-                              ? "bg-yellow-50 text-yellow-700"
-                              : order.paymentMethod === "bank_payment"
-                              ? "bg-green-50 text-green-700"
-                              : order.paymentMethod === "cod"
-                              ? "bg-orange-50 text-orange-700"
-                              : "bg-gray-100 text-gray-600"
-                          }`}>
-                            {order.paymentMethodLabel}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="flex flex-col gap-0.5">
-                            <span className={`px-1.5 py-0.5 rounded w-fit ${
-                              order.paymentStatus === "paid" ? "bg-green-100 text-green-700"
-                              : order.paymentStatus === "ignored" ? "bg-gray-100 text-gray-500"
-                              : "bg-red-50 text-red-600"
-                            }`}>
-                              {order.paymentStatus === "paid" ? "入金済" : order.paymentStatus === "ignored" ? "無視" : "未入金"}
-                            </span>
-                            <span className={`px-1.5 py-0.5 rounded w-fit ${
-                              order.shippingStatus === "shipped" ? "bg-green-100 text-green-700"
-                              : order.shippingStatus === "ignored" ? "bg-gray-100 text-gray-500"
-                              : "bg-orange-50 text-orange-600"
-                            }`}>
-                              {order.shippingStatus === "shipped" ? "発送済" : order.shippingStatus === "ignored" ? "無視" : "未発送"}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 text-right font-medium text-gray-800">¥{order.totalAmount.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-gray-500 max-w-[120px] truncate">{order.note || ""}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* ══════════════════════════════════════════════
@@ -1115,9 +1044,7 @@ export default function OrdersShippingPage() {
                           {row.monthLabel}
                         </td>
                       )}
-                      <td className={`px-3 py-2.5 font-semibold text-center border-r border-gray-200 whitespace-nowrap text-xs ${
-                        row.statusType === "unpaid" ? "text-red-600" : "text-orange-600"
-                      }`}>
+                      <td className={"px-3 py-2.5 font-semibold text-center border-r border-gray-200 whitespace-nowrap text-xs " + (row.statusType === "unpaid" ? "text-red-600" : "text-orange-600")}>
                         {row.rowLabel}
                       </td>
                       {SUMMARY_COLS.map(col => {
@@ -1137,9 +1064,7 @@ export default function OrdersShippingPage() {
                           <td key={col.key} className="px-3 py-2.5 text-center border-r border-gray-100">
                             {count > 0 ? (
                               <button
-                                className={`font-bold text-xs hover:underline transition-colors ${
-                                  row.statusType === "unpaid" ? "text-red-600 hover:text-red-800" : "text-orange-600 hover:text-orange-800"
-                                }`}
+                                className={"font-bold text-xs hover:underline transition-colors " + (row.statusType === "unpaid" ? "text-red-600 hover:text-red-800" : "text-orange-600 hover:text-orange-800")}
                                 onClick={() => showSummaryOrders(col.key, row.statusType, row.period)}>
                                 {count}件
                               </button>
@@ -1156,273 +1081,125 @@ export default function OrdersShippingPage() {
             </table>
           </div>
         ) : null}
-
-        {/* 未処理伝票クリック → 対象伝票一覧 */}
-        {(summaryOrders !== null || summaryOrdersLoading) && (
-          <div className="border-t border-gray-200">
-            {/* ヘッダ */}
-            <div className="bg-amber-50 px-4 py-2 flex items-center justify-between flex-wrap gap-2">
-              <span className="text-sm font-semibold text-amber-800 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4" />
-                {summaryFilterLabel} の伝票一覧
-                {summaryOrders && <span className="ml-2 text-xs font-normal text-amber-600">（{summaryOrders.length}件）</span>}
-                {summarySelected.size > 0 && (
-                  <span className="ml-1 px-2 py-0.5 bg-amber-600 text-white rounded text-[11px]">{summarySelected.size}件選択中</span>
-                )}
-              </span>
-              <button onClick={() => { setSummaryOrders(null); setSummaryFilterLabel(null); setSummarySelected(new Set()) }}
-                className="text-xs text-gray-400 hover:text-gray-600 px-2 py-0.5 rounded hover:bg-gray-100">✕ 閉じる</button>
-            </div>
-
-            {/* ── 一括処理バー（チェック選択時に表示） */}
-            {summaryOrders && summaryOrders.length > 0 && (
-              <div className="bg-amber-50/70 border-b border-amber-200 px-4 py-2 flex flex-wrap items-center gap-2">
-                {/* 全選択 */}
-                <button onClick={toggleSummaryAll}
-                  className="flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 border border-amber-300 rounded px-2 py-1 bg-white hover:bg-amber-50">
-                  {summarySelected.size === summaryOrders.length
-                    ? <CheckSquare className="w-3.5 h-3.5" />
-                    : <Square className="w-3.5 h-3.5" />}
-                  全選択
-                </button>
-                <span className="text-xs text-amber-600 border-r border-amber-300 pr-2">
-                  {summarySelected.size > 0 ? `${summarySelected.size}件選択` : "チェックで選択"}
-                </span>
-                {/* 入金操作 */}
-                <button
-                  onClick={() => summaryBulkPatch("setPaymentStatus", "paid")}
-                  disabled={summarySelected.size === 0 || summaryBulkProcessing}
-                  className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 disabled:opacity-40">
-                  入金済にする
-                </button>
-                <button
-                  onClick={() => summaryBulkPatch("setPaymentStatus", "unpaid")}
-                  disabled={summarySelected.size === 0 || summaryBulkProcessing}
-                  className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200 disabled:opacity-40">
-                  未入金に戻す
-                </button>
-                <button
-                  onClick={() => summaryBulkPatch("setPaymentStatus", "ignored")}
-                  disabled={summarySelected.size === 0 || summaryBulkProcessing}
-                  className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs hover:bg-gray-200 disabled:opacity-40">
-                  入金無視
-                </button>
-                <span className="border-l border-amber-300 pl-2 flex items-center gap-1">
-                  {/* 入金日設定 */}
-                  <input type="date" value={summaryBulkPaidDate}
-                    onChange={e => setSummaryBulkPaidDate(e.target.value)}
-                    className="border border-gray-300 rounded px-1.5 py-0.5 text-xs" />
-                  <button
-                    onClick={() => summaryBulkPatch("setPaidAt", summaryBulkPaidDate)}
-                    disabled={summarySelected.size === 0 || summaryBulkProcessing}
-                    className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-40">
-                    入金日セット
-                  </button>
-                </span>
-                {/* 発送操作 */}
-                <span className="border-l border-amber-300 pl-2 flex items-center gap-1">
-                  <button
-                    onClick={() => summaryBulkPatch("setShippingStatus", "shipped")}
-                    disabled={summarySelected.size === 0 || summaryBulkProcessing}
-                    className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 disabled:opacity-40">
-                    発送済にする
-                  </button>
-                  <button
-                    onClick={() => summaryBulkPatch("setShippingStatus", "unshipped")}
-                    disabled={summarySelected.size === 0 || summaryBulkProcessing}
-                    className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs hover:bg-orange-200 disabled:opacity-40">
-                    未発送に戻す
-                  </button>
-                </span>
-                {/* 備考設定 */}
-                <span className="border-l border-amber-300 pl-2 flex items-center gap-1">
-                  <input type="text" value={summaryBulkNote}
-                    onChange={e => setSummaryBulkNote(e.target.value)}
-                    placeholder="備考テキスト"
-                    className="border border-gray-300 rounded px-1.5 py-0.5 text-xs w-28" />
-                  <button
-                    onClick={async () => {
-                      await summaryBulkPatch("setNote", summaryBulkNote)
-                      setSummaryBulkNote("")
-                    }}
-                    disabled={summarySelected.size === 0 || !summaryBulkNote || summaryBulkProcessing}
-                    className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs hover:bg-purple-200 disabled:opacity-40">
-                    備考セット
-                  </button>
-                </span>
-                {summaryBulkProcessing && <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" />}
-              </div>
-            )}
-
-            {summaryOrdersLoading ? (
-              <div className="p-4 text-center text-gray-400 text-sm">
-                <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-1" />読み込み中...
-              </div>
-            ) : summaryOrders && summaryOrders.length === 0 ? (
-              <div className="p-4 text-center text-gray-400 text-sm">
-                <Package className="w-8 h-8 text-gray-200 mx-auto mb-1" />
-                該当する伝票はありません
-              </div>
-            ) : summaryOrders && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs border-collapse min-w-[900px]">
-                  <thead>
-                    <tr className="border-b border-gray-200 bg-amber-50/60 text-gray-500 text-left">
-                      <th className="px-2 py-2 w-8"></th>
-                      <th className="px-3 py-2">種別</th>
-                      <th className="px-3 py-2">注文日</th>
-                      <th className="px-3 py-2">入金日</th>
-                      <th className="px-3 py-2">会員ID</th>
-                      <th className="px-3 py-2">氏名/配送先</th>
-                      <th className="px-3 py-2">支払方法</th>
-                      <th className="px-3 py-2">ステイタス</th>
-                      <th className="px-3 py-2 text-right">金額</th>
-                      <th className="px-3 py-2">備考</th>
-                      <th className="px-3 py-2">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summaryOrders.map((order, idx) => (
-                      <tr key={order.id}
-                        className={`border-b border-gray-100 transition-colors ${
-                          summarySelected.has(order.id) ? "bg-amber-50" : idx % 2 === 0 ? "" : "bg-gray-50/50"
-                        }`}>
-                        {/* チェックボックス */}
-                        <td className="px-2 py-2" onClick={e => { e.stopPropagation(); toggleSummarySelect(order.id) }}>
-                          <button type="button" className="flex items-center">
-                            {summarySelected.has(order.id)
-                              ? <CheckSquare className="w-4 h-4 text-amber-600" />
-                              : <Square className="w-4 h-4 text-gray-300" />}
-                          </button>
-                        </td>
-                        <td className="px-3 py-2">
-                          <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-700">{order.slipTypeLabel}</span>
-                        </td>
-                        {/* 注文日：クリックで編集モーダル */}
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={e => openEditModal(order, e)}
-                            className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer">
-                            {order.orderedAt.slice(0,10)}
-                          </button>
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          {order.paidAt
-                            ? <span className="text-green-700">{order.paidAt.slice(0,10)}</span>
-                            : <span className="text-red-400 font-medium">未入金</span>}
-                        </td>
-                        <td className="px-3 py-2 text-gray-600 font-mono">{order.memberCode}</td>
-                        <td className="px-3 py-2">
-                          <div className="font-medium text-gray-800">{order.memberName}</div>
-                          {order.shippingLabel && (
-                            <div className="text-gray-400">{order.shippingLabel.recipientName}</div>
-                          )}
-                        </td>
-                        <td className="px-3 py-2">
-                          <span className={`px-1.5 py-0.5 rounded ${
-                            order.paymentMethod === "card" || order.paymentMethod === "credit_card"
-                              ? "bg-blue-50 text-blue-700"
-                              : order.paymentMethod === "bank_transfer"
-                              ? "bg-yellow-50 text-yellow-700"
-                              : order.paymentMethod === "bank_payment"
-                              ? "bg-green-50 text-green-700"
-                              : order.paymentMethod === "cod"
-                              ? "bg-orange-50 text-orange-700"
-                              : "bg-gray-100 text-gray-600"
-                          }`}>
-                            {order.paymentMethodLabel}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="flex flex-col gap-0.5">
-                            <span className={`px-1.5 py-0.5 rounded w-fit ${
-                              order.paymentStatus === "paid" ? "bg-green-100 text-green-700"
-                              : order.paymentStatus === "ignored" ? "bg-gray-100 text-gray-500"
-                              : "bg-red-50 text-red-600"
-                            }`}>
-                              {order.paymentStatus === "paid" ? "入金済" : order.paymentStatus === "ignored" ? "無視" : "未入金"}
-                            </span>
-                            <span className={`px-1.5 py-0.5 rounded w-fit ${
-                              order.shippingStatus === "shipped" ? "bg-green-100 text-green-700"
-                              : order.shippingStatus === "ignored" ? "bg-gray-100 text-gray-500"
-                              : "bg-orange-50 text-orange-600"
-                            }`}>
-                              {order.shippingStatus === "shipped" ? "発送済" : order.shippingStatus === "ignored" ? "無視" : "未発送"}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 text-right font-medium text-gray-800">¥{order.totalAmount.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-gray-500 max-w-[100px] truncate">{order.note || ""}</td>
-                        {/* 個別操作 */}
-                        <td className="px-2 py-2">
-                          <div className="flex flex-col gap-0.5">
-                            <button
-                              onClick={() => summaryBulkPatch("setPaymentStatus", "paid", [order.id])}
-                              disabled={summaryBulkProcessing}
-                              className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px] hover:bg-green-200 whitespace-nowrap disabled:opacity-40">
-                              入金済
-                            </button>
-                            <button
-                              onClick={() => summaryBulkPatch("setShippingStatus", "shipped", [order.id])}
-                              disabled={summaryBulkProcessing}
-                              className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] hover:bg-blue-200 whitespace-nowrap disabled:opacity-40">
-                              発送済
-                            </button>
-                            <button
-                              onClick={e => openEditModal(order, e)}
-                              className="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-[10px] hover:bg-orange-200 whitespace-nowrap">
-                              編集
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
       </div>
+
 
       {/* ══════════════════════════════════════════════
           伝票一覧テーブル
       ══════════════════════════════════════════════ */}
       {searched && (
         <div className="rounded-2xl bg-white border border-stone-100 overflow-hidden" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
-          {/* ヘッダバー */}
-          <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button onClick={toggleAll} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700">
+          {/* ── ソースラベル＋件数バー ── */}
+          <div className={"px-4 py-2 flex items-center justify-between flex-wrap gap-2 " + (orderSource === "outbox" ? "bg-blue-600 text-white" : orderSource === "summary" ? "bg-amber-500 text-white" : "bg-gray-700 text-white")}>
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              {orderSource === "outbox" && <Box className="w-4 h-4" />}
+              {orderSource === "summary" && <AlertCircle className="w-4 h-4" />}
+              {orderSource === "search" && <Search className="w-4 h-4" />}
+              <span>{orderSourceLabel || "伝票一覧"}</span>
+              <span className="text-xs font-normal opacity-80">（{orders.length}件）</span>
+            </div>
+            <button
+              onClick={() => { setOrders([]); setSearched(false); setOrderSource(null); setOrderSourceLabel(""); setSelected(new Set()) }}
+              className="text-xs opacity-70 hover:opacity-100 px-2 py-0.5 rounded hover:bg-black/20">
+              ✕ 閉じる
+            </button>
+          </div>
+
+          {/* ── 一括編集バー ── */}
+          <div className="bg-gray-50 border-b border-gray-200 px-3 py-2 space-y-2">
+            {/* 行1: 全選択・件数・CSV */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <button onClick={toggleAll} className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800 border border-gray-300 rounded px-2 py-1 bg-white hover:bg-gray-100">
                 {selected.size === orders.length && orders.length > 0
-                  ? <CheckSquare className="w-4 h-4 text-blue-600" />
-                  : <Square className="w-4 h-4" />}
+                  ? <CheckSquare className="w-3.5 h-3.5 text-blue-600" />
+                  : <Square className="w-3.5 h-3.5" />}
                 全選択
               </button>
-              {selected.size > 0 && (
-                <span className="text-xs text-blue-600 font-medium">{selected.size}件選択中</span>
-              )}
-              <span className="text-xs text-gray-500">計 {orders.length}件</span>
-            </div>
-            <div className="flex gap-1 flex-wrap">
-              <button onClick={exportCSV}
-                className="flex items-center gap-1 text-xs px-3 py-1 border border-gray-300 rounded hover:bg-gray-50">
-                <Download className="w-3.5 h-3.5" />CSV出力
+              <span className="text-xs text-gray-500 border-r border-gray-300 pr-2">
+                {selected.size > 0
+                  ? <span className="font-medium text-blue-600">{selected.size}件選択中</span>
+                  : <span>チェックで選択</span>}
+              </span>
+              {/* 入金操作 */}
+              <button
+                onClick={() => bulkPatch("setPaymentStatus", "paid").then(() => { fetchOrders(); fetchSummary() })}
+                disabled={selected.size === 0 || bulkProcessing}
+                className="px-2 py-1 bg-green-100 text-green-700 border border-green-300 rounded text-xs hover:bg-green-200 disabled:opacity-40 whitespace-nowrap">
+                入金済にする
               </button>
-              <button onClick={handleExportYamatoCSV}
-                className="flex items-center gap-1 text-xs px-3 py-1 border border-amber-400 text-amber-700 rounded hover:bg-amber-50"
-                title="ヤマトB2クラウド取込用CSV">
-                <Download className="w-3.5 h-3.5" />ヤマトCSV
+              <button
+                onClick={() => bulkPatch("setPaymentStatus", "unpaid").then(() => { fetchOrders(); fetchSummary() })}
+                disabled={selected.size === 0 || bulkProcessing}
+                className="px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded text-xs hover:bg-red-100 disabled:opacity-40 whitespace-nowrap">
+                未入金に戻す
               </button>
-              {selected.size > 0 && (
+              <button
+                onClick={() => bulkPatch("setPaymentStatus", "ignored").then(() => { fetchOrders(); fetchSummary() })}
+                disabled={selected.size === 0 || bulkProcessing}
+                className="px-2 py-1 bg-gray-100 text-gray-600 border border-gray-300 rounded text-xs hover:bg-gray-200 disabled:opacity-40 whitespace-nowrap">
+                入金無視
+              </button>
+              <span className="border-l border-gray-300 pl-2 flex items-center gap-1">
                 <button
-                  onClick={handleBulkDeliveryNote}
-                  className="flex items-center gap-1 text-xs px-3 py-1 bg-indigo-600 text-white border border-indigo-700 rounded hover:bg-indigo-700 font-medium"
-                  title="チェックした伝票の納品書PDFを一括ダウンロード">
-                  <Download className="w-3.5 h-3.5" />納品書PDF一括出力（{selected.size}件）
+                  onClick={() => bulkPatch("setShippingStatus", "shipped").then(() => { fetchOrders(); fetchSummary() })}
+                  disabled={selected.size === 0 || bulkProcessing}
+                  className="px-2 py-1 bg-blue-100 text-blue-700 border border-blue-300 rounded text-xs hover:bg-blue-200 disabled:opacity-40 whitespace-nowrap">
+                  発送済にする
                 </button>
-              )}
+                <button
+                  onClick={() => bulkPatch("setShippingStatus", "unshipped").then(() => { fetchOrders(); fetchSummary() })}
+                  disabled={selected.size === 0 || bulkProcessing}
+                  className="px-2 py-1 bg-orange-50 text-orange-600 border border-orange-200 rounded text-xs hover:bg-orange-100 disabled:opacity-40 whitespace-nowrap">
+                  未発送に戻す
+                </button>
+              </span>
+              {bulkProcessing && <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" />}
+            </div>
+            {/* 行2: 日付設定・備考・CSV */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <select value={bulkDateType} onChange={e => setBulkDateType(e.target.value)}
+                className="border border-gray-300 rounded px-1.5 py-0.5 text-xs bg-white">
+                <option value="paidAt">入金日</option>
+                <option value="shippedAt">発送日</option>
+                <option value="orderedAt">注文日</option>
+              </select>
+              <input type="date" value={bulkPaidDate} onChange={e => setBulkPaidDate(e.target.value)}
+                className="border border-gray-300 rounded px-1.5 py-0.5 text-xs" />
+              <button onClick={handleSetBulkDate} disabled={selected.size === 0 || bulkProcessing}
+                className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-40 whitespace-nowrap">
+                日付セット
+              </button>
+              <span className="border-l border-gray-300 pl-2 flex items-center gap-1">
+                <input type="text" value={bulkNote} onChange={e => setBulkNote(e.target.value)}
+                  placeholder="備考テキスト"
+                  className="border border-gray-300 rounded px-1.5 py-0.5 text-xs w-28" />
+                <select value={bulkAction} onChange={e => setBulkAction(e.target.value)}
+                  className="border border-gray-300 rounded px-1.5 py-0.5 text-xs bg-white">
+                  <option value="setNote">備考に</option>
+                  <option value="setNoteSlip">備考(納品)に</option>
+                  <option value="setNoteAll">両方に</option>
+                </select>
+                <button onClick={handleBulkExecute} disabled={selected.size === 0 || !bulkNote || bulkProcessing}
+                  className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs hover:bg-purple-200 disabled:opacity-40 whitespace-nowrap">
+                  備考セット
+                </button>
+              </span>
+              <span className="border-l border-gray-300 pl-2 flex items-center gap-1">
+                <button onClick={exportCSV}
+                  className="flex items-center gap-1 text-xs px-2 py-1 border border-gray-300 rounded bg-white hover:bg-gray-50">
+                  <Download className="w-3 h-3" />CSV
+                </button>
+                <button onClick={handleExportYamatoCSV}
+                  className="flex items-center gap-1 text-xs px-2 py-1 border border-amber-400 text-amber-700 rounded bg-white hover:bg-amber-50">
+                  <Download className="w-3 h-3" />ヤマトCSV
+                </button>
+                {selected.size > 0 && (
+                  <button onClick={handleBulkDeliveryNote}
+                    className="flex items-center gap-1 text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                    <Download className="w-3 h-3" />納品書PDF({selected.size}件)
+                  </button>
+                )}
+              </span>
             </div>
           </div>
 
@@ -1454,14 +1231,14 @@ export default function OrdersShippingPage() {
                     <th className="px-2 py-2">伝票作成</th>
                     <th className="px-2 py-2">備考</th>
                     <th className="px-2 py-2">備考(納品)</th>
+                    <th className="px-2 py-2 text-center">操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   {orders.map(order => (
                     <>
                       <tr key={order.id}
-                        className={`border-b border-gray-100 cursor-pointer transition-colors
-                          ${selected.has(order.id) ? "bg-blue-50" : "hover:bg-stone-50"}`}
+                        className={"border-b border-gray-100 cursor-pointer transition-colors " + (selected.has(order.id) ? "bg-blue-50" : "hover:bg-stone-50")}
                         onClick={() => setExpandedId(expandedId === order.id ? null : order.id)}>
                         {/* チェックボックス */}
                         <td className="px-2 py-2" onClick={e => { e.stopPropagation(); toggleSelect(order.id) }}>
@@ -1498,35 +1275,17 @@ export default function OrdersShippingPage() {
                         </td>
                         {/* 支払方法 */}
                         <td className="px-2 py-2">
-                          <span className={`px-1.5 py-0.5 rounded text-xs ${
-                            order.paymentMethod === "card" || order.paymentMethod === "credit_card"
-                              ? "bg-blue-50 text-blue-700"
-                              : order.paymentMethod === "bank_transfer"
-                              ? "bg-yellow-50 text-yellow-700"
-                              : "bg-gray-100 text-gray-600"
-                          }`}>
+                          <span className={"px-1.5 py-0.5 rounded text-xs " + (order.paymentMethod === "card" || order.paymentMethod === "credit_card" ? "bg-blue-50 text-blue-700" : order.paymentMethod === "bank_transfer" ? "bg-yellow-50 text-yellow-700" : "bg-gray-100 text-gray-600")}>
                             {order.paymentMethodLabel}
                           </span>
                         </td>
                         {/* ステイタス */}
                         <td className="px-2 py-2">
                           <div className="flex flex-col gap-0.5">
-                            <span className={`px-1.5 py-0.5 rounded text-xs w-fit ${
-                              order.paymentStatus === "paid"
-                                ? "bg-green-100 text-green-700"
-                                : order.paymentStatus === "ignored"
-                                ? "bg-gray-100 text-gray-500"
-                                : "bg-red-50 text-red-600"
-                            }`}>
+                            <span className={"px-1.5 py-0.5 rounded text-xs w-fit " + (order.paymentStatus === "paid" ? "bg-green-100 text-green-700" : order.paymentStatus === "ignored" ? "bg-gray-100 text-gray-500" : "bg-red-50 text-red-600")}>
                               {order.paymentStatus === "paid" ? "入金済" : order.paymentStatus === "ignored" ? "無視" : "未入金"}
                             </span>
-                            <span className={`px-1.5 py-0.5 rounded text-xs w-fit ${
-                              order.shippingStatus === "shipped"
-                                ? "bg-green-100 text-green-700"
-                                : order.shippingStatus === "ignored"
-                                ? "bg-gray-100 text-gray-500"
-                                : "bg-orange-50 text-orange-600"
-                            }`}>
+                            <span className={"px-1.5 py-0.5 rounded text-xs w-fit " + (order.shippingStatus === "shipped" ? "bg-green-100 text-green-700" : order.shippingStatus === "ignored" ? "bg-gray-100 text-gray-500" : "bg-orange-50 text-orange-600")}>
                               {order.shippingStatus === "shipped" ? "発送済" : order.shippingStatus === "ignored" ? "無視" : "未発送"}
                             </span>
                           </div>
@@ -1553,12 +1312,32 @@ export default function OrdersShippingPage() {
                         <td className="px-2 py-2 text-gray-600 max-w-[120px] truncate">
                           {order.noteSlip || ""}
                         </td>
+                        {/* 個別操作ボタン */}
+                        <td className="px-2 py-2" onClick={e => e.stopPropagation()}>
+                          <div className="flex flex-col gap-0.5">
+                            <button
+                              onClick={() => bulkPatch("setPaymentStatus", "paid", [order.id]).then(() => { fetchOrders(); fetchSummary() })}
+                              className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px] hover:bg-green-200 whitespace-nowrap">
+                              入金済
+                            </button>
+                            <button
+                              onClick={() => bulkPatch("setShippingStatus", "shipped", [order.id]).then(() => { fetchOrders(); fetchSummary() })}
+                              className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] hover:bg-blue-200 whitespace-nowrap">
+                              発送済
+                            </button>
+                            <button
+                              onClick={e => openEditModal(order, e)}
+                              className="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-[10px] hover:bg-orange-200 whitespace-nowrap">
+                              編集
+                            </button>
+                          </div>
+                        </td>
                       </tr>
 
                       {/* 展開詳細 */}
                       {expandedId === order.id && (
                         <tr key={`${order.id}-detail`}>
-                          <td colSpan={13} className="bg-blue-50/40 px-6 py-3 border-b border-blue-100">
+                          <td colSpan={14} className="bg-blue-50/40 px-6 py-3 border-b border-blue-100">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                               {/* 商品明細 */}
                               <div>
