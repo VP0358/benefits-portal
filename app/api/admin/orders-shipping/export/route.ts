@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
         },
         items: {
           include: {
-            product: true
+            mlmProduct: true
           }
         },
         shippingLabel: true
@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
           order.user.phone || "",
           order.user.postalCode || "",
           `"${order.user.address?.replace(/"/g, '""') || ""}"`,
-          item.product.code || "",
+          item.mlmProduct?.code || "",
           item.productName,
           item.quantity,
           item.unitPrice,

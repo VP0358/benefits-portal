@@ -20,7 +20,7 @@ export async function GET(
           include: {
             orderItems: {
               include: {
-                product: true
+                mlmProduct: true
               }
             }
           }

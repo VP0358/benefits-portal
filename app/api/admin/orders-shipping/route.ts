@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
             unitPrice: true,
             quantity: true,
             lineAmount: true,
-            product: { select: { id: true, code: true } }
+            mlmProduct: { select: { id: true, code: true } }
           }
         },
         shippingLabel: {
@@ -176,9 +176,9 @@ export async function GET(request: NextRequest) {
         memberEmail: order.user.email,
         items: order.items.map((item) => ({
           id: Number(item.id),
-          productId: Number(item.productId),
+          productId: item.productId ? Number(item.productId) : null,
           productName: item.productName,
-          productCode: item.product?.code || "",
+          productCode: item.mlmProduct?.code || "",
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           lineAmount: item.lineAmount,
