@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
     if (outboxNo !== null) where.outboxNo = Number(outboxNo)
 
     if (memberCode) {
+      // user.memberCode と mlmMember.memberCode の両方を前方一致で検索
       where.user = {
         OR: [
           { memberCode: { contains: memberCode } },
@@ -97,12 +98,19 @@ export async function GET(request: NextRequest) {
     }
 
     if (keyword) {
-      where.OR = [
+      // memberCode フィルターと keyword フィルターが同時に指定された場合、
+      // keyword は AND 条件として追加（where.AND を使う）
+      const keywordConditions = [
         { orderNumber: { contains: keyword } },
         { user: { name: { contains: keyword } } },
         { items: { some: { productName: { contains: keyword } } } },
         { shippingLabel: { trackingNumber: { contains: keyword } } },
       ]
+      if (where.AND) {
+        where.AND.push({ OR: keywordConditions })
+      } else {
+        where.AND = [{ OR: keywordConditions }]
+      }
     }
 
     const orders = await prisma.order.findMany({

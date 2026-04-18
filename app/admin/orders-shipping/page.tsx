@@ -107,19 +107,22 @@ const BULK_ACTIONS = [
   { value: "setNoteAll", label: "備考・備考(納品書)に" },
 ]
 
+// ローカル時刻で YYYY-MM-DD を返す
+function toLocalDateStr(d: Date) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const dd = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${dd}`
+}
+// 指定した年月の 1 日〜末日を返す
+function getMonthRange(year: number, month: number) {
+  const start = new Date(year, month, 1)          // 1日
+  const end   = new Date(year, month + 1, 0)      // 末日
+  return { start: toLocalDateStr(start), end: toLocalDateStr(end) }
+}
 function getThisMonthRange() {
   const now = new Date()
-  const start = new Date(now.getFullYear(), now.getMonth(), 1)
-  const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  return {
-    start: start.toISOString().split("T")[0],
-    end:   end.toISOString().split("T")[0],
-  }
-}
-function offsetMonth(dateStr: string, offset: number) {
-  const d = new Date(dateStr + "-01")
-  d.setMonth(d.getMonth() + offset)
-  return d.toISOString().slice(0, 7)
+  return getMonthRange(now.getFullYear(), now.getMonth())
 }
 
 // ─── メインコンポーネント ───────────────────────────────
@@ -137,6 +140,7 @@ export default function OrdersShippingPage() {
   const [paymentStatus,  setPaymentStatus]  = useState("")
   const [shippingStatus, setShippingStatus] = useState("")
   const [keyword,        setKeyword]        = useState("")
+  const [memberCodeFilter, setMemberCodeFilter] = useState("")
 
   // 結果 + 表示元管理
   const [orders,   setOrders]   = useState<Order[]>([])
@@ -199,13 +203,13 @@ export default function OrdersShippingPage() {
 
   // ─── 月ナビ ─────────────────────────────────────────
   const shiftMonth = (offset: number) => {
-    const ym = startDate.slice(0, 7)
-    const newYm = offsetMonth(ym, offset)
-    const [y, m] = newYm.split("-").map(Number)
-    const s = new Date(y, m - 1, 1)
-    const e = new Date(y, m, 0)
-    setStartDate(s.toISOString().split("T")[0])
-    setEndDate(e.toISOString().split("T")[0])
+    // startDate の年月を基準にして offset 月分移動
+    const base = startDate ? new Date(startDate + "T00:00:00") : new Date()
+    const y = base.getFullYear()
+    const m = base.getMonth() + offset   // getMonth() は 0 始まり
+    const { start, end } = getMonthRange(y, m)
+    setStartDate(start)
+    setEndDate(end)
   }
 
   // ─── 検索 ───────────────────────────────────────────
@@ -215,14 +219,15 @@ export default function OrdersShippingPage() {
     setExpandedId(null)
     try {
       const p = new URLSearchParams()
-      if (startDate)     p.set("startDate",      startDate)
-      if (endDate)       p.set("endDate",        endDate)
-      if (dateType)      p.set("dateType",       dateType)
-      if (slipType)      p.set("slipType",       slipType)
-      if (paymentMethod) p.set("paymentMethod",  paymentMethod)
-      if (paymentStatus) p.set("paymentStatus",  paymentStatus)
-      if (shippingStatus)p.set("shippingStatus", shippingStatus)
-      if (keyword)       p.set("keyword",        keyword)
+      if (startDate)        p.set("startDate",      startDate)
+      if (endDate)          p.set("endDate",        endDate)
+      if (dateType)         p.set("dateType",       dateType)
+      if (slipType)         p.set("slipType",       slipType)
+      if (paymentMethod)    p.set("paymentMethod",  paymentMethod)
+      if (paymentStatus)    p.set("paymentStatus",  paymentStatus)
+      if (shippingStatus)   p.set("shippingStatus", shippingStatus)
+      if (keyword)          p.set("keyword",        keyword)
+      if (memberCodeFilter) p.set("memberCode",     memberCodeFilter)
       const res  = await fetch(`/api/admin/orders-shipping?${p}`)
       const data = await res.json()
       setOrders(data.orders || [])
@@ -235,10 +240,11 @@ export default function OrdersShippingPage() {
       if (paymentStatus) parts.push(PAY_STATUS_OPTS.find(p=>p.value===paymentStatus)?.label||paymentStatus)
       if (shippingStatus) parts.push(SHIP_STATUS_OPTS.find(p=>p.value===shippingStatus)?.label||shippingStatus)
       if (keyword) parts.push(`"${keyword}"`)
+      if (memberCodeFilter) parts.push(`会員コード:${memberCodeFilter}`)
       setOrderSourceLabel(parts.length > 0 ? `検索: ${parts.join(" / ")}` : "検索結果")
     } catch { alert("取得エラー") }
     finally  { setLoading(false) }
-  }, [startDate, endDate, dateType, slipType, paymentMethod, paymentStatus, shippingStatus, keyword])
+  }, [startDate, endDate, dateType, slipType, paymentMethod, paymentStatus, shippingStatus, keyword, memberCodeFilter])
 
   const fetchSummary = useCallback(async () => {
     setSummaryLoading(true)
@@ -779,8 +785,17 @@ export default function OrdersShippingPage() {
             </div>
           </div>
 
-          {/* キーワード + 検索ボタン */}
+          {/* 会員コード + キーワード + 検索ボタン */}
           <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-gray-500 whitespace-nowrap">会員コード</span>
+              <input
+                type="text" value={memberCodeFilter} onChange={e => setMemberCodeFilter(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && fetchOrders()}
+                placeholder="例: 10001"
+                className="border border-gray-300 rounded px-2 py-1 text-sm w-28"
+              />
+            </div>
             <input
               type="text" value={keyword} onChange={e => setKeyword(e.target.value)}
               onKeyDown={e => e.key === "Enter" && fetchOrders()}
@@ -792,7 +807,7 @@ export default function OrdersShippingPage() {
               {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
               検索
             </button>
-            <button onClick={() => { setSlipType(""); setPaymentMethod(""); setPaymentStatus(""); setShippingStatus(""); setKeyword(""); setOrders([]); setSearched(false) }}
+            <button onClick={() => { setSlipType(""); setPaymentMethod(""); setPaymentStatus(""); setShippingStatus(""); setKeyword(""); setMemberCodeFilter(""); setOrders([]); setSearched(false) }}
               className="px-3 py-1.5 border border-gray-300 rounded text-sm hover:bg-gray-50">
               クリア
             </button>
