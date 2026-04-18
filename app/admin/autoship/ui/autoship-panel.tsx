@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 
 /* ───────────── 型定義 ───────────── */
 type PaymentMethod = "credit_card" | "bank_transfer" | "bank_payment" | "cod" | "other";
@@ -89,6 +89,75 @@ const PM_LABELS: Record<string, string> = {
   other:         "📋 その他",
 };
 
+/* ───────────── 伝票作成用型定義 ───────────── */
+type SlipItem = {
+  productId: string;
+  productCode: string;
+  productName: string;
+  unitPrice: number;
+  quantity: number;
+  points: number;
+  taxRate: number;
+};
+
+const SLIP_PAYMENT_METHODS = [
+  { value: "", label: "未選択" },
+  { value: "postal_transfer", label: "振替（郵便）" },
+  { value: "bank_transfer", label: "振替（銀行）" },
+  { value: "bank_payment", label: "振込み" },
+  { value: "cod", label: "代引き" },
+  { value: "card", label: "カード" },
+  { value: "cash", label: "現金" },
+  { value: "convenience", label: "コンビニ" },
+  { value: "other", label: "その他" },
+];
+
+const SLIP_TYPES_LIST = [
+  { value: "autoship", label: "オートシップ" },
+  { value: "normal", label: "通常" },
+  { value: "new_member", label: "新規" },
+  { value: "one_time", label: "都度購入" },
+  { value: "additional", label: "追加" },
+  { value: "subscription", label: "定期購入" },
+];
+
+function makeSlipForm(memberCode: string, memberName: string, memberPhone: string, memberPostal: string, memberAddress: string, today: string) {
+  return {
+    orderedAt: today,
+    shippedAt: "",
+    paidAt: "",
+    slipType: "autoship",
+    paymentMethod: "bank_transfer",
+    deliveryDate: "",
+    deliveryTime: "",
+    bundleTargetId: memberCode,
+    autoshipNo: "",
+    deliverySlipNo: "",
+    taxMethod: "external",
+    paymentHolder: "",
+    ordererMemberId: memberCode,
+    ordererCompany: "",
+    ordererName: memberName,
+    ordererPostal: memberPostal.replace(/-/g, ""),
+    ordererPrefecture: "",
+    ordererCity: memberAddress,
+    ordererBuilding: "",
+    ordererPhone: memberPhone,
+    ordererNote: "",
+    ordererNoteSlip: "",
+    detailName: "delivery",
+    recipientCompany: "",
+    recipientName: memberName,
+    recipientPostal: memberPostal.replace(/-/g, ""),
+    recipientPrefecture: "",
+    recipientCity: memberAddress,
+    recipientBuilding: "",
+    recipientPhone: memberPhone,
+    deliveryCenter: "",
+    afterCreateOutbox: 0,
+  };
+}
+
 /* ───────────── ヘルパー ───────────── */
 function fmtYen(n: number) {
   return n.toLocaleString("ja-JP") + "円";
@@ -96,6 +165,47 @@ function fmtYen(n: number) {
 function fmtDate(s: string | null) {
   if (!s) return "—";
   return new Date(s).toLocaleString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+/* ─── 日本語日付セレクト ─── */
+function SlipDatePicker({ value, onChange, allowEmpty = false }: {
+  value: string; onChange: (v: string) => void; allowEmpty?: boolean;
+}) {
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const parts = value ? value.split("-") : [];
+  const selYear  = parts[0] ? parseInt(parts[0]) : (allowEmpty ? 0 : curYear);
+  const selMonth = parts[1] ? parseInt(parts[1]) : (allowEmpty ? 0 : now.getMonth() + 1);
+  const selDay   = parts[2] ? parseInt(parts[2]) : (allowEmpty ? 0 : now.getDate());
+  const daysInMonth = useMemo(() => {
+    if (!selYear || !selMonth) return 31;
+    return new Date(selYear, selMonth, 0).getDate();
+  }, [selYear, selMonth]);
+  const years  = Array.from({ length: 11 }, (_, i) => curYear - 5 + i);
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const days   = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const sc = "border border-gray-300 rounded px-1 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400";
+  function update(y: number, m: number, d: number) {
+    if (allowEmpty && (!y || !m || !d)) { onChange(""); return; }
+    const safeD = Math.min(d, new Date(y, m, 0).getDate());
+    onChange(`${y}-${String(m).padStart(2,"0")}-${String(safeD).padStart(2,"0")}`);
+  }
+  return (
+    <div className="flex items-center gap-0.5">
+      <select value={selYear} onChange={e => update(Number(e.target.value), selMonth, selDay)} className={`${sc} w-16`}>
+        {allowEmpty && <option value={0}>未設定</option>}
+        {years.map(y => <option key={y} value={y}>{y}年</option>)}
+      </select>
+      <select value={selMonth} onChange={e => update(selYear, Number(e.target.value), selDay)} className={`${sc} w-12`}>
+        {allowEmpty && <option value={0}>月</option>}
+        {months.map(m => <option key={m} value={m}>{m}月</option>)}
+      </select>
+      <select value={selDay} onChange={e => update(selYear, selMonth, Number(e.target.value))} className={`${sc} w-12`}>
+        {allowEmpty && <option value={0}>日</option>}
+        {days.map(d => <option key={d} value={d}>{d}日</option>)}
+      </select>
+    </div>
+  );
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -138,10 +248,34 @@ export default function AutoShipPanel() {
   });
   const [memberListPm, setMemberListPm] = useState<string>("credit_card");
   const [memberListData, setMemberListData] = useState<{
-    id: string; memberCode: string; memberName: string; memberPhone: string | null; memberEmail: string | null; paymentMethod: string; autoshipStartDate: string | null; autoshipStopDate: string | null;
+    id: string; memberCode: string; memberName: string; memberPhone: string | null; memberEmail: string | null;
+    memberPostal: string | null; memberAddress: string | null; companyName: string | null;
+    paymentMethod: string; autoshipStartDate: string | null; autoshipStopDate: string | null;
   }[]>([]);
   const [memberListLoading, setMemberListLoading] = useState(false);
   const [showMemberList, setShowMemberList] = useState(false);
+
+  /* ── 伝票作成モーダル（個別） ── */
+  const [slipModalMember, setSlipModalMember] = useState<{
+    memberCode: string; memberName: string; memberPhone: string | null;
+    memberPostal: string | null; memberAddress: string | null;
+  } | null>(null);
+  const [slipProducts, setSlipProducts] = useState<{ id: string; product_code: string; name: string; price: number; pv: number }[]>([]);
+  const [slipForm, setSlipForm] = useState<ReturnType<typeof makeSlipForm> | null>(null);
+  const [slipItems, setSlipItems] = useState<SlipItem[]>([]);
+  const [slipSubmitting, setSlipSubmitting] = useState(false);
+
+  /* ── 一括選択・一括伝票作成 ── */
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
+  const [bulkSlipProducts, setBulkSlipProducts] = useState<{ id: string; product_code: string; name: string; price: number; pv: number }[]>([]);
+  const [showBulkSlipModal, setShowBulkSlipModal] = useState(false);
+  const [bulkSlipItems, setBulkSlipItems] = useState<SlipItem[]>([
+    { productId: "", productCode: "", productName: "", unitPrice: 0, quantity: 1, points: 0, taxRate: 10 },
+  ]);
+  const [bulkSlipType, setBulkSlipType] = useState("autoship");
+  const [bulkPaymentMethod, setBulkPaymentMethod] = useState("bank_transfer");
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
 
   /* ── CSV直接インポート（外部ファイルから即アクティブ反映） ── */
   const [csvImportFile, setCsvImportFile] = useState<File | null>(null);
@@ -357,6 +491,138 @@ export default function AutoShipPanel() {
     }
   }
 
+  /* ─── 商品マスター取得（伝票作成用） ─── */
+  async function loadProducts(): Promise<{ id: string; product_code: string; name: string; price: number; pv: number }[]> {
+    try {
+      const res = await fetch("/api/admin/products");
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.products ?? []).filter((p: { status: string }) => p.status === "active");
+    } catch { return []; }
+  }
+
+  /* ─── 個別伝票作成モーダルを開く ─── */
+  async function openSlipModal(m: { memberCode: string; memberName: string; memberPhone: string | null; memberPostal: string | null; memberAddress: string | null }) {
+    const prods = await loadProducts();
+    setSlipProducts(prods);
+    setSlipModalMember(m);
+    const today = new Date().toISOString().split("T")[0];
+    setSlipForm(makeSlipForm(m.memberCode, m.memberName, m.memberPhone || "", m.memberPostal || "", m.memberAddress || "", today));
+    setSlipItems([{ productId: "", productCode: "", productName: "", unitPrice: 0, quantity: 1, points: 0, taxRate: 10 }]);
+  }
+
+  /* ─── 個別伝票作成送信 ─── */
+  async function handleSlipSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!slipModalMember || !slipForm) return;
+    const validItems = slipItems.filter(i => i.productId);
+    if (validItems.length === 0) { alert("商品を1つ以上選択してください"); return; }
+    setSlipSubmitting(true);
+    try {
+      const res = await fetch("/api/admin/mlm-members/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...slipForm, memberCode: slipModalMember.memberCode, items: validItems }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || "伝票作成に失敗しました"); return; }
+      alert(`伝票を作成しました\n注文番号: ${data.orderNumber}\n合計金額: ¥${data.totalAmount?.toLocaleString()}`);
+      setSlipModalMember(null);
+      setSlipForm(null);
+    } finally {
+      setSlipSubmitting(false);
+    }
+  }
+
+  /* ─── チェックボックス操作 ─── */
+  function toggleMember(id: string) {
+    setSelectedMemberIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function toggleAllMembers() {
+    if (selectedMemberIds.size === memberListData.length) {
+      setSelectedMemberIds(new Set());
+    } else {
+      setSelectedMemberIds(new Set(memberListData.map(m => m.id)));
+    }
+  }
+
+  /* ─── 一括伝票作成モーダルを開く ─── */
+  async function openBulkSlipModal() {
+    if (selectedMemberIds.size === 0) { alert("会員を1人以上選択してください"); return; }
+    const prods = await loadProducts();
+    setBulkSlipProducts(prods);
+    setBulkSlipItems([{ productId: "", productCode: "", productName: "", unitPrice: 0, quantity: 1, points: 0, taxRate: 10 }]);
+    setBulkResult(null);
+    setShowBulkSlipModal(true);
+  }
+
+  /* ─── 一括伝票作成実行 ─── */
+  async function handleBulkSlipCreate(e: React.FormEvent) {
+    e.preventDefault();
+    const validItems = bulkSlipItems.filter(i => i.productId);
+    if (validItems.length === 0) { alert("商品を1つ以上選択してください"); return; }
+    const targets = memberListData.filter(m => selectedMemberIds.has(m.id));
+    if (targets.length === 0) return;
+    setBulkSubmitting(true);
+    setBulkResult(null);
+    const today = new Date().toISOString().split("T")[0];
+    let success = 0, failed = 0;
+    const errors: string[] = [];
+    for (const m of targets) {
+      try {
+        const form = makeSlipForm(m.memberCode, m.memberName, m.memberPhone || "", m.memberPostal || "", m.memberAddress || "", today);
+        form.slipType = bulkSlipType;
+        form.paymentMethod = bulkPaymentMethod;
+        const res = await fetch("/api/admin/mlm-members/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...form, memberCode: m.memberCode, items: validItems }),
+        });
+        const data = await res.json();
+        if (!res.ok) { failed++; errors.push(`${m.memberName}(${m.memberCode}): ${data.error ?? "失敗"}`); }
+        else success++;
+      } catch (err) {
+        failed++;
+        errors.push(`${m.memberName}(${m.memberCode}): エラー`);
+      }
+    }
+    setBulkResult({ success, failed, errors });
+    setBulkSubmitting(false);
+    if (success > 0) setMsg({ type: "success", text: `一括伝票作成完了: 成功 ${success}件 / 失敗 ${failed}件` });
+  }
+
+  /* ─── 商品選択ヘルパー ─── */
+  function onSlipProductSelect(idx: number, productId: string, items: SlipItem[], setItems: React.Dispatch<React.SetStateAction<SlipItem[]>>, prods: typeof slipProducts) {
+    const product = prods.find(p => p.id === productId);
+    setItems(prev => prev.map((item, i) =>
+      i === idx ? {
+        ...item,
+        productId: product?.id || "",
+        productCode: product?.product_code || "",
+        productName: product?.name || "",
+        unitPrice: product?.price || 0,
+        points: product?.pv || 0,
+        taxRate: 10,
+      } : item
+    ));
+  }
+
+  function calcTotals(items: SlipItem[]) {
+    const tax8total  = items.filter(i => i.taxRate === 8).reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+    const tax10total = items.filter(i => i.taxRate === 10).reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+    const tax8  = Math.floor(tax8total  * 0.08);
+    const tax10 = Math.floor(tax10total * 0.10);
+    return {
+      tax8total, tax10total, tax8, tax10,
+      totalAmount: tax8total + tax10total + tax8 + tax10,
+      totalPoints: items.reduce((s, i) => s + i.points * i.quantity, 0),
+    };
+  }
+
   /* ═══ レンダー ═══ */
   return (
     <div className="space-y-6">
@@ -414,17 +680,39 @@ export default function AutoShipPanel() {
         </div>
         {showMemberList && (
           <div className="mt-3">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
               <p className="text-sm text-gray-600">
                 対象: <strong>{memberListMonth}</strong> / {memberListPm ? PM_LABELS[memberListPm] ?? memberListPm : "すべての支払い方法"} — <strong>{memberListData.length}件</strong>
+                {selectedMemberIds.size > 0 && (
+                  <span className="ml-2 text-blue-700 font-semibold">{selectedMemberIds.size}件選択中</span>
+                )}
               </p>
-              <button onClick={() => setShowMemberList(false)} className="text-xs text-gray-400 hover:text-gray-600">✕ 閉じる</button>
+              <div className="flex gap-2">
+                {selectedMemberIds.size > 0 && (
+                  <button
+                    onClick={openBulkSlipModal}
+                    className="px-4 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium rounded-lg transition"
+                  >
+                    📋 選択した{selectedMemberIds.size}件の伝票を一括作成
+                  </button>
+                )}
+                <button onClick={() => setShowMemberList(false)} className="text-xs text-gray-400 hover:text-gray-600">✕ 閉じる</button>
+              </div>
             </div>
             {memberListData.length > 0 ? (
               <div className="overflow-x-auto rounded-lg border">
                 <table className="min-w-full text-xs">
                   <thead>
                     <tr className="bg-gray-50 text-gray-500 uppercase">
+                      <th className="px-3 py-2 text-center w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedMemberIds.size === memberListData.length && memberListData.length > 0}
+                          onChange={toggleAllMembers}
+                          className="w-3.5 h-3.5 cursor-pointer"
+                          title="全て選択/解除"
+                        />
+                      </th>
                       <th className="px-3 py-2 text-left">会員コード</th>
                       <th className="px-3 py-2 text-left">氏名</th>
                       <th className="px-3 py-2 text-left">電話</th>
@@ -432,18 +720,42 @@ export default function AutoShipPanel() {
                       <th className="px-3 py-2 text-left">支払い方法</th>
                       <th className="px-3 py-2 text-left">開始日</th>
                       <th className="px-3 py-2 text-left">停止日</th>
+                      <th className="px-3 py-2 text-center">操作</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {memberListData.map(m => (
-                      <tr key={m.id} className="hover:bg-gray-50">
+                      <tr key={m.id} className={`hover:bg-blue-50 ${selectedMemberIds.has(m.id) ? "bg-blue-50" : ""}`}>
+                        <td className="px-3 py-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedMemberIds.has(m.id)}
+                            onChange={() => toggleMember(m.id)}
+                            className="w-3.5 h-3.5 cursor-pointer"
+                          />
+                        </td>
                         <td className="px-3 py-2 font-mono">{m.memberCode}</td>
-                        <td className="px-3 py-2">{m.memberName}</td>
+                        <td className="px-3 py-2">
+                          <button
+                            onClick={() => openSlipModal(m)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-semibold text-left"
+                          >
+                            {m.memberName}
+                          </button>
+                        </td>
                         <td className="px-3 py-2 text-gray-500">{m.memberPhone ?? "—"}</td>
                         <td className="px-3 py-2 text-gray-500">{m.memberEmail ?? "—"}</td>
                         <td className="px-3 py-2">{PM_LABELS[m.paymentMethod] ?? m.paymentMethod}</td>
                         <td className="px-3 py-2 text-gray-500">{m.autoshipStartDate ? new Date(m.autoshipStartDate).toLocaleDateString("ja-JP") : "—"}</td>
                         <td className="px-3 py-2 text-gray-500">{m.autoshipStopDate ? new Date(m.autoshipStopDate).toLocaleDateString("ja-JP") : "—"}</td>
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            onClick={() => openSlipModal(m)}
+                            className="px-2 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded text-xs font-medium"
+                          >
+                            📋 伝票作成
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -877,6 +1189,309 @@ export default function AutoShipPanel() {
           </div>
         </div>
       )}
+
+      {/* ══════════════ 個別伝票作成モーダル ══════════════ */}
+      {slipModalMember && slipForm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto p-4 pt-8">
+          <div className="bg-white w-full max-w-3xl rounded-2xl shadow-xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b bg-violet-600 rounded-t-2xl">
+              <div>
+                <h2 className="text-base font-bold text-white">📋 伝票作成</h2>
+                <p className="text-violet-200 text-xs mt-0.5">{slipModalMember.memberName}（{slipModalMember.memberCode}）</p>
+              </div>
+              <button onClick={() => { setSlipModalMember(null); setSlipForm(null); }} className="text-white hover:text-violet-200 text-2xl leading-none">×</button>
+            </div>
+            <form onSubmit={handleSlipSubmit} className="p-5 space-y-4">
+              {/* ── ヘッダー情報 */}
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-red-600 font-medium w-20 shrink-0">注文日</span>
+                    <SlipDatePicker value={slipForm.orderedAt} onChange={v => setSlipForm(f => f ? { ...f, orderedAt: v } : f)} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-600 font-medium w-20 shrink-0">発送日</span>
+                    <SlipDatePicker value={slipForm.shippedAt} onChange={v => setSlipForm(f => f ? { ...f, shippedAt: v } : f)} allowEmpty />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-600 font-medium w-20 shrink-0">入金日</span>
+                    <SlipDatePicker value={slipForm.paidAt} onChange={v => setSlipForm(f => f ? { ...f, paidAt: v } : f)} allowEmpty />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-red-600 font-medium w-20 shrink-0">支払方法</span>
+                    <select value={slipForm.paymentMethod} onChange={e => setSlipForm(f => f ? { ...f, paymentMethod: e.target.value } : f)}
+                      className="border rounded px-2 py-1 text-xs bg-blue-50 w-full">
+                      {SLIP_PAYMENT_METHODS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-600 font-medium w-20 shrink-0">伝票種別</span>
+                    <select value={slipForm.slipType} onChange={e => setSlipForm(f => f ? { ...f, slipType: e.target.value } : f)}
+                      className="border rounded px-2 py-1 text-xs bg-white w-full">
+                      {SLIP_TYPES_LIST.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-600 font-medium w-20 shrink-0">配達希望日</span>
+                    <SlipDatePicker value={slipForm.deliveryDate} onChange={v => setSlipForm(f => f ? { ...f, deliveryDate: v } : f)} allowEmpty />
+                  </div>
+                </div>
+              </div>
+              {/* ── 配送先情報（簡易）*/}
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-700">注文者情報</div>
+                  <div className="p-3 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-red-600 font-medium w-20 shrink-0">氏名</span>
+                      <input value={slipForm.ordererName} onChange={e => setSlipForm(f => f ? { ...f, ordererName: e.target.value } : f)}
+                        className="border rounded px-2 py-1 text-xs w-full bg-blue-50" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-600 font-medium w-20 shrink-0">郵便番号</span>
+                      <input value={slipForm.ordererPostal} onChange={e => setSlipForm(f => f ? { ...f, ordererPostal: e.target.value } : f)}
+                        className="border rounded px-2 py-1 text-xs w-full" placeholder="例:1234567" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-600 font-medium w-20 shrink-0">住所</span>
+                      <input value={slipForm.ordererCity} onChange={e => setSlipForm(f => f ? { ...f, ordererCity: e.target.value } : f)}
+                        className="border rounded px-2 py-1 text-xs w-full" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-600 font-medium w-20 shrink-0">電話番号</span>
+                      <input value={slipForm.ordererPhone} onChange={e => setSlipForm(f => f ? { ...f, ordererPhone: e.target.value } : f)}
+                        className="border rounded px-2 py-1 text-xs w-full" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-600 font-medium w-20 shrink-0">備考</span>
+                      <input value={slipForm.ordererNote} onChange={e => setSlipForm(f => f ? { ...f, ordererNote: e.target.value } : f)}
+                        className="border rounded px-2 py-1 text-xs w-full" />
+                    </div>
+                  </div>
+                </div>
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-700 flex items-center justify-between">
+                    <span>配送先</span>
+                    <button type="button" className="text-blue-600 hover:underline text-[10px]"
+                      onClick={() => setSlipForm(f => f ? { ...f, recipientName: f.ordererName, recipientPostal: f.ordererPostal, recipientCity: f.ordererCity, recipientPhone: f.ordererPhone } : f)}>
+                      注文者からコピー
+                    </button>
+                  </div>
+                  <div className="p-3 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-600 font-medium w-20 shrink-0">氏名</span>
+                      <input value={slipForm.recipientName} onChange={e => setSlipForm(f => f ? { ...f, recipientName: e.target.value } : f)}
+                        className="border rounded px-2 py-1 text-xs w-full" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-600 font-medium w-20 shrink-0">郵便番号</span>
+                      <input value={slipForm.recipientPostal} onChange={e => setSlipForm(f => f ? { ...f, recipientPostal: e.target.value } : f)}
+                        className="border rounded px-2 py-1 text-xs w-full" placeholder="例:1234567" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-600 font-medium w-20 shrink-0">住所</span>
+                      <input value={slipForm.recipientCity} onChange={e => setSlipForm(f => f ? { ...f, recipientCity: e.target.value } : f)}
+                        className="border rounded px-2 py-1 text-xs w-full" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-600 font-medium w-20 shrink-0">電話番号</span>
+                      <input value={slipForm.recipientPhone} onChange={e => setSlipForm(f => f ? { ...f, recipientPhone: e.target.value } : f)}
+                        className="border rounded px-2 py-1 text-xs w-full" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {/* ── 商品テーブル */}
+              <SlipItemsTable
+                items={slipItems} setItems={setSlipItems}
+                products={slipProducts}
+                onProductSelect={(idx, pid) => onSlipProductSelect(idx, pid, slipItems, setSlipItems, slipProducts)}
+                calcTotals={calcTotals}
+              />
+              <div className="flex justify-end gap-3 pt-2 border-t">
+                <button type="button" onClick={() => { setSlipModalMember(null); setSlipForm(null); }}
+                  className="px-5 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">キャンセル</button>
+                <button type="submit" disabled={slipSubmitting}
+                  className="px-8 py-2 bg-violet-600 text-white text-sm font-bold rounded-lg hover:bg-violet-700 disabled:opacity-50">
+                  {slipSubmitting ? "作成中…" : "伝票を作成"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════ 一括伝票作成モーダル ══════════════ */}
+      {showBulkSlipModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto p-4 pt-8">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b bg-violet-700 rounded-t-2xl">
+              <div>
+                <h2 className="text-base font-bold text-white">📋 一括伝票作成</h2>
+                <p className="text-violet-200 text-xs mt-0.5">選択した {selectedMemberIds.size} 件の会員に同じ商品で伝票を作成します</p>
+              </div>
+              <button onClick={() => setShowBulkSlipModal(false)} className="text-white hover:text-violet-200 text-2xl leading-none">×</button>
+            </div>
+            <form onSubmit={handleBulkSlipCreate} className="p-5 space-y-4">
+              {/* 対象会員一覧 */}
+              <div className="bg-gray-50 rounded-lg p-3 text-xs border">
+                <p className="font-semibold text-gray-700 mb-2">対象会員（{selectedMemberIds.size}件）</p>
+                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+                  {memberListData.filter(m => selectedMemberIds.has(m.id)).map(m => (
+                    <span key={m.id} className="px-2 py-0.5 bg-violet-100 text-violet-700 rounded-full text-[11px]">
+                      {m.memberName}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              {/* 共通設定 */}
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-red-600 font-medium w-20 shrink-0">支払方法</span>
+                  <select value={bulkPaymentMethod} onChange={e => setBulkPaymentMethod(e.target.value)}
+                    className="border rounded px-2 py-1 text-xs bg-blue-50 w-full">
+                    {SLIP_PAYMENT_METHODS.filter(p => p.value).map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600 font-medium w-20 shrink-0">伝票種別</span>
+                  <select value={bulkSlipType} onChange={e => setBulkSlipType(e.target.value)}
+                    className="border rounded px-2 py-1 text-xs bg-white w-full">
+                    {SLIP_TYPES_LIST.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </select>
+                </div>
+              </div>
+              {/* 商品テーブル */}
+              <SlipItemsTable
+                items={bulkSlipItems} setItems={setBulkSlipItems}
+                products={bulkSlipProducts}
+                onProductSelect={(idx, pid) => onSlipProductSelect(idx, pid, bulkSlipItems, setBulkSlipItems, bulkSlipProducts)}
+                calcTotals={calcTotals}
+              />
+              {/* 結果表示 */}
+              {bulkResult && (
+                <div className={`p-3 rounded-lg text-sm border ${bulkResult.failed === 0 ? "bg-green-50 border-green-200 text-green-800" : "bg-yellow-50 border-yellow-200 text-yellow-800"}`}>
+                  <p className="font-semibold">✅ 一括作成完了: 成功 {bulkResult.success}件 / 失敗 {bulkResult.failed}件</p>
+                  {bulkResult.errors.length > 0 && (
+                    <ul className="mt-1 text-xs list-disc list-inside space-y-0.5">
+                      {bulkResult.errors.map((e, i) => <li key={i} className="text-red-600">{e}</li>)}
+                    </ul>
+                  )}
+                </div>
+              )}
+              <div className="flex justify-end gap-3 pt-2 border-t">
+                <button type="button" onClick={() => setShowBulkSlipModal(false)}
+                  className="px-5 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50">閉じる</button>
+                <button type="submit" disabled={bulkSubmitting}
+                  className="px-8 py-2 bg-violet-700 text-white text-sm font-bold rounded-lg hover:bg-violet-800 disabled:opacity-50">
+                  {bulkSubmitting ? `作成中… (${bulkResult ? bulkResult.success + bulkResult.failed : 0}/${selectedMemberIds.size})` : `${selectedMemberIds.size}件まとめて伝票作成`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── 商品テーブルコンポーネント（伝票作成共通）─── */
+function SlipItemsTable({
+  items, setItems, products, onProductSelect, calcTotals
+}: {
+  items: SlipItem[];
+  setItems: React.Dispatch<React.SetStateAction<SlipItem[]>>;
+  products: { id: string; product_code: string; name: string; price: number; pv: number }[];
+  onProductSelect: (idx: number, productId: string) => void;
+  calcTotals: (items: SlipItem[]) => { tax8: number; tax10: number; totalAmount: number; totalPoints: number; tax8total: number; tax10total: number };
+}) {
+  const totals = calcTotals(items);
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <div className="bg-gray-800 text-white px-3 py-1.5 text-xs font-bold">商品</div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs border-collapse min-w-[500px]">
+          <thead className="bg-gray-100 border-b border-gray-200">
+            <tr>
+              <th className="px-2 py-2 text-left w-8"></th>
+              <th className="px-2 py-2 text-left">商品</th>
+              <th className="px-2 py-2 text-right w-24">価格</th>
+              <th className="px-2 py-2 text-center w-16">個数</th>
+              <th className="px-2 py-2 text-right w-20">ポイント</th>
+              <th className="px-2 py-2 text-right w-24">小計</th>
+              <th className="px-2 py-2 text-center w-20">税率</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, idx) => (
+              <tr key={idx} className="border-b border-gray-100">
+                <td className="px-2 py-1.5 text-center">
+                  <button type="button"
+                    onClick={() => setItems(prev => prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx))}
+                    className="text-gray-300 hover:text-red-500 text-sm font-bold">×</button>
+                </td>
+                <td className="px-2 py-1.5">
+                  <select value={item.productId} onChange={e => onProductSelect(idx, e.target.value)}
+                    className="border border-gray-300 rounded px-2 py-1 text-xs bg-white w-full focus:ring-1 focus:ring-blue-400">
+                    <option value=""></option>
+                    {products.map(p => (
+                      <option key={p.id} value={p.id}>{p.product_code} - {p.name}</option>
+                    ))}
+                  </select>
+                </td>
+                <td className="px-2 py-1.5">
+                  <input type="number" min={0} value={item.unitPrice}
+                    onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, unitPrice: Number(e.target.value) } : it))}
+                    className="border border-gray-300 rounded px-2 py-1 text-xs text-right w-full bg-white" />
+                </td>
+                <td className="px-2 py-1.5">
+                  <input type="number" min={1} value={item.quantity}
+                    onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) || 1 } : it))}
+                    className="border border-gray-300 rounded px-2 py-1 text-xs text-center w-full bg-white" />
+                </td>
+                <td className="px-2 py-1.5">
+                  <input type="number" min={0} value={item.points}
+                    onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, points: Number(e.target.value) } : it))}
+                    className="border border-gray-300 rounded px-2 py-1 text-xs text-right w-full bg-white" />
+                </td>
+                <td className="px-2 py-1.5 text-right font-medium">{(item.unitPrice * item.quantity).toLocaleString()}</td>
+                <td className="px-2 py-1.5">
+                  <select value={item.taxRate}
+                    onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, taxRate: Number(e.target.value) } : it))}
+                    className="border border-gray-300 rounded px-2 py-1 text-xs bg-white w-full">
+                    <option value={10}>10%</option>
+                    <option value={8}>8%</option>
+                    <option value={0}>非課税</option>
+                  </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="px-3 py-2 flex gap-2 bg-gray-50">
+        <button type="button"
+          onClick={() => setItems(prev => [...prev, { productId: "", productCode: "", productName: "", unitPrice: 0, quantity: 1, points: 0, taxRate: 10 }])}
+          className="w-7 h-7 bg-green-500 text-white rounded font-bold text-sm hover:bg-green-600 flex items-center justify-center">+</button>
+        <button type="button"
+          onClick={() => setItems(prev => prev.length > 1 ? prev.slice(0, -1) : prev)}
+          className="w-7 h-7 bg-gray-400 text-white rounded font-bold text-sm hover:bg-gray-500 flex items-center justify-center">−</button>
+      </div>
+      <div className="border-t border-gray-200 px-4 py-3 flex justify-end">
+        <table className="text-xs">
+          <tbody>
+            <tr><td className="px-3 py-0.5 text-right text-gray-600">外税（8%）</td><td className="px-3 py-0.5 text-right font-medium w-24">¥{totals.tax8.toLocaleString()}</td></tr>
+            <tr><td className="px-3 py-0.5 text-right text-gray-600">外税（10%）</td><td className="px-3 py-0.5 text-right font-medium">¥{totals.tax10.toLocaleString()}</td></tr>
+            <tr className="border-t border-gray-300">
+              <td className="px-3 py-1 text-right font-bold text-gray-800">合計</td>
+              <td className="px-3 py-1 text-right font-bold text-gray-900 text-sm">¥{totals.totalAmount.toLocaleString()}</td>
+            </tr>
+            <tr><td className="px-3 py-0.5 text-right text-gray-600">ポイント合計</td><td className="px-3 py-0.5 text-right font-medium text-blue-700">{totals.totalPoints.toLocaleString()}pt</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

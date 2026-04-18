@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
     where,
     include: {
       user: {
-        select: { name: true, nameKana: true, phone: true, email: true, postalCode: true },
+        select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true },
       },
     },
   });
@@ -91,6 +91,9 @@ export async function GET(req: NextRequest) {
       memberName:       getMlmDisplayName(m.user.name, m.companyName),
       memberPhone:      m.user.phone ?? null,
       memberEmail:      m.user.email ?? null,
+      memberPostal:     m.user.postalCode ?? null,
+      memberAddress:    m.user.address ?? null,
+      companyName:      m.companyName ?? null,
       paymentMethod:    m.paymentMethod,
       paymentMethodLabel: PM_LABELS[m.paymentMethod] ?? m.paymentMethod,
       autoshipStartDate: m.autoshipStartDate?.toISOString() ?? null,
