@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
           include: {
             orderItems: {
               include: {
-                product: true
+                mlmProduct: true
               }
             }
           }

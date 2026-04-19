@@ -118,16 +118,23 @@ export async function GET(request: NextRequest) {
     }
 
     // keyword 検索：AND 条件と組み合わせるため where.AND を使用
+    // ※ user リレーションを OR の中で2回参照するとPrismaがエラーになるため
+    //   user 条件は OR でまとめる
     if (keyword) {
       where.AND = [
         ...(where.AND || []),
         {
           OR: [
             { orderNumber: { contains: keyword } },
-            { user: { name: { contains: keyword } } },
+            { user: {
+                OR: [
+                  { name: { contains: keyword } },
+                  { memberCode: { contains: keyword } },
+                ]
+              }
+            },
             { items: { some: { productName: { contains: keyword } } } },
             { shippingLabel: { trackingNumber: { contains: keyword } } },
-            { user: { mlmMember: { memberCode: { contains: keyword } } } },
           ]
         }
       ]
@@ -152,7 +159,7 @@ export async function GET(request: NextRequest) {
             unitPrice: true,
             quantity: true,
             lineAmount: true,
-            product: { select: { id: true, code: true } }
+            mlmProduct: { select: { id: true, productCode: true } }
           }
         },
         shippingLabel: {
@@ -206,7 +213,7 @@ export async function GET(request: NextRequest) {
           id: Number(item.id),
           productId: Number(item.productId),
           productName: item.productName,
-          productCode: item.product?.code || "",
+          productCode: item.mlmProduct?.productCode || "",
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           lineAmount: item.lineAmount,
@@ -232,7 +239,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, orders: formattedOrders, count: formattedOrders.length })
   } catch (error) {
     console.error("Error fetching orders:", error)
-    return NextResponse.json({ success: false, error: "Failed to fetch orders" }, { status: 500 })
+    const msg = error instanceof Error ? error.message : String(error)
+    return NextResponse.json({ success: false, error: "Failed to fetch orders", detail: msg }, { status: 500 })
   } finally {
     await prisma.$disconnect()
   }

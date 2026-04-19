@@ -225,7 +225,7 @@ export default function OrdersShippingPage() {
       const data = await res.json()
       if (!res.ok) {
         console.error("fetchOrders API error:", data)
-        alert("検索エラー: " + (data.error || "不明なエラー"))
+        alert("検索エラー: " + (data.error || "不明なエラー") + (data.detail ? "\n詳細: " + data.detail : ""))
         return
       }
       setOrders(data.orders || [])

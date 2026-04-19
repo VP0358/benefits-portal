@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
             unitPrice: true,
             quantity: true,
             lineAmount: true,
-            product: { select: { code: true } }
+            mlmProduct: { select: { productCode: true } }
           }
         },
         shippingLabel: {
@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
         // 商品
         items: o.items.map(i => ({
           id: Number(i.id),
-          productCode: i.product?.code || "",
+          productCode: i.mlmProduct?.productCode || "",
           productName: i.productName,
           unitPrice: i.unitPrice,
           quantity: i.quantity,

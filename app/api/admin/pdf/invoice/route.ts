@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
         },
         items: {
           include: {
-            product: true
+            mlmProduct: true
           }
         }
       }
@@ -140,7 +140,7 @@ export async function GET(req: NextRequest) {
 
     // 商品行
     order.items.forEach((item) => {
-      const productName = item.product?.name || item.productName;
+      const productName = item.mlmProduct?.name || item.productName;
       const unitPrice = item.unitPrice;
       const quantity = item.quantity;
       const amount = unitPrice * quantity;
