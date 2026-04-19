@@ -216,19 +216,32 @@ export default function OrdersShippingPage() {
   }
 
   // ─── 検索 ───────────────────────────────────────────
-  const fetchOrders = useCallback(async () => {
+  // overrides を渡すと、その値を優先してAPIを叩く（ボタンクリック時のstate更新race condition回避用）
+  const fetchOrders = useCallback(async (overrides?: {
+    startDate?: string; endDate?: string; dateType?: string
+    slipType?: string; paymentMethod?: string
+    paymentStatus?: string; shippingStatus?: string; keyword?: string
+  }) => {
     setLoading(true)
     setSelected(new Set())
     try {
       const p = new URLSearchParams()
-      if (startDate)      p.set("startDate",      startDate)
-      if (endDate)        p.set("endDate",        endDate)
-      if (dateType)       p.set("dateType",       dateType)
-      if (slipType)       p.set("slipType",       slipType)
-      if (paymentMethod)  p.set("paymentMethod",  paymentMethod)
-      if (paymentStatus)  p.set("paymentStatus",  paymentStatus)
-      if (shippingStatus) p.set("shippingStatus", shippingStatus)
-      if (keyword)        p.set("keyword",        keyword)
+      const sd = overrides?.startDate      !== undefined ? overrides.startDate      : startDate
+      const ed = overrides?.endDate        !== undefined ? overrides.endDate        : endDate
+      const dt = overrides?.dateType       !== undefined ? overrides.dateType       : dateType
+      const st = overrides?.slipType       !== undefined ? overrides.slipType       : slipType
+      const pm = overrides?.paymentMethod  !== undefined ? overrides.paymentMethod  : paymentMethod
+      const ps = overrides?.paymentStatus  !== undefined ? overrides.paymentStatus  : paymentStatus
+      const ss = overrides?.shippingStatus !== undefined ? overrides.shippingStatus : shippingStatus
+      const kw = overrides?.keyword        !== undefined ? overrides.keyword        : keyword
+      if (sd) p.set("startDate",      sd)
+      if (ed) p.set("endDate",        ed)
+      if (dt) p.set("dateType",       dt)
+      if (st) p.set("slipType",       st)
+      if (pm) p.set("paymentMethod",  pm)
+      if (ps) p.set("paymentStatus",  ps)
+      if (ss) p.set("shippingStatus", ss)
+      if (kw) p.set("keyword",        kw)
       const res  = await fetch(`/api/admin/orders-shipping?${p}`)
       const data = await res.json()
       if (!res.ok) {
@@ -755,6 +768,10 @@ export default function OrdersShippingPage() {
               className="px-2 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 flex items-center gap-1">
               次月<ChevronRight className="w-3 h-3" />
             </button>
+            <button onClick={() => { setStartDate(""); setEndDate("") }}
+              className="px-2 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 text-gray-500">
+              全期間
+            </button>
           </div>
 
           {/* 絞り込み行 */}
@@ -801,7 +818,7 @@ export default function OrdersShippingPage() {
               placeholder="注文番号・氏名・商品名・追跡番号"
               className="border border-gray-300 rounded px-2 py-1 text-sm w-64"
             />
-            <button onClick={fetchOrders} disabled={loading}
+            <button onClick={() => fetchOrders()} disabled={loading}
               className="flex items-center gap-1 px-4 py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
               {loading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
               検索
@@ -1137,17 +1154,31 @@ export default function OrdersShippingPage() {
           {summary && (
             <div className="flex flex-wrap gap-2 text-xs">
               <button
-                onClick={() => { setPaymentStatus("unpaid"); setShippingStatus("unshipped"); setStartDate(""); setEndDate(""); fetchOrders(); setSearched(true) }}
+                onClick={() => {
+                  setPaymentStatus("unpaid"); setShippingStatus("unshipped"); setStartDate(""); setEndDate("")
+                  fetchOrders({ paymentStatus: "unpaid", shippingStatus: "unshipped", startDate: "", endDate: "" })
+                  setSearched(true)
+                }}
                 className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded whitespace-nowrap">
                 翌月以降未入金（{summary.prevUnpaidCount}件）
               </button>
               <button
-                onClick={() => { setPaymentStatus("unpaid"); setShippingStatus("unshipped"); setPaymentMethod(""); const { start, end } = getThisMonthRange(); setStartDate(start); setEndDate(end); setTimeout(fetchOrders, 0); setSearched(true) }}
+                onClick={() => {
+                  setPaymentStatus("unpaid"); setShippingStatus("unshipped"); setPaymentMethod("")
+                  setStartDate(""); setEndDate("")
+                  fetchOrders({ paymentStatus: "unpaid", shippingStatus: "unshipped", paymentMethod: "", startDate: "", endDate: "" })
+                  setSearched(true)
+                }}
                 className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded whitespace-nowrap">
                 未入金（{summary.totalUnpaid}件）
               </button>
               <button
-                onClick={() => { setPaymentStatus("paid"); setShippingStatus("unshipped"); setPaymentMethod(""); const { start, end } = getThisMonthRange(); setStartDate(start); setEndDate(end); setTimeout(fetchOrders, 0); setSearched(true) }}
+                onClick={() => {
+                  setPaymentStatus("paid"); setShippingStatus("unshipped"); setPaymentMethod("")
+                  setStartDate(""); setEndDate("")
+                  fetchOrders({ paymentStatus: "paid", shippingStatus: "unshipped", paymentMethod: "", startDate: "", endDate: "" })
+                  setSearched(true)
+                }}
                 className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded whitespace-nowrap">
                 未発送（{summary.totalUnshipped}件）
               </button>

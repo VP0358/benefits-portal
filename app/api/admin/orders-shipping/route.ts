@@ -87,7 +87,12 @@ export async function GET(request: NextRequest) {
         where.shippingLabel = { shippedAt: {} }
         if (startDate) where.shippingLabel.shippedAt.gte = new Date(startDate)
         if (endDate) { const e = new Date(endDate); e.setHours(23,59,59,999); where.shippingLabel.shippedAt.lte = e }
+      } else if (dateType === "createdAt") {
+        where.createdAt = {}
+        if (startDate) where.createdAt.gte = new Date(startDate)
+        if (endDate) { const e = new Date(endDate); e.setHours(23,59,59,999); where.createdAt.lte = e }
       } else {
+        // orderedAt（デフォルト）
         where.orderedAt = {}
         if (startDate) where.orderedAt.gte = new Date(startDate)
         if (endDate) { const e = new Date(endDate); e.setHours(23,59,59,999); where.orderedAt.lte = e }
@@ -98,7 +103,17 @@ export async function GET(request: NextRequest) {
     if (paymentStatus)  where.paymentStatus = paymentStatus
     if (shippingStatus) where.shippingStatus = shippingStatus
     if (slipType)       where.slipType = slipType
-    if (paymentMethod)  where.paymentMethod = paymentMethod
+    // card / credit_card は同義（DBに両方の値が混在）→ OR 検索で両方ヒットさせる
+    if (paymentMethod) {
+      if (paymentMethod === "card" || paymentMethod === "credit_card") {
+        where.AND = [
+          ...(where.AND || []),
+          { OR: [{ paymentMethod: "card" }, { paymentMethod: "credit_card" }] }
+        ]
+      } else {
+        where.paymentMethod = paymentMethod
+      }
+    }
     // ※ outboxNo は文字列 "null" ではなく null チェックで判定（outboxNo=0 も有効な値）
     if (outboxNo !== null && outboxNo !== undefined && outboxNo !== "") {
       where.outboxNo = Number(outboxNo)
@@ -265,19 +280,33 @@ async function getSummary() {
 
   const buildSummaryRow = async (dateStart: Date, dateEnd: Date, rowType: "unpaid" | "unshipped") => {
     const row: Record<string, number> = {}
+    const statusFilter = rowType === "unpaid"
+      ? { paymentStatus: "unpaid", shippingStatus: "unshipped" }
+      : { paymentStatus: "paid",   shippingStatus: "unshipped" }
     for (const pm of paymentMethods) {
-      const count = await prisma.order.count({
-        where: {
-          orderedAt: { gte: dateStart, lte: dateEnd },
-          paymentMethod: pm,
-          // 未入金：paymentStatus=unpaid かつ shippingStatus=unshipped
-          // 未発送：paymentStatus=paid  かつ shippingStatus=unshipped
-          ...(rowType === "unpaid"
-            ? { paymentStatus: "unpaid", shippingStatus: "unshipped" }
-            : { paymentStatus: "paid",   shippingStatus: "unshipped" })
-        }
-      })
-      row[pm] = count
+      // card / credit_card は同義（DBに両方混在）→ OR で合算
+      if (pm === "card") {
+        const count = await prisma.order.count({
+          where: {
+            orderedAt: { gte: dateStart, lte: dateEnd },
+            OR: [{ paymentMethod: "card" }, { paymentMethod: "credit_card" }],
+            ...statusFilter
+          }
+        })
+        row[pm] = count
+      } else if (pm === "credit_card") {
+        // credit_card は card に合算済みなので個別カウントは 0 にする（重複防止）
+        row[pm] = 0
+      } else {
+        const count = await prisma.order.count({
+          where: {
+            orderedAt: { gte: dateStart, lte: dateEnd },
+            paymentMethod: pm,
+            ...statusFilter
+          }
+        })
+        row[pm] = count
+      }
     }
     return row
   }
