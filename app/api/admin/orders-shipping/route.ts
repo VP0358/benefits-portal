@@ -8,12 +8,19 @@ import { NextRequest, NextResponse } from "next/server"
 // 支払方法の表示名マップ
 const paymentMethodLabels: Record<string, string> = {
   bank_transfer: "口座振替",
+  postal_transfer: "振替(郵便)",
   card: "カード",
   credit_card: "カード",
   direct_debit: "口座振替",
   cod: "代引き",
   bank_payment: "銀行振込",
   convenience: "コンビニ",
+  cash: "現金",
+  accounts_receivable: "売掛",
+  cod_ng: "代引NG",
+  stop_shipping: "発送停止",
+  refund: "返金",
+  points_payment: "ポイント",
   other: "その他",
 }
 
@@ -29,6 +36,17 @@ const slipTypeLabels: Record<string, string> = {
   additional: "追加",
   present: "プレゼント",
   web: "Web",
+  normal: "通常",
+  next_month: "翌月分",
+  redelivery: "再配送",
+  refund_target: "返金対象",
+  refund: "返金",
+  partial: "分納",
+  defective: "商品不良",
+  shortage: "過不足",
+  mid_cancel: "中途解約",
+  subscription: "定期購入",
+  mypage: "MyPage",
   other: "その他",
 }
 
@@ -81,7 +99,10 @@ export async function GET(request: NextRequest) {
     if (shippingStatus) where.shippingStatus = shippingStatus
     if (slipType)       where.slipType = slipType
     if (paymentMethod)  where.paymentMethod = paymentMethod
-    if (outboxNo !== null) where.outboxNo = Number(outboxNo)
+    // ※ outboxNo は文字列 "null" ではなく null チェックで判定（outboxNo=0 も有効な値）
+    if (outboxNo !== null && outboxNo !== undefined && outboxNo !== "") {
+      where.outboxNo = Number(outboxNo)
+    }
 
     if (memberCode) {
       where.user = {
@@ -96,12 +117,19 @@ export async function GET(request: NextRequest) {
       where.shippingLabel = { ...(where.shippingLabel || {}), carrier }
     }
 
+    // keyword 検索：AND 条件と組み合わせるため where.AND を使用
     if (keyword) {
-      where.OR = [
-        { orderNumber: { contains: keyword } },
-        { user: { name: { contains: keyword } } },
-        { items: { some: { productName: { contains: keyword } } } },
-        { shippingLabel: { trackingNumber: { contains: keyword } } },
+      where.AND = [
+        ...(where.AND || []),
+        {
+          OR: [
+            { orderNumber: { contains: keyword } },
+            { user: { name: { contains: keyword } } },
+            { items: { some: { productName: { contains: keyword } } } },
+            { shippingLabel: { trackingNumber: { contains: keyword } } },
+            { user: { mlmMember: { memberCode: { contains: keyword } } } },
+          ]
+        }
       ]
     }
 
@@ -218,7 +246,14 @@ async function getSummary() {
   const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const lastMonthEnd   = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
 
-  const paymentMethods = ["bank_transfer", "card", "direct_debit", "cod", "bank_payment", "convenience", "other"]
+  // 画面のサマリーテーブルに表示する全支払方法（DBに保存されうる値を網羅）
+  const paymentMethods = [
+    "bank_transfer", "postal_transfer",
+    "bank_payment", "cod", "cash",
+    "card", "credit_card",
+    "stop_shipping", "refund", "cod_ng",
+    "convenience", "accounts_receivable", "points_payment", "other",
+  ]
 
   const buildSummaryRow = async (dateStart: Date, dateEnd: Date, rowType: "unpaid" | "unshipped") => {
     const row: Record<string, number> = {}

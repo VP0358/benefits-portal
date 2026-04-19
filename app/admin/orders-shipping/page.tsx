@@ -213,19 +213,27 @@ export default function OrdersShippingPage() {
     setSelected(new Set())
     try {
       const p = new URLSearchParams()
-      if (startDate)     p.set("startDate",      startDate)
-      if (endDate)       p.set("endDate",        endDate)
-      if (dateType)      p.set("dateType",       dateType)
-      if (slipType)      p.set("slipType",       slipType)
-      if (paymentMethod) p.set("paymentMethod",  paymentMethod)
-      if (paymentStatus) p.set("paymentStatus",  paymentStatus)
-      if (shippingStatus)p.set("shippingStatus", shippingStatus)
-      if (keyword)       p.set("keyword",        keyword)
+      if (startDate)      p.set("startDate",      startDate)
+      if (endDate)        p.set("endDate",        endDate)
+      if (dateType)       p.set("dateType",       dateType)
+      if (slipType)       p.set("slipType",       slipType)
+      if (paymentMethod)  p.set("paymentMethod",  paymentMethod)
+      if (paymentStatus)  p.set("paymentStatus",  paymentStatus)
+      if (shippingStatus) p.set("shippingStatus", shippingStatus)
+      if (keyword)        p.set("keyword",        keyword)
       const res  = await fetch(`/api/admin/orders-shipping?${p}`)
       const data = await res.json()
+      if (!res.ok) {
+        console.error("fetchOrders API error:", data)
+        alert("検索エラー: " + (data.error || "不明なエラー"))
+        return
+      }
       setOrders(data.orders || [])
       setSearched(true)
-    } catch { alert("取得エラー") }
+    } catch (err) {
+      console.error("fetchOrders fetch error:", err)
+      alert("取得エラー")
+    }
     finally  { setLoading(false) }
   }, [startDate, endDate, dateType, slipType, paymentMethod, paymentStatus, shippingStatus, keyword])
 
@@ -377,8 +385,16 @@ export default function OrdersShippingPage() {
     try {
       const res  = await fetch(`/api/admin/orders-shipping?outboxNo=${outbox}`)
       const data = await res.json()
+      if (!res.ok) {
+        console.error("OutboxAPI error:", data)
+        alert("取得エラー: " + (data.error || "不明なエラー"))
+        return
+      }
       setOutboxOrders(data.orders || [])
-    } catch { alert("取得エラー") }
+    } catch (err) {
+      console.error("showOutbox fetch error:", err)
+      alert("取得エラー")
+    }
     finally  { setOutboxLoading(false) }
   }
 
@@ -395,18 +411,21 @@ export default function OrdersShippingPage() {
     p.set("startDate", start); p.set("endDate", end); p.set("dateType", "orderedAt")
 
     // カラムキーをAPIの支払方法にマッピング
+    // ※ DBに実際に保存されている paymentMethod 値に合わせる
     const pmApiMap: Record<string, string> = {
-      bank_transfer:  "bank_transfer",
-      postal_transfer: "bank_transfer", // 郵便振替もbank_transfer扱い
-      bank_payment:   "bank_payment",
-      cod:            "cod",
-      cash:           "cash",
-      card:           "card",
-      stop_shipping:  "stop_shipping",
-      refund:         "refund",
-      cod_ng:         "cod_ng",
+      bank_transfer:   "bank_transfer",
+      postal_transfer: "postal_transfer",
+      bank_payment:    "bank_payment",
+      cod:             "cod",
+      cash:            "cash",
+      card:            "card",
+      stop_shipping:   "stop_shipping",
+      refund:          "refund",
+      cod_ng:          "cod_ng",
     }
-    if (pmApiMap[pm]) p.set("paymentMethod", pmApiMap[pm])
+    // pmApiMap にキーがある場合のみ paymentMethod フィルターを設定
+    // （ない場合は全支払方法を対象にする）
+    if (pmApiMap[pm] !== undefined) p.set("paymentMethod", pmApiMap[pm])
     if (statusType === "unpaid")    p.set("paymentStatus",  "unpaid")
     if (statusType === "unshipped") p.set("shippingStatus", "unshipped")
 
@@ -416,8 +435,16 @@ export default function OrdersShippingPage() {
     try {
       const res  = await fetch(`/api/admin/orders-shipping?${p}`)
       const data = await res.json()
+      if (!res.ok) {
+        console.error("API error:", data)
+        alert("取得エラー: " + (data.error || "不明なエラー"))
+        return
+      }
       setSummaryOrders(data.orders || [])
-    } catch { alert("取得エラー") }
+    } catch (err) {
+      console.error("fetch error:", err)
+      alert("取得エラー")
+    }
     finally { setSummaryOrdersLoading(false) }
   }
 
