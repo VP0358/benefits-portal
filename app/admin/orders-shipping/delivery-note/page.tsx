@@ -66,100 +66,155 @@ function DeliveryNoteContent() {
       .finally(() => setLoading(false))
   }, [idsParam])
 
-  // ── 納品書HTML生成 ──────────────────────────────────
+  // ── 納品書HTML生成（添付サンプルPDF準拠レイアウト） ──
   const buildDeliveryNoteHTML = useCallback((orderList: DeliveryOrder[]) => {
     const pages = orderList.map(o => {
-      const dateStr = new Date(o.orderedAt).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })
-      const itemRows = o.items.map(item => `
-        <tr>
-          <td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;">${item.productName}</td>
-          <td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;text-align:right;">¥${item.unitPrice.toLocaleString()}</td>
-          <td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;text-align:center;">${item.quantity}</td>
-          <td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">¥${item.lineAmount.toLocaleString()}</td>
-        </tr>
-      `).join("")
+      // 注文日
+      const orderedDate = new Date(o.orderedAt)
+      const dateStr = `${orderedDate.getFullYear()}年${orderedDate.getMonth()+1}月${orderedDate.getDate()}日`
+      // 対象月（orderedAtの年月）
+      const targetMonth = `${orderedDate.getFullYear()}年${orderedDate.getMonth()+1}月度`
 
-      const feeRow = `
+      // 税率計算
+      let subtotal8 = 0
+      let subtotal10 = 0
+      const SHIPPING_FEE = 880
+
+      const itemRows = o.items.map(item => {
+        const is8 = item.productName.startsWith("※")
+        if (is8) subtotal8 += item.lineAmount
+        else subtotal10 += item.lineAmount
+        return `
+          <tr>
+            <td style="padding:5px 8px;border-bottom:1px solid #d1d5db;font-size:11px;">${item.productName}</td>
+            <td style="padding:5px 8px;border-bottom:1px solid #d1d5db;text-align:right;font-size:11px;">¥${item.unitPrice.toLocaleString()}</td>
+            <td style="padding:5px 8px;border-bottom:1px solid #d1d5db;text-align:center;font-size:11px;">${item.quantity}</td>
+            <td style="padding:5px 8px;border-bottom:1px solid #d1d5db;text-align:right;font-size:11px;">¥${item.lineAmount.toLocaleString()}</td>
+          </tr>`
+      }).join("")
+
+      // 出荷事務手数料は10%
+      subtotal10 += SHIPPING_FEE
+      const shippingFeeRow = `
         <tr>
-          <td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;">出荷事務手数料</td>
-          <td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;text-align:right;">¥0</td>
-          <td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;text-align:center;">1</td>
-          <td style="padding:5px 10px;border-bottom:1px solid #e5e7eb;text-align:right;">¥0</td>
-        </tr>
-      `
+          <td style="padding:5px 8px;border-bottom:1px solid #d1d5db;font-size:11px;">出荷事務手数料</td>
+          <td style="padding:5px 8px;border-bottom:1px solid #d1d5db;text-align:right;font-size:11px;">¥${SHIPPING_FEE.toLocaleString()}</td>
+          <td style="padding:5px 8px;border-bottom:1px solid #d1d5db;text-align:center;font-size:11px;">1</td>
+          <td style="padding:5px 8px;border-bottom:1px solid #d1d5db;text-align:right;font-size:11px;">¥${SHIPPING_FEE.toLocaleString()}</td>
+        </tr>`
+
+      const tax8  = Math.floor(subtotal8  * 0.08)
+      const tax10 = Math.floor(subtotal10 * 0.10)
+
+      // 交付Noは注文IDを使用
+      const kouhuNo = o.id.toString().padStart(9, "0")
 
       return `
-        <div style="page-break-after:always;padding:28px 32px;font-family:'Noto Sans JP','Yu Gothic',sans-serif;font-size:12px;max-width:740px;margin:0 auto;box-sizing:border-box;">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
-            <div>
-              <h1 style="font-size:26px;font-weight:700;margin:0 0 6px;letter-spacing:6px;">納　品　書</h1>
-              <div style="font-size:11px;color:#6b7280;">注文日: ${dateStr}</div>
-              <div style="font-size:11px;color:#6b7280;">注文番号: ${o.orderNumber}</div>
-              ${o.trackingNumber ? `<div style="font-size:11px;color:#6b7280;">追跡番号: ${o.trackingNumber}</div>` : ""}
+        <div style="page-break-after:always;padding:20px 28px 16px;font-family:'Noto Sans JP','Yu Gothic','Hiragino Kaku Gothic ProN',sans-serif;font-size:11px;max-width:720px;margin:0 auto;box-sizing:border-box;color:#111;">
+
+          <!-- 宛先ブロック（左上） -->
+          <div style="margin-bottom:10px;">
+            <div style="font-size:11px;">〒${o.recipientPostal}</div>
+            <div style="font-size:12px;margin:2px 0;">${o.recipientAddress}</div>
+            <div style="font-size:18px;font-weight:700;margin:6px 0 2px;">${o.recipientName} 様</div>
+            <div style="font-size:11px;color:#374151;">ID番号　${o.memberCode}</div>
+          </div>
+
+          <!-- 合計金額（右上に配置） -->
+          <div style="text-align:right;margin-bottom:4px;">
+            <div style="font-size:13px;font-weight:700;">合計金額(税込)</div>
+            <div style="font-size:22px;font-weight:700;">¥${o.totalAmount.toLocaleString()}</div>
+          </div>
+
+          <!-- ごあいさつ文 -->
+          <div style="font-size:11px;margin-bottom:8px;line-height:1.8;">
+            ご購入いただき誠にありがとうございます。<br>
+            下記の通り納品致します。
+          </div>
+
+          <!-- 中段：ご注文者情報 + 納品書タイトル・交付No -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+            <!-- 左：ご注文者 -->
+            <div style="font-size:11px;line-height:2;">
+              <div style="font-weight:700;margin-bottom:2px;">ご注文者</div>
+              <div style="font-weight:700;">${o.memberName} 様</div>
+              <div style="display:flex;gap:24px;margin-top:4px;">
+                <table style="border-collapse:collapse;font-size:11px;">
+                  <tr>
+                    <td style="padding:2px 8px 2px 0;white-space:nowrap;font-weight:600;">ご注文者ＩＤ</td>
+                    <td style="padding:2px 0;">${o.memberCode}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:2px 8px 2px 0;white-space:nowrap;font-weight:600;">ご注文者対象月</td>
+                    <td style="padding:2px 0;">${targetMonth}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:2px 8px 2px 0;white-space:nowrap;font-weight:600;">取引年月日</td>
+                    <td style="padding:2px 0;">${dateStr}</td>
+                  </tr>
+                </table>
+              </div>
             </div>
-            <div style="text-align:right;font-size:11px;color:#374151;">
-              <div style="font-weight:700;font-size:14px;margin-bottom:4px;">${COMPANY.name}</div>
-              <div>${COMPANY.postal} ${COMPANY.address}</div>
-              <div>${COMPANY.phone}　${COMPANY.fax}</div>
+            <!-- 右：納品書タイトル + 交付No + 会社情報 -->
+            <div style="text-align:right;">
+              <div style="font-size:22px;font-weight:700;letter-spacing:4px;margin-bottom:2px;">納　品　書</div>
+              <div style="font-size:11px;margin-bottom:8px;">交付No.${kouhuNo}</div>
+              <div style="font-size:11px;font-weight:700;">${COMPANY.name}</div>
+              <div style="font-size:10px;color:#374151;">${COMPANY.postal} ${COMPANY.address}</div>
+              <div style="font-size:10px;color:#374151;">${COMPANY.phone}　FAX：050-3385-7788</div>
+              <div style="font-size:10px;color:#374151;">登録番号 T4400001016001</div>
             </div>
           </div>
 
-          <div style="border:2px solid #1d4ed8;border-radius:8px;padding:14px 16px;margin-bottom:18px;background:#eff6ff;">
-            <div style="font-size:10px;color:#1d4ed8;font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">お届け先</div>
-            ${o.recipientCompany ? `<div style="font-size:13px;font-weight:600;color:#1d4ed8;">${o.recipientCompany}</div>` : ""}
-            <div style="font-size:18px;font-weight:700;margin:2px 0;">${o.recipientName} 様</div>
-            <div style="font-size:11px;color:#374151;margin-top:4px;">〒${o.recipientPostal}　${o.recipientAddress}</div>
-            ${o.recipientPhone ? `<div style="font-size:11px;color:#374151;">TEL: ${o.recipientPhone}</div>` : ""}
-          </div>
-
-          <div style="display:flex;gap:20px;margin-bottom:14px;font-size:11px;color:#6b7280;flex-wrap:wrap;">
-            <div>会員コード: <strong style="color:#374151;">${o.memberCode}</strong></div>
-            <div>支払方法: <strong style="color:#374151;">${o.paymentMethodLabel}</strong></div>
-            <div>種別: <strong style="color:#374151;">${o.slipTypeLabel}</strong></div>
-          </div>
-
-          <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+          <!-- 商品明細テーブル -->
+          <table style="width:100%;border-collapse:collapse;margin-bottom:4px;border:1px solid #9ca3af;">
             <thead>
-              <tr style="background:#1d4ed8;color:white;">
-                <th style="padding:7px 10px;text-align:left;font-size:11px;font-weight:600;">商品名</th>
-                <th style="padding:7px 10px;text-align:right;font-size:11px;font-weight:600;width:100px;">単価</th>
-                <th style="padding:7px 10px;text-align:center;font-size:11px;font-weight:600;width:60px;">数量</th>
-                <th style="padding:7px 10px;text-align:right;font-size:11px;font-weight:600;width:110px;">小計</th>
+              <tr style="background:#f3f4f6;">
+                <th style="padding:5px 8px;text-align:left;font-size:11px;border:1px solid #9ca3af;font-weight:700;">商品</th>
+                <th style="padding:5px 8px;text-align:right;font-size:11px;border:1px solid #9ca3af;font-weight:700;width:90px;">単価</th>
+                <th style="padding:5px 8px;text-align:center;font-size:11px;border:1px solid #9ca3af;font-weight:700;width:55px;">数量</th>
+                <th style="padding:5px 8px;text-align:right;font-size:11px;border:1px solid #9ca3af;font-weight:700;width:100px;">金額</th>
               </tr>
             </thead>
             <tbody>
               ${itemRows}
-              ${feeRow}
+              ${shippingFeeRow}
             </tbody>
           </table>
 
-          <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
-            <table style="font-size:12px;min-width:280px;">
-              ${o.usedPoints > 0 ? `
-                <tr>
-                  <td style="padding:4px 14px;color:#6b7280;border-bottom:1px solid #f3f4f6;">小計</td>
-                  <td style="padding:4px 14px;text-align:right;border-bottom:1px solid #f3f4f6;">¥${o.subtotalAmount.toLocaleString()}</td>
-                </tr>
-                <tr>
-                  <td style="padding:4px 14px;color:#059669;border-bottom:1px solid #f3f4f6;">ポイント使用</td>
-                  <td style="padding:4px 14px;text-align:right;color:#059669;border-bottom:1px solid #f3f4f6;">-¥${o.usedPoints.toLocaleString()}</td>
-                </tr>
-              ` : ""}
-              <tr style="background:#1d4ed8;color:white;">
-                <td style="padding:8px 18px;font-weight:700;font-size:13px;">合計（税込）</td>
-                <td style="padding:8px 18px;text-align:right;font-weight:700;font-size:18px;">¥${o.totalAmount.toLocaleString()}</td>
+          <!-- 軽減税率注記 -->
+          <div style="font-size:9px;color:#374151;margin-bottom:6px;">商品名の前に「※」は軽減税率(8％)対象商品</div>
+
+          <!-- 税計算（右寄せ） -->
+          <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+            <table style="border-collapse:collapse;font-size:11px;min-width:260px;">
+              <tr>
+                <td style="padding:3px 10px;text-align:left;border-bottom:1px solid #e5e7eb;">※8％対象(外税)</td>
+                <td style="padding:3px 10px;text-align:right;border-bottom:1px solid #e5e7eb;">¥${subtotal8.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td style="padding:3px 10px;text-align:left;border-bottom:1px solid #e5e7eb;">※8％消費税(外税)</td>
+                <td style="padding:3px 10px;text-align:right;border-bottom:1px solid #e5e7eb;">¥${tax8.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td style="padding:3px 10px;text-align:left;border-bottom:1px solid #e5e7eb;">10％対象(外税)</td>
+                <td style="padding:3px 10px;text-align:right;border-bottom:1px solid #e5e7eb;">¥${subtotal10.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td style="padding:3px 10px;text-align:left;border-bottom:1px solid #9ca3af;">10％消費税(外税)</td>
+                <td style="padding:3px 10px;text-align:right;border-bottom:1px solid #9ca3af;">¥${tax10.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td style="padding:5px 10px;text-align:left;font-weight:700;border-bottom:2px solid #111;">合計金額(税込)</td>
+                <td style="padding:5px 10px;text-align:right;font-weight:700;border-bottom:2px solid #111;">¥${o.totalAmount.toLocaleString()}</td>
               </tr>
             </table>
           </div>
 
-          ${o.noteSlip || o.note ? `
-            <div style="border:1px solid #e5e7eb;border-radius:4px;padding:10px 12px;font-size:11px;color:#374151;margin-bottom:12px;">
-              <strong>備考:</strong> ${o.noteSlip || o.note}
-            </div>
-          ` : ""}
-
-          <div style="margin-top:20px;text-align:center;font-size:10px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:10px;">
-            この度はご購入いただき、誠にありがとうございます。ご不明な点は上記連絡先までお問い合わせください。
+          <!-- 備考 -->
+          <div style="font-size:11px;font-weight:700;margin-bottom:2px;">◆備考◆</div>
+          <div style="font-size:11px;min-height:20px;border-top:1px solid #d1d5db;padding-top:4px;">
+            ${o.noteSlip || o.note || ""}
           </div>
         </div>
       `
@@ -171,9 +226,9 @@ function DeliveryNoteContent() {
       <style>
         @media print {
           body { margin: 0; }
-          @page { margin: 6mm; size: A4; }
+          @page { margin: 8mm; size: A4; }
         }
-        body { font-family: 'Noto Sans JP', 'Yu Gothic', 'Hiragino Sans', sans-serif; }
+        body { font-family: 'Noto Sans JP', 'Yu Gothic', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif; }
       </style>
     </head><body>${pages}</body></html>`
   }, [])
@@ -439,29 +494,27 @@ function DeliveryNoteContent() {
             <span className="font-semibold text-gray-700">完了</span>
           </div>
 
-          {/* ダウンロードリンク（スクショ準拠） */}
+          {/* ダウンロード・印刷ボタン */}
           <div className="mb-4">
-            <h3 className="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">ダウンロード</h3>
-            <div className="flex flex-col gap-1.5">
+            <h3 className="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">納品書 ダウンロード・印刷</h3>
+            <div className="flex flex-wrap gap-2 mb-3">
               <button onClick={handlePrintDeliveryNote}
-                className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm hover:underline w-fit">
-                <FileText className="w-4 h-4 text-red-500 flex-shrink-0" />
-                <span>clair{new Date().getFullYear()}-{new Date().getMonth()+1}-{new Date().getDate()}-納品書.pdf</span>
-                <span className="text-gray-400 text-xs">({orders.length}件)</span>
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 font-medium shadow-sm">
+                <Printer className="w-4 h-4 flex-shrink-0" />
+                納品書を印刷・PDF保存（{orders.length}件）
               </button>
               <button onClick={handlePrintReceipt}
-                className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm hover:underline w-fit">
-                <FileText className="w-4 h-4 text-red-500 flex-shrink-0" />
-                <span>clair{new Date().getFullYear()}-{new Date().getMonth()+1}-{new Date().getDate()}-領収書.pdf</span>
-                <span className="text-gray-400 text-xs">({orders.length}件)</span>
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 font-medium shadow-sm">
+                <FileText className="w-4 h-4 flex-shrink-0" />
+                領収書を印刷・PDF保存（{orders.length}件）
               </button>
               <button onClick={handlePrintRegistrationNotice}
-                className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm hover:underline w-fit">
-                <FileText className="w-4 h-4 text-red-500 flex-shrink-0" />
-                <span>clair{new Date().getFullYear()}-{new Date().getMonth()+1}-{new Date().getDate()}-登録完了通知書.pdf</span>
-                <span className="text-gray-400 text-xs">({orders.length}件)</span>
+                className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg text-sm hover:bg-amber-700 font-medium shadow-sm">
+                <FileText className="w-4 h-4 flex-shrink-0" />
+                登録完了通知書（{orders.length}件）
               </button>
             </div>
+            <p className="text-xs text-gray-400">※ ブラウザの印刷ダイアログで「PDFに保存」を選択するとダウンロードできます</p>
           </div>
 
           {/* 出庫リスト */}
