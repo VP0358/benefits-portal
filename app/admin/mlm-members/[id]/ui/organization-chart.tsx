@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 
+type ActiveMarker = "active" | "warning" | "danger" | "none";
+
 type MemberNode = {
   id: string;
   memberCode: string;
@@ -12,6 +14,20 @@ type MemberNode = {
   lastMonthPoints?: number;
   currentMonthPoints?: number;
   directDownlines?: MemberNode[];
+  activeMarker?: ActiveMarker;
+};
+
+const ACTIVE_MARKER_BG: Record<ActiveMarker, string> = {
+  active:  "bg-yellow-200 text-yellow-900",
+  warning: "bg-blue-200 text-blue-900",
+  danger:  "bg-red-200 text-red-900",
+  none:    "",
+};
+const ACTIVE_MARKER_LABEL: Record<ActiveMarker, string> = {
+  active:  "★当月アクティブ",
+  warning: "⚠5ヶ月未入金",
+  danger:  "✖6ヶ月+未入金",
+  none:    "",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -87,8 +103,17 @@ export default function OrganizationChart({ memberCode }: { memberCode: string }
           </div>
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-gray-800 text-sm truncate">
-              <Link href={`/admin/mlm-members/${node.id}`} className="text-blue-600 hover:text-blue-700">
-                {node.memberCode}
+              <Link href={`/admin/mlm-members/${node.id}`}>
+                {(node.activeMarker && node.activeMarker !== "none") ? (
+                  <span
+                    className={`${ACTIVE_MARKER_BG[node.activeMarker]} rounded px-1 font-bold text-blue-600 hover:text-blue-700`}
+                    title={ACTIVE_MARKER_LABEL[node.activeMarker]}
+                  >
+                    {node.memberCode}
+                  </span>
+                ) : (
+                  <span className="text-blue-600 hover:text-blue-700">{node.memberCode}</span>
+                )}
               </Link>
               {" - "}{node.name}
             </div>

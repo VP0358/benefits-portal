@@ -5,6 +5,8 @@ import { useState, useCallback, useRef, useEffect } from "react";
 type OrgType = "matrix" | "unilevel";
 
 // ─── 型定義 ───────────────────────────────────────────
+type ActiveMarker = "active" | "warning" | "danger" | "none";
+
 type MemberNode = {
   id: string;
   memberCode: string;
@@ -29,6 +31,7 @@ type MemberNode = {
   groupPoints: number;
   hasMore: boolean;
   directDownlines: MemberNode[];
+  activeMarker?: ActiveMarker;
 };
 
 type CandidateMember = {
@@ -288,6 +291,14 @@ function MemberDetailModal({
   );
 }
 
+// ─── アクティブマーカースタイル ──────────────────────────────────
+const ACTIVE_MARKER_STYLE: Record<ActiveMarker, { bg: string; textCls: string; border: string; label: string }> = {
+  active:  { bg: "bg-yellow-200",  textCls: "text-yellow-900", border: "ring-2 ring-yellow-400", label: "★ 当月アクティブ" },
+  warning: { bg: "bg-blue-200",    textCls: "text-blue-900",   border: "ring-2 ring-blue-400",   label: "⚠）入金5ヶ月なし" },
+  danger:  { bg: "bg-red-200",     textCls: "text-red-900",    border: "ring-2 ring-red-400",    label: "✖）入金6ヶ月+" },
+  none:    { bg: "",               textCls: "",                border: "",                       label: "" },
+};
+
 // ─── ノードカード ──────────────────────────────────────
 function NodeCard({
   node,
@@ -299,12 +310,16 @@ function NodeCard({
   onClickNode: (n: MemberNode) => void;
 }) {
   const st = STATUS_BG[node.status] ?? defaultStyle;
+  const marker      = node.activeMarker ?? "none";
+  const markerStyle = ACTIVE_MARKER_STYLE[marker];
+
   return (
     <div
       className={`
         relative border-2 rounded-xl shadow-sm cursor-pointer select-none
         hover:shadow-md hover:scale-105 transition-all
         ${st.card}
+        ${markerStyle.border}
         ${isRoot ? "px-4 py-3 min-w-[148px] max-w-[180px]" : "px-3 py-2 min-w-[120px] max-w-[160px]"}
         text-center
       `}
@@ -320,6 +335,20 @@ function NodeCard({
         LV.{node.level}
       </span>
 
+      {/* アクティブマーカーバッジ（右上） */}
+      {marker !== "none" && (
+        <span
+          className={`
+            absolute -top-2 right-0.5
+            ${markerStyle.bg} ${markerStyle.textCls}
+            text-[8px] font-bold px-1 py-0.5 rounded-full whitespace-nowrap z-20
+          `}
+          title={markerStyle.label}
+        >
+          {marker === "active" ? "★" : marker === "warning" ? "⚠" : "✖"}
+        </span>
+      )}
+
       {/* 名前 */}
       <div
         className={`mt-1 font-bold text-slate-800 leading-tight truncate ${isRoot ? "text-sm" : "text-xs"}`}
@@ -328,8 +357,16 @@ function NodeCard({
         {node.companyName ? <span>🏢 {node.name}</span> : node.name}
       </div>
 
-      {/* 会員コード */}
-      <div className="text-[9px] text-slate-500 mt-0.5 font-mono truncate">{node.memberCode}</div>
+      {/* 会員コード（アクティブマーカーで色付き） */}
+      <div
+        className={`text-[9px] mt-0.5 font-mono truncate inline-block rounded px-1 ${
+          marker !== "none"
+            ? `${markerStyle.bg} ${markerStyle.textCls} font-bold`
+            : "text-slate-500"
+        }`}
+      >
+        {node.memberCode}
+      </div>
 
       {/* ステータス */}
       <span className={`inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${st.badge}`}>
@@ -347,7 +384,7 @@ function NodeCard({
       )}
 
       {/* タップヒント */}
-      <div className="absolute top-1 right-1 text-[8px] text-slate-300 select-none">ℹ</div>
+      <div className="absolute bottom-1 right-1 text-[8px] text-slate-300 select-none">ℹ</div>
     </div>
   );
 }
@@ -1031,6 +1068,11 @@ export default function MlmOrganizationPage() {
                 <span className="text-[9px] text-slate-400 ml-1">
                   各カードをタップで詳細・紹介者を確認できます
                 </span>
+                <span className="ml-2 inline-flex items-center gap-1.5 flex-wrap">
+                  <span className="bg-yellow-200 text-yellow-900 text-[9px] font-bold px-2 py-0.5 rounded-full">★ アクティブ</span>
+                  <span className="bg-blue-200 text-blue-900 text-[9px] font-bold px-2 py-0.5 rounded-full">⚠ 5ヶ月未入金</span>
+                  <span className="bg-red-200 text-red-900 text-[9px] font-bold px-2 py-0.5 rounded-full">✖ 6ヶ月+未入金</span>
+                </span>
               </div>
               {/* ズームボタン群 */}
               <div className="flex items-center gap-1.5">
@@ -1111,29 +1153,54 @@ export default function MlmOrganizationPage() {
                     <th className="px-4 py-3 text-left text-xs font-semibold">会員コード</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold">氏名</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold">ステータス</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold">アクティブ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {listData.map((m) => (
-                    <tr
-                      key={m.id}
-                      className="hover:bg-violet-50 transition cursor-pointer"
-                      onClick={() => setSelectedNode(m as unknown as MemberNode)}
-                    >
-                      <td className="px-4 py-2.5">
-                        <span className={`${LEVEL_COLOR[m.level] ?? "bg-gray-400"} text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full`}>
-                          LV.{m.level}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-slate-700 font-mono">{m.memberCode}</td>
-                      <td className="px-4 py-2.5 text-xs font-medium text-slate-800">{m.name}</td>
-                      <td className="px-4 py-2.5 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${getStatusBadge(m.status)}`}>
-                          {STATUS_LABEL[m.status] ?? m.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {listData.map((m) => {
+                    const mMarker = (m as MemberNode).activeMarker ?? "none";
+                    const mStyle  = ACTIVE_MARKER_STYLE[mMarker];
+                    return (
+                      <tr
+                        key={m.id}
+                        className="hover:bg-violet-50 transition cursor-pointer"
+                        onClick={() => setSelectedNode(m as unknown as MemberNode)}
+                      >
+                        <td className="px-4 py-2.5">
+                          <span className={`${LEVEL_COLOR[m.level] ?? "bg-gray-400"} text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full`}>
+                            LV.{m.level}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span
+                            className={`text-xs font-mono rounded px-1 ${
+                              mMarker !== "none"
+                                ? `${mStyle.bg} ${mStyle.textCls} font-bold`
+                                : "text-slate-700"
+                            }`}
+                          >
+                            {m.memberCode}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs font-medium text-slate-800">{m.name}</td>
+                        <td className="px-4 py-2.5 text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${getStatusBadge(m.status)}`}>
+                            {STATUS_LABEL[m.status] ?? m.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          {mMarker !== "none" && (
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${mStyle.bg} ${mStyle.textCls}`}
+                              title={mStyle.label}
+                            >
+                              {mMarker === "active" ? "★ アクティブ" : mMarker === "warning" ? "⚠ 5ヶ月" : "✖ 6ヶ月+"}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

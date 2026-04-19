@@ -8,6 +8,153 @@ import { prisma } from '@/lib/prisma';
 
 type OrgType = "matrix" | "unilevel";
 
+/** アクティブマーカー種別 */
+type ActiveMarker = "active" | "warning" | "danger" | "none";
+
+// ─── アクティブ判定用ヘルパー ───
+function isProduct1000(code: string): boolean {
+  return code === "1000" || code === "s1000";
+}
+function isProduct2000(code: string): boolean {
+  return code === "2000";
+}
+
+/**
+ * 対象月（YYYY-MM）の会員IDリストに対してアクティブマーカーを計算する
+ */
+async function calcActiveMarkers(
+  memberIds: bigint[],
+  userIds: bigint[],
+  memberMap: Map<string, { contractDate: Date | null; forceActive: boolean; status: string; userId: bigint }>,
+  targetMonth: string
+): Promise<Map<string, ActiveMarker>> {
+  const result = new Map<string, ActiveMarker>();
+
+  if (memberIds.length === 0) return result;
+
+  const [targetYear, targetMonthNum] = targetMonth.split("-").map(Number);
+
+  // 対象月の範囲
+  const monthStart = new Date(targetYear, targetMonthNum - 1, 1, 0, 0, 0, 0);
+  const monthEnd   = new Date(targetYear, targetMonthNum, 0, 23, 59, 59, 999);
+
+  // 直近6ヶ月前
+  const sixMonthsAgo = new Date(monthStart);
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+  // userId → memberId マップ
+  const userIdToMemberId = new Map<string, string>();
+  for (const [mid, m] of memberMap) {
+    userIdToMemberId.set(m.userId.toString(), mid);
+  }
+
+  // 直近6ヶ月の入金済み伝票（対象商品含む）を一括取得
+  const historicOrders = await prisma.order.findMany({
+    where: {
+      userId: { in: userIds },
+      paymentStatus: "paid",
+      OR: [
+        { paidAt: { gte: sixMonthsAgo, lte: monthEnd } },
+        { paidAt: null, orderedAt: { gte: sixMonthsAgo, lte: monthEnd } },
+      ],
+    },
+    select: {
+      userId: true,
+      paidAt: true,
+      orderedAt: true,
+      items: {
+        select: {
+          mlmProduct: { select: { productCode: true } },
+        },
+      },
+    },
+  });
+
+  // 会員ごとに当月 1000/2000 購入フラグ & 過去月別入金セット
+  const memberHas1000 = new Set<string>();
+  const memberHas2000 = new Set<string>();
+  const memberPaidMonths = new Map<string, Set<string>>();
+
+  for (const order of historicOrders) {
+    const memberId = userIdToMemberId.get(order.userId.toString());
+    if (!memberId) continue;
+
+    const effectiveDate = order.paidAt ?? order.orderedAt;
+    const ym = `${effectiveDate.getFullYear()}-${String(effectiveDate.getMonth() + 1).padStart(2, "0")}`;
+    const isCurrentMonth = ym === targetMonth;
+
+    let hasTarget = false;
+    for (const item of order.items) {
+      const code = item.mlmProduct?.productCode ?? "";
+      if (isProduct1000(code) || isProduct2000(code)) {
+        hasTarget = true;
+        if (isCurrentMonth) {
+          if (isProduct1000(code)) memberHas1000.add(memberId);
+          if (isProduct2000(code)) memberHas2000.add(memberId);
+        }
+      }
+    }
+    if (hasTarget) {
+      if (!memberPaidMonths.has(memberId)) memberPaidMonths.set(memberId, new Set());
+      memberPaidMonths.get(memberId)!.add(ym);
+    }
+  }
+
+  // 各会員のマーカーを判定
+  for (const [mid, member] of memberMap) {
+    if (member.forceActive) {
+      result.set(mid, "active");
+      continue;
+    }
+    if (["withdrawn", "lapsed", "suspended", "midCancel"].includes(member.status)) {
+      result.set(mid, "none");
+      continue;
+    }
+
+    // 当月アクティブ: 1000/s1000 AND 2000 両方入金済み
+    if (memberHas1000.has(mid) && memberHas2000.has(mid)) {
+      result.set(mid, "active");
+      continue;
+    }
+
+    // 5/6ヶ月目判定
+    if (!member.contractDate) {
+      result.set(mid, "none");
+      continue;
+    }
+    const cd = member.contractDate;
+    const contractYear  = cd.getFullYear();
+    const contractMonth = cd.getMonth() + 1;
+    const monthsElapsed = (targetYear - contractYear) * 12 + (targetMonthNum - contractMonth);
+
+    if (monthsElapsed < 4) {
+      result.set(mid, "none");
+      continue;
+    }
+
+    // 最後に入金があった月を検索
+    const paidMonths = memberPaidMonths.get(mid) ?? new Set<string>();
+    let lastPaidYear  = contractYear;
+    let lastPaidMonth = contractMonth - 1;
+    for (let offset = 0; offset <= monthsElapsed; offset++) {
+      const checkYear  = contractYear + Math.floor((contractMonth - 1 + offset) / 12);
+      const checkMonth = ((contractMonth - 1 + offset) % 12) + 1;
+      const ym = `${checkYear}-${String(checkMonth).padStart(2, "0")}`;
+      if (paidMonths.has(ym)) {
+        lastPaidYear  = checkYear;
+        lastPaidMonth = checkMonth;
+      }
+    }
+    const monthsSinceLastPaid = (targetYear - lastPaidYear) * 12 + (targetMonthNum - lastPaidMonth);
+
+    if (monthsSinceLastPaid >= 6)      result.set(mid, "danger");
+    else if (monthsSinceLastPaid >= 5) result.set(mid, "warning");
+    else                               result.set(mid, "none");
+  }
+
+  return result;
+}
+
 // ─── 組織図データ取得 ───
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -24,31 +171,51 @@ export async function GET(req: NextRequest) {
     const type        = (searchParams.get("type") as OrgType) || "matrix";
     const depthLimit  = Math.min(20, Math.max(1, parseInt(searchParams.get("depthLimit") ?? "5")));
 
-    // ★ 検索条件なし → 全会員フラットリストを返す
+    // ★ 検索条件なし → 全会員フラットリストを返す（アクティブマーカー付き）
     if (!memberCode && !name && !email && !phone) {
-      const [allMembers, totalCount] = await Promise.all([
-        prisma.mlmMember.findMany({
-          select: {
-            id: true, memberCode: true, currentLevel: true,
-            status: true, uplineId: true, referrerId: true,
-            user: { select: { name: true } },
-          },
-          orderBy: { memberCode: "asc" },
-          take: 500,
-        }),
-        prisma.mlmMember.count(),
-      ]);
-      const list = allMembers.map(m => ({
-        id: m.id.toString(), memberCode: m.memberCode, name: m.user.name,
+      const allMembersResult = await prisma.mlmMember.findMany({
+        select: {
+          id: true, memberCode: true, currentLevel: true,
+          status: true, uplineId: true, referrerId: true,
+          contractDate: true, forceActive: true, userId: true,
+          user: { select: { name: true } },
+        },
+        orderBy: { memberCode: "asc" },
+        take: 500,
+      });
+      const totalCount = await prisma.mlmMember.count();
+      const allMembers = allMembersResult;
+
+      // アクティブマーカーを計算
+      const nowJST2 = new Date(Date.now() + 9 * 60 * 60 * 1000);
+      const currentMonth = `${nowJST2.getUTCFullYear()}-${String(nowJST2.getUTCMonth() + 1).padStart(2, "0")}`;
+      const listMemberInfoMap = new Map<string, { contractDate: Date | null; forceActive: boolean; status: string; userId: bigint }>();
+      const listUserIds: bigint[] = [];
+      for (const m of allMembers) {
+        listMemberInfoMap.set(m.id.toString(), { contractDate: m.contractDate, forceActive: m.forceActive, status: m.status, userId: m.userId });
+        listUserIds.push(m.userId);
+      }
+      const listMemberIds: bigint[] = allMembers.map((m) => m.id as bigint);
+      const listActiveMarkers = await calcActiveMarkers(
+        listMemberIds,
+        listUserIds,
+        listMemberInfoMap,
+        currentMonth
+      );
+
+      const list = allMembers.map((m) => ({
+        id: (m.id as bigint).toString(), memberCode: m.memberCode, name: m.user.name,
         level: m.currentLevel, status: m.status,
         uplineId: m.uplineId?.toString() ?? null,
         referrerId: m.referrerId?.toString() ?? null,
         lastMonthPoints: 0, currentMonthPoints: 0, directDownlines: [],
         totalDescendants: 0, hasMore: false,
+        activeMarker: listActiveMarkers.get((m.id as bigint).toString()) ?? "none",
       }));
       return NextResponse.json({
         root: null, list, totalCount,
         message: "会員コードを入力すると個別ツリーを表示できます",
+        targetMonth: currentMonth,
       }, { status: 200 });
     }
 
@@ -151,6 +318,10 @@ export async function GET(req: NextRequest) {
       : null;
     const rootReferrerCode = rootMemberFull?.referrer?.memberCode ?? null;
 
+    // ─── 対象月（当月）を特定 ───
+    const nowJST = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    const targetMonth = `${nowJST.getUTCFullYear()}-${String(nowJST.getUTCMonth() + 1).padStart(2, "0")}`;
+
     // ─── 傘下全員の購入ポイント合計を取得（グループポイント）───
     // 翠彩（スミサイ）: 1個 = 150pt で流通ポイントを計算
     const descendantIds = allDescendants.map(m => BigInt(m.id));
@@ -165,11 +336,31 @@ export async function GET(req: NextRequest) {
       memberPointMap.set(ps.mlmMemberId.toString(), ps._sum.totalPoints ?? 0);
     }
 
+    // ─── アクティブマーカーを計算 ───
+    const memberInfoMap = new Map<string, { contractDate: Date | null; forceActive: boolean; status: string; userId: bigint }>();
+    const allUserIds: bigint[] = [];
+    // allDescendants には contractDate が含まれていないので MlmMember から直接取得
+    const descendantMemberData = await prisma.mlmMember.findMany({
+      where: { id: { in: descendantIds } },
+      select: { id: true, contractDate: true, forceActive: true, status: true, userId: true },
+    });
+    for (const m of descendantMemberData) {
+      memberInfoMap.set(m.id.toString(), {
+        contractDate: m.contractDate,
+        forceActive: m.forceActive,
+        status: m.status,
+        userId: m.userId,
+      });
+      allUserIds.push(m.userId);
+    }
+    const activeMarkers = await calcActiveMarkers(descendantIds, allUserIds, memberInfoMap, targetMonth);
+
     const rootNode = buildTreeWithDepthLimit(
       targetMember.id, allDescendants, depthLimit, type,
       idToName, idToCode,
       rootUplineName, rootUplineCode, rootReferrerName, rootReferrerCode,
-      memberPointMap
+      memberPointMap,
+      activeMarkers
     );
     const list = flattenTree(rootNode);
 
@@ -177,6 +368,7 @@ export async function GET(req: NextRequest) {
       root: rootNode,
       list,
       totalDescendants: allDescendants.length - 1,
+      targetMonth,
     }, { status: 200 });
 
   } catch (error) {
@@ -249,6 +441,7 @@ async function fetchAllDescendants(rootId: bigint, parentField: "uplineId" | "re
         position: m.matrixPosition,
         contractDate: m.contractDate?.toISOString() ?? null,
         createdAt: m.createdAt.toISOString(),
+        activeMarker: "none" as ActiveMarker,  // 後でマーカーマップで上書き
       };
     });
 }
@@ -270,6 +463,7 @@ type FlatMember = {
   position: number;
   contractDate: string | null;
   createdAt: string;
+  activeMarker: ActiveMarker;  // アクティブ判定マーカー
 };
 
 type TreeNode = FlatMember & {
@@ -297,6 +491,7 @@ function buildTreeWithDepthLimit(
   rootReferrerName: string | null,
   rootReferrerCode: string | null,
   memberPointMap: Map<string, number> = new Map(),
+  activeMarkers: Map<string, ActiveMarker> = new Map(),
 ): TreeNode {
   const map = new Map<string, TreeNode & { _allChildren: string[] }>();
   const rootIdStr = rootId.toString();
@@ -319,6 +514,7 @@ function buildTreeWithDepthLimit(
       uplineCode: upCode,
       referrerName: refName,
       referrerCode: refCode,
+      activeMarker: activeMarkers.get(m.id) ?? "none",
       _allChildren: [],
     });
   }
@@ -384,6 +580,7 @@ function buildTreeWithDepthLimit(
     position: 0, contractDate: null, createdAt: "",
     depth: 0, directDownlines: [], totalDescendants: 0, groupPoints: 0, hasMore: false,
     uplineName: null, uplineCode: null, referrerName: null, referrerCode: null,
+    activeMarker: "none" as ActiveMarker,
     _allChildren: [],
   };
 }
