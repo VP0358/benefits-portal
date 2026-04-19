@@ -270,7 +270,11 @@ async function getSummary() {
         where: {
           orderedAt: { gte: dateStart, lte: dateEnd },
           paymentMethod: pm,
-          ...(rowType === "unpaid" ? { paymentStatus: "unpaid" } : { shippingStatus: "unshipped" })
+          // 未入金：paymentStatus=unpaid かつ shippingStatus=unshipped
+          // 未発送：paymentStatus=paid  かつ shippingStatus=unshipped
+          ...(rowType === "unpaid"
+            ? { paymentStatus: "unpaid", shippingStatus: "unshipped" }
+            : { paymentStatus: "paid",   shippingStatus: "unshipped" })
         }
       })
       row[pm] = count
@@ -278,9 +282,9 @@ async function getSummary() {
     return row
   }
 
-  // 未処理伝票カウント（当月以前の未入金）
+  // 未処理伝票カウント（当月以前の未入金かつ未発送）
   const prevUnpaidCount = await prisma.order.count({
-    where: { orderedAt: { lt: thisMonthStart }, paymentStatus: "unpaid" }
+    where: { orderedAt: { lt: thisMonthStart }, paymentStatus: "unpaid", shippingStatus: "unshipped" }
   })
 
   const [thisUnpaid, thisUnshipped, lastUnpaid, lastUnshipped] = await Promise.all([
@@ -290,9 +294,10 @@ async function getSummary() {
     buildSummaryRow(lastMonthStart, lastMonthEnd, "unshipped"),
   ])
 
-  // 総未入金・未発送
-  const totalUnpaid = await prisma.order.count({ where: { paymentStatus: "unpaid" } })
-  const totalUnshipped = await prisma.order.count({ where: { shippingStatus: "unshipped" } })
+  // 総未入金（paymentStatus=unpaid かつ shippingStatus=unshipped）
+  // 総未発送（paymentStatus=paid  かつ shippingStatus=unshipped）
+  const totalUnpaid    = await prisma.order.count({ where: { paymentStatus: "unpaid", shippingStatus: "unshipped" } })
+  const totalUnshipped = await prisma.order.count({ where: { paymentStatus: "paid",   shippingStatus: "unshipped" } })
 
   // 出庫BOX件数
   const outboxCounts: Record<number, number> = {}

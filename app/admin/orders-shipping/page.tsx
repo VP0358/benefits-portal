@@ -434,8 +434,15 @@ export default function OrdersShippingPage() {
     // pmApiMap にキーがある場合のみ paymentMethod フィルターを設定
     // （ない場合は全支払方法を対象にする）
     if (pmApiMap[pm] !== undefined) p.set("paymentMethod", pmApiMap[pm])
-    if (statusType === "unpaid")    p.set("paymentStatus",  "unpaid")
-    if (statusType === "unshipped") p.set("shippingStatus", "unshipped")
+    // 未入金：paymentStatus=unpaid かつ shippingStatus=unshipped
+    // 未発送：paymentStatus=paid   かつ shippingStatus=unshipped
+    if (statusType === "unpaid") {
+      p.set("paymentStatus",  "unpaid")
+      p.set("shippingStatus", "unshipped")
+    } else {
+      p.set("paymentStatus",  "paid")
+      p.set("shippingStatus", "unshipped")
+    }
 
     const col = SUMMARY_COLS.find(c => c.key === pm)
     const label = `${period === "thisMonth" ? "当月" : "先月"} ${col?.label || pm} ${statusType === "unpaid" ? "未入金" : "未発送"}`
@@ -1130,17 +1137,17 @@ export default function OrdersShippingPage() {
           {summary && (
             <div className="flex flex-wrap gap-2 text-xs">
               <button
-                onClick={() => { setPaymentStatus("unpaid"); setStartDate(""); setEndDate(""); fetchOrders(); setSearched(true) }}
+                onClick={() => { setPaymentStatus("unpaid"); setShippingStatus("unshipped"); setStartDate(""); setEndDate(""); fetchOrders(); setSearched(true) }}
                 className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded whitespace-nowrap">
                 翌月以降未入金（{summary.prevUnpaidCount}件）
               </button>
               <button
-                onClick={() => { setPaymentStatus("unpaid"); setPaymentMethod(""); const { start, end } = getThisMonthRange(); setStartDate(start); setEndDate(end); setTimeout(fetchOrders, 0); setSearched(true) }}
+                onClick={() => { setPaymentStatus("unpaid"); setShippingStatus("unshipped"); setPaymentMethod(""); const { start, end } = getThisMonthRange(); setStartDate(start); setEndDate(end); setTimeout(fetchOrders, 0); setSearched(true) }}
                 className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded whitespace-nowrap">
                 未入金（{summary.totalUnpaid}件）
               </button>
               <button
-                onClick={() => { setShippingStatus("unshipped"); setPaymentMethod(""); const { start, end } = getThisMonthRange(); setStartDate(start); setEndDate(end); setTimeout(fetchOrders, 0); setSearched(true) }}
+                onClick={() => { setPaymentStatus("paid"); setShippingStatus("unshipped"); setPaymentMethod(""); const { start, end } = getThisMonthRange(); setStartDate(start); setEndDate(end); setTimeout(fetchOrders, 0); setSearched(true) }}
                 className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded whitespace-nowrap">
                 未発送（{summary.totalUnshipped}件）
               </button>
