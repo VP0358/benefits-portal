@@ -112,6 +112,15 @@ const SLIP_PAYMENT_METHODS = [
   { value: "other", label: "その他" },
 ];
 
+// 会員一覧検索時の支払方法（PaymentMethod enum）→ 伝票の支払方法（SLIP_PAYMENT_METHODS の value）への変換マップ
+const MEMBER_PM_TO_SLIP_PM: Record<string, string> = {
+  credit_card:   "card",
+  bank_transfer: "bank_transfer",
+  bank_payment:  "bank_payment",
+  cod:           "cod",
+  other:         "other",
+};
+
 const SLIP_TYPES_LIST = [
   { value: "autoship", label: "オートシップ" },
   { value: "normal", label: "通常" },
@@ -507,7 +516,11 @@ export default function AutoShipPanel() {
     setSlipProducts(prods);
     setSlipModalMember(m);
     const today = new Date().toISOString().split("T")[0];
-    setSlipForm(makeSlipForm(m.memberCode, m.memberName, m.memberPhone || "", m.memberPostal || "", m.memberAddress || "", today));
+    const form = makeSlipForm(m.memberCode, m.memberName, m.memberPhone || "", m.memberPostal || "", m.memberAddress || "", today);
+    // 会員一覧の検索条件（memberListPm）から伝票の支払方法を自動セット
+    const slipPm = MEMBER_PM_TO_SLIP_PM[memberListPm] ?? "bank_transfer";
+    form.paymentMethod = slipPm;
+    setSlipForm(form);
     setSlipItems([{ productId: "", productCode: "", productName: "", unitPrice: 0, quantity: 1, points: 0, taxRate: 10 }]);
   }
 
@@ -556,6 +569,9 @@ export default function AutoShipPanel() {
     const prods = await loadProducts();
     setBulkSlipProducts(prods);
     setBulkSlipItems([{ productId: "", productCode: "", productName: "", unitPrice: 0, quantity: 1, points: 0, taxRate: 10 }]);
+    // 会員一覧の検索条件（memberListPm）から一括伝票の支払方法を自動セット
+    const slipPm = MEMBER_PM_TO_SLIP_PM[memberListPm] ?? "bank_transfer";
+    setBulkPaymentMethod(slipPm);
     setBulkResult(null);
     setShowBulkSlipModal(true);
   }
