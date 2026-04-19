@@ -688,6 +688,36 @@ export default function OrdersShippingPage() {
     }
   }
 
+  // ─── 三菱UFJファクターCSV出力 ────────────────────────────
+  const handleExportMufgCSV = async () => {
+    // 選択あり：選択中の口座振替伝票のみ / 選択なし：表示中全伝票の口座振替のみ
+    const base   = selected.size > 0 ? orders.filter(o => selected.has(o.id)) : orders
+    const target = base.filter(o => o.paymentMethod === "bank_transfer" || o.paymentMethod === "direct_debit")
+    if (target.length === 0) {
+      alert("口座振替の伝票がありません。\n支払方法が「口座振替（振替(銀行)）」の伝票を選択してください。")
+      return
+    }
+    const ids = target.map(o => o.id).join(",")
+    try {
+      const res = await fetch(`/api/admin/orders-shipping/mufg-csv?ids=${ids}`)
+      if (!res.ok) {
+        const d = await res.json()
+        alert("三菱UFJファクターCSV出力エラー: " + (d.error || "不明なエラー"))
+        return
+      }
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement("a")
+      a.href = url
+      a.download = `mufg_${new Date().toISOString().slice(0,10).replace(/-/g,"")}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      alert(`三菱UFJファクターCSVを出力しました（${target.length}件）`)
+    } catch {
+      alert("三菱UFJファクターCSV出力に失敗しました")
+    }
+  }
+
   // ─── 振替伝票の入金日削除 ──────────────────────────────
   const handleClearBankTransferPaidAt = async () => {
     const target = selected.size > 0
@@ -1140,6 +1170,12 @@ export default function OrdersShippingPage() {
               className="flex items-center gap-1 px-3 py-1.5 bg-white border border-blue-500 text-blue-700 rounded text-sm hover:bg-blue-50 font-medium"
               title="選択したカード決済伝票をクレディックス向けCSVでダウンロード">
               <Download className="w-3.5 h-3.5" />クレディックスデータ出力
+            </button>
+            {/* 三菱UFJファクターCSV出力 */}
+            <button onClick={handleExportMufgCSV}
+              className="flex items-center gap-1 px-3 py-1.5 bg-white border border-red-400 text-red-700 rounded text-sm hover:bg-red-50 font-medium"
+              title="選択した口座振替伝票を三菱UFJファクター向けCSVでダウンロード">
+              <Download className="w-3.5 h-3.5" />三菱UFJファクターデータ出力
             </button>
             {/* 納品書ボタン → 納品書・出庫リストページへ遷移 */}
             <button
