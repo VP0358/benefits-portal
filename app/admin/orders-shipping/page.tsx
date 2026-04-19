@@ -899,6 +899,9 @@ export default function OrdersShippingPage() {
                 <Box className="w-4 h-4" />
                 出庫BOX{displayedOutbox} の内容
                 {outboxOrders && <span className="ml-2 text-xs font-normal text-blue-600">（{outboxOrders.length}件）</span>}
+                {selected.size > 0 && (
+                  <span className="ml-1 px-2 py-0.5 bg-blue-600 text-white rounded text-[11px]">{selected.size}件選択中</span>
+                )}
               </span>
               <button onClick={() => { setOutboxOrders(null); setDisplayedOutbox(null) }}
                 className="text-xs text-gray-400 hover:text-gray-600 px-2 py-0.5 rounded hover:bg-gray-100">✕ 閉じる</button>
@@ -914,9 +917,21 @@ export default function OrdersShippingPage() {
               </div>
             ) : outboxOrders && (
               <div className="overflow-x-auto">
-                <table className="w-full text-xs border-collapse min-w-[800px]">
+                <table className="w-full text-xs border-collapse min-w-[860px]">
                   <thead>
                     <tr className="border-b border-gray-200 bg-gray-50 text-gray-500 text-left">
+                      {/* ② チェックボックス列ヘッダー */}
+                      <th className="px-2 py-2 w-8">
+                        <button onClick={() =>
+                          setSelected(selected.size === outboxOrders.length && outboxOrders.length > 0
+                            ? new Set()
+                            : new Set(outboxOrders.map(o => o.id)))
+                        }>
+                          {selected.size === outboxOrders.length && outboxOrders.length > 0
+                            ? <CheckSquare className="w-4 h-4 text-blue-600" />
+                            : <Square className="w-4 h-4 text-gray-300" />}
+                        </button>
+                      </th>
                       <th className="px-3 py-2">種別</th>
                       <th className="px-3 py-2">注文日</th>
                       <th className="px-3 py-2">入金日</th>
@@ -930,11 +945,29 @@ export default function OrdersShippingPage() {
                   </thead>
                   <tbody>
                     {outboxOrders.map((order, idx) => (
-                      <tr key={order.id} className={`border-b border-gray-100 ${idx % 2 === 0 ? "" : "bg-gray-50/50"}`}>
+                      <tr key={order.id} className={`border-b border-gray-100 transition-colors ${
+                        selected.has(order.id) ? "bg-blue-50" : idx % 2 === 0 ? "" : "bg-gray-50/50"
+                      }`}>
+                        {/* ② チェックボックス */}
+                        <td className="px-2 py-2" onClick={e => { e.stopPropagation(); toggleSelect(order.id) }}>
+                          <button type="button" className="flex items-center">
+                            {selected.has(order.id)
+                              ? <CheckSquare className="w-4 h-4 text-blue-600" />
+                              : <Square className="w-4 h-4 text-gray-300" />}
+                          </button>
+                        </td>
                         <td className="px-3 py-2">
                           <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-700">{order.slipTypeLabel}</span>
                         </td>
-                        <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{order.orderedAt.slice(0,10)}</td>
+                        {/* ① 注文日を青いリンク（クリックで編集モーダル）に変更 */}
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={e => openEditModal(order, e)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer">
+                            {order.orderedAt.slice(0,10)}
+                          </button>
+                        </td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           {order.paidAt
                             ? <span className="text-green-700">{order.paidAt.slice(0,10)}</span>
