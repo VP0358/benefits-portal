@@ -107,19 +107,29 @@ const BULK_ACTIONS = [
   { value: "setNoteAll", label: "備考・備考(納品書)に" },
 ]
 
+// ローカル日付を "YYYY-MM-DD" 文字列に変換（タイムゾーンずれなし）
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+// 指定した年月の1日〜末日を返す（ローカル時刻ベース）
+function getMonthRange(year: number, month: number): { start: string; end: string } {
+  const start = new Date(year, month, 1)          // 月の1日
+  const end   = new Date(year, month + 1, 0)      // 翌月0日 = 当月末日
+  return { start: toLocalDateStr(start), end: toLocalDateStr(end) }
+}
 function getThisMonthRange() {
   const now = new Date()
-  const start = new Date(now.getFullYear(), now.getMonth(), 1)
-  const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  return {
-    start: start.toISOString().split("T")[0],
-    end:   end.toISOString().split("T")[0],
-  }
+  return getMonthRange(now.getFullYear(), now.getMonth())
 }
-function offsetMonth(dateStr: string, offset: number) {
-  const d = new Date(dateStr + "-01")
-  d.setMonth(d.getMonth() + offset)
-  return d.toISOString().slice(0, 7)
+function offsetMonth(dateStr: string, offset: number): string {
+  // "YYYY-MM-DD" から年月を取得してoffset月ずらす
+  const [y, m] = dateStr.split("-").map(Number)
+  // Date(y, m-1+offset) でローカルベースに計算
+  const d = new Date(y, m - 1 + offset, 1)
+  return toLocalDateStr(d).slice(0, 7) // "YYYY-MM"
 }
 
 // ─── メインコンポーネント ───────────────────────────────
@@ -198,13 +208,11 @@ export default function OrdersShippingPage() {
 
   // ─── 月ナビ ─────────────────────────────────────────
   const shiftMonth = (offset: number) => {
-    const ym = startDate.slice(0, 7)
-    const newYm = offsetMonth(ym, offset)
-    const [y, m] = newYm.split("-").map(Number)
-    const s = new Date(y, m - 1, 1)
-    const e = new Date(y, m, 0)
-    setStartDate(s.toISOString().split("T")[0])
-    setEndDate(e.toISOString().split("T")[0])
+    // startDate の年月を基準にoffset月ずらした月の1日〜末日をセット
+    const [y, m] = startDate.split("-").map(Number)
+    const { start, end } = getMonthRange(y, m - 1 + offset)
+    setStartDate(start)
+    setEndDate(end)
   }
 
   // ─── 検索 ───────────────────────────────────────────
