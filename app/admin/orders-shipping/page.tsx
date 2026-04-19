@@ -657,6 +657,37 @@ export default function OrdersShippingPage() {
     } catch { alert("CSV出力に失敗しました") }
   }
 
+  // ─── クレディックスCSV出力 ─────────────────────────────
+  const handleExportCredixCSV = async () => {
+    // 選択あり：選択中のカード決済伝票のみ / 選択なし：表示中全伝票のカード決済のみ
+    const base = selected.size > 0 ? orders.filter(o => selected.has(o.id)) : orders
+    const target = base.filter(o => o.paymentMethod === "card" || o.paymentMethod === "credit_card")
+    if (target.length === 0) {
+      alert("カード決済（クレジットカード）の伝票がありません。\n支払方法が「カード」の伝票を選択してください。")
+      return
+    }
+    const ids = target.map(o => o.id).join(",")
+    try {
+      const res = await fetch(`/api/admin/orders-shipping/credix-csv?ids=${ids}`)
+      if (!res.ok) {
+        const d = await res.json()
+        alert("クレディックスCSV出力エラー: " + (d.error || "不明なエラー"))
+        return
+      }
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement("a")
+      a.href = url
+      a.download = `credix_${new Date().toISOString().slice(0,10).replace(/-/g,"")}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      // 出力完了メッセージ
+      alert(`クレディックスCSVを出力しました（${target.length}件）`)
+    } catch {
+      alert("クレディックスCSV出力に失敗しました")
+    }
+  }
+
   // ─── 振替伝票の入金日削除 ──────────────────────────────
   const handleClearBankTransferPaidAt = async () => {
     const target = selected.size > 0
@@ -1103,6 +1134,12 @@ export default function OrdersShippingPage() {
               className="flex items-center gap-1 px-3 py-1.5 bg-white border border-amber-500 text-amber-700 rounded text-sm hover:bg-amber-50"
               title="選択した伝票をヤマトB2クラウド取込用CSVでダウンロード">
               <Download className="w-3.5 h-3.5" />ヤマトB2CSV出力
+            </button>
+            {/* クレディックスCSV出力 */}
+            <button onClick={handleExportCredixCSV}
+              className="flex items-center gap-1 px-3 py-1.5 bg-white border border-blue-500 text-blue-700 rounded text-sm hover:bg-blue-50 font-medium"
+              title="選択したカード決済伝票をクレディックス向けCSVでダウンロード">
+              <Download className="w-3.5 h-3.5" />クレディックスデータ出力
             </button>
             {/* 納品書ボタン → 納品書・出庫リストページへ遷移 */}
             <button
