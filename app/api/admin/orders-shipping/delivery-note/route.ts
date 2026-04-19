@@ -33,7 +33,6 @@ export async function GET(request: NextRequest) {
                 paymentMethod: true,
                 companyName: true,
                 mobile: true,
-                postalCode: true,
                 prefecture: true,
                 city: true,
                 address1: true,
@@ -89,12 +88,16 @@ export async function GET(request: NextRequest) {
     const result = orders.map(o => {
       const mlm = o.user.mlmMember
       const pm = o.paymentMethod || mlm?.paymentMethod || ""
-      // 配送先: ShippingLabelがあればそちら優先
+      // mlmMemberの住所を結合（postalCodeフィールドは存在しないため prefecture+city+address1+address2 で組み立て）
+      const mlmAddress = mlm
+        ? [mlm.prefecture, mlm.city, mlm.address1, mlm.address2].filter(Boolean).join("")
+        : ""
+      // 配送先: ShippingLabelがあればそちら優先、次にUser、次にMlmMember
       const recipientName    = o.shippingLabel?.recipientName    || o.user.name
       const recipientPostal  = o.shippingLabel?.recipientPostal  || o.user.postalCode || ""
-      const recipientAddress = o.shippingLabel?.recipientAddress || o.user.address || ""
-      const recipientPhone   = o.shippingLabel?.recipientPhone   || o.user.phone || ""
-      const recipientCompany = o.shippingLabel?.recipientCompany || mlm?.companyName || ""
+      const recipientAddress = o.shippingLabel?.recipientAddress || o.user.address    || mlmAddress
+      const recipientPhone   = o.shippingLabel?.recipientPhone   || o.user.phone      || mlm?.mobile || ""
+      const recipientCompany = o.shippingLabel?.recipientCompany || mlm?.companyName  || ""
 
       return {
         id: Number(o.id),
