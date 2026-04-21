@@ -716,7 +716,16 @@ model MlmMember {
   note              String?         @db.VarChar(500)
   // 追加フィールド
   firstPayDate      DateTime?                                // 初回入金日
-  creditCardId      String?         @db.VarChar(100)        // クレジットカード決済ID（クレディックス顧客ID）
+  // クレジットカード情報（クレディックス）最大3枠
+  creditCardId      String?         @db.VarChar(100)        // 1枠目：決済ID
+  creditCardExpiry  String?         @db.VarChar(10)         // 1枠目：有効期限（MM/YY形式）
+  creditCardLast4   String?         @db.VarChar(4)          // 1枠目：下4桁
+  creditCardId2     String?         @db.VarChar(100)        // 2枠目：決済ID
+  creditCardExpiry2 String?         @db.VarChar(10)         // 2枠目：有効期限
+  creditCardLast4_2 String?         @db.VarChar(4)          // 2枠目：下4桁
+  creditCardId3     String?         @db.VarChar(100)        // 3枠目：決済ID
+  creditCardExpiry3 String?         @db.VarChar(10)         // 3枠目：有効期限
+  creditCardLast4_3 String?         @db.VarChar(4)          // 3枠目：下4桁
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 

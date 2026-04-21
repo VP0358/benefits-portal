@@ -107,7 +107,16 @@ type MemberDetail = {
   forceLevel: number | null;
   contractDate: string | null;
   firstPayDate: string | null;
+  // クレジットカード情報（クレディックス）3枠
   creditCardId: string | null;
+  creditCardExpiry: string | null;
+  creditCardLast4: string | null;
+  creditCardId2: string | null;
+  creditCardExpiry2: string | null;
+  creditCardLast4_2: string | null;
+  creditCardId3: string | null;
+  creditCardExpiry3: string | null;
+  creditCardLast4_3: string | null;
   autoshipEnabled: boolean;
   autoshipStartDate: string | null;
   autoshipStopDate: string | null;
@@ -427,6 +436,14 @@ export default function MlmMemberDetailPage() {
         contractDate: m.contractDate ? m.contractDate.slice(0, 10) : "",
         firstPayDate: m.firstPayDate ? m.firstPayDate.slice(0, 10) : "",
         creditCardId: m.creditCardId ?? "",
+        creditCardExpiry: m.creditCardExpiry ?? "",
+        creditCardLast4: m.creditCardLast4 ?? "",
+        creditCardId2: m.creditCardId2 ?? "",
+        creditCardExpiry2: m.creditCardExpiry2 ?? "",
+        creditCardLast4_2: m.creditCardLast4_2 ?? "",
+        creditCardId3: m.creditCardId3 ?? "",
+        creditCardExpiry3: m.creditCardExpiry3 ?? "",
+        creditCardLast4_3: m.creditCardLast4_3 ?? "",
         note: m.note ?? "", newPassword: "",
       });
     } else if (section === "registration") {
@@ -668,7 +685,20 @@ export default function MlmMemberDetailPage() {
             } />
             <InfoRow label="契約締結日"       value={fmtDate(m.contractDate)} />
             <InfoRow label="初回入金日"       value={fmtDate(m.firstPayDate)} />
-            <InfoRow label="クレジット決済ID" value={m.creditCardId ? <span className="font-mono text-xs">{m.creditCardId}</span> : null} />
+            {/* クレジットカード情報（クレディックス）3枠 */}
+            {[
+              { id: m.creditCardId,  expiry: m.creditCardExpiry,  last4: m.creditCardLast4,   label: "クレジット①" },
+              { id: m.creditCardId2, expiry: m.creditCardExpiry2, last4: m.creditCardLast4_2, label: "クレジット②" },
+              { id: m.creditCardId3, expiry: m.creditCardExpiry3, last4: m.creditCardLast4_3, label: "クレジット③" },
+            ].map((card, idx) => (card.id || card.expiry || card.last4) ? (
+              <InfoRow key={idx} label={`${card.label}（クレディックス）`} value={
+                <span className="font-mono text-xs space-x-2">
+                  {card.id && <span>ID: {card.id}</span>}
+                  {card.expiry && <span>期限: {card.expiry}</span>}
+                  {card.last4 && <span>下4桁: {card.last4}</span>}
+                </span>
+              } />
+            ) : null)}
             <InfoRow label="備考"             value={m.note} />
           </div>
         </div>
@@ -1075,12 +1105,53 @@ export default function MlmMemberDetailPage() {
             <FormField label="初回入金日">
               <JpDatePicker value={String(editData.firstPayDate ?? "")} onChange={v => set("firstPayDate", v)} />
             </FormField>
-            <FormField label="クレジット決済ID（クレディックス）">
-              <input className={inputCls} value={String(editData.creditCardId ?? "")} onChange={e => set("creditCardId", e.target.value)} placeholder="クレディックス顧客ID" />
-            </FormField>
             <FormField label="マイページパスワード変更（6文字以上）">
               <input type="text" className={inputCls} value={String(editData.newPassword ?? "")} onChange={e => set("newPassword", e.target.value)} placeholder="変更する場合のみ入力" />
             </FormField>
+          </div>
+
+          {/* クレジットカード情報（クレディックス）3枠 */}
+          <div className="md:col-span-2 mt-2">
+            <p className="text-xs font-bold text-slate-600 mb-2">💳 クレジットカード情報（クレディックス）</p>
+            <div className="space-y-3">
+              {([
+                { label: "①", idKey: "creditCardId", expiryKey: "creditCardExpiry", last4Key: "creditCardLast4" },
+                { label: "②", idKey: "creditCardId2", expiryKey: "creditCardExpiry2", last4Key: "creditCardLast4_2" },
+                { label: "③", idKey: "creditCardId3", expiryKey: "creditCardExpiry3", last4Key: "creditCardLast4_3" },
+              ] as const).map((card) => (
+                <div key={card.label} className="rounded-xl border border-slate-200 p-3 space-y-2">
+                  <p className="text-xs font-semibold text-slate-500">カード {card.label}</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <FormField label="決済ID">
+                      <input
+                        className={inputCls}
+                        value={String(editData[card.idKey] ?? "")}
+                        onChange={e => set(card.idKey, e.target.value)}
+                        placeholder="クレディックス顧客ID"
+                      />
+                    </FormField>
+                    <FormField label="有効期限（MM/YY）">
+                      <input
+                        className={inputCls}
+                        value={String(editData[card.expiryKey] ?? "")}
+                        onChange={e => set(card.expiryKey, e.target.value)}
+                        placeholder="例: 12/28"
+                        maxLength={5}
+                      />
+                    </FormField>
+                    <FormField label="下4桁">
+                      <input
+                        className={inputCls}
+                        value={String(editData[card.last4Key] ?? "")}
+                        onChange={e => set(card.last4Key, e.target.value)}
+                        placeholder="例: 1234"
+                        maxLength={4}
+                      />
+                    </FormField>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
           <FormField label="備考">
             <textarea className={inputCls} rows={3} value={String(editData.note ?? "")} onChange={e => set("note", e.target.value)} />

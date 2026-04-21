@@ -9,6 +9,7 @@ type StatsData = {
     active: number;
     inactive: number;
     breakdown: { active: number; autoship: number; withdrawn: number; lapsed: number; suspended: number; midCancel: number };
+    currentMonthBuyers: number;
   };
   mobile: {
     total: number;
@@ -64,6 +65,7 @@ export default function MemberStatsSummary({ show, compact = false }: Props) {
       active: data.mlm.active,
       inactive: data.mlm.inactive,
       activeDetail: `活動中 ${data.mlm.breakdown.active}件・オートシップ ${data.mlm.breakdown.autoship}件`,
+      currentMonthBuyers: data.mlm.currentMonthBuyers ?? 0,
       inactiveDetail: `退会 ${data.mlm.breakdown.withdrawn}件・失効 ${data.mlm.breakdown.lapsed}件・停止 ${data.mlm.breakdown.suspended}件・中途解約 ${data.mlm.breakdown.midCancel}件`,
     },
     {
@@ -114,6 +116,10 @@ export default function MemberStatsSummary({ show, compact = false }: Props) {
     },
   };
 
+  // 当月の年月を表示用に整形
+  const now = new Date();
+  const nowLabel = `${now.getFullYear()}年${now.getMonth() + 1}月`;
+
   if (compact) {
     // コンパクト版：横並びの数字カード
     return (
@@ -138,6 +144,15 @@ export default function MemberStatsSummary({ show, compact = false }: Props) {
                     <span className="text-xs text-slate-600">非アクティブ</span>
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${c.inactiveBadge}`}>{s.inactive.toLocaleString()}件</span>
                   </div>
+                  {/* MLM のみ当月購入者件数を表示 */}
+                  {"currentMonthBuyers" in s && (
+                    <div className="flex items-center justify-between pt-1 border-t border-white/60 mt-1">
+                      <span className="text-xs text-amber-700 font-medium">{nowLabel}購入者</span>
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                        {(s as { currentMonthBuyers: number }).currentMonthBuyers.toLocaleString()}件
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="mt-2 text-xs text-slate-400 leading-relaxed hidden sm:block">
                   <div>{s.activeDetail}</div>
@@ -177,13 +192,28 @@ export default function MemberStatsSummary({ show, compact = false }: Props) {
               </div>
 
               {/* 非アクティブ */}
-              <div className={`rounded-xl px-3 py-2 ${c.inactiveBadge}`}>
+              <div className={`rounded-xl px-3 py-2 mb-2 ${c.inactiveBadge}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold">❌ 非アクティブ</span>
                   <span className="text-lg font-bold">{s.inactive.toLocaleString()}件</span>
                 </div>
                 <div className="text-xs mt-0.5 opacity-80">{s.inactiveDetail}</div>
               </div>
+
+              {/* MLM のみ当月購入者件数を表示 */}
+              {"currentMonthBuyers" in s && (
+                <div className="rounded-xl px-3 py-2 bg-amber-50 border border-amber-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-amber-800">🛒 {nowLabel}購入者</span>
+                    <span className="text-lg font-bold text-amber-700">
+                      {(s as { currentMonthBuyers: number }).currentMonthBuyers.toLocaleString()}件
+                    </span>
+                  </div>
+                  <div className="text-xs mt-0.5 text-amber-600 opacity-80">
+                    商品コード1000・2000 入金済み会員
+                  </div>
+                </div>
+              )}
             </Link>
           );
         })}

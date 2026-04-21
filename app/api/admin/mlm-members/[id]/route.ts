@@ -69,9 +69,18 @@ export async function PATCH(
         if (data.city          !== undefined) memberUpdate.city         = data.city || null;
         if (data.address1      !== undefined) memberUpdate.address1     = data.address1 || null;
         if (data.address2      !== undefined) memberUpdate.address2     = data.address2 || null;
-        if (data.note          !== undefined) memberUpdate.note         = data.note || null;
-        if (data.firstPayDate  !== undefined) memberUpdate.firstPayDate = data.firstPayDate ? new Date(data.firstPayDate) : null;
-        if (data.creditCardId  !== undefined) memberUpdate.creditCardId = data.creditCardId || null;
+        if (data.note            !== undefined) memberUpdate.note           = data.note || null;
+        if (data.firstPayDate    !== undefined) memberUpdate.firstPayDate   = data.firstPayDate ? new Date(data.firstPayDate) : null;
+        // クレジットカード情報（クレディックス）3枠
+        if (data.creditCardId    !== undefined) memberUpdate.creditCardId    = data.creditCardId    || null;
+        if (data.creditCardExpiry  !== undefined) memberUpdate.creditCardExpiry  = data.creditCardExpiry  || null;
+        if (data.creditCardLast4   !== undefined) memberUpdate.creditCardLast4   = data.creditCardLast4   || null;
+        if (data.creditCardId2   !== undefined) memberUpdate.creditCardId2   = data.creditCardId2   || null;
+        if (data.creditCardExpiry2 !== undefined) memberUpdate.creditCardExpiry2 = data.creditCardExpiry2 || null;
+        if (data.creditCardLast4_2 !== undefined) memberUpdate.creditCardLast4_2 = data.creditCardLast4_2 || null;
+        if (data.creditCardId3   !== undefined) memberUpdate.creditCardId3   = data.creditCardId3   || null;
+        if (data.creditCardExpiry3 !== undefined) memberUpdate.creditCardExpiry3 = data.creditCardExpiry3 || null;
+        if (data.creditCardLast4_3 !== undefined) memberUpdate.creditCardLast4_3 = data.creditCardLast4_3 || null;
         if (Object.keys(memberUpdate).length > 0) {
           await tx.mlmMember.update({ where: { id: memberId }, data: memberUpdate });
         }

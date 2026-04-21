@@ -11,6 +11,11 @@ export async function GET() {
   if (guard.error) return guard.error;
 
   try {
+    // 当月の開始日・終了日
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
     const [
       // MLM会員
       mlmTotal,
@@ -55,6 +60,23 @@ export async function GET() {
       prisma.travelSubscription.count({ where: { status: "suspended" } }),
     ]);
 
+    // 当月購入者件数：
+    // 条件: OrderItem の商品コードが "1000" または "2000" を含む伝票があり、
+    //       かつ Order.paymentStatus = "paid"、かつ orderedAt が当月
+    // MLM会員（mlmMember）に紐づく userId で集計（会員単位のユニーク件数）
+    const currentMonthBuyersRaw = await prisma.$queryRaw<{ cnt: bigint }[]>`
+      SELECT COUNT(DISTINCT mm."id") AS cnt
+      FROM "mlm_members" mm
+      INNER JOIN "Order" o ON o."userId" = mm."userId"
+      INNER JOIN "OrderItem" oi ON oi."orderId" = o."id"
+      INNER JOIN "mlm_products" mp ON mp."id" = oi."productId"
+      WHERE mp."productCode" IN ('1000', '2000')
+        AND o."paymentStatus" = 'paid'
+        AND o."orderedAt" >= ${monthStart}
+        AND o."orderedAt" < ${monthEnd}
+    `;
+    const currentMonthBuyers = Number(currentMonthBuyersRaw[0]?.cnt ?? 0);
+
     return NextResponse.json({
       mlm: {
         total: mlmTotal,
@@ -68,6 +90,7 @@ export async function GET() {
           suspended: mlmSuspended,
           midCancel: mlmMidCancel,
         },
+        currentMonthBuyers,
       },
       mobile: {
         total: mobileTotal,
