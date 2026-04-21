@@ -311,6 +311,59 @@ export default function MlmMemberDetailPage() {
   // 編集フォームの一時データ
   const [editData, setEditData] = useState<Record<string, string | boolean | number | null>>({});
 
+  // ─── ポイント調整モーダル ───
+  const [pointAdjModal, setPointAdjModal] = useState(false);
+  const [pointAdjMode, setPointAdjMode] = useState<"add" | "subtract">("add");
+  const [pointAdjType, setPointAdjType] = useState<"manual" | "external">("manual");
+  const [pointAdjAmount, setPointAdjAmount] = useState<string>("");
+  const [pointAdjDesc, setPointAdjDesc] = useState<string>("");
+  const [pointAdjSaving, setPointAdjSaving] = useState(false);
+  const [pointAdjError, setPointAdjError] = useState<string | null>(null);
+
+  const handlePointAdjust = async () => {
+    if (!member) return;
+    const pts = parseInt(pointAdjAmount, 10);
+    if (!pts || pts <= 0) { setPointAdjError("1以上の整数を入力してください"); return; }
+    if (!pointAdjDesc.trim()) { setPointAdjError("理由・メモを入力してください"); return; }
+    // 減算時は残高チェック
+    if (pointAdjMode === "subtract") {
+      const current = pointAdjType === "manual"
+        ? (member.user.pointWallet?.manualPointsBalance ?? 0)
+        : (member.user.pointWallet?.externalPointsBalance ?? 0);
+      if (pts > current) {
+        setPointAdjError(`残高不足です（現在: ${current.toLocaleString()} pt）`);
+        return;
+      }
+    }
+    setPointAdjSaving(true);
+    setPointAdjError(null);
+    try {
+      const res = await fetch("/api/admin/points/manual-adjust", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: member.user.id,
+          pointSourceType: pointAdjType,
+          mode: pointAdjMode,
+          points: pts,
+          description: pointAdjDesc.trim(),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? "調整に失敗しました");
+      }
+      setPointAdjModal(false);
+      setPointAdjAmount("");
+      setPointAdjDesc("");
+      await fetchMember(); // 最新データを再取得
+    } catch (e: unknown) {
+      setPointAdjError(e instanceof Error ? e.message : "エラーが発生しました");
+    } finally {
+      setPointAdjSaving(false);
+    }
+  };
+
   const fetchMember = useCallback(async () => {
     setLoading(true);
     try {
@@ -840,7 +893,23 @@ export default function MlmMemberDetailPage() {
 
       {/* ─── ポイント情報 ─── */}
       <section className="bg-white rounded-2xl shadow-sm p-5">
-        <SectionHeader title="ポイント情報" icon="fas fa-coins" />
+        <div className="flex items-center justify-between mb-4">
+          <SectionHeader title="ポイント情報" icon="fas fa-coins" />
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setPointAdjMode("add"); setPointAdjType("manual"); setPointAdjAmount(""); setPointAdjDesc(""); setPointAdjError(null); setPointAdjModal(true); }}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition"
+            >
+              <i className="fas fa-plus" /> 加算
+            </button>
+            <button
+              onClick={() => { setPointAdjMode("subtract"); setPointAdjType("manual"); setPointAdjAmount(""); setPointAdjDesc(""); setPointAdjError(null); setPointAdjModal(true); }}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition"
+            >
+              <i className="fas fa-minus" /> 減算
+            </button>
+          </div>
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { label: "自動pt", value: m.user.pointWallet?.autoPointsBalance ?? 0 },
@@ -858,6 +927,117 @@ export default function MlmMemberDetailPage() {
           <InfoRow label="貯金ポイント (SAV)" value={<span className="text-green-600 font-semibold">{(m.savingsPoints ?? 0).toLocaleString()} pt</span>} />
         </div>
       </section>
+
+      {/* ─── ポイント調整モーダル ─── */}
+      {pointAdjModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-base font-bold ${pointAdjMode === "add" ? "text-emerald-600" : "text-rose-600"}`}>
+                <i className={`fas ${pointAdjMode === "add" ? "fa-plus-circle" : "fa-minus-circle"} mr-2`} />
+                ポイント{pointAdjMode === "add" ? "加算" : "減算"}
+              </h3>
+              <button onClick={() => setPointAdjModal(false)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">✕</button>
+            </div>
+
+            {/* 現在残高 */}
+            <div className="bg-slate-50 rounded-xl p-3 mb-4 grid grid-cols-2 gap-2 text-center text-xs">
+              <div>
+                <div className="text-slate-500">手動pt残高</div>
+                <div className="font-bold text-slate-700">{(m.user.pointWallet?.manualPointsBalance ?? 0).toLocaleString()} pt</div>
+              </div>
+              <div>
+                <div className="text-slate-500">外部pt残高</div>
+                <div className="font-bold text-slate-700">{(m.user.pointWallet?.externalPointsBalance ?? 0).toLocaleString()} pt</div>
+              </div>
+              <div>
+                <div className="text-slate-500">自動pt残高</div>
+                <div className="font-bold text-slate-700">{(m.user.pointWallet?.autoPointsBalance ?? 0).toLocaleString()} pt</div>
+              </div>
+              <div className="bg-violet-50 rounded-lg">
+                <div className="text-violet-500">利用可能</div>
+                <div className="font-bold text-violet-700">{(m.user.pointWallet?.availablePointsBalance ?? 0).toLocaleString()} pt</div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {/* ポイント種別 */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">ポイント種別</label>
+                <div className="flex gap-2">
+                  {(["manual", "external"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setPointAdjType(t)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition ${
+                        pointAdjType === t
+                          ? "bg-violet-600 text-white border-violet-600"
+                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      {t === "manual" ? "手動ポイント" : "外部ポイント"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 金額入力 */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  {pointAdjMode === "add" ? "加算" : "減算"}ポイント数
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    value={pointAdjAmount}
+                    onChange={(e) => setPointAdjAmount(e.target.value)}
+                    placeholder="例: 100"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 pr-10"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">pt</span>
+                </div>
+              </div>
+
+              {/* 理由・メモ */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">理由・メモ <span className="text-rose-500">*</span></label>
+                <textarea
+                  value={pointAdjDesc}
+                  onChange={(e) => setPointAdjDesc(e.target.value)}
+                  placeholder="例: 管理者手動調整"
+                  rows={2}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 resize-none"
+                />
+              </div>
+
+              {pointAdjError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg">
+                  <i className="fas fa-exclamation-circle mr-1" />{pointAdjError}
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setPointAdjModal(false)}
+                  className="flex-1 py-2.5 rounded-lg border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handlePointAdjust}
+                  disabled={pointAdjSaving}
+                  className={`flex-1 py-2.5 rounded-lg text-white text-sm font-bold transition disabled:opacity-50 ${
+                    pointAdjMode === "add" ? "bg-emerald-500 hover:bg-emerald-600" : "bg-rose-500 hover:bg-rose-600"
+                  }`}
+                >
+                  {pointAdjSaving ? "処理中..." : `${pointAdjMode === "add" ? "加算" : "減算"}する`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── 組織情報 ─── */}
       <div className="grid gap-6 md:grid-cols-2">

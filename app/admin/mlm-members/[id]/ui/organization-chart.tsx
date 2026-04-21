@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 
 type ActiveMarker = "active" | "warning" | "danger" | "none";
@@ -41,26 +41,38 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = {
   active: "text-green-600 font-semibold",
   autoship: "text-blue-600 font-semibold",
-  withdrawn: "text-purple-700 font-semibold",
+  // 退会: 灰色（danger=赤、LV2=紫と区別）
+  withdrawn: "text-gray-500",
   midCancel: "text-orange-600",
   lapsed: "text-gray-400",
   suspended: "text-yellow-600",
 };
 
-// 退会会員のノード全体に適用する背景・ボーダースタイル（dangerの赤色と区別）
+// 退会会員のノード全体に適用する背景・ボーダースタイル（danger=赤、LV2=紫と区別して灰色）
 const WITHDRAWN_NODE_STYLE = {
-  background: "rgba(216,180,254,0.25)",   // purple-200 薄め
-  border: "1px solid rgba(147,51,234,0.4)", // purple-600
+  background: "rgba(209,213,219,0.4)",    // gray-300 薄め
+  border: "1px solid rgba(107,114,128,0.5)", // gray-500
 };
 
 const LEVEL_COLORS: Record<number, string> = {
-  0: "bg-gray-400",
+  0: "",           // LV0は白背景・黒縁（下記 getLevelStyle 参照）
   1: "bg-blue-500",
   2: "bg-green-500",
   3: "bg-yellow-500",
   4: "bg-purple-500",
   5: "bg-red-500",
 };
+
+/** LV0は白背景・黒縁、それ以外はクラス名 */
+function getLevelStyle(level: number): { className: string; style?: React.CSSProperties } {
+  if (level === 0) {
+    return {
+      className: "text-gray-800 font-bold",
+      style: { background: "#ffffff", border: "2px solid #1a1a1a" },
+    };
+  }
+  return { className: `${LEVEL_COLORS[level] ?? "bg-gray-400"} text-white` };
+}
 
 export default function OrganizationChart({ memberCode }: { memberCode: string }) {
   const [orgType, setOrgType] = useState<"matrix" | "unilevel">("matrix");
@@ -95,8 +107,8 @@ export default function OrganizationChart({ memberCode }: { memberCode: string }
   const renderTreeNode = (node: MemberNode, depth: number = 0): JSX.Element => {
     const indent = depth * 36;
     const hasChildren = node.directDownlines && node.directDownlines.length > 0;
-    const levelColor = LEVEL_COLORS[node.level] ?? "bg-gray-400";
     const levelLabel = node.level === 0 ? "未設定" : `LV.${node.level}`;
+    const ls = getLevelStyle(node.level);
     const isWithdrawn = node.status === "withdrawn";
 
     return (
@@ -108,7 +120,10 @@ export default function OrganizationChart({ memberCode }: { memberCode: string }
             ...(isWithdrawn ? WITHDRAWN_NODE_STYLE : { background: "white" }),
           }}
         >
-          <div className={`w-9 h-9 ${levelColor} text-white rounded-full flex items-center justify-center font-bold text-xs shrink-0`}>
+          <div
+            className={`w-9 h-9 ${ls.className} rounded-full flex items-center justify-center font-bold text-xs shrink-0`}
+            style={ls.style}
+          >
             {levelLabel}
           </div>
           <div className="flex-1 min-w-0">
@@ -123,13 +138,13 @@ export default function OrganizationChart({ memberCode }: { memberCode: string }
                     {node.memberCode}
                   </span>
                 ) : (
-                  <span className={isWithdrawn ? "text-purple-700 hover:text-purple-900" : "text-blue-600 hover:text-blue-700"}>
+                  <span className={isWithdrawn ? "text-gray-500 hover:text-gray-700" : "text-blue-600 hover:text-blue-700"}>
                     {node.memberCode}
                   </span>
                 )}
               </Link>
               {" - "}{node.name}
-              {isWithdrawn && <span className="ml-1 text-xs text-purple-500">（退会）</span>}
+              {isWithdrawn && <span className="ml-1 text-xs text-gray-400">（退会）</span>}
             </div>
             <div className="text-xs flex items-center gap-2">
               <span className={STATUS_COLORS[node.status] ?? "text-gray-500"}>

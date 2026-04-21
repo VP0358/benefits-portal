@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 
 type OrgType = "matrix" | "unilevel";
 
@@ -57,21 +57,34 @@ const STATUS_LABEL: Record<string, string> = {
 const STATUS_BG: Record<string, { card: string; badge: string }> = {
   active:    { card: "border-emerald-400 bg-emerald-50",  badge: "bg-emerald-500 text-white" },
   autoship:  { card: "border-blue-400 bg-blue-50",        badge: "bg-blue-500 text-white" },
-  // 退会: 紫系（danger=赤 と明確に区別）
-  withdrawn: { card: "border-purple-400 bg-purple-50",    badge: "bg-purple-500 text-white" },
+  // 退会: 灰色（danger=赤の6ヶ月未購入マーカーと区別、LV2紫とも区別）
+  withdrawn: { card: "border-gray-400 bg-gray-100",       badge: "bg-gray-500 text-white" },
   midCancel: { card: "border-orange-300 bg-orange-50",    badge: "bg-orange-400 text-white" },
   lapsed:    { card: "border-gray-300 bg-gray-50",        badge: "bg-gray-400 text-white" },
   suspended: { card: "border-yellow-300 bg-yellow-50",    badge: "bg-yellow-400 text-white" },
 };
 
+// LV0は白背景・黒縁で特別表示（LV2の紫と被らないよう）
+// LV1〜5はそれぞれの色クラス
 const LEVEL_COLOR: Record<number, string> = {
-  0: "bg-gray-500",
+  0: "",           // LV0はインラインスタイルで白背景・黒縁を適用（下記 getLevelStyle 参照）
   1: "bg-blue-600",
   2: "bg-violet-600",
   3: "bg-amber-500",
   4: "bg-rose-500",
   5: "bg-red-700",
 };
+
+/** LV0 か否かでクラスとスタイルを返すヘルパー */
+function getLevelStyle(level: number): { className: string; style?: React.CSSProperties } {
+  if (level === 0) {
+    return {
+      className: "text-gray-800 font-bold",
+      style: { background: "#ffffff", border: "2px solid #1a1a1a" },
+    };
+  }
+  return { className: `${LEVEL_COLOR[level] ?? "bg-gray-400"} text-white` };
+}
 
 const defaultStyle = { card: "border-slate-200 bg-white", badge: "bg-slate-400 text-white" };
 
@@ -116,7 +129,10 @@ function CandidateModal({
                   <td className="px-4 py-2.5 font-medium text-slate-800">{c.name}</td>
                   <td className="px-4 py-2.5 text-slate-500 text-xs">{c.memberCode}</td>
                   <td className="px-4 py-2.5 text-center">
-                    <span className={`${LEVEL_COLOR[c.level] ?? "bg-gray-400"} text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full`}>
+                    <span
+                      className={`${getLevelStyle(c.level).className} text-[10px] font-bold px-1.5 py-0.5 rounded-full`}
+                      style={getLevelStyle(c.level).style}
+                    >
                       LV.{c.level}
                     </span>
                   </td>
@@ -173,7 +189,10 @@ function MemberDetailModal({
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                <span className={`${LEVEL_COLOR[node.level] ?? "bg-gray-400"} text-white text-[10px] font-bold px-2 py-0.5 rounded-full`}>
+                <span
+                  className={`${getLevelStyle(node.level).className} text-[10px] font-bold px-2 py-0.5 rounded-full`}
+                  style={getLevelStyle(node.level).style}
+                >
                   LV.{node.level}
                 </span>
                 <span className={`${st.badge} text-[10px] font-bold px-2 py-0.5 rounded-full`}>
@@ -328,13 +347,17 @@ function NodeCard({
       title={`${node.name}（${node.memberCode}）をタップで詳細`}
     >
       {/* LVバッジ */}
-      <span className={`
-        absolute -top-2.5 left-1/2 -translate-x-1/2
-        ${LEVEL_COLOR[node.level] ?? "bg-gray-400"}
-        text-white text-[9px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap z-10
-      `}>
-        LV.{node.level}
-      </span>
+      {(() => {
+        const ls = getLevelStyle(node.level);
+        return (
+          <span
+            className={`absolute -top-2.5 left-1/2 -translate-x-1/2 ${ls.className} text-[9px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap z-10`}
+            style={ls.style}
+          >
+            LV.{node.level}
+          </span>
+        );
+      })()}
 
       {/* アクティブマーカーバッジ（右上） */}
       {marker !== "none" && (
@@ -864,8 +887,8 @@ export default function MlmOrganizationPage() {
     const m: Record<string, string> = {
       active:    "bg-emerald-100 text-emerald-800",
       autoship:  "bg-blue-100 text-blue-800",
-      // 退会: 紫系（danger=赤の6ヶ月未購入マーカーと区別）
-      withdrawn: "bg-purple-100 text-purple-800",
+      // 退会: 灰色（danger=赤の6ヶ月未購入マーカー、LV2紫と区別）
+      withdrawn: "bg-gray-200 text-gray-700",
       midCancel: "bg-orange-100 text-orange-800",
       lapsed:    "bg-gray-100 text-gray-800",
       suspended: "bg-yellow-100 text-yellow-800",
@@ -1062,7 +1085,8 @@ export default function MlmOrganizationPage() {
                 {[0, 1, 2, 3, 4, 5].map((lv) => (
                   <span
                     key={lv}
-                    className={`${LEVEL_COLOR[lv] ?? "bg-gray-400"} text-white text-[9px] px-2 py-0.5 rounded-full`}
+                    className={`${getLevelStyle(lv).className} text-[9px] px-2 py-0.5 rounded-full`}
+                    style={getLevelStyle(lv).style}
                   >
                     LV.{lv}
                   </span>
@@ -1166,11 +1190,14 @@ export default function MlmOrganizationPage() {
                     return (
                       <tr
                         key={m.id}
-                        className={`transition cursor-pointer ${isWithdrawnRow ? "bg-purple-50 hover:bg-purple-100" : "hover:bg-violet-50"}`}
+                        className={`transition cursor-pointer ${isWithdrawnRow ? "bg-gray-100 hover:bg-gray-200" : "hover:bg-violet-50"}`}
                         onClick={() => setSelectedNode(m as unknown as MemberNode)}
                       >
                         <td className="px-4 py-2.5">
-                          <span className={`${LEVEL_COLOR[m.level] ?? "bg-gray-400"} text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full`}>
+                          <span
+                            className={`${getLevelStyle(m.level).className} text-[10px] font-bold px-1.5 py-0.5 rounded-full`}
+                            style={getLevelStyle(m.level).style}
+                          >
                             LV.{m.level}
                           </span>
                         </td>
@@ -1180,7 +1207,7 @@ export default function MlmOrganizationPage() {
                               !isWithdrawnRow && mMarker !== "none"
                                 ? `${mStyle.bg} ${mStyle.textCls} font-bold`
                                 : isWithdrawnRow
-                                  ? "text-purple-700 font-semibold"
+                                  ? "text-gray-500"
                                   : "text-slate-700"
                             }`}
                           >
@@ -1204,7 +1231,7 @@ export default function MlmOrganizationPage() {
                             </span>
                           )}
                           {isWithdrawnRow && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-200 text-gray-600">
                               退会済
                             </span>
                           )}
