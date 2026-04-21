@@ -179,10 +179,11 @@ export async function GET(req: NextRequest) {
 
     // ① オートシップ率 = 入金済みオートシップ伝票がある会員数 ÷ 総会員数（active+autoship）
     // 対象月内に slipType='autoship' かつ paymentStatus='paid' の伝票を持つ会員数を DB から直接集計
+    // ※ テーブル名は "Order"（大文字）、mlm_members（スネークケース）
     const autoshipPaidMembersResult = await prisma.$queryRaw<{ cnt: bigint }[]>`
       SELECT COUNT(DISTINCT mm.id) AS cnt
       FROM mlm_members mm
-      INNER JOIN orders o ON o."userId" = mm."userId"
+      INNER JOIN "Order" o ON o."userId" = mm."userId"
       WHERE o."slipType" = 'autoship'
         AND o."paymentStatus" = 'paid'
         AND o."paidAt" >= ${periodStart}
