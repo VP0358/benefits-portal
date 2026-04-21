@@ -208,6 +208,7 @@ export async function POST(request: Request) {
   if (!run) {
     // 伝票がまだないので新規作成
     runCreated = true;
+    try {
     await prisma.$transaction(async (tx) => {
       const newRun = await tx.autoShipRun.create({
         data: {
@@ -243,6 +244,10 @@ export async function POST(request: Request) {
         skipDuplicates: true,
       });
     });
+    } catch (txErr) {
+      console.error("[import-direct] 伝票作成トランザクションエラー:", txErr);
+      return NextResponse.json({ error: `伝票作成に失敗しました: ${txErr instanceof Error ? txErr.message : String(txErr)}` }, { status: 500 });
+    }
 
     run = await prisma.autoShipRun.findUnique({
       where: { targetMonth_paymentMethod: { targetMonth, paymentMethod } },
@@ -258,6 +263,7 @@ export async function POST(request: Request) {
   let paidCount   = 0;
   let failedCount = 0;
 
+  try {
   await prisma.$transaction(async (tx) => {
     for (const order of run!.orders) {
       const res = resultMap.get(order.memberCode);
@@ -288,6 +294,7 @@ export async function POST(request: Request) {
               unitPrice:    order.unitPrice,
               points:       order.points,
               totalPoints:  order.points * order.quantity,
+              purchaseStatus: 'autoship',
               purchaseMonth: targetMonth,
               purchasedAt:  now,
             },
@@ -349,6 +356,10 @@ export async function POST(request: Request) {
       },
     });
   });
+  } catch (txErr) {
+    console.error("[import-direct] アクティブ反映トランザクションエラー:", txErr);
+    return NextResponse.json({ error: `アクティブ反映に失敗しました: ${txErr instanceof Error ? txErr.message : String(txErr)}` }, { status: 500 });
+  }
 
   return NextResponse.json({
     runId:       run.id.toString(),
@@ -422,6 +433,7 @@ async function processFromDatabase(
   let runCreated = false;
   if (!run) {
     runCreated = true;
+    try {
     await prisma.$transaction(async (tx) => {
       const newRun = await tx.autoShipRun.create({
         data: {
@@ -457,6 +469,10 @@ async function processFromDatabase(
         skipDuplicates: true,
       });
     });
+    } catch (txErr) {
+      console.error("[import-direct/db] 伝票作成トランザクションエラー:", txErr);
+      return NextResponse.json({ error: `伝票作成に失敗しました: ${txErr instanceof Error ? txErr.message : String(txErr)}` }, { status: 500 });
+    }
 
     run = await prisma.autoShipRun.findUnique({
       where: { targetMonth_paymentMethod: { targetMonth, paymentMethod } },
@@ -472,6 +488,7 @@ async function processFromDatabase(
   let paidCount   = 0;
   let failedCount = 0;
 
+  try {
   await prisma.$transaction(async (tx) => {
     for (const order of run!.orders) {
       const memberRecord = memberMap.get(order.memberCode);
@@ -496,6 +513,7 @@ async function processFromDatabase(
             unitPrice:    order.unitPrice,
             points:       order.points,
             totalPoints:  order.points * order.quantity,
+            purchaseStatus: 'autoship',
             purchaseMonth: targetMonth,
             purchasedAt:  now,
           },
@@ -543,6 +561,10 @@ async function processFromDatabase(
       },
     });
   });
+  } catch (txErr) {
+    console.error("[import-direct/db] アクティブ反映トランザクションエラー:", txErr);
+    return NextResponse.json({ error: `アクティブ反映に失敗しました: ${txErr instanceof Error ? txErr.message : String(txErr)}` }, { status: 500 });
+  }
 
   return NextResponse.json({
     runId:      run.id.toString(),

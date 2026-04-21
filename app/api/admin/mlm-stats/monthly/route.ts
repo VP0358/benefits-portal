@@ -226,16 +226,16 @@ export async function GET(req: NextRequest) {
     try {
       const bonusResults = await prisma.bonusResult.findMany({
         where: {
-          month: targetMonthStr,
-          status: { not: 'cancelled' },
+          bonusMonth: targetMonthStr,
+          paymentAmount: { gt: 0 },
         },
         select: {
-          recipientId: true,
-          amount: true,
+          mlmMemberId: true,
+          paymentAmount: true,
         }
       })
-      const recipientIds = new Set(bonusResults.map(b => b.recipientId))
-      const totalAmount  = bonusResults.reduce((s, b) => s + (b.amount ?? 0), 0)
+      const recipientIds = new Set(bonusResults.map(b => b.mlmMemberId.toString()))
+      const totalAmount  = bonusResults.reduce((s, b) => s + (b.paymentAmount ?? 0), 0)
       bonusSummary = {
         recipientCount: recipientIds.size,
         totalAmount,

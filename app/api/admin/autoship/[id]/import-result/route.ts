@@ -68,6 +68,7 @@ export async function POST(request: Request, { params }: Params) {
   let failedCount = 0;
 
   // 注文ごとにステータス更新
+  try {
   await prisma.$transaction(async (tx) => {
     for (const order of run.orders) {
       const res = resultMap.get(order.memberCode);
@@ -99,6 +100,7 @@ export async function POST(request: Request, { params }: Params) {
               unitPrice: order.unitPrice,
               points: order.points,
               totalPoints: order.points * order.quantity,
+              purchaseStatus: 'autoship',
               purchaseMonth: targetMonth,
               purchasedAt: now,
             },
@@ -168,6 +170,10 @@ export async function POST(request: Request, { params }: Params) {
       },
     });
   });
+  } catch (txErr) {
+    console.error("[import-result] トランザクションエラー:", txErr);
+    return NextResponse.json({ error: `取り込みに失敗しました: ${txErr instanceof Error ? txErr.message : String(txErr)}` }, { status: 500 });
+  }
 
   return NextResponse.json({
     success: true,
