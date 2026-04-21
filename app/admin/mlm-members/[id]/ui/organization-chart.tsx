@@ -41,10 +41,16 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = {
   active: "text-green-600 font-semibold",
   autoship: "text-blue-600 font-semibold",
-  withdrawn: "text-red-500",
+  withdrawn: "text-purple-700 font-semibold",
   midCancel: "text-orange-600",
   lapsed: "text-gray-400",
   suspended: "text-yellow-600",
+};
+
+// 退会会員のノード全体に適用する背景・ボーダースタイル（dangerの赤色と区別）
+const WITHDRAWN_NODE_STYLE = {
+  background: "rgba(216,180,254,0.25)",   // purple-200 薄め
+  border: "1px solid rgba(147,51,234,0.4)", // purple-600
 };
 
 const LEVEL_COLORS: Record<number, string> = {
@@ -91,12 +97,16 @@ export default function OrganizationChart({ memberCode }: { memberCode: string }
     const hasChildren = node.directDownlines && node.directDownlines.length > 0;
     const levelColor = LEVEL_COLORS[node.level] ?? "bg-gray-400";
     const levelLabel = node.level === 0 ? "未設定" : `LV.${node.level}`;
+    const isWithdrawn = node.status === "withdrawn";
 
     return (
       <div key={node.id} className="mb-1">
         <div
-          className="flex items-center gap-2 p-2 bg-white rounded-lg border hover:shadow-sm transition"
-          style={{ paddingLeft: `${indent + 8}px` }}
+          className="flex items-center gap-2 p-2 rounded-lg border hover:shadow-sm transition"
+          style={{
+            paddingLeft: `${indent + 8}px`,
+            ...(isWithdrawn ? WITHDRAWN_NODE_STYLE : { background: "white" }),
+          }}
         >
           <div className={`w-9 h-9 ${levelColor} text-white rounded-full flex items-center justify-center font-bold text-xs shrink-0`}>
             {levelLabel}
@@ -104,7 +114,8 @@ export default function OrganizationChart({ memberCode }: { memberCode: string }
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-gray-800 text-sm truncate">
               <Link href={`/admin/mlm-members/${node.id}`}>
-                {(node.activeMarker && node.activeMarker !== "none") ? (
+                {/* 退会会員にはアクティブマーカー色付けをしない（紫ノード自体で識別） */}
+                {(!isWithdrawn && node.activeMarker && node.activeMarker !== "none") ? (
                   <span
                     className={`${ACTIVE_MARKER_BG[node.activeMarker]} rounded px-1 font-bold text-blue-600 hover:text-blue-700`}
                     title={ACTIVE_MARKER_LABEL[node.activeMarker]}
@@ -112,10 +123,13 @@ export default function OrganizationChart({ memberCode }: { memberCode: string }
                     {node.memberCode}
                   </span>
                 ) : (
-                  <span className="text-blue-600 hover:text-blue-700">{node.memberCode}</span>
+                  <span className={isWithdrawn ? "text-purple-700 hover:text-purple-900" : "text-blue-600 hover:text-blue-700"}>
+                    {node.memberCode}
+                  </span>
                 )}
               </Link>
               {" - "}{node.name}
+              {isWithdrawn && <span className="ml-1 text-xs text-purple-500">（退会）</span>}
             </div>
             <div className="text-xs flex items-center gap-2">
               <span className={STATUS_COLORS[node.status] ?? "text-gray-500"}>

@@ -57,7 +57,8 @@ const STATUS_LABEL: Record<string, string> = {
 const STATUS_BG: Record<string, { card: string; badge: string }> = {
   active:    { card: "border-emerald-400 bg-emerald-50",  badge: "bg-emerald-500 text-white" },
   autoship:  { card: "border-blue-400 bg-blue-50",        badge: "bg-blue-500 text-white" },
-  withdrawn: { card: "border-red-300 bg-red-50",          badge: "bg-red-400 text-white" },
+  // 退会: 紫系（danger=赤 と明確に区別）
+  withdrawn: { card: "border-purple-400 bg-purple-50",    badge: "bg-purple-500 text-white" },
   midCancel: { card: "border-orange-300 bg-orange-50",    badge: "bg-orange-400 text-white" },
   lapsed:    { card: "border-gray-300 bg-gray-50",        badge: "bg-gray-400 text-white" },
   suspended: { card: "border-yellow-300 bg-yellow-50",    badge: "bg-yellow-400 text-white" },
@@ -863,7 +864,8 @@ export default function MlmOrganizationPage() {
     const m: Record<string, string> = {
       active:    "bg-emerald-100 text-emerald-800",
       autoship:  "bg-blue-100 text-blue-800",
-      withdrawn: "bg-red-100 text-red-800",
+      // 退会: 紫系（danger=赤の6ヶ月未購入マーカーと区別）
+      withdrawn: "bg-purple-100 text-purple-800",
       midCancel: "bg-orange-100 text-orange-800",
       lapsed:    "bg-gray-100 text-gray-800",
       suspended: "bg-yellow-100 text-yellow-800",
@@ -1160,10 +1162,11 @@ export default function MlmOrganizationPage() {
                   {listData.map((m) => {
                     const mMarker = (m as MemberNode).activeMarker ?? "none";
                     const mStyle  = ACTIVE_MARKER_STYLE[mMarker];
+                    const isWithdrawnRow = m.status === "withdrawn";
                     return (
                       <tr
                         key={m.id}
-                        className="hover:bg-violet-50 transition cursor-pointer"
+                        className={`transition cursor-pointer ${isWithdrawnRow ? "bg-purple-50 hover:bg-purple-100" : "hover:bg-violet-50"}`}
                         onClick={() => setSelectedNode(m as unknown as MemberNode)}
                       >
                         <td className="px-4 py-2.5">
@@ -1174,9 +1177,11 @@ export default function MlmOrganizationPage() {
                         <td className="px-4 py-2.5">
                           <span
                             className={`text-xs font-mono rounded px-1 ${
-                              mMarker !== "none"
+                              !isWithdrawnRow && mMarker !== "none"
                                 ? `${mStyle.bg} ${mStyle.textCls} font-bold`
-                                : "text-slate-700"
+                                : isWithdrawnRow
+                                  ? "text-purple-700 font-semibold"
+                                  : "text-slate-700"
                             }`}
                           >
                             {m.memberCode}
@@ -1189,12 +1194,18 @@ export default function MlmOrganizationPage() {
                           </span>
                         </td>
                         <td className="px-4 py-2.5 text-center">
-                          {mMarker !== "none" && (
+                          {/* 退会会員にはアクティブマーカーを表示しない */}
+                          {!isWithdrawnRow && mMarker !== "none" && (
                             <span
                               className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${mStyle.bg} ${mStyle.textCls}`}
                               title={mStyle.label}
                             >
                               {mMarker === "active" ? "★ アクティブ" : mMarker === "warning" ? "⚠ 5ヶ月" : "✖ 6ヶ月+"}
+                            </span>
+                          )}
+                          {isWithdrawnRow && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700">
+                              退会済
                             </span>
                           )}
                         </td>

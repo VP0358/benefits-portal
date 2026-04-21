@@ -65,7 +65,9 @@ export async function GET(req: NextRequest) {
       return d >= periodStart && d <= periodEnd
     })
 
-    // 対象月末時点でアクティブな会員（ステータスが active のもの）
+    // ② 総会員数 = active + autoship ステータスの会員（活動中＋オートシップ）
+    const activeAndAutoshipMembers = allMembers.filter(m => m.status === 'active' || m.status === 'autoship')
+    // 旧: activeMembers (status=active のみ) → 後方互換のため残す
     const activeMembers = allMembers.filter(m => m.status === 'active')
 
     // ── 年齢分布 ──────────────────────────────────────────────────────
@@ -152,7 +154,7 @@ export async function GET(req: NextRequest) {
     // ── オートシップ統計 ──────────────────────────────────────────────
     const targetMonthStr = `${year}-${String(month).padStart(2, '0')}`
 
-    // 現在オートシップ有効
+    // 現在オートシップ有効（autoshipEnabled フラグ）
     const autoshipActive = allMembers.filter(m => m.autoshipEnabled).length
 
     // 対象月に停止（autoshipSuspendMonths に対象月が含まれる）
@@ -175,10 +177,27 @@ export async function GET(req: NextRequest) {
       return d.getFullYear() === year && d.getMonth() + 1 === month
     }).length
 
-    // オートシップ継続率 = アクティブ autoship / 全アクティブ会員
+    // ① オートシップ率 = 入金済みオートシップ伝票がある会員数 ÷ 総会員数（active+autoship）
+    // 対象月内に slipType='autoship' かつ paymentStatus='paid' の伝票を持つ会員数を DB から直接集計
+    const autoshipPaidMembersResult = await prisma.$queryRaw<{ cnt: bigint }[]>`
+      SELECT COUNT(DISTINCT mm.id) AS cnt
+      FROM mlm_members mm
+      INNER JOIN orders o ON o."userId" = mm."userId"
+      WHERE o."slipType" = 'autoship'
+        AND o."paymentStatus" = 'paid'
+        AND o."paidAt" >= ${periodStart}
+        AND o."paidAt" <= ${periodEnd}
+        AND mm.status IN ('active', 'autoship')
+    `
+    const autoshipPaidMembersCount = Number(autoshipPaidMembersResult[0]?.cnt ?? 0)
+
+    // ② 総会員数 = active + autoship ステータスの会員数
+    const totalActiveAutoshipCount = activeAndAutoshipMembers.length
+
+    // オートシップ率 = 入金済みオートシップ伝票がある会員数 ÷ 総会員数（active+autoship）
     const autoshipRetentionRate =
-      activeMembers.length > 0
-        ? Math.round((autoshipActive / activeMembers.length) * 1000) / 10
+      totalActiveAutoshipCount > 0
+        ? Math.round((autoshipPaidMembersCount / totalActiveAutoshipCount) * 1000) / 10
         : 0
 
     // オートシップ停止率（一時停止）
@@ -189,9 +208,10 @@ export async function GET(req: NextRequest) {
 
     const autoshipStats = {
       activeCount:            autoshipActive,
-      retentionRate:          autoshipRetentionRate,   // %
+      paidAutoshipCount:      autoshipPaidMembersCount, // 入金済みオートシップ会員数
+      retentionRate:          autoshipRetentionRate,    // %（入金済みオートシップ÷総会員数）
       suspendedThisMonth:     autoshipSuspendedThisMonth,
-      suspendRate:            autoshipSuspendRate,      // %
+      suspendRate:            autoshipSuspendRate,       // %
       newStartThisMonth:      autoshipNewThisMonth,
       stoppedThisMonth:       autoshipStoppedThisMonth,
     }
@@ -235,7 +255,7 @@ export async function GET(req: NextRequest) {
       registrationTrend.push({ month: label, count })
     }
 
-    // ── 過去12ヶ月のアクティブ会員数推移（月末時点で status=active の会員数を近似） ──
+    // ── 過去12ヶ月のアクティブ会員数推移（月末時点で status=active or autoship の会員数を近似） ──
     // 厳密には月次スナップショットがないため、contractDate ベースの近似
     const retentionTrend: { month: string; count: number }[] = []
     for (let i = 11; i >= 0; i--) {
@@ -243,15 +263,16 @@ export async function GET(req: NextRequest) {
       const y = d.getFullYear()
       const mo = d.getMonth() + 1
       const label = `${y}-${String(mo).padStart(2, '0')}`
-      // その月末時点で登録済みかつ現在アクティブな会員
+      // その月末時点で登録済みかつ現在アクティブ（active or autoship）な会員
       const monthEnd = new Date(y, mo, 0, 23, 59, 59, 999)
       const count = allMembers.filter(m =>
-        m.status === 'active' && m.createdAt <= monthEnd
+        (m.status === 'active' || m.status === 'autoship') && m.createdAt <= monthEnd
       ).length
       retentionTrend.push({ month: label, count })
     }
 
     // ── オートシップ継続率トレンド（過去12ヶ月） ──────────────────────
+    // ※ トレンドはオートシップ有効数÷(active+autoship)で近似
     const autoshipTrend: { month: string; retentionRate: number; activeCount: number }[] = []
     for (let i = 11; i >= 0; i--) {
       const d = new Date(year, month - 1 - i, 1)
@@ -259,10 +280,11 @@ export async function GET(req: NextRequest) {
       const mo = d.getMonth() + 1
       const label = `${y}-${String(mo).padStart(2, '0')}`
       const monthEnd = new Date(y, mo, 0, 23, 59, 59, 999)
-      // その月末時点で autoship 有効
-      const activeAtMonth = allMembers.filter(m =>
-        m.status === 'active' && m.createdAt <= monthEnd
+      // その月末時点で active or autoship の会員数（総会員数基準）
+      const totalAtMonth = allMembers.filter(m =>
+        (m.status === 'active' || m.status === 'autoship') && m.createdAt <= monthEnd
       ).length
+      // その月末時点でオートシップ有効な会員数
       const autoshipAtMonth = allMembers.filter(m => {
         if (!m.autoshipEnabled) return false
         if (!m.autoshipStartDate) return false
@@ -270,8 +292,8 @@ export async function GET(req: NextRequest) {
         if (m.autoshipStopDate && m.autoshipStopDate <= monthEnd) return false
         return true
       }).length
-      const rate = activeAtMonth > 0
-        ? Math.round((autoshipAtMonth / activeAtMonth) * 1000) / 10
+      const rate = totalAtMonth > 0
+        ? Math.round((autoshipAtMonth / totalAtMonth) * 1000) / 10
         : 0
       autoshipTrend.push({ month: label, retentionRate: rate, activeCount: autoshipAtMonth })
     }
@@ -279,11 +301,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       period: { year, month, label: targetMonthStr },
       snapshot: {
-        totalMembers:    allMembers.length,
-        activeMembers:   activeMembers.length,
+        totalMembers:    totalActiveAutoshipCount,  // ② active+autoship の会員数を総会員数として返す
+        activeMembers:   activeAndAutoshipMembers.length, // active+autoship
         newMembers:      newMembers.length,
         suspendedMembers: allMembers.filter(m => m.status === 'suspended').length,
         inactiveMembers:  allMembers.filter(m => m.status === 'inactive').length,
+        allMembersTotal: allMembers.length, // 全ステータス含む総会員数（参考値）
       },
       ageDistribution,
       genderDistribution,
