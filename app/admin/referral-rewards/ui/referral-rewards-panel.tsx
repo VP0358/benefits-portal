@@ -299,7 +299,7 @@ export default function ReferralRewardsPanel() {
                                 ¥{c.reward.toLocaleString()}
                               </td>
                               <td className="py-2.5 text-xs text-slate-700">
-                                {new Date(c.confirmedAt).toLocaleDateString("ja-JP")}
+                                {new Date(c.confirmedAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
                               </td>
                             </tr>
                           ))}

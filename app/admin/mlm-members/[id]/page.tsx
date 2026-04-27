@@ -87,7 +87,7 @@ function JpDatePicker({
       {/* 選択確認表示 */}
       {value && (
         <span className="text-xs text-slate-500">
-          ✓ {new Date(value + "T00:00:00").toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}
+          ✓ {new Date(value + "T00:00:00+09:00").toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "long", day: "numeric" })}
         </span>
       )}
     </div>
@@ -201,7 +201,9 @@ const PAYMENT_LABEL: Record<string, string> = {
 // ─── ヘルパー ────────────────────────────────────────
 function fmtDate(s: string | null | undefined) {
   if (!s) return "—";
-  try { return new Date(s).toLocaleDateString("ja-JP"); } catch { return s; }
+  try {
+    return new Date(s).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "long", day: "numeric" });
+  } catch { return s; }
 }
 function displayName(m: { user: { name: string }; companyName: string | null } | null) {
   if (!m) return "—";

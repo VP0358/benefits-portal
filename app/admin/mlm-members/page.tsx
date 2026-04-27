@@ -363,7 +363,7 @@ export default function MlmMembersPage() {
 
   const fmtDate = (s: string | null) => {
     if (!s) return "—";
-    return new Date(s).toLocaleDateString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" });
+    return new Date(s).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo",  year: "numeric", month: "2-digit", day: "2-digit" });
   };
 
   const getSearchPlaceholder = () => {

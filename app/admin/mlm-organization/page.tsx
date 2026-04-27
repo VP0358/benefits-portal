@@ -173,7 +173,7 @@ function MemberDetailModal({
 }) {
   const st = STATUS_BG[node.status] ?? defaultStyle;
   const fmt = (s: string | null) =>
-    s ? new Date(s).toLocaleDateString("ja-JP") : "—";
+    s ? new Date(s).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) : "—";
 
   return (
     <div

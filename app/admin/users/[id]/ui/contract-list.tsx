@@ -262,7 +262,7 @@ export default function ContractList({ contracts: initial }: { contracts: Contra
                   <div className="text-xs text-slate-600 mt-0.5">契約番号: {contract.contractNumber}</div>
                   {contract.createdAt && (
                     <div className="text-xs text-slate-500 mt-0.5">
-                      契約日: {new Date(contract.createdAt).toLocaleDateString("ja-JP")}
+                      契約日: {new Date(contract.createdAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
                     </div>
                   )}
                 </div>
@@ -274,9 +274,9 @@ export default function ContractList({ contracts: initial }: { contracts: Contra
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-700">
                 <div>月額: <span className="font-semibold text-slate-900">{Number(contract.monthlyFee).toLocaleString()}円</span></div>
                 <div>紹介報酬: <span className="font-semibold text-emerald-700">{Math.floor(Number(contract.monthlyFee) * 0.25).toLocaleString()}pt/月</span></div>
-                {contract.startedAt   && <div>開始日: {new Date(contract.startedAt).toLocaleDateString("ja-JP")}</div>}
-                {contract.confirmedAt && <div>確定日: {new Date(contract.confirmedAt).toLocaleDateString("ja-JP")}</div>}
-                {contract.canceledAt  && <div className="text-red-500 col-span-2">解約日: {new Date(contract.canceledAt).toLocaleDateString("ja-JP")}</div>}
+                {contract.startedAt   && <div>開始日: {new Date(contract.startedAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}</div>}
+                {contract.confirmedAt && <div>確定日: {new Date(contract.confirmedAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}</div>}
+                {contract.canceledAt  && <div className="text-red-500 col-span-2">解約日: {new Date(contract.canceledAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}</div>}
               </div>
 
               {contract.note && (

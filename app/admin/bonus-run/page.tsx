@@ -464,7 +464,7 @@ export default function BonusRunPage() {
               { label: "対象会員数", value: `${detail.totalMembers}名`, icon: "👥" },
               { label: "アクティブ数", value: `${detail.totalActiveMembers}名`, icon: "✅" },
               { label: "ボーナス総額", value: yen(detail.totalBonusAmount), icon: "💰" },
-              { label: "確定日時", value: detail.confirmedAt ? new Date(detail.confirmedAt).toLocaleString("ja-JP") : "未確定", icon: "📅" },
+              { label: "確定日時", value: detail.confirmedAt ? new Date(detail.confirmedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }) : "未確定", icon: "📅" },
             ].map((item) => (
               <div key={item.label} className="rounded-2xl bg-slate-50 border border-slate-200 p-3">
                 <div className="text-xs text-slate-500 flex items-center gap-1">

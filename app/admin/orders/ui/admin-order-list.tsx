@@ -105,7 +105,7 @@ export default function AdminOrderList() {
               />
               <div>
                 <div className="font-semibold text-slate-800">{row.orderNumber}</div>
-                <div className="text-sm text-slate-700">{new Date(row.orderedAt).toLocaleString("ja-JP")}</div>
+                <div className="text-sm text-slate-700">{new Date(row.orderedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</div>
               </div>
             </div>
             <span className={`self-start rounded-full px-3 py-1 text-xs ${row.status === "canceled" ? "bg-red-50 text-red-700" : row.status === "completed" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}>

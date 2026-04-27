@@ -20,7 +20,7 @@ function fmtDateTime(d: Date | null | undefined) {
 
 function fmtDate(d: Date | null | undefined) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("ja-JP");
+  return new Date(d).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
 }
 
 const STATUS_STYLE: Record<string, string> = {

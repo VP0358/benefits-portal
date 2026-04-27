@@ -390,7 +390,7 @@ export default async function AdminTravelSubsPage({
                           )}
                         </td>
                         <td className="px-5 py-3 text-xs text-slate-700">
-                          {s.confirmedAt ? new Date(s.confirmedAt).toLocaleDateString("ja-JP") : "—"}
+                          {s.confirmedAt ? new Date(s.confirmedAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) : "—"}
                         </td>
                         <td className="px-5 py-3">
                           <div className="flex flex-col gap-1">

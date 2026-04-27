@@ -360,7 +360,7 @@ export default async function AdminContractsPage({
                         </td>
                         <td className="px-5 py-3 text-xs text-slate-700">
                           {c.createdAt
-                            ? new Date(c.createdAt).toLocaleDateString("ja-JP")
+                            ? new Date(c.createdAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })
                             : "—"}
                         </td>
                         <td className="px-5 py-3">

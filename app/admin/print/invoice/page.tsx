@@ -68,13 +68,13 @@ export default async function InvoicePrintPage({ searchParams }: PageProps) {
 
   const formatDate = (d: Date | null | undefined) => {
     if (!d) return ""
-    return new Date(d).toLocaleDateString("ja-JP", {
+    return new Date(d).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", 
       year: "numeric", month: "long", day: "numeric"
     })
   }
 
   const orderDate = formatDate(order.createdAt)
-  const orderMonth = new Date(order.createdAt).toLocaleDateString("ja-JP", {
+  const orderMonth = new Date(order.createdAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", 
     year: "numeric", month: "long"
   }) + "度"
 

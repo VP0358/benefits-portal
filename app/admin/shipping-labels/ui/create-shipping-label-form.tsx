@@ -97,7 +97,7 @@ export default function CreateShippingLabelForm() {
               {availableOrders.map(o => (
                 <option key={o.id} value={o.id}>
                   {o.orderNumber} / {o.user.memberCode} {o.user.name} /
-                  {new Date(o.orderedAt).toLocaleDateString("ja-JP")} / {o.status}
+                  {new Date(o.orderedAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })} / {o.status}
                 </option>
               ))}
             </select>

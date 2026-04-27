@@ -43,7 +43,7 @@ export default function InvoicePrint({ data }: Props) {
     return () => clearTimeout(timer)
   }, [])
 
-  const formatYen = (n: number) => `¥${n.toLocaleString("ja-JP")}`
+  const formatYen = (n: number) => `¥${n.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}`
 
   return (
     <>

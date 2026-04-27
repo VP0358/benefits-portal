@@ -43,7 +43,7 @@ export default function AuditLogTable() {
           <div className="grid gap-3 md:grid-cols-[1fr_150px_150px_80px]">
             <div className="text-sm text-slate-800 font-medium">{row.actionType}</div>
             <div className="text-sm text-slate-800">{row.targetTable}{row.targetId ? ` / ${row.targetId}` : ""}</div>
-            <div className="text-sm text-slate-700">{new Date(row.createdAt).toLocaleString("ja-JP")}</div>
+            <div className="text-sm text-slate-700">{new Date(row.createdAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</div>
             <button type="button" onClick={() => setExpandedId(expandedId === row.id ? null : row.id)} className="rounded-xl border px-3 py-2 text-xs font-medium text-slate-800 text-right">
               {expandedId === row.id ? "閉じる" : "詳細"}
             </button>

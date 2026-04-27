@@ -42,7 +42,7 @@ export default async function RegistrationCompletePrintPage({ searchParams }: Pa
   // 日付フォーマット
   const formatDate = (d: Date | null | undefined) => {
     if (!d) return ""
-    return new Date(d).toLocaleDateString("ja-JP", {
+    return new Date(d).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", 
       year: "numeric", month: "long", day: "numeric"
     })
   }
@@ -52,7 +52,7 @@ export default async function RegistrationCompletePrintPage({ searchParams }: Pa
 
   const referrerName = mlmMember.referrer?.user?.name || ""
   const referrerCode = mlmMember.referrer?.memberCode || ""
-  const issueDate = new Date().toLocaleDateString("ja-JP", {
+  const issueDate = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", 
     year: "numeric", month: "long", day: "numeric"
   })
 

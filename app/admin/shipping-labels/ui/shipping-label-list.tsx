@@ -165,7 +165,7 @@ export default function ShippingLabelList() {
                   <div>
                     <div className="font-semibold text-slate-800">{label.orderNumber}</div>
                     <div className="text-xs text-slate-500">
-                      {new Date(label.createdAt).toLocaleString("ja-JP")} 作成
+                      {new Date(label.createdAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })} 作成
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

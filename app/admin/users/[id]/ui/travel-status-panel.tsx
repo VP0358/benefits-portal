@@ -33,7 +33,7 @@ const STATUS_DESCS: Record<string, string> = {
 
 function fmtDate(iso: string | null) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("ja-JP");
+  return new Date(iso).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" });
 }
 
 export default function TravelStatusPanel({ sub, userId }: { sub: TravelSub | null; userId: string }) {

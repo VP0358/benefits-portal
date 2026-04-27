@@ -772,7 +772,7 @@ export default function ProductPurchasesPage() {
                           </td>
                           <td className="px-4 py-3 text-right">{purchase.quantity}</td>
                           <td className="px-4 py-3 text-right">¥{purchase.totalAmount.toLocaleString()}</td>
-                          <td className="px-4 py-3 text-center">{new Date(purchase.purchasedAt).toLocaleDateString("ja-JP")}</td>
+                          <td className="px-4 py-3 text-center">{new Date(purchase.purchasedAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}</td>
                           <td className="px-4 py-3 text-center">{purchase.purchaseMonth}</td>
                         </tr>
                       ))}

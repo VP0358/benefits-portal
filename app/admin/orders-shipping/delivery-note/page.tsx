@@ -260,8 +260,8 @@ function DeliveryNoteContent() {
   const buildReceiptHTML = useCallback((orderList: DeliveryOrder[]) => {
     const pages = orderList.map(o => {
       const dateStr = o.paidAt
-        ? new Date(o.paidAt).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })
-        : new Date(o.orderedAt).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })
+        ? new Date(o.paidAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo",  year: "numeric", month: "long", day: "numeric" })
+        : new Date(o.orderedAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo",  year: "numeric", month: "long", day: "numeric" })
       return `
         <div style="page-break-after:always;padding:32px 40px;font-family:'Noto Sans JP','Yu Gothic',sans-serif;font-size:12px;max-width:640px;margin:0 auto;">
           <div style="text-align:center;margin-bottom:24px;">
@@ -308,7 +308,7 @@ function DeliveryNoteContent() {
   // ── 登録完了通知書HTML生成 ──────────────────────────
   const buildRegistrationNoticeHTML = useCallback((orderList: DeliveryOrder[]) => {
     const pages = orderList.map(o => {
-      const dateStr = new Date(o.orderedAt).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })
+      const dateStr = new Date(o.orderedAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo",  year: "numeric", month: "long", day: "numeric" })
       return `
         <div style="page-break-after:always;padding:36px 40px;font-family:'Noto Sans JP','Yu Gothic',sans-serif;font-size:12px;max-width:680px;margin:0 auto;">
           <div style="text-align:center;margin-bottom:32px;border-bottom:3px solid #1d4ed8;padding-bottom:16px;">

@@ -204,7 +204,7 @@ export default function AnnouncementsAdminPage() {
                         {a.isPublished ? "公開中" : "非公開"}
                       </span>
                       <span className="text-xs text-stone-400">
-                        {new Date(a.createdAt).toLocaleDateString("ja-JP")}
+                        {new Date(a.createdAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
                       </span>
                     </div>
                     <p className="font-semibold text-stone-800 text-sm truncate">{a.title}</p>

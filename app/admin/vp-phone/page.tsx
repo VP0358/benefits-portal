@@ -243,7 +243,7 @@ export default async function AdminVpPhonePage({
         {applications.map(a => {
           const st = STATUS_LABEL[a.status] ?? STATUS_LABEL.pending;
           const birthDate = a.birthDate
-            ? new Date(a.birthDate).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })
+            ? new Date(a.birthDate).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo",  year: "numeric", month: "long", day: "numeric" })
             : "未入力";
           const hasPassword = !!(a as typeof a & { password?: string | null }).password;
 
@@ -296,7 +296,7 @@ export default async function AdminVpPhonePage({
                   <span className="text-base">{st.icon}</span>
                   <span className="text-sm font-bold">{st.label}</span>
                   <span className="text-xs font-medium ml-2">
-                    申込日: {new Date(a.createdAt).toLocaleDateString("ja-JP")}
+                    申込日: {new Date(a.createdAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
                   </span>
                   {/* 手動申請ステータスバッジ */}
                   {appSubmitted ? (
@@ -394,7 +394,7 @@ export default async function AdminVpPhonePage({
                     <div>
                       <p className="text-xs font-bold text-emerald-800">事務局への申請完了</p>
                       <p className="text-[10px] text-emerald-600">
-                        申請日時: {new Date(appSubmittedAt).toLocaleString("ja-JP")}
+                        申請日時: {new Date(appSubmittedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}
                       </p>
                     </div>
                   </div>
@@ -444,7 +444,7 @@ export default async function AdminVpPhonePage({
                   <div className="mt-3 rounded-xl bg-emerald-50 border border-emerald-200 p-3 flex items-center gap-2">
                     <span className="text-emerald-600">✅</span>
                     <p className="text-xs font-semibold text-emerald-800">
-                      契約完了: {new Date(a.contractedAt).toLocaleDateString("ja-JP")}
+                      契約完了: {new Date(a.contractedAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
                     </p>
                     <Link href={`/admin/contracts`}
                       className="ml-auto text-xs text-emerald-600 hover:text-emerald-800 underline">

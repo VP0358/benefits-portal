@@ -90,7 +90,7 @@ export default function ReferralHistoryTable() {
                 return (
                   <tr key={row.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3 text-xs text-slate-700 whitespace-nowrap">
-                      {new Date(row.createdAt).toLocaleString("ja-JP")}
+                      {new Date(row.createdAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}
                     </td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-slate-800">{row.userName}</div>

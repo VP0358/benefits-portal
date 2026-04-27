@@ -27,7 +27,7 @@ export default function MonthlyRunsTable() {
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
               <div className="font-semibold text-slate-800">{row.rewardMonth}</div>
-              <div className="text-sm text-slate-700">{new Date(row.createdAt).toLocaleString("ja-JP")}</div>
+              <div className="text-sm text-slate-700">{new Date(row.createdAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</div>
             </div>
             <span className={`rounded-full px-3 py-1 text-xs ${row.mode === "execute" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}>{row.mode}</span>
           </div>

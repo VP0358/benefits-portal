@@ -95,7 +95,7 @@ export default function AdminOrderDetail({ orderId }: { orderId: string }) {
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700 space-y-1">
           <div>注文番号: <span className="font-medium">{data.orderNumber}</span></div>
-          <div>日時: {new Date(data.orderedAt).toLocaleString("ja-JP")}</div>
+          <div>日時: {new Date(data.orderedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</div>
           <div>会員: {data.user.memberCode} / {data.user.name}</div>
           <div>現在状態: <span className="font-medium">{data.status}</span></div>
         </div>

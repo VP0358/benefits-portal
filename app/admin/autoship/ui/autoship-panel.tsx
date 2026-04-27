@@ -180,11 +180,11 @@ function makeSlipForm(memberCode: string, memberName: string, memberPhone: strin
 
 /* ───────────── ヘルパー ───────────── */
 function fmtYen(n: number) {
-  return n.toLocaleString("ja-JP") + "円";
+  return n.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }) + "円";
 }
 function fmtDate(s: string | null) {
   if (!s) return "—";
-  return new Date(s).toLocaleString("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return new Date(s).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo",  year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
 /* ─── 日本語日付セレクト ─── */
@@ -766,8 +766,8 @@ export default function AutoShipPanel() {
                         <td className="px-3 py-2 text-gray-500">{m.memberPhone ?? "—"}</td>
                         <td className="px-3 py-2 text-gray-500">{m.memberEmail ?? "—"}</td>
                         <td className="px-3 py-2">{PM_LABELS[m.paymentMethod] ?? m.paymentMethod}</td>
-                        <td className="px-3 py-2 text-gray-500">{m.autoshipStartDate ? new Date(m.autoshipStartDate).toLocaleDateString("ja-JP") : "—"}</td>
-                        <td className="px-3 py-2 text-gray-500">{m.autoshipStopDate ? new Date(m.autoshipStopDate).toLocaleDateString("ja-JP") : "—"}</td>
+                        <td className="px-3 py-2 text-gray-500">{m.autoshipStartDate ? new Date(m.autoshipStartDate).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) : "—"}</td>
+                        <td className="px-3 py-2 text-gray-500">{m.autoshipStopDate ? new Date(m.autoshipStopDate).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) : "—"}</td>
                         <td className="px-3 py-2 text-center">
                           <button
                             onClick={() => openSlipModal(m)}

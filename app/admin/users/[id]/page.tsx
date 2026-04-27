@@ -154,7 +154,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
               <div>現在レベル: <span className="font-medium">Lv.{mlmMember.currentLevel}</span></div>
               <div>タイトルレベル: <span className="font-medium">Lv.{mlmMember.titleLevel}</span></div>
               {mlmMember.contractDate && (
-                <div>契約日: {new Date(mlmMember.contractDate).toLocaleDateString("ja-JP")}</div>
+                <div>契約日: {new Date(mlmMember.contractDate).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}</div>
               )}
               <div className="mt-2">
                 <Link
@@ -282,7 +282,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
         <div className="mt-4 space-y-2 text-sm">
           {user!.pointLogs.length === 0 ? <div className="text-slate-700">履歴はありません。</div> : user!.pointLogs.map(log => (
             <div key={log.id.toString()} className="grid grid-cols-[160px_120px_100px_1fr] gap-4 rounded-2xl border p-3">
-              <div className="text-slate-700">{new Date(log.occurredAt).toLocaleString("ja-JP")}</div>
+              <div className="text-slate-700">{new Date(log.occurredAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</div>
               <div>{log.transactionType}</div>
               <div className={log.points > 0 ? "text-emerald-600 font-medium" : "text-red-600 font-medium"}>{log.points > 0 ? "+" : ""}{log.points.toLocaleString()}</div>
               <div className="text-slate-800">{log.description}</div>

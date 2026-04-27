@@ -124,7 +124,7 @@ export default function ContractEditPanel({ contracts, onUpdate }: {
               )}
               {c.canceledAt && (
                 <div className="mt-2 text-xs text-slate-700">
-                  解約日: {new Date(c.canceledAt).toLocaleDateString("ja-JP")}
+                  解約日: {new Date(c.canceledAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}
                 </div>
               )}
             </div>
