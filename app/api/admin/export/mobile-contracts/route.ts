@@ -7,6 +7,7 @@ import { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/app/api/admin/route-guard";
+import { todayJST } from "@/lib/japan-time";
 
 function csvEscape(value: unknown) {
   const str = String(value ?? "");
@@ -85,7 +86,7 @@ export async function GET(req: NextRequest) {
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="mobile_contracts_${new Date().toISOString().slice(0, 10)}.csv"`,
+      "Content-Disposition": `attachment; filename="mobile_contracts_${todayJST()}.csv"`,
     },
   });
 }

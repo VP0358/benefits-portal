@@ -82,11 +82,14 @@ function yen(n: number) {
 
 function generateMonthOptions() {
   const options: { value: string; label: string }[] = [];
-  const now = new Date();
+  const s = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" });
+  const [y, m] = s.split("/").map(Number);
   for (let i = 0; i < 15; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const label = `${d.getFullYear()}年${d.getMonth() + 1}月度`;
+    const total = y * 12 + (m - 1) - i;
+    const ny = Math.floor(total / 12);
+    const nm = (total % 12) + 1;
+    const value = `${ny}-${String(nm).padStart(2, "0")}`;
+    const label = `${ny}年${nm}月度`;
     options.push({ value, label });
   }
   return options;

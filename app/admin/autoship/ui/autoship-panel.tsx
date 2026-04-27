@@ -2,6 +2,17 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 
+/** ブラウザ側 JST 今日の日付 "YYYY-MM-DD" */
+function todayJST() {
+  return new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\//g, "-");
+}
+/** ブラウザ側 JST 今月の "YYYY-MM" */
+function currentMonthJST() {
+  const s = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" });
+  const [y, m] = s.split("/");
+  return `${y}-${m}`;
+}
+
 /* ───────────── 型定義 ───────────── */
 type PaymentMethod = "credit_card" | "bank_transfer" | "bank_payment" | "cod" | "other";
 type RunStatus = "draft" | "exported" | "imported" | "completed" | "canceled";
@@ -180,12 +191,14 @@ function fmtDate(s: string | null) {
 function SlipDatePicker({ value, onChange, allowEmpty = false }: {
   value: string; onChange: (v: string) => void; allowEmpty?: boolean;
 }) {
-  const now = new Date();
-  const curYear = now.getFullYear();
+  const jstParts = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).split("/");
+  const curYear  = parseInt(jstParts[0]);
+  const curMonth = parseInt(jstParts[1]);
+  const curDay   = parseInt(jstParts[2]);
   const parts = value ? value.split("-") : [];
   const selYear  = parts[0] ? parseInt(parts[0]) : (allowEmpty ? 0 : curYear);
-  const selMonth = parts[1] ? parseInt(parts[1]) : (allowEmpty ? 0 : now.getMonth() + 1);
-  const selDay   = parts[2] ? parseInt(parts[2]) : (allowEmpty ? 0 : now.getDate());
+  const selMonth = parts[1] ? parseInt(parts[1]) : (allowEmpty ? 0 : curMonth);
+  const selDay   = parts[2] ? parseInt(parts[2]) : (allowEmpty ? 0 : curDay);
   const daysInMonth = useMemo(() => {
     if (!selYear || !selMonth) return 31;
     return new Date(selYear, selMonth, 0).getDate();
@@ -227,10 +240,7 @@ export default function AutoShipPanel() {
 
   /* 新規作成フォーム */
   const [creating, setCreating] = useState(false);
-  const [newMonth, setNewMonth] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  });
+  const [newMonth, setNewMonth] = useState(() => currentMonthJST());
   const [newPm, setNewPm] = useState<string>("credit_card");
   const [createLoading, setCreateLoading] = useState(false);
 
@@ -251,10 +261,7 @@ export default function AutoShipPanel() {
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   /* ── 有効会員一覧表示 ── */
-  const [memberListMonth, setMemberListMonth] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  });
+  const [memberListMonth, setMemberListMonth] = useState(() => currentMonthJST());
   const [memberListPm, setMemberListPm] = useState<string>("credit_card");
   const [memberListData, setMemberListData] = useState<{
     id: string; memberCode: string; memberName: string; memberPhone: string | null; memberEmail: string | null;
@@ -288,10 +295,7 @@ export default function AutoShipPanel() {
 
   /* ── CSV直接インポート（外部ファイルから即アクティブ反映） ── */
   const [csvImportFile, setCsvImportFile] = useState<File | null>(null);
-  const [csvImportMonth, setCsvImportMonth] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  });
+  const [csvImportMonth, setCsvImportMonth] = useState(() => currentMonthJST());
   const [csvImportPm, setCsvImportPm] = useState<string>("credit_card");
   const [csvImportLoading, setCsvImportLoading] = useState(false);
   const [csvImportResult, setCsvImportResult] = useState<{ paidCount: number; failedCount: number; newRunId?: string } | null>(null);
@@ -515,7 +519,7 @@ export default function AutoShipPanel() {
     const prods = await loadProducts();
     setSlipProducts(prods);
     setSlipModalMember(m);
-    const today = new Date().toISOString().split("T")[0];
+    const today = todayJST();
     const form = makeSlipForm(m.memberCode, m.memberName, m.memberPhone || "", m.memberPostal || "", m.memberAddress || "", today);
     // 会員一覧の検索条件（memberListPm）から伝票の支払方法を自動セット
     const slipPm = MEMBER_PM_TO_SLIP_PM[memberListPm] ?? "bank_transfer";
@@ -585,7 +589,7 @@ export default function AutoShipPanel() {
     if (targets.length === 0) return;
     setBulkSubmitting(true);
     setBulkResult(null);
-    const today = new Date().toISOString().split("T")[0];
+    const today = todayJST();
     let success = 0, failed = 0;
     const errors: string[] = [];
     for (const m of targets) {

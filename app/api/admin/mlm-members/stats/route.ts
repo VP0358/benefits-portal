@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
+import { currentYearJST, nowJST } from '@/lib/japan-time'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -64,7 +65,7 @@ export async function GET() {
     const ageDistribution = ageRanges.map(ageRange => {
       const count = allMembers.filter(member => {
         if (!member.birthDate) return false
-        const age = new Date().getFullYear() - new Date(member.birthDate).getFullYear()
+        const age = currentYearJST() - new Date(member.birthDate).getUTCFullYear()
         return age >= ageRange.min && age <= ageRange.max
       }).length
       return {
@@ -103,17 +104,21 @@ export async function GET() {
       .sort((a, b) => a.level - b.level)
 
     // 月別登録数（過去12ヶ月）
-    const now = new Date()
+    const jstNow = nowJST();
+    const jstY0  = jstNow.getUTCFullYear();
+    const jstM0  = jstNow.getUTCMonth(); // 0-based
     const monthlyRegistrations = []
     for (let i = 11; i >= 0; i--) {
-      const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const year = targetDate.getFullYear()
-      const month = targetDate.getMonth() + 1
+      // JST 基準で i ヶ月前の年月を計算
+      const totalMonths = jstY0 * 12 + jstM0 - i;
+      const year  = Math.floor(totalMonths / 12);
+      const month = (totalMonths % 12) + 1; // 1-based
       const monthStr = `${year}-${String(month).padStart(2, '0')}`
       
       const count = allMembers.filter(member => {
-        const createdAt = new Date(member.createdAt)
-        return createdAt.getFullYear() === year && createdAt.getMonth() + 1 === month
+        // createdAt は UTC Date。JST に換算して比較
+        const jstCreated = new Date(new Date(member.createdAt).getTime() + 9*60*60*1000);
+        return jstCreated.getUTCFullYear() === year && jstCreated.getUTCMonth() + 1 === month
       }).length
 
       monthlyRegistrations.push({

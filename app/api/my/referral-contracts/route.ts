@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { startOfMonthJST, endOfMonthJST, nowJST } from "@/lib/japan-time";
 
 const REWARD_RATE = 0.25;
 
@@ -25,9 +26,9 @@ export async function GET() {
   });
   if (!user) return NextResponse.json({ error: "user not found" }, { status: 404 });
 
-  const now      = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const jstNow    = nowJST();
+  const monthStart = startOfMonthJST();
+  const monthEnd   = endOfMonthJST();
 
   // この会員が直紹介した会員のIDリスト
   const referrals = await prisma.userReferral.findMany({
@@ -39,8 +40,8 @@ export async function GET() {
 
   if (referredUserIds.length === 0) {
     return NextResponse.json({
-      year: now.getFullYear(),
-      month: now.getMonth() + 1,
+      year: jstNow.getUTCFullYear(),
+      month: jstNow.getUTCMonth() + 1,
       thisMonthCount: 0,
       totalCount: 0,
       thisMonthFee: 0,
@@ -75,8 +76,8 @@ export async function GET() {
   const thisMonthReward = Math.floor(thisMonthFee * REWARD_RATE);
 
   return NextResponse.json({
-    year:            now.getFullYear(),
-    month:           now.getMonth() + 1,
+    year:            jstNow.getUTCFullYear(),
+    month:           jstNow.getUTCMonth() + 1,
     thisMonthCount:  thisMonthContracts.length,
     totalCount:      allContracts,
     thisMonthFee,

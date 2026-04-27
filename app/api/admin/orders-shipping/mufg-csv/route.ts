@@ -4,6 +4,7 @@ export const revalidate = 0
 
 import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
+import { todayJST, nowJST, toJSTDateString } from "@/lib/japan-time"
 
 /**
  * GET /api/admin/orders-shipping/mufg-csv?ids=1,2,3
@@ -141,16 +142,16 @@ export async function GET(request: NextRequest) {
         user.name || "",
         phone,
         order.orderNumber,
-        order.orderedAt.toISOString().slice(0, 10),
+        toJSTDateString(order.orderedAt),
         order.note || "",
       ])
     })
 
     // ─── 全銀協テキスト形式（別シート/参考用：ヘッダー行として末尾に追記）─
-    // 振替日：翌月の26日（当月の場合は当月26日）
-    const now          = new Date()
-    const transferYYYY = now.getFullYear()
-    const transferMM   = String(now.getMonth() + 1).padStart(2, "0")
+    // 振替日：当月の26日（JST基準）
+    const jstNow       = nowJST()
+    const transferYYYY = jstNow.getUTCFullYear()
+    const transferMM   = String(jstNow.getUTCMonth() + 1).padStart(2, "0")
     const transferDate = `${transferYYYY}${transferMM}26` // YYYYMMDD
 
     const zenginLines: string[] = []
@@ -226,7 +227,7 @@ export async function GET(request: NextRequest) {
       "\r\n\r\n# 全銀協テキスト形式（三菱UFJファクター送信用）\r\n" +
       zenginLines.join("\r\n")                            // 全銀協テキスト
 
-    const date     = new Date().toISOString().slice(0, 10).replace(/-/g, "")
+    const date     = todayJST().replace(/-/g, "")
     const filename = `mufg_${date}.csv`
 
     return new NextResponse(csvContent, {

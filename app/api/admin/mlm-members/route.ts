@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma';
 import { generateMemberCode } from "@/lib/mlm-utils";
 import { getMlmDisplayName } from "@/lib/mlm-display-name";
 import bcrypt from "bcryptjs";
+import { parseDateJST } from "@/lib/japan-time";
 
 // 初期パスワード：全会員一律「0000」
 // ※ ログイン後、会員自身がパスワードを変更してください
@@ -322,11 +323,9 @@ export async function POST(req: NextRequest) {
           titleLevel: parseInt(data.titleLevel) || 0,
           forceActive: data.forceActive || false,
           forceLevel: data.forceLevel ? parseInt(data.forceLevel) : null,
-          contractDate: data.contractDate ? new Date(data.contractDate) : null,
+          contractDate: parseDateJST(data.contractDate),
           autoshipEnabled: data.autoshipEnabled || false,
-          autoshipStartDate: data.autoshipStartDate
-            ? new Date(data.autoshipStartDate)
-            : null,
+          autoshipStartDate: parseDateJST(data.autoshipStartDate),
           paymentMethod: data.paymentMethod || "credit_card",
           note: data.note || null,
           // 銀行情報
@@ -341,7 +340,7 @@ export async function POST(req: NextRequest) {
           companyName: data.companyName || null,
           companyNameKana: data.companyNameKana || null,
           // 追加の個人情報
-          birthDate: data.birthDate ? new Date(data.birthDate) : null,
+          birthDate: parseDateJST(data.birthDate),
           gender: data.gender || null,
           mobile: data.mobile || null,
           prefecture: data.prefecture || null,

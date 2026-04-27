@@ -107,35 +107,37 @@ const BULK_ACTIONS = [
   { value: "setNoteAll", label: "備考・備考(納品書)に" },
 ]
 
-// ローカル日付を "YYYY-MM-DD" 文字列に変換（タイムゾーンずれなし）
-function toLocalDateStr(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, "0")
-  const day = String(d.getDate()).padStart(2, "0")
-  return `${y}-${m}-${day}`
+/** JST の "YYYY-MM-DD" を返す */
+function todayJST(): string {
+  return new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\//g, "-")
 }
-// 指定した年月の1日〜末日を返す（ローカル時刻ベース）
+/** JST 指定年月の1日〜末日 "YYYY-MM-DD" を返す (month: 0-based) */
 function getMonthRange(year: number, month: number): { start: string; end: string } {
-  const start = new Date(year, month, 1)          // 月の1日
-  const end   = new Date(year, month + 1, 0)      // 翌月0日 = 当月末日
-  return { start: toLocalDateStr(start), end: toLocalDateStr(end) }
+  const padded = (n: number) => String(n).padStart(2, "0")
+  // 月初
+  const startY = year; const startM = month + 1;
+  const start = `${startY}-${padded(startM)}-01`
+  // 月末（翌月0日）
+  const endDate = new Date(Date.UTC(year, month + 1, 0))
+  const end = `${endDate.getUTCFullYear()}-${padded(endDate.getUTCMonth() + 1)}-${padded(endDate.getUTCDate())}`
+  return { start, end }
 }
 function getThisMonthRange() {
-  const now = new Date()
-  return getMonthRange(now.getFullYear(), now.getMonth())
+  const s = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" })
+  const [y, m] = s.split("/").map(Number)
+  return getMonthRange(y, m - 1)
 }
 function offsetMonth(dateStr: string, offset: number): string {
-  // "YYYY-MM-DD" から年月を取得してoffset月ずらす
   const [y, m] = dateStr.split("-").map(Number)
-  // Date(y, m-1+offset) でローカルベースに計算
-  const d = new Date(y, m - 1 + offset, 1)
-  return toLocalDateStr(d).slice(0, 7) // "YYYY-MM"
+  const total = y * 12 + (m - 1) + offset
+  const ny = Math.floor(total / 12)
+  const nm = (total % 12) + 1
+  return `${ny}-${String(nm).padStart(2, "0")}`
 }
 
 // ─── メインコンポーネント ───────────────────────────────
 export default function OrdersShippingPage() {
   const router = useRouter()
-  const today = new Date()
   const { start: mStart, end: mEnd } = getThisMonthRange()
 
   // 検索フィルター
@@ -176,13 +178,13 @@ export default function OrdersShippingPage() {
   const [summarySelected, setSummarySelected] = useState<Set<number>>(new Set())
   // 未処理伝票一覧の一括処理
   const [summaryBulkNote,      setSummaryBulkNote]      = useState("")
-  const [summaryBulkPaidDate,  setSummaryBulkPaidDate]  = useState(today.toISOString().split("T")[0])
+  const [summaryBulkPaidDate,  setSummaryBulkPaidDate]  = useState(() => todayJST())
   const [summaryBulkProcessing, setSummaryBulkProcessing] = useState(false)
 
   // 一括処理
   const [bulkAction,    setBulkAction]    = useState("")
   const [bulkNote,      setBulkNote]      = useState("")
-  const [bulkPaidDate,  setBulkPaidDate]  = useState(today.toISOString().split("T")[0])
+  const [bulkPaidDate,  setBulkPaidDate]  = useState(() => todayJST())
   const [bulkDateType,  setBulkDateType]  = useState("paidAt") // paidAt / shippedAt / orderedAt
   const [bulkProcessing, setBulkProcessing] = useState(false)
 
@@ -423,11 +425,10 @@ export default function OrdersShippingPage() {
   const showSummaryOrders = async (pm: string, statusType: "unpaid" | "unshipped", period: "thisMonth" | "lastMonth") => {
     setSummaryOrdersLoading(true)
     setSummaryOrders(null)
-    const now = new Date()
-    let y = now.getFullYear(), m = now.getMonth()
+    const jstStr = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).split("/").map(Number)
+    let y = jstStr[0], m = jstStr[1] - 1 // 0-based
     if (period === "lastMonth") { m -= 1; if (m < 0) { m = 11; y-- } }
-    const start = new Date(y, m, 1).toISOString().split("T")[0]
-    const end   = new Date(y, m + 1, 0).toISOString().split("T")[0]
+    const { start, end } = getMonthRange(y, m)
     const p = new URLSearchParams()
     p.set("startDate", start); p.set("endDate", end); p.set("dateType", "orderedAt")
 
@@ -651,7 +652,7 @@ export default function OrdersShippingPage() {
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement("a")
       a.href = url
-      a.download = `yamato_${new Date().toISOString().slice(0,10)}.csv`
+      a.download = `yamato_${todayJST()}.csv`
       a.click()
       URL.revokeObjectURL(url)
     } catch { alert("CSV出力に失敗しました") }
@@ -678,7 +679,7 @@ export default function OrdersShippingPage() {
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement("a")
       a.href = url
-      a.download = `credix_${new Date().toISOString().slice(0,10).replace(/-/g,"")}.csv`
+      a.download = `credix_${todayJST().replace(/-/g, "")}.csv`
       a.click()
       URL.revokeObjectURL(url)
       // 出力完了メッセージ
@@ -709,7 +710,7 @@ export default function OrdersShippingPage() {
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement("a")
       a.href = url
-      a.download = `mufg_${new Date().toISOString().slice(0,10).replace(/-/g,"")}.csv`
+      a.download = `mufg_${todayJST().replace(/-/g, "")}.csv`
       a.click()
       URL.revokeObjectURL(url)
       alert(`三菱UFJファクターCSVを出力しました（${target.length}件）`)
@@ -756,7 +757,7 @@ export default function OrdersShippingPage() {
     const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n")
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv" })
     const url  = URL.createObjectURL(blob)
-    const a    = document.createElement("a"); a.href = url; a.download = `orders_${new Date().toISOString().slice(0,10)}.csv`
+    const a    = document.createElement("a"); a.href = url; a.download = `orders_${todayJST()}.csv`
     a.click(); URL.revokeObjectURL(url)
   }
 

@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getNonPurchaseAlert } from "@/lib/mlm-bonus";
+import { currentMonthJST } from "@/lib/japan-time";
 
 const ACTIVE_REQUIRED_PRODUCTS = ["1000", "1001", "1002", "2000"];
 
@@ -225,8 +226,7 @@ export async function GET() {
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const userId = BigInt(session.user.id ?? "0");
-  const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const currentMonth = currentMonthJST();
 
   try {
     // 自分のMLM会員情報（マトリックス5段 + ユニレベル5段）

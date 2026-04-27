@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
+import { currentAndLastMonthJST } from '@/lib/japan-time'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -44,11 +45,7 @@ export async function GET() {
       })
     }
 
-    // 先月・今月の月文字列を計算
-    const now = new Date()
-    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    const lastMonthStr = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`
-    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const { currentMonth: currentMonthStr, lastMonth: lastMonthStr } = currentAndLastMonthJST()
 
     // 先月のmlmPurchaseポイント集計
     const lastMonthAgg = await prisma.mlmPurchase.aggregate({

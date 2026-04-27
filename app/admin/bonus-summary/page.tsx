@@ -2,14 +2,17 @@
 
 import { useState, useEffect } from "react";
 
-// 過去15ヶ月分の月リストを生成
+// 過去15ヶ月分の月リストを生成（JST基準）
 function generateMonthOptions() {
   const options: { value: string; label: string }[] = [];
-  const now = new Date();
+  const s = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" });
+  const [y, m] = s.split("/").map(Number);
   for (let i = 0; i < 15; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const label = `${d.getFullYear()}年${d.getMonth() + 1}月度`;
+    const total = y * 12 + (m - 1) - i;
+    const ny = Math.floor(total / 12);
+    const nm = (total % 12) + 1;
+    const value = `${ny}-${String(nm).padStart(2, "0")}`;
+    const label = `${ny}年${nm}月度`;
     options.push({ value, label });
   }
   return options;
@@ -160,7 +163,7 @@ export default function BonusSummaryPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `bonus_summary_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `bonus_summary_${new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\//g, "-")}.csv`;
     link.click();
   };
 

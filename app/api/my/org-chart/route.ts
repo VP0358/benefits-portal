@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { startOfMonthJST, endOfMonthJST, nowJST } from "@/lib/japan-time";
 
 /**
  * GET /api/my/org-chart
@@ -19,9 +20,9 @@ export async function GET() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const jstNow    = nowJST();
+  const monthStart = startOfMonthJST();
+  const monthEnd   = endOfMonthJST();
 
   // 自分の情報を取得
   const me = await prisma.user.findUnique({
@@ -99,8 +100,8 @@ export async function GET() {
   });
 
   return NextResponse.json({
-    year: now.getFullYear(),
-    month: now.getMonth() + 1,
+    year: jstNow.getUTCFullYear(),
+    month: jstNow.getUTCMonth() + 1,
     me: {
       id: me.id.toString(),
       name: me.name,

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
+import { currentYearJST } from '@/lib/japan-time'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -84,7 +85,7 @@ export async function GET() {
     const ageDistribution = ageRanges.map(ageRange => {
       const count = allApplications.filter(app => {
         if (!app.birthDate) return false
-        const age = new Date().getFullYear() - new Date(app.birthDate).getFullYear()
+        const age = currentYearJST() - new Date(app.birthDate).getUTCFullYear()
         return age >= ageRange.min && age <= ageRange.max
       }).length
       return {

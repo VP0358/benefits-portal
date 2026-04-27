@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/app/api/admin/route-guard";
+import { parseDateJST } from "@/lib/japan-time";
 
 const updateSchema = z.object({
   planName: z.string().min(1).max(255).optional(),
@@ -47,9 +48,9 @@ export async function PATCH(
       ...(data.planName !== undefined ? { planName: data.planName } : {}),
       ...(data.monthlyFee !== undefined ? { monthlyFee: data.monthlyFee } : {}),
       ...(data.status !== undefined ? { status: data.status } : {}),
-      ...(data.startedAt !== undefined ? { startedAt: data.startedAt ? new Date(data.startedAt) : null } : {}),
-      ...(data.confirmedAt !== undefined ? { confirmedAt: data.confirmedAt ? new Date(data.confirmedAt) : null } : {}),
-      ...(data.canceledAt !== undefined ? { canceledAt: data.canceledAt ? new Date(data.canceledAt) : null } : {}),
+      ...(data.startedAt !== undefined ? { startedAt: parseDateJST(data.startedAt) } : {}),
+      ...(data.confirmedAt !== undefined ? { confirmedAt: parseDateJST(data.confirmedAt) } : {}),
+      ...(data.canceledAt !== undefined ? { canceledAt: parseDateJST(data.canceledAt) } : {}),
     },
   });
 

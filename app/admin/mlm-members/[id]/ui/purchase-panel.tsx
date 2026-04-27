@@ -2,6 +2,11 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 
+/** ブラウザ側 JST 今日の日付 "YYYY-MM-DD" */
+function todayJST() {
+  return new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\//g, "-");
+}
+
 // ── 日本語日付ピッカー（年・月・日 セレクトボックス） ────────────────
 function SlipDatePicker({
   value,
@@ -16,14 +21,16 @@ function SlipDatePicker({
   allowEmpty?: boolean;    // true のとき「未設定」選択肢を表示
   highlightBg?: string;    // 強調背景クラス（例: "bg-blue-50"）
 }) {
-  const now = new Date();
-  const curYear = now.getFullYear();
+  const curYear = new Date().getFullYear(); // 年リスト生成用（ブラウザローカル時刻で十分）
 
   // value から年・月・日を分解
   const parts = value ? value.split("-") : [];
   const selYear  = parts[0] ? parseInt(parts[0]) : (allowEmpty ? 0 : curYear);
-  const selMonth = parts[1] ? parseInt(parts[1]) : (allowEmpty ? 0 : now.getMonth() + 1);
-  const selDay   = parts[2] ? parseInt(parts[2]) : (allowEmpty ? 0 : now.getDate());
+  const jstToday  = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).split("/");
+  const curMonth  = parseInt(jstToday[1]);
+  const curDay    = parseInt(jstToday[2]);
+  const selMonth = parts[1] ? parseInt(parts[1]) : (allowEmpty ? 0 : curMonth);
+  const selDay   = parts[2] ? parseInt(parts[2]) : (allowEmpty ? 0 : curDay);
 
   // 月ごとの日数（閏年対応）
   const daysInMonth = useMemo(() => {
@@ -189,7 +196,7 @@ const DETAIL_NAMES = [
 
 // 空フォームの初期値
 function makeEmptyForm(memberCode: string, memberName: string, memberPostal: string, memberAddress: string, memberPhone: string) {
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayJST();
   return {
     orderedAt: today,
     shippedAt: "",

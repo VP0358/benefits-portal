@@ -54,7 +54,7 @@ function JapaneseDatePicker({
   onChange: (name: string, value: string) => void;
   placeholder?: string;
 }) {
-  const currentYear = new Date().getFullYear();
+  const currentYear = new Date().getFullYear(); // ブラウザのローカルタイムで十分（年リスト生成用）
   const years = Array.from({ length: 100 }, (_, i) => currentYear - i); // 今年から100年前まで
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 

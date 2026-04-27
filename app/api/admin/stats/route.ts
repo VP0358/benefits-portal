@@ -5,16 +5,16 @@ export const revalidate = 0
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/app/api/admin/route-guard";
+import { startOfMonthJST, endOfMonthJST } from "@/lib/japan-time";
 
 export async function GET() {
   const guard = await requireAdmin();
   if (guard.error) return guard.error;
 
   try {
-    // 当月の開始日・終了日
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    // 当月の開始日・終了日（JST基準）
+    const monthStart = startOfMonthJST();
+    const monthEnd   = endOfMonthJST();
 
     const [
       // MLM会員

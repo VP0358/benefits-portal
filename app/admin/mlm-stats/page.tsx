@@ -266,9 +266,10 @@ function RetentionRing({ rate, label, color = GOLD }: { rate: number; label: str
 // ─── メインコンポーネント ─────────────────────────────────────────────────────
 
 export default function MlmStatsPage() {
-  const now = new Date()
-  const [year,  setYear]  = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth() + 1)
+  // JST 基準で今月の年・月を取得
+  const jstStr = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).split("/")
+  const [year,  setYear]  = useState(parseInt(jstStr[0]))
+  const [month, setMonth] = useState(parseInt(jstStr[1]))
   const [stats, setStats] = useState<MonthlyStats | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError]   = useState<string | null>(null)

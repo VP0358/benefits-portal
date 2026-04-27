@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { startOfMonthJST, endOfMonthJST } from "@/lib/japan-time";
 
 /**
  * GET /api/admin/contracts-org
@@ -20,9 +21,8 @@ export async function GET() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const monthStart = startOfMonthJST();
+  const monthEnd   = endOfMonthJST();
 
   // 全UserReferral(直紹介関係)を取得
   const referrals = await prisma.userReferral.findMany({

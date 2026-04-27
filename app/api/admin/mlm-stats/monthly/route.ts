@@ -5,6 +5,7 @@ export const revalidate = 0
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/app/api/admin/route-guard'
+import { nowJST, jstMonthRange } from '@/lib/japan-time'
 
 /**
  * MLM 月次統計データ取得 API
@@ -30,13 +31,13 @@ export async function GET(req: NextRequest) {
   if (guard.error) return guard.error
 
   const { searchParams } = req.nextUrl
-  const now = new Date()
-  const year  = parseInt(searchParams.get('year')  ?? String(now.getFullYear()),  10)
-  const month = parseInt(searchParams.get('month') ?? String(now.getMonth() + 1), 10)
+  const jstNow = nowJST()
+  const year  = parseInt(searchParams.get('year')  ?? String(jstNow.getUTCFullYear()),  10)
+  const month = parseInt(searchParams.get('month') ?? String(jstNow.getUTCMonth() + 1), 10)
 
-  // 対象月の開始・終了
-  const periodStart = new Date(year, month - 1, 1)
-  const periodEnd   = new Date(year, month,     0, 23, 59, 59, 999)
+  // 対象月の開始・終了（JST基準 → UTC Date）
+  const targetMonthStr2 = `${year}-${String(month).padStart(2, '0')}`
+  const { start: periodStart, end: periodEnd } = jstMonthRange(targetMonthStr2)
 
   try {
     // ── 全会員（スナップショット用） ──────────────────────────────────
@@ -84,10 +85,17 @@ export async function GET(req: NextRequest) {
 
     const calcAge = (birthDate: Date | null): number | null => {
       if (!birthDate) return null
-      const today = new Date(year, month - 1, periodEnd.getDate())
-      let age = today.getFullYear() - birthDate.getFullYear()
-      const m2 = today.getMonth() - birthDate.getMonth()
-      if (m2 < 0 || (m2 === 0 && today.getDate() < birthDate.getDate())) age--
+      // 対象月末時点での年齢をJST基準で計算
+      const JST = 9 * 60 * 60 * 1000
+      const endJST = new Date(periodEnd.getTime() + JST)
+      const ty = endJST.getUTCFullYear()
+      const tm = endJST.getUTCMonth() + 1
+      const td = endJST.getUTCDate()
+      const by = birthDate.getUTCFullYear()
+      const bm = birthDate.getUTCMonth() + 1
+      const bd = birthDate.getUTCDate()
+      let age = ty - by
+      if (tm < bm || (tm === bm && td < bd)) age--
       return age
     }
 
@@ -166,15 +174,17 @@ export async function GET(req: NextRequest) {
     // 対象月に新規オートシップ開始
     const autoshipNewThisMonth = allMembers.filter(m => {
       if (!m.autoshipStartDate) return false
-      const d = m.autoshipStartDate
-      return d.getFullYear() === year && d.getMonth() + 1 === month
+      const JST = 9 * 60 * 60 * 1000
+      const dJST = new Date(m.autoshipStartDate.getTime() + JST)
+      return dJST.getUTCFullYear() === year && dJST.getUTCMonth() + 1 === month
     }).length
 
     // 対象月に停止（autoshipStopDate が対象月内）
     const autoshipStoppedThisMonth = allMembers.filter(m => {
       if (!m.autoshipStopDate) return false
-      const d = m.autoshipStopDate
-      return d.getFullYear() === year && d.getMonth() + 1 === month
+      const JST = 9 * 60 * 60 * 1000
+      const dJST = new Date(m.autoshipStopDate.getTime() + JST)
+      return dJST.getUTCFullYear() === year && dJST.getUTCMonth() + 1 === month
     }).length
 
     // ① オートシップ率 = 入金済みオートシップ伝票がある会員数 ÷ 総会員数（active+autoship）
@@ -244,14 +254,16 @@ export async function GET(req: NextRequest) {
     } catch { /* BonusResult が存在しない場合は無視 */ }
 
     // ── 過去12ヶ月の登録数推移 ───────────────────────────────────────
+    const JST_MS = 9 * 60 * 60 * 1000
     const registrationTrend: { month: string; count: number }[] = []
     for (let i = 11; i >= 0; i--) {
-      const d = new Date(year, month - 1 - i, 1)
-      const y = d.getFullYear()
-      const mo = d.getMonth() + 1
+      const totalM = (year - 1) * 12 + (month - 1) - i
+      const y  = Math.floor(totalM / 12) + 1
+      const mo = (totalM % 12) + 1
       const label = `${y}-${String(mo).padStart(2, '0')}`
       const count = allMembers.filter(m => {
-        return m.createdAt.getFullYear() === y && m.createdAt.getMonth() + 1 === mo
+        const jstCreated = new Date(m.createdAt.getTime() + JST_MS)
+        return jstCreated.getUTCFullYear() === y && jstCreated.getUTCMonth() + 1 === mo
       }).length
       registrationTrend.push({ month: label, count })
     }
@@ -260,14 +272,14 @@ export async function GET(req: NextRequest) {
     // 厳密には月次スナップショットがないため、contractDate ベースの近似
     const retentionTrend: { month: string; count: number }[] = []
     for (let i = 11; i >= 0; i--) {
-      const d = new Date(year, month - 1 - i, 1)
-      const y = d.getFullYear()
-      const mo = d.getMonth() + 1
+      const totalM = (year - 1) * 12 + (month - 1) - i
+      const y  = Math.floor(totalM / 12) + 1
+      const mo = (totalM % 12) + 1
       const label = `${y}-${String(mo).padStart(2, '0')}`
-      // その月末時点で登録済みかつ現在アクティブ（active or autoship）な会員
-      const monthEnd = new Date(y, mo, 0, 23, 59, 59, 999)
+      // その月末時点（JST→UTC）
+      const { end: monthEndUTC } = jstMonthRange(label)
       const count = allMembers.filter(m =>
-        (m.status === 'active' || m.status === 'autoship') && m.createdAt <= monthEnd
+        (m.status === 'active' || m.status === 'autoship') && m.createdAt <= monthEndUTC
       ).length
       retentionTrend.push({ month: label, count })
     }
@@ -276,21 +288,21 @@ export async function GET(req: NextRequest) {
     // ※ トレンドはオートシップ有効数÷(active+autoship)で近似
     const autoshipTrend: { month: string; retentionRate: number; activeCount: number }[] = []
     for (let i = 11; i >= 0; i--) {
-      const d = new Date(year, month - 1 - i, 1)
-      const y = d.getFullYear()
-      const mo = d.getMonth() + 1
+      const totalM = (year - 1) * 12 + (month - 1) - i
+      const y  = Math.floor(totalM / 12) + 1
+      const mo = (totalM % 12) + 1
       const label = `${y}-${String(mo).padStart(2, '0')}`
-      const monthEnd = new Date(y, mo, 0, 23, 59, 59, 999)
+      const { end: monthEndUTC } = jstMonthRange(label)
       // その月末時点で active or autoship の会員数（総会員数基準）
       const totalAtMonth = allMembers.filter(m =>
-        (m.status === 'active' || m.status === 'autoship') && m.createdAt <= monthEnd
+        (m.status === 'active' || m.status === 'autoship') && m.createdAt <= monthEndUTC
       ).length
       // その月末時点でオートシップ有効な会員数
       const autoshipAtMonth = allMembers.filter(m => {
         if (!m.autoshipEnabled) return false
         if (!m.autoshipStartDate) return false
-        if (m.autoshipStartDate > monthEnd) return false
-        if (m.autoshipStopDate && m.autoshipStopDate <= monthEnd) return false
+        if (m.autoshipStartDate > monthEndUTC) return false
+        if (m.autoshipStopDate && m.autoshipStopDate <= monthEndUTC) return false
         return true
       }).length
       const rate = totalAtMonth > 0

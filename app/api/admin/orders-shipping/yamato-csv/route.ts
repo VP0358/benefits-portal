@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
+import { todayJST } from "@/lib/japan-time"
 
 // クロネコヤマト B2クラウド 送り状発行CSV形式
 // 参考: ヤマト運輸B2クラウド データ取込 仕様
@@ -118,7 +119,7 @@ export async function GET(request: NextRequest) {
     )
     const csvContent = "\uFEFF" + csvLines.join("\r\n")
 
-    const date = new Date().toISOString().slice(0, 10)
+    const date = todayJST()
     return new NextResponse(csvContent, {
       status: 200,
       headers: {

@@ -2,8 +2,16 @@
 
 import { useState } from "react";
 
-function today() { return new Date().toISOString().slice(0, 10); }
-function firstDayOfMonth() { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1).toISOString().slice(0, 10); }
+function toJSTStr(d: Date) {
+  return d.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\//g, "-");
+}
+function today() { return toJSTStr(new Date()); }
+function firstDayOfMonth() {
+  const n = new Date();
+  const jstStr = n.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" });
+  const [y, m] = jstStr.split("/");
+  return `${y}-${m}-01`;
+}
 
 export default function AdminDashboardContainer() {
   const [draftFrom, setDraftFrom] = useState(firstDayOfMonth());

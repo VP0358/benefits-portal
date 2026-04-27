@@ -5,6 +5,7 @@ export const revalidate = 0
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { currentAndLastMonthJST } from "@/lib/japan-time";
 
 /**
  * GET /api/my/mlm-positions
@@ -64,11 +65,8 @@ export async function GET() {
 
     // ポジション数が1の場合は複数ポジションではない
     if (allPositions.length <= 1) {
-      // 今月・先月のポイント計算
-      const now = new Date();
-      const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-      const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const lastMonthStr = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, "0")}`;
+      // 今月・先月のポイント計算（JST基準）
+      const { currentMonth: currentMonthStr, lastMonth: lastMonthStr } = currentAndLastMonthJST();
 
       const [currentAgg, lastAgg] = await Promise.all([
         prisma.mlmPurchase.aggregate({
@@ -98,11 +96,8 @@ export async function GET() {
       });
     }
 
-    // 複数ポジションの場合：各ポジションのポイントを取得
-    const now = new Date();
-    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonthStr = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, "0")}`;
+    // 複数ポジションの場合：各ポジションのポイントを取得（JST基準）
+    const { currentMonth: currentMonthStr, lastMonth: lastMonthStr } = currentAndLastMonthJST();
 
     const positionsWithPoints = await Promise.all(
       allPositions.map(async (pos) => {

@@ -53,17 +53,21 @@ function yen(n: number) {
   return `¥${n.toLocaleString()}`;
 }
 
-/* ─── 現在月を取得 ─── */
+/* ─── 現在月を取得（JST 基準） ─── */
 function getCurrentMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const s = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" });
+  const [y, m] = s.split("/");
+  return `${y}-${m}`;
 }
 
-/* ─── 前月を取得 ─── */
+/* ─── 前月を取得（JST 基準） ─── */
 function getPrevMonth() {
-  const d = new Date();
-  d.setMonth(d.getMonth() - 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const s = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" });
+  const [y, m] = s.split("/").map(Number);
+  const total = y * 12 + (m - 1) - 1;
+  const ny = Math.floor(total / 12);
+  const nm = (total % 12) + 1;
+  return `${ny}-${String(nm).padStart(2, "0")}`;
 }
 
 /* ─── 計算結果テーブル ─── */
@@ -262,7 +266,7 @@ export default function BonusRunPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           bonusMonth: targetMonth,
-          closingDate: closingDate || new Date().toISOString(),
+          closingDate: closingDate || new Date().toISOString(), // DB保存用タイムスタンプ（UTC）
           mode,
         }),
       });

@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { LEVEL_LABELS } from "@/lib/mlm-bonus";
 import { getMlmDisplayName } from "@/lib/mlm-display-name";
+import { currentAndLastMonthJST } from "@/lib/japan-time";
 
 export async function GET() {
   const session = await auth();
@@ -27,11 +28,8 @@ export async function GET() {
     });
     if (!mlmMember) return NextResponse.json({ error: "MLM会員情報がありません" }, { status: 404 });
 
-    // 今月・先月の計算
-    const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonth = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, "0")}`;
+    // 今月・先月の計算（JST基準）
+    const { currentMonth, lastMonth } = currentAndLastMonthJST();
 
     // 今月・先月の購入集計（MLM購入）
     const [currentPurchases, lastPurchases] = await Promise.all([

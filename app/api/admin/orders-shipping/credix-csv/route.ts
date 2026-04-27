@@ -4,6 +4,7 @@ export const revalidate = 0
 
 import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
+import { todayJST } from "@/lib/japan-time"
 
 /**
  * GET /api/admin/orders-shipping/credix-csv?ids=1,2,3
@@ -189,7 +190,7 @@ export async function GET(request: NextRequest) {
 
     // BOM付きUTF-8（Excel で文字化けしない）
     const csvContent = "\uFEFF" + [header, ...rows].join("\r\n")
-    const date       = new Date().toISOString().slice(0, 10).replace(/-/g, "")
+    const date       = todayJST().replace(/-/g, "")
     const filename   = `credix_${date}.csv`
 
     return new NextResponse(csvContent, {

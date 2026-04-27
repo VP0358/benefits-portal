@@ -9,6 +9,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/app/api/admin/route-guard";
 import { getTravelFee, getTravelPlanName } from "@/lib/travel-pricing";
+import { parseDateJST } from "@/lib/japan-time";
 
 const updateSchema = z.object({
   level: z.number().int().min(1).max(5).optional(),
@@ -55,8 +56,8 @@ export async function PATCH(
     data: {
       ...(levelOrTierChanged ? { level: newLevel, pricingTier: newTier, monthlyFee: newMonthlyFee, planName: newPlanName } : {}),
       ...(data.status !== undefined ? { status: data.status } : {}),
-      ...(data.startedAt !== undefined ? { startedAt: data.startedAt ? new Date(data.startedAt) : null } : {}),
-      ...(data.confirmedAt !== undefined ? { confirmedAt: data.confirmedAt ? new Date(data.confirmedAt) : null } : {}),
+      ...(data.startedAt !== undefined ? { startedAt: parseDateJST(data.startedAt) } : {}),
+      ...(data.confirmedAt !== undefined ? { confirmedAt: parseDateJST(data.confirmedAt) } : {}),
       ...(data.note !== undefined ? { note: data.note } : {}),
     },
   });

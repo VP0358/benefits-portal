@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { sendWelcomeEmail } from "@/lib/mailer";
+import { parseDateJST } from "@/lib/japan-time";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -111,12 +112,8 @@ export async function POST(request: Request) {
     if (referrer) referrerId = referrer.id;
   }
 
-  // 生年月日の変換（YYYY-MM-DD → DateTime）
-  let birthDateTime: Date | undefined = undefined;
-  if (birthDate) {
-    const parsed = new Date(birthDate);
-    if (!isNaN(parsed.getTime())) birthDateTime = parsed;
-  }
+  // 生年月日の変換（YYYY-MM-DD → DateTime）JST基準
+  const birthDateTime: Date | null | undefined = birthDate ? parseDateJST(birthDate) : undefined;
 
   // 支払方法の変換（フロント値 → Prisma enum）
   type PaymentMethodType = "credit_card" | "bank_transfer" | "direct_debit";

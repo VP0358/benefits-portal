@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getMlmDisplayName } from "@/lib/mlm-display-name";
+import { currentAndLastMonthJST } from "@/lib/japan-time";
 
 export async function GET() {
   const session = await auth();
@@ -42,11 +43,8 @@ export async function GET() {
       orderBy: { createdAt: "asc" },
     });
 
-    // 現在月と先月を計算
-    const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonth = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, "0")}`;
+    // 現在月と先月を計算（JST基準）
+    const { currentMonth, lastMonth } = currentAndLastMonthJST();
 
     // 直紹介のうちアクティブ数
     const activeCount = directReferrals.filter(

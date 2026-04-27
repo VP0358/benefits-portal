@@ -360,7 +360,7 @@ export default function ShippingLabelsPage() {
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `shipping-labels-${new Date().toISOString().split('T')[0]}.csv`
+      a.download = `shipping-labels-${new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\//g, "-")}.csv`
       a.click()
     } catch (error) {
       console.error('Export error:', error)

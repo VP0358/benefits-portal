@@ -307,7 +307,7 @@ export default function ProductPurchasesPage() {
       const downloadUrl = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = downloadUrl
-      a.download = `purchases_${type}_${new Date().toISOString().split("T")[0]}.csv`
+      a.download = `purchases_${type}_${new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\//g, "-")}.csv`
       document.body.appendChild(a)
       a.click()
       a.remove()

@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/app/api/admin/route-guard";
+import { startOfMonthJST, endOfMonthJST } from "@/lib/japan-time";
 
 function parseDate(value: string | null, fallback: Date) {
   if (!value) return fallback;
@@ -19,9 +20,8 @@ export async function GET(req: NextRequest) {
   if (guard.error) return guard.error;
 
   const { searchParams } = req.nextUrl;
-  const now = new Date();
-  const defaultFrom = new Date(now.getFullYear(), now.getMonth(), 1);
-  const defaultTo = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const defaultFrom = startOfMonthJST();
+  const defaultTo   = endOfMonthJST();
 
   const from = parseDate(searchParams.get("from"), defaultFrom);
   const to = parseDate(searchParams.get("to"), defaultTo);

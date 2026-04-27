@@ -7,18 +7,24 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/app/api/admin/route-guard";
+import { nowJST, toJSTDate } from "@/lib/japan-time";
 
-function getMonthKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+function getMonthKeyJST(date: Date) {
+  const jst = toJSTDate(date);
+  return `${jst.getUTCFullYear()}-${String(jst.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function monthRange(from: Date, to: Date) {
   const result: string[] = [];
-  const cursor = new Date(from.getFullYear(), from.getMonth(), 1);
-  const end = new Date(to.getFullYear(), to.getMonth(), 1);
+  const fromJST = toJSTDate(from);
+  const toJST   = toJSTDate(to);
+  const cursor = new Date(Date.UTC(fromJST.getUTCFullYear(), fromJST.getUTCMonth(), 1));
+  const end    = new Date(Date.UTC(toJST.getUTCFullYear(),   toJST.getUTCMonth(),   1));
   while (cursor <= end) {
-    result.push(getMonthKey(cursor));
-    cursor.setMonth(cursor.getMonth() + 1);
+    const y = cursor.getUTCFullYear();
+    const m = String(cursor.getUTCMonth() + 1).padStart(2, "0");
+    result.push(`${y}-${m}`);
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
   }
   return result;
 }
@@ -34,9 +40,12 @@ export async function GET(req: NextRequest) {
   if (guard.error) return guard.error;
 
   const { searchParams } = req.nextUrl;
-  const now = new Date();
-  const from = parseDate(searchParams.get("from"), new Date(now.getFullYear(), now.getMonth() - 11, 1));
-  const to = parseDate(searchParams.get("to"), new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999));
+  const jstNow = nowJST();
+  const jstY = jstNow.getUTCFullYear();
+  const jstM = jstNow.getUTCMonth();
+  const JST = 9 * 60 * 60 * 1000;
+  const from = parseDate(searchParams.get("from"), new Date(Date.UTC(jstY, jstM - 11, 1) - JST));
+  const to   = parseDate(searchParams.get("to"),   new Date(Date.UTC(jstY, jstM + 1, 0, 23, 59, 59, 999) - JST));
 
   const [orders, pointUsages, pointGrants] = await Promise.all([
     prisma.order.findMany({ where: { status: { not: "canceled" }, orderedAt: { gte: from, lte: to } }, select: { orderedAt: true, totalAmount: true, usedPoints: true } }),
@@ -50,15 +59,15 @@ export async function GET(req: NextRequest) {
   const grantedMap = new Map(months.map(m => [m, 0]));
 
   for (const o of orders) {
-    const k = getMonthKey(new Date(o.orderedAt));
+    const k = getMonthKeyJST(new Date(o.orderedAt));
     if (salesMap.has(k)) salesMap.set(k, (salesMap.get(k) ?? 0) + Number(o.totalAmount));
   }
   for (const u of pointUsages) {
-    const k = getMonthKey(new Date(u.usedAt));
+    const k = getMonthKeyJST(new Date(u.usedAt));
     if (usedMap.has(k)) usedMap.set(k, (usedMap.get(k) ?? 0) + Number(u.totalUsedPoints));
   }
   for (const g of pointGrants) {
-    const k = getMonthKey(new Date(g.occurredAt));
+    const k = getMonthKeyJST(new Date(g.occurredAt));
     if (grantedMap.has(k)) grantedMap.set(k, (grantedMap.get(k) ?? 0) + Number(g.points));
   }
 

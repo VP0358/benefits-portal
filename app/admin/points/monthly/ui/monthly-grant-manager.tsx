@@ -21,7 +21,7 @@ type PreviewResponse = {
 };
 
 export default function MonthlyGrantManager() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\//g, "-");
   const [rewardMonth, setRewardMonth] = useState(today.slice(0, 7));
   const [closingDate, setClosingDate] = useState(today);
   const [loading, setLoading]     = useState(false);
