@@ -305,8 +305,114 @@ export default function MlmMemberDetailPage() {
 
   // モーダル管理
   const [editSection, setEditSection] = useState<
-    "basic" | "registration" | "bank" | "level" | "autoship" | "bonusStatement" | null
+    "basic" | "registration" | "bank" | "level" | "autoship" | "bonusStatement" | "relations" | null
   >(null);
+
+  // ─── 会員削除モーダル ───
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleDelete = async () => {
+    if (!member) return;
+    if (deleteConfirmText !== member.memberCode) {
+      setDeleteError("会員コードが一致しません");
+      return;
+    }
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/admin/mlm-members/${memberId}`, { method: "DELETE" });
+      if (res.ok) {
+        router.push("/admin/mlm-members");
+      } else {
+        const err = await res.json();
+        setDeleteError(err.error ?? "削除に失敗しました");
+      }
+    } catch {
+      setDeleteError("通信エラーが発生しました");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // ─── 紹介者・直上者検索モーダル用 ───
+  const [relSearchCode, setRelSearchCode] = useState<{ referrer: string; upline: string }>({ referrer: "", upline: "" });
+  const [relSearchResult, setRelSearchResult] = useState<{
+    referrer: { id: string; memberCode: string; name: string } | null;
+    upline:   { id: string; memberCode: string; name: string } | null;
+  }>({ referrer: null, upline: null });
+  const [relSearchError, setRelSearchError] = useState<{ referrer: string | null; upline: string | null }>({ referrer: null, upline: null });
+  const [relSearching, setRelSearching] = useState<{ referrer: boolean; upline: boolean }>({ referrer: false, upline: false });
+  const [relSaving, setRelSaving] = useState(false);
+
+  const searchRelMember = async (type: "referrer" | "upline") => {
+    const code = relSearchCode[type].trim();
+    if (!code) return;
+    setRelSearching(s => ({ ...s, [type]: true }));
+    setRelSearchError(s => ({ ...s, [type]: null }));
+    setRelSearchResult(s => ({ ...s, [type]: null }));
+    try {
+      const res = await fetch(`/api/admin/mlm-members/search?code=${encodeURIComponent(code)}`);
+      if (res.ok) {
+        const data = await res.json();
+        const m = data.member;
+        if (m.id === memberId) {
+          setRelSearchError(s => ({ ...s, [type]: "自分自身は設定できません" }));
+        } else {
+          setRelSearchResult(s => ({ ...s, [type]: { id: m.id, memberCode: m.memberCode, name: m.companyName || m.user?.name || m.userName } }));
+        }
+      } else {
+        setRelSearchError(s => ({ ...s, [type]: "会員が見つかりません" }));
+      }
+    } catch {
+      setRelSearchError(s => ({ ...s, [type]: "通信エラー" }));
+    } finally {
+      setRelSearching(s => ({ ...s, [type]: false }));
+    }
+  };
+
+  const handleRelSave = async () => {
+    setRelSaving(true);
+    try {
+      const body: Record<string, string | null> = {};
+      // referrer が検索済み → 変更 / クリア指示あり → null
+      if (relSearchResult.referrer !== null) {
+        body.referrerId = relSearchResult.referrer.id;
+      } else if (relSearchCode.referrer === "__CLEAR__") {
+        body.referrerId = null;
+      }
+      if (relSearchResult.upline !== null) {
+        body.uplineId = relSearchResult.upline.id;
+      } else if (relSearchCode.upline === "__CLEAR__") {
+        body.uplineId = null;
+      }
+      if (Object.keys(body).length === 0) {
+        setEditSection(null);
+        return;
+      }
+      const res = await fetch(`/api/admin/mlm-members/${memberId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ section: "relations", ...body }),
+      });
+      if (res.ok) {
+        await fetchMember();
+        setEditSection(null);
+        setRelSearchCode({ referrer: "", upline: "" });
+        setRelSearchResult({ referrer: null, upline: null });
+        setRelSearchError({ referrer: null, upline: null });
+      } else {
+        const err = await res.json();
+        alert(err.error ?? "保存に失敗しました");
+      }
+    } catch {
+      alert("通信エラーが発生しました");
+    } finally {
+      setRelSaving(false);
+    }
+  };
 
   // 編集フォームの一時データ
   const [editData, setEditData] = useState<Record<string, string | boolean | number | null>>({});
@@ -657,10 +763,18 @@ export default function MlmMemberDetailPage() {
             {m.memberCode} ／ {dispName}
           </p>
         </div>
-        <button onClick={() => router.back()}
-          className="px-4 py-2 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition">
-          ← 戻る
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => router.back()}
+            className="px-4 py-2 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition">
+            ← 戻る
+          </button>
+          <button
+            onClick={() => { setDeleteConfirmText(""); setDeleteError(null); setDeleteModalOpen(true); }}
+            className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-700 transition"
+          >
+            <i className="fas fa-trash-alt text-xs"></i> 会員削除
+          </button>
+        </div>
       </div>
 
       {/* ─── 初期パスワード表示バナー（新規登録直後のみ） ─── */}
@@ -1042,7 +1156,13 @@ export default function MlmMemberDetailPage() {
       {/* ─── 組織情報 ─── */}
       <div className="grid gap-6 md:grid-cols-2">
         <section className="bg-white rounded-2xl shadow-sm p-5">
-          <SectionHeader title="紹介者（ユニレベル）" icon="fas fa-user-tie" />
+          <SectionHeader title="紹介者（ユニレベル）" icon="fas fa-user-tie"
+            onEdit={() => {
+              setRelSearchCode({ referrer: "", upline: "" });
+              setRelSearchResult({ referrer: null, upline: null });
+              setRelSearchError({ referrer: null, upline: null });
+              setEditSection("relations");
+            }} />
           {m.referrer ? (
             <div className="space-y-1">
               <InfoRow label="会員コード" value={
@@ -1055,7 +1175,13 @@ export default function MlmMemberDetailPage() {
           ) : <p className="text-slate-400 text-sm">紹介者なし（トップ）</p>}
         </section>
         <section className="bg-white rounded-2xl shadow-sm p-5">
-          <SectionHeader title="直上者（マトリックス）" icon="fas fa-sitemap" />
+          <SectionHeader title="直上者（マトリックス）" icon="fas fa-sitemap"
+            onEdit={() => {
+              setRelSearchCode({ referrer: "", upline: "" });
+              setRelSearchResult({ referrer: null, upline: null });
+              setRelSearchError({ referrer: null, upline: null });
+              setEditSection("relations");
+            }} />
           {m.upline ? (
             <div className="space-y-1">
               <InfoRow label="会員コード" value={
@@ -1450,6 +1576,250 @@ export default function MlmMemberDetailPage() {
             </div>
           )}
         </EditModal>
+      )}
+
+      {/* ─── 会員削除 確認モーダル ─── */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={() => setDeleteModalOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <i className="fas fa-exclamation-triangle text-red-600 text-lg"></i>
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-800">会員を削除しますか？</h3>
+                <p className="text-xs text-slate-500 mt-0.5">この操作は取り消せません</p>
+              </div>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-xs text-red-800 space-y-1">
+              <p className="font-bold">⚠️ 削除されるデータ</p>
+              <p>• 会員情報・ログイン情報（User）</p>
+              <p>• 購入履歴・注文履歴</p>
+              <p>• ポイントウォレット・取引履歴</p>
+              <p>• ボーナス計算結果</p>
+              <p>• オートシップ注文履歴</p>
+              <p className="font-bold mt-1">🔄 自動処理</p>
+              <p>• 継続購入（オートシップ）を自動停止</p>
+              <p>• ダウンラインの上位リンクを解除</p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                確認のため会員コード（<span className="font-mono text-red-600">{m.memberCode}</span>）を入力してください
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={e => { setDeleteConfirmText(e.target.value); setDeleteError(null); }}
+                placeholder={m.memberCode}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-300 font-mono"
+              />
+              {deleteError && (
+                <p className="text-red-600 text-xs mt-1">
+                  <i className="fas fa-exclamation-circle mr-1"></i>{deleteError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteModalOpen(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting || deleteConfirmText !== m.memberCode}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-40 transition"
+              >
+                {deleting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+                    削除中...
+                  </span>
+                ) : "削除する"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── 紹介者・直上者変更 モーダル ─── */}
+      {editSection === "relations" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6 overflow-auto"
+          onClick={() => setEditSection(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-800">
+                <i className="fas fa-project-diagram mr-2 text-violet-600"></i>紹介者・直上者を変更
+              </h3>
+              <button onClick={() => setEditSection(null)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">✕</button>
+            </div>
+
+            <div className="px-5 py-4 space-y-5">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+                <p className="font-bold mb-1">⚠️ 注意</p>
+                <p>• 組織構造（ボーナス計算）に影響します。変更は慎重に行ってください。</p>
+                <p>• 変更しない項目は空欄のままにしてください。</p>
+                <p>• クリアボタンで現在の設定をなしにできます。</p>
+              </div>
+
+              {/* 紹介者変更 */}
+              <div className="border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-bold text-slate-700">
+                    <i className="fas fa-user-tie mr-1.5 text-violet-500"></i>紹介者（ユニレベル）
+                  </p>
+                  <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                    現在: {m.referrer ? `${m.referrer.memberCode} ${displayName(m.referrer)}` : "なし"}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={relSearchCode.referrer === "__CLEAR__" ? "" : relSearchCode.referrer}
+                    onChange={e => {
+                      setRelSearchCode(s => ({ ...s, referrer: e.target.value }));
+                      setRelSearchResult(s => ({ ...s, referrer: null }));
+                      setRelSearchError(s => ({ ...s, referrer: null }));
+                    }}
+                    placeholder="会員コードを入力（例: 123456-01）"
+                    className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 font-mono"
+                  />
+                  <button
+                    onClick={() => searchRelMember("referrer")}
+                    disabled={relSearching.referrer || !relSearchCode.referrer.trim()}
+                    className="px-3 py-2 bg-violet-600 text-white text-xs font-bold rounded-lg hover:bg-violet-700 disabled:opacity-40 transition whitespace-nowrap"
+                  >
+                    {relSearching.referrer ? "検索中..." : "検索"}
+                  </button>
+                  {m.referrer && (
+                    <button
+                      onClick={() => {
+                        setRelSearchCode(s => ({ ...s, referrer: "__CLEAR__" }));
+                        setRelSearchResult(s => ({ ...s, referrer: null }));
+                        setRelSearchError(s => ({ ...s, referrer: null }));
+                      }}
+                      className={`px-3 py-2 text-xs font-bold rounded-lg border transition whitespace-nowrap ${
+                        relSearchCode.referrer === "__CLEAR__"
+                          ? "bg-red-600 text-white border-red-600"
+                          : "border-red-300 text-red-600 hover:bg-red-50"
+                      }`}
+                    >
+                      クリア
+                    </button>
+                  )}
+                </div>
+                {relSearchError.referrer && (
+                  <p className="text-xs text-red-600"><i className="fas fa-exclamation-circle mr-1"></i>{relSearchError.referrer}</p>
+                )}
+                {relSearchResult.referrer && (
+                  <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-800">
+                    <i className="fas fa-check-circle text-green-600"></i>
+                    <span className="font-mono font-bold">{relSearchResult.referrer.memberCode}</span>
+                    <span>{relSearchResult.referrer.name}</span>
+                    <span className="text-green-600 ml-auto">← 新紹介者に設定</span>
+                  </div>
+                )}
+                {relSearchCode.referrer === "__CLEAR__" && (
+                  <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-800">
+                    <i className="fas fa-times-circle text-red-600"></i>
+                    <span>紹介者をなしにします</span>
+                  </div>
+                )}
+              </div>
+
+              {/* 直上者変更 */}
+              <div className="border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-bold text-slate-700">
+                    <i className="fas fa-sitemap mr-1.5 text-blue-500"></i>直上者（マトリックス）
+                  </p>
+                  <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                    現在: {m.upline ? `${m.upline.memberCode} ${displayName(m.upline)}` : "なし"}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={relSearchCode.upline === "__CLEAR__" ? "" : relSearchCode.upline}
+                    onChange={e => {
+                      setRelSearchCode(s => ({ ...s, upline: e.target.value }));
+                      setRelSearchResult(s => ({ ...s, upline: null }));
+                      setRelSearchError(s => ({ ...s, upline: null }));
+                    }}
+                    placeholder="会員コードを入力（例: 123456-01）"
+                    className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 font-mono"
+                  />
+                  <button
+                    onClick={() => searchRelMember("upline")}
+                    disabled={relSearching.upline || !relSearchCode.upline.trim()}
+                    className="px-3 py-2 bg-violet-600 text-white text-xs font-bold rounded-lg hover:bg-violet-700 disabled:opacity-40 transition whitespace-nowrap"
+                  >
+                    {relSearching.upline ? "検索中..." : "検索"}
+                  </button>
+                  {m.upline && (
+                    <button
+                      onClick={() => {
+                        setRelSearchCode(s => ({ ...s, upline: "__CLEAR__" }));
+                        setRelSearchResult(s => ({ ...s, upline: null }));
+                        setRelSearchError(s => ({ ...s, upline: null }));
+                      }}
+                      className={`px-3 py-2 text-xs font-bold rounded-lg border transition whitespace-nowrap ${
+                        relSearchCode.upline === "__CLEAR__"
+                          ? "bg-red-600 text-white border-red-600"
+                          : "border-red-300 text-red-600 hover:bg-red-50"
+                      }`}
+                    >
+                      クリア
+                    </button>
+                  )}
+                </div>
+                {relSearchError.upline && (
+                  <p className="text-xs text-red-600"><i className="fas fa-exclamation-circle mr-1"></i>{relSearchError.upline}</p>
+                )}
+                {relSearchResult.upline && (
+                  <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-800">
+                    <i className="fas fa-check-circle text-green-600"></i>
+                    <span className="font-mono font-bold">{relSearchResult.upline.memberCode}</span>
+                    <span>{relSearchResult.upline.name}</span>
+                    <span className="text-green-600 ml-auto">← 新直上者に設定</span>
+                  </div>
+                )}
+                {relSearchCode.upline === "__CLEAR__" && (
+                  <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-800">
+                    <i className="fas fa-times-circle text-red-600"></i>
+                    <span>直上者をなしにします</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-3 px-5 py-4 border-t border-slate-100">
+              <button
+                onClick={handleRelSave}
+                disabled={relSaving || (
+                  relSearchResult.referrer === null && relSearchCode.referrer !== "__CLEAR__" &&
+                  relSearchResult.upline === null && relSearchCode.upline !== "__CLEAR__"
+                )}
+                className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 disabled:opacity-40 transition"
+              >
+                {relSaving ? "保存中..." : "変更を保存する"}
+              </button>
+              <button
+                onClick={() => setEditSection(null)}
+                className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm text-slate-600 hover:bg-slate-50 transition"
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 継続購入設定 編集 */}

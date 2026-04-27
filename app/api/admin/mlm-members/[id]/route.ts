@@ -6,6 +6,64 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
+// DELETE: 会員削除（継続購入自動停止 + User含む全データ削除）
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  let memberId: bigint;
+  try {
+    memberId = BigInt(id);
+  } catch {
+    return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+  }
+
+  try {
+    const member = await prisma.mlmMember.findUnique({
+      where: { id: memberId },
+      include: { user: true },
+    });
+    if (!member) {
+      return NextResponse.json({ error: "会員が見つかりません" }, { status: 404 });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // ① 継続購入（オートシップ）を停止
+      await tx.mlmMember.update({
+        where: { id: memberId },
+        data: {
+          autoshipEnabled: false,
+          autoshipStopDate: new Date(),
+        },
+      });
+
+      // ② ダウンラインの uplineId / referrerId を null にして組織から切り離す
+      await tx.mlmMember.updateMany({
+        where: { uplineId: memberId },
+        data: { uplineId: null },
+      });
+      await tx.mlmMember.updateMany({
+        where: { referrerId: memberId },
+        data: { referrerId: null },
+      });
+
+      // ③ User を削除（Cascade で MlmMember・PointWallet・Order 等も連鎖削除）
+      await tx.user.delete({ where: { id: member.userId } });
+    });
+
+    return NextResponse.json({ message: "会員を削除しました" }, { status: 200 });
+  } catch (error) {
+    console.error("DELETE mlm-member error:", error);
+    return NextResponse.json({ error: "削除に失敗しました" }, { status: 500 });
+  }
+}
+
 // PATCH: 会員情報更新
 export async function PATCH(
   req: NextRequest,
@@ -138,6 +196,46 @@ export async function PATCH(
       if (data.paymentMethod     !== undefined) asUpdate.paymentMethod     = data.paymentMethod;
       if (data.autoshipSuspendMonths !== undefined) asUpdate.autoshipSuspendMonths = data.autoshipSuspendMonths || null;
       await prisma.mlmMember.update({ where: { id: memberId }, data: asUpdate });
+
+    } else if (section === "relations") {
+      // 紹介者・直上者変更
+      const relUpdate: Record<string, unknown> = {};
+
+      if (data.referrerId !== undefined) {
+        if (data.referrerId === null || data.referrerId === "") {
+          relUpdate.referrerId = null;
+        } else {
+          const refId = BigInt(data.referrerId as string);
+          if (refId === memberId) {
+            return NextResponse.json({ error: "自分自身は紹介者に設定できません" }, { status: 400 });
+          }
+          const refMember = await prisma.mlmMember.findUnique({ where: { id: refId } });
+          if (!refMember) {
+            return NextResponse.json({ error: "指定した紹介者が見つかりません" }, { status: 404 });
+          }
+          relUpdate.referrerId = refId;
+        }
+      }
+
+      if (data.uplineId !== undefined) {
+        if (data.uplineId === null || data.uplineId === "") {
+          relUpdate.uplineId = null;
+        } else {
+          const upId = BigInt(data.uplineId as string);
+          if (upId === memberId) {
+            return NextResponse.json({ error: "自分自身は直上者に設定できません" }, { status: 400 });
+          }
+          const upMember = await prisma.mlmMember.findUnique({ where: { id: upId } });
+          if (!upMember) {
+            return NextResponse.json({ error: "指定した直上者が見つかりません" }, { status: 404 });
+          }
+          relUpdate.uplineId = upId;
+        }
+      }
+
+      if (Object.keys(relUpdate).length > 0) {
+        await prisma.mlmMember.update({ where: { id: memberId }, data: relUpdate });
+      }
 
     } else {
       return NextResponse.json({ error: "section が不正です" }, { status: 400 });
