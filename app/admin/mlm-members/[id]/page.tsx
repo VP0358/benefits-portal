@@ -1672,11 +1672,12 @@ export default function MlmMemberDetailPage() {
                     type="button"
                     onClick={() => {
                       if (!yuchoResult) return;
-                      set("regBankCode",   yuchoResult.bankCode);
-                      set("regBankName",   yuchoResult.bankName);
-                      set("regBranchCode", yuchoResult.branchCode);
-                      set("regBankBranch", yuchoResult.branchName);
+                      set("regBankCode",    yuchoResult.bankCode);
+                      set("regBankName",    yuchoResult.bankName);
+                      set("regBranchCode",  yuchoResult.branchCode);
+                      set("regBankBranch",  yuchoResult.branchName);
                       set("regAccountType", yuchoResult.accountType);
+                      set("regAccountNumber", yuchoResult.accountNumber);
                       setYuchoResult(null);
                       setYuchoKigo("");
                       setYuchoBango("");
@@ -1710,7 +1711,24 @@ export default function MlmMemberDetailPage() {
           </div>
 
           {/* ── 引き落とし先口座 ── */}
-          <p className="text-xs font-bold text-teal-700 mt-5 mb-2">💳 引き落とし先口座（クレジット/振替）</p>
+          <div className="flex items-center justify-between mt-5 mb-2">
+            <p className="text-xs font-bold text-teal-700">💳 引き落とし先口座（クレジット/振替）</p>
+            <button
+              type="button"
+              onClick={() => {
+                set("regBankCode",    String(editData.bankCode    ?? ""));
+                set("regBankName",    String(editData.bankName    ?? ""));
+                set("regBranchCode",  String(editData.branchCode  ?? ""));
+                set("regBankBranch",  String(editData.branchName  ?? ""));
+                set("regAccountType", String(editData.accountType ?? "普通"));
+                set("regAccountNumber", String(editData.accountNumber ?? ""));
+                set("regAccountHolder", String(editData.accountHolder ?? ""));
+              }}
+              className="flex items-center gap-1 rounded-lg bg-slate-100 hover:bg-teal-50 border border-slate-300 hover:border-teal-400 text-slate-600 hover:text-teal-700 text-xs font-bold py-1.5 px-3 transition-colors"
+            >
+              <i className="fas fa-copy text-[10px]" /> 報酬振込先からコピー
+            </button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <FormField label="銀行コード"><input className={inputCls} value={String(editData.regBankCode ?? "")} onChange={e => set("regBankCode", e.target.value)} /></FormField>
             <FormField label="銀行名"><input className={inputCls} value={String(editData.regBankName ?? "")} onChange={e => set("regBankName", e.target.value)} /></FormField>
