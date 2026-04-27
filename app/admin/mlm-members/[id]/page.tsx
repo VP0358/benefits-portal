@@ -979,6 +979,11 @@ export default function MlmMemberDetailPage() {
               } />
             ) : null)}
             <InfoRow label="備考"             value={m.note} />
+            <InfoRow label="継続購入" value={
+              m.autoshipEnabled
+                ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">継続購入は有効です</span>
+                : <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">継続購入はしていません</span>
+            } />
           </div>
         </div>
         {/* 登録完了通知書ボタン */}
