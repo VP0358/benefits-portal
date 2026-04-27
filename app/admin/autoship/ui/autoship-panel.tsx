@@ -766,8 +766,8 @@ export default function AutoShipPanel() {
                         <td className="px-3 py-2 text-gray-500">{m.memberPhone ?? "—"}</td>
                         <td className="px-3 py-2 text-gray-500">{m.memberEmail ?? "—"}</td>
                         <td className="px-3 py-2">{PM_LABELS[m.paymentMethod] ?? m.paymentMethod}</td>
-                        <td className="px-3 py-2 text-gray-500">{m.autoshipStartDate ? new Date(m.autoshipStartDate).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) : "—"}</td>
-                        <td className="px-3 py-2 text-gray-500">{m.autoshipStopDate ? new Date(m.autoshipStopDate).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) : "—"}</td>
+                        <td className="px-3 py-2 text-gray-500">{m.autoshipStartDate ? (() => { const d = new Date(m.autoshipStartDate); return `${d.getUTCFullYear()}/${d.getUTCMonth()+1}/${d.getUTCDate()}`; })() : "—"}</td>
+                        <td className="px-3 py-2 text-gray-500">{m.autoshipStopDate ? (() => { const d = new Date(m.autoshipStopDate); return `${d.getUTCFullYear()}/${d.getUTCMonth()+1}/${d.getUTCDate()}`; })() : "—"}</td>
                         <td className="px-3 py-2 text-center">
                           <button
                             onClick={() => openSlipModal(m)}

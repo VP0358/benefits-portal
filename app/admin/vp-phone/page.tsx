@@ -243,7 +243,7 @@ export default async function AdminVpPhonePage({
         {applications.map(a => {
           const st = STATUS_LABEL[a.status] ?? STATUS_LABEL.pending;
           const birthDate = a.birthDate
-            ? new Date(a.birthDate).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo",  year: "numeric", month: "long", day: "numeric" })
+            ? (() => { const d = new Date(a.birthDate); return `${d.getUTCFullYear()}年${d.getUTCMonth()+1}月${d.getUTCDate()}日`; })()
             : "未入力";
           const hasPassword = !!(a as typeof a & { password?: string | null }).password;
 

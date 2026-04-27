@@ -4,7 +4,7 @@ export const revalidate = 0
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { parseDateJST } from '@/lib/japan-time'
+
 
 
 export async function GET(
@@ -67,7 +67,7 @@ export async function PUT(
         representative: data.representative || null,
         ordererPhone: data.ordererPhone || null,
         ordererFax: data.ordererFax || null,
-        ordererBirthDate: parseDateJST(data.ordererBirthDate),
+        ordererBirthDate: data.ordererBirthDate ? new Date(data.ordererBirthDate) : null,
         initialContact: data.initialContact || null,
         customerRank: data.customerRank || null,
         
@@ -85,7 +85,7 @@ export async function PUT(
         deliveryCenter: data.deliveryCenter || null,
         autoshipNo: data.autoshipNo || null,
         voucherNumber: data.voucherNumber || null,
-        desiredDeliveryDate: parseDateJST(data.desiredDeliveryDateValue),
+        desiredDeliveryDate: data.desiredDeliveryDateValue ? new Date(data.desiredDeliveryDateValue) : null,
         recordNumber: data.recordNumber || null,
         orderMethod: data.orderMethod || null,
         

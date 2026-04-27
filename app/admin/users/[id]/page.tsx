@@ -154,7 +154,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
               <div>現在レベル: <span className="font-medium">Lv.{mlmMember.currentLevel}</span></div>
               <div>タイトルレベル: <span className="font-medium">Lv.{mlmMember.titleLevel}</span></div>
               {mlmMember.contractDate && (
-                <div>契約日: {new Date(mlmMember.contractDate).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}</div>
+                <div>契約日: {(() => { const d = new Date(mlmMember.contractDate); return `${d.getUTCFullYear()}年${d.getUTCMonth()+1}月${d.getUTCDate()}日`; })()}</div>
               )}
               <div className="mt-2">
                 <Link

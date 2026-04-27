@@ -609,11 +609,7 @@ export default function MlmMemberNewPage() {
               {formData.birthDate && (
                 <p className="text-xs text-gray-500 mt-1">
                   <i className="fas fa-check-circle text-green-500 mr-1"></i>
-                  選択済み: {new Date(formData.birthDate).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", 
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
+                  選択済み: {(() => { const d = new Date(formData.birthDate); return `${d.getUTCFullYear()}年${d.getUTCMonth()+1}月${d.getUTCDate()}日`; })()}
                 </p>
               )}
             </div>

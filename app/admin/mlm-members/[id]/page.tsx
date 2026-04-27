@@ -202,7 +202,12 @@ const PAYMENT_LABEL: Record<string, string> = {
 function fmtDate(s: string | null | undefined) {
   if (!s) return "—";
   try {
-    return new Date(s).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "long", day: "numeric" });
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return s;
+    const y = d.getUTCFullYear();
+    const m = d.getUTCMonth() + 1;
+    const day = d.getUTCDate();
+    return `${y}年${m}月${day}日`;
   } catch { return s; }
 }
 function displayName(m: { user: { name: string }; companyName: string | null } | null) {
