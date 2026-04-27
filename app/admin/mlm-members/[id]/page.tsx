@@ -156,7 +156,9 @@ type MemberDetail = {
     } | null;
     mlmRegistration: {
       disclosureDocNumber: string | null;
+      bankCode: string | null;
       bankName: string | null;
+      branchCode: string | null;
       bankBranch: string | null;
       bankAccountType: string | null;
       bankAccountNumber: string | null;
@@ -737,7 +739,8 @@ export default function MlmMemberDetailPage() {
         accountNumber: m.accountNumber ?? "",
         accountHolder: m.accountHolder ?? "",
         // MlmRegistration の銀行（引き落とし先）
-        regBankName: r?.bankName ?? "", regBankBranch: r?.bankBranch ?? "",
+        regBankCode: r?.bankCode ?? "", regBankName: r?.bankName ?? "",
+        regBranchCode: r?.branchCode ?? "", regBankBranch: r?.bankBranch ?? "",
         regAccountType: r?.bankAccountType ?? "普通",
         regAccountNumber: r?.bankAccountNumber ?? "",
         regAccountHolder: r?.bankAccountHolder ?? "",
@@ -796,7 +799,9 @@ export default function MlmMemberDetailPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             section: "registration",
+            bankCode: editData.regBankCode,
             bankName: editData.regBankName,
+            branchCode: editData.regBranchCode,
             bankBranch: editData.regBankBranch,
             bankAccountType: editData.regAccountType,
             bankAccountNumber: editData.regAccountNumber,
@@ -1045,11 +1050,13 @@ export default function MlmMemberDetailPage() {
           </div>
           <div>
             <p className="text-xs font-bold text-slate-600 mb-2 mt-1">💳 引き落とし先口座（クレジット/振替）</p>
-            <InfoRow label="銀行名"   value={r?.bankName} />
-            <InfoRow label="支店名"   value={r?.bankBranch} />
-            <InfoRow label="口座種別" value={r?.bankAccountType} />
-            <InfoRow label="口座番号" value={r?.bankAccountNumber} mono />
-            <InfoRow label="口座名義" value={r?.bankAccountHolder} />
+            <InfoRow label="銀行コード" value={r?.bankCode} mono />
+            <InfoRow label="銀行名"     value={r?.bankName} />
+            <InfoRow label="支店コード" value={r?.branchCode} mono />
+            <InfoRow label="支店名"     value={r?.bankBranch} />
+            <InfoRow label="口座種別"   value={r?.bankAccountType} />
+            <InfoRow label="口座番号"   value={r?.bankAccountNumber} mono />
+            <InfoRow label="口座名義"   value={r?.bankAccountHolder} />
           </div>
         </div>
       </section>
@@ -1652,17 +1659,38 @@ export default function MlmMemberDetailPage() {
                   <span className="text-slate-500">口座種別</span><span className="font-bold">{yuchoResult.accountType}</span>
                   <span className="text-slate-500">口座番号</span><span className="font-mono font-bold">{yuchoResult.accountNumber}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={applyYuchoResult}
-                  className="mt-2 w-full rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold py-2 px-4 transition-colors"
-                >
-                  ↑ 報酬振込先口座に反映する
-                </button>
+                {/* 反映先ボタン：報酬振込先 ／ 引き落とし先 の2択 */}
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={applyYuchoResult}
+                    className="rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold py-2 px-3 transition-colors"
+                  >
+                    📥 報酬振込先口座に反映
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!yuchoResult) return;
+                      set("regBankCode",   yuchoResult.bankCode);
+                      set("regBankName",   yuchoResult.bankName);
+                      set("regBranchCode", yuchoResult.branchCode);
+                      set("regBankBranch", yuchoResult.branchName);
+                      set("regAccountType", yuchoResult.accountType);
+                      setYuchoResult(null);
+                      setYuchoKigo("");
+                      setYuchoBango("");
+                    }}
+                    className="rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold py-2 px-3 transition-colors"
+                  >
+                    💳 引き落とし先口座に反映
+                  </button>
+                </div>
               </div>
             )}
           </div>
 
+          {/* ── 報酬振込先口座 ── */}
           <p className="text-xs font-bold text-violet-700 mb-2">📥 報酬振込先口座</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <FormField label="銀行コード"><input className={inputCls} value={String(editData.bankCode ?? "")} onChange={e => set("bankCode", e.target.value)} /></FormField>
@@ -1680,9 +1708,13 @@ export default function MlmMemberDetailPage() {
               <FormField label="口座名義（カナ）"><input className={inputCls} value={String(editData.accountHolder ?? "")} onChange={e => set("accountHolder", e.target.value)} /></FormField>
             </div>
           </div>
-          <p className="text-xs font-bold text-slate-600 mt-4 mb-2">💳 引き落とし先口座（クレジット/振替）</p>
+
+          {/* ── 引き落とし先口座 ── */}
+          <p className="text-xs font-bold text-teal-700 mt-5 mb-2">💳 引き落とし先口座（クレジット/振替）</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <FormField label="銀行コード"><input className={inputCls} value={String(editData.regBankCode ?? "")} onChange={e => set("regBankCode", e.target.value)} /></FormField>
             <FormField label="銀行名"><input className={inputCls} value={String(editData.regBankName ?? "")} onChange={e => set("regBankName", e.target.value)} /></FormField>
+            <FormField label="支店コード"><input className={inputCls} value={String(editData.regBranchCode ?? "")} onChange={e => set("regBranchCode", e.target.value)} /></FormField>
             <FormField label="支店名"><input className={inputCls} value={String(editData.regBankBranch ?? "")} onChange={e => set("regBankBranch", e.target.value)} /></FormField>
             <FormField label="口座種別">
               <select className={selectCls} value={String(editData.regAccountType ?? "普通")} onChange={e => set("regAccountType", e.target.value)}>

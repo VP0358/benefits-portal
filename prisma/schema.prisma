@@ -591,7 +591,9 @@ model MlmRegistration {
   // 概要書面番号
   disclosureDocNumber String?   @db.VarChar(100)
   // 報酬受取り口座情報
+  bankCode            String?   @db.VarChar(10)
   bankName            String?   @db.VarChar(100)
+  branchCode          String?   @db.VarChar(10)
   bankBranch          String?   @db.VarChar(100)
   bankAccountType     String?   @default("普通") @db.VarChar(20)  // 普通/当座
   bankAccountNumber   String?   @db.VarChar(20)

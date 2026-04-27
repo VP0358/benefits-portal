@@ -149,7 +149,9 @@ export async function PATCH(
       // MlmRegistration (概要書面番号・銀行口座・配送先など)
       const regUpdate: Record<string, unknown> = {};
       if (data.disclosureDocNumber !== undefined) regUpdate.disclosureDocNumber = data.disclosureDocNumber || null;
+      if (data.bankCode            !== undefined) regUpdate.bankCode            = data.bankCode || null;
       if (data.bankName            !== undefined) regUpdate.bankName            = data.bankName || null;
+      if (data.branchCode          !== undefined) regUpdate.branchCode          = data.branchCode || null;
       if (data.bankBranch          !== undefined) regUpdate.bankBranch          = data.bankBranch || null;
       if (data.bankAccountType     !== undefined) regUpdate.bankAccountType     = data.bankAccountType || null;
       if (data.bankAccountNumber   !== undefined) regUpdate.bankAccountNumber   = data.bankAccountNumber || null;
