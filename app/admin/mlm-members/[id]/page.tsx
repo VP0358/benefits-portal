@@ -198,6 +198,81 @@ const PAYMENT_LABEL: Record<string, string> = {
   other:         "その他",
 };
 
+// ─── ゆうちょ銀行 記号番号→振込用口座情報 変換 ────────────────────
+/**
+ * ゆうちょ銀行の記号番号から、他行振込用の口座情報に変換する。
+ *
+ * 【変換ルール】
+ *   記号：5桁（例: 10020）
+ *   番号：最大8桁（例: 12345671）
+ *
+ *   銀行コード : 9900
+ *   銀行名     : ゆうちょ銀行
+ *   支店コード : 記号の2・3桁目 + "8"  例: 10020 → "002" → "0028"（3桁+1）
+ *               ※正確には: 記号先頭1桁が "1" の場合 → (記号2〜3桁目) + "8"
+ *                           記号先頭1桁が "0" の場合 → (記号1〜3桁目) + "8"
+ *   支店名     : 支店コードに対応する名称（3桁数字+8）
+ *   口座種別   : 普通
+ *   口座番号   : 番号の末尾1桁を除いた数字（チェックデジット除去）、左ゼロ除去後7桁
+ */
+interface YuchoConvertResult {
+  bankCode: string;
+  bankName: string;
+  branchCode: string;
+  branchName: string;
+  accountType: string;
+  accountNumber: string;
+  error?: string;
+}
+
+function convertYucho(kigo: string, bango: string): YuchoConvertResult {
+  // 半角数字のみ抽出
+  const k = kigo.replace(/[^\d]/g, "");
+  const b = bango.replace(/[^\d]/g, "");
+
+  if (k.length < 5) {
+    return { bankCode: "", bankName: "", branchCode: "", branchName: "", accountType: "", accountNumber: "", error: "記号は5桁で入力してください（例: 10020）" };
+  }
+  if (b.length < 2) {
+    return { bankCode: "", bankName: "", branchCode: "", branchName: "", accountType: "", accountNumber: "", error: "番号を入力してください" };
+  }
+
+  // 支店コード算出
+  // 記号先頭が "1" → 2〜3桁目 + "8"
+  // 記号先頭が "0" → 1〜3桁目 + "8"
+  let branchCode: string;
+  if (k[0] === "1") {
+    branchCode = k.substring(1, 3) + "8";
+  } else {
+    branchCode = k.substring(0, 3) + "8";
+  }
+
+  // 支店名：コードを漢数字で表現（末尾は必ず「八」）
+  const kanjiDigits = ["〇", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+  const branchDigits = branchCode.split("").map(c => kanjiDigits[parseInt(c)] ?? c);
+  const branchName = branchDigits.join("") + "支店";
+
+  // 振込用口座番号：番号の末尾1桁（チェックデジット）を除去して7桁に整形
+  // 番号が8桁の場合: 先頭7桁を使用
+  // 番号が7桁以下の場合: そのまま使用（ゼロ除去）
+  let accountNumber: string;
+  if (b.length >= 8) {
+    accountNumber = b.substring(0, 7);
+  } else {
+    // 番号が短い場合は左ゼロ埋め除去
+    accountNumber = String(parseInt(b, 10) || 0).padStart(7, "0");
+  }
+
+  return {
+    bankCode: "9900",
+    bankName: "ゆうちょ銀行",
+    branchCode,
+    branchName,
+    accountType: "普通",
+    accountNumber,
+  };
+}
+
 // ─── ヘルパー ────────────────────────────────────────
 function fmtDate(s: string | null | undefined) {
   if (!s) return "—";
@@ -423,6 +498,36 @@ export default function MlmMemberDetailPage() {
 
   // 編集フォームの一時データ
   const [editData, setEditData] = useState<Record<string, string | boolean | number | null>>({});
+
+  // ─── ゆうちょ記号番号変換 ───
+  const [yuchoKigo, setYuchoKigo] = useState("");
+  const [yuchoBango, setYuchoBango] = useState("");
+  const [yuchoResult, setYuchoResult] = useState<YuchoConvertResult | null>(null);
+  const [yuchoError, setYuchoError] = useState<string | null>(null);
+
+  const handleYuchoConvert = () => {
+    setYuchoError(null);
+    setYuchoResult(null);
+    const result = convertYucho(yuchoKigo, yuchoBango);
+    if (result.error) {
+      setYuchoError(result.error);
+      return;
+    }
+    setYuchoResult(result);
+  };
+
+  const applyYuchoResult = () => {
+    if (!yuchoResult) return;
+    set("bankCode", yuchoResult.bankCode);
+    set("bankName", yuchoResult.bankName);
+    set("branchCode", yuchoResult.branchCode);
+    set("branchName", yuchoResult.branchName);
+    set("accountType", yuchoResult.accountType);
+    set("accountNumber", yuchoResult.accountNumber);
+    setYuchoResult(null);
+    setYuchoKigo("");
+    setYuchoBango("");
+  };
 
   // ─── ポイント調整モーダル ───
   const [pointAdjModal, setPointAdjModal] = useState(false);
@@ -1492,6 +1597,67 @@ export default function MlmMemberDetailPage() {
       {/* 銀行口座 編集 */}
       {editSection === "bank" && (
         <EditModal title="銀行口座情報を編集" onClose={() => setEditSection(null)} onSave={handleSave} saving={saving}>
+
+          {/* ── ゆうちょ銀行 記号番号変換ツール ── */}
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-xs font-bold text-amber-700 mb-3">
+              <i className="fas fa-exchange-alt mr-1" />
+              🏣 ゆうちょ銀行 記号番号 → 振込用口座情報 変換
+            </p>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">記号（5桁）</label>
+                <input
+                  className={inputCls + " font-mono"}
+                  placeholder="例: 10020"
+                  maxLength={7}
+                  value={yuchoKigo}
+                  onChange={e => { setYuchoKigo(e.target.value); setYuchoResult(null); setYuchoError(null); }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">番号（8桁）</label>
+                <input
+                  className={inputCls + " font-mono"}
+                  placeholder="例: 12345671"
+                  maxLength={9}
+                  value={yuchoBango}
+                  onChange={e => { setYuchoBango(e.target.value); setYuchoResult(null); setYuchoError(null); }}
+                />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleYuchoConvert}
+              className="w-full rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2 px-4 transition-colors"
+            >
+              変換する
+            </button>
+            {yuchoError && (
+              <p className="mt-2 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">⚠ {yuchoError}</p>
+            )}
+            {yuchoResult && (
+              <div className="mt-3 rounded-lg border border-amber-300 bg-white p-3 space-y-1">
+                <p className="text-xs font-bold text-amber-700 mb-2">✅ 変換結果</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  <span className="text-slate-500">銀行コード</span><span className="font-mono font-bold">{yuchoResult.bankCode}</span>
+                  <span className="text-slate-500">銀行名</span><span className="font-bold">{yuchoResult.bankName}</span>
+                  <span className="text-slate-500">支店コード</span><span className="font-mono font-bold">{yuchoResult.branchCode}</span>
+                  <span className="text-slate-500">支店名</span><span className="font-bold">{yuchoResult.branchName}</span>
+                  <span className="text-slate-500">口座種別</span><span className="font-bold">{yuchoResult.accountType}</span>
+                  <span className="text-slate-500">口座番号</span><span className="font-mono font-bold">{yuchoResult.accountNumber}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={applyYuchoResult}
+                  className="mt-2 w-full rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold py-2 px-4 transition-colors"
+                >
+                  ↑ 報酬振込先口座に反映する
+                </button>
+              </div>
+            )}
+          </div>
+
           <p className="text-xs font-bold text-violet-700 mb-2">📥 報酬振込先口座</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <FormField label="銀行コード"><input className={inputCls} value={String(editData.bankCode ?? "")} onChange={e => set("bankCode", e.target.value)} /></FormField>
