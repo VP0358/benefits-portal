@@ -470,6 +470,10 @@ export default function BonusCalculatePage() {
   const [newShor, setNewShor] = useState({ memberCode: "", memberName: "", amount: "", comment: "" });
   const [shorLookingUp, setShorLookingUp] = useState(false);
 
+  // 診断情報（計算結果取得エラー時に表示）
+  type DebugInfo = { status: number; hasResults: boolean; resultsCount: number; error?: string; detail?: string } | null;
+  const [debugInfo, setDebugInfo] = useState<DebugInfo>(null);
+
   // CSV ファイル ref
   const adjCsvRef  = useRef<HTMLInputElement>(null);
   const shorCsvRef = useRef<HTMLInputElement>(null);
@@ -499,12 +503,26 @@ export default function BonusCalculatePage() {
             const detailData = await resDetail.json();
             if (resDetail.ok && Array.isArray(detailData.results)) {
               setResults(detailData.results);
+              setDebugInfo(null);
             } else {
               setResults([]);
+              setDebugInfo({
+                status: resDetail.status,
+                hasResults: Array.isArray(detailData.results),
+                resultsCount: Array.isArray(detailData.results) ? detailData.results.length : 0,
+                error: detailData.error || "不明なエラー",
+                detail: detailData.detail || String(detailData),
+              });
             }
           } catch (detailErr) {
             console.error("計算結果取得エラー:", detailErr);
             setResults([]);
+            setDebugInfo({
+              status: 0,
+              hasResults: false,
+              resultsCount: 0,
+              error: String(detailErr),
+            });
           }
           // 公開状況も取得
           try { await fetchPublishStatus(); } catch {}
