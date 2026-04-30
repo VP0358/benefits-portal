@@ -156,8 +156,19 @@ export async function GET(req: NextRequest) {
 
     for (const r of bonusRun.results) {
       const mc = r.mlmMember.memberCode;
-      // "123456-01" → "123456"  /  "123456" → "123456"
-      const baseCode = mc.replace(/-\d+$/, "");
+      // memberCode形式: "10885801"（8桁） → baseCode="108858"（先頭6桁）、枝番="01"（末尾2桁）
+      // ハイフンあり形式: "123456-01" → baseCode="123456" にも対応
+      let baseCode: string;
+      if (mc.includes("-")) {
+        // ハイフン区切り形式: "123456-01" → "123456"
+        baseCode = mc.replace(/-\d+$/, "");
+      } else if (mc.length === 8) {
+        // 8桁形式: "10885801" → "108858"（先頭6桁）
+        baseCode = mc.slice(0, 6);
+      } else {
+        // その他（5桁等）はそのままbaseCode
+        baseCode = mc;
+      }
       const pos = toPositionRow(r);
 
       if (mergedMap.has(baseCode)) {

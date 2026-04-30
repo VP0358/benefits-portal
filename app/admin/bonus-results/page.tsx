@@ -220,7 +220,7 @@ function BonusDetailModal({ row, onClose }: { row: BonusResultDetail; onClose: (
             <h3 className="text-xl font-bold text-gray-900">{name}</h3>
             {row.companyName && <p className="text-sm text-gray-500 mt-0.5">{row.memberName}</p>}
             <p className="text-xs text-gray-400 mt-1 font-mono">
-              {isMulti ? `${row.baseCode}-** （${row.positionCount}ポジション）` : row.memberCode}
+              {isMulti ? `${row.baseCode}** （${row.positionCount}ポジション）` : row.memberCode}
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -661,7 +661,7 @@ export default function BonusResultsPage() {
                         >
                           <td className="px-3 py-2.5 font-mono text-xs text-slate-600 sticky left-0 bg-white">
                             {isMulti
-                              ? <span>{displayCode}<span className="text-purple-400">-**</span></span>
+                              ? <span>{displayCode}<span className="text-purple-400">**</span></span>
                               : displayCode
                             }
                           </td>

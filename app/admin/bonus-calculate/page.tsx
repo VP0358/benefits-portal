@@ -299,7 +299,7 @@ function BonusDetailModal({ row, onClose }: { row: BonusResultRow; onClose: () =
             <h3 className="text-xl font-bold text-gray-900">{name}</h3>
             {row.companyName && <p className="text-sm text-gray-500 mt-0.5">{row.memberName}</p>}
             <p className="text-xs text-gray-400 mt-1 font-mono">
-              {isMulti ? `${row.baseCode}-** （${row.positionCount}ポジション）` : row.memberCode}
+              {isMulti ? `${row.baseCode}** （${row.positionCount}ポジション）` : row.memberCode}
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -463,7 +463,7 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
                 {/* 会員コード：複数ポジションは baseCode-** 表示 */}
                 <td className="p-2 font-mono text-xs text-slate-600">
                   {r.positionCount >= 2
-                    ? <span>{r.baseCode}<span className="text-purple-400">-**</span></span>
+                    ? <span>{r.baseCode}<span className="text-purple-400">**</span></span>
                     : r.memberCode}
                 </td>
                 <td className="p-2">

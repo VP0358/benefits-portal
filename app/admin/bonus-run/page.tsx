@@ -134,7 +134,7 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
                     </div>
                     <div className="text-slate-400 font-mono">
                       {isMulti
-                        ? <span>{displayCode}<span className="text-purple-400">-**</span></span>
+                        ? <span>{displayCode}<span className="text-purple-400">**</span></span>
                         : displayCode
                       }
                     </div>
