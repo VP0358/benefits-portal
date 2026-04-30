@@ -77,7 +77,7 @@ type CsvPreviewRow = {
 
 /* ─── 定数 ─── */
 const STATUS_STYLES = {
-  draft:     { label: "下書き（計算中）", bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-300" },
+  draft:     { label: "計算済み（未確定）", bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-300" },
   confirmed: { label: "確定済み",         bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-300" },
   canceled:  { label: "取消",             bg: "bg-slate-100",  text: "text-slate-500",   border: "border-slate-200" },
 };
@@ -434,7 +434,6 @@ export default function BonusCalculatePage() {
   const [loading, setLoading] = useState(false);
   const [executing, setExecuting] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
   // 公開状況
@@ -589,7 +588,7 @@ export default function BonusCalculatePage() {
       });
       const data = await res.json();
       if (res.ok) {
-        alert(`✅ ボーナス計算が完了しました\n対象: ${data.totalMembers}名 / アクティブ: ${data.totalActiveMembers}名\n合計ボーナス: ¥${Number(data.totalBonusAmount).toLocaleString()}`);
+        alert(`✅ ボーナス計算・確定が完了しました\n対象: ${data.totalMembers}名 / アクティブ: ${data.totalActiveMembers}名\n合計ボーナス: ¥${Number(data.totalBonusAmount).toLocaleString()}\n\n次のステップ: 計算結果を確認して「全員に一括公開」を実行してください`);
         await fetchBonusRun();
         setActiveTab("calculation");
       } else alert(`❌ エラー: ${data.error}`);
@@ -597,33 +596,10 @@ export default function BonusCalculatePage() {
     finally { setExecuting(false); }
   };
 
-  // ─── ボーナス確定 ───
-  const handleConfirm = async () => {
-    if (!selectedMonth || !bonusRun) return;
-    if (bonusRun.status === "confirmed") { alert("すでに確定済みです"); return; }
-    if (!confirm(`${selectedMonth}のボーナス計算を確定しますか？\n\n確定すると各会員の称号レベル（currentLevel）が更新されます。\nこの操作は取り消せません。`)) return;
-    setConfirming(true);
-    try {
-      const res = await fetch("/api/admin/bonus-run", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bonusMonth: selectedMonth }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        alert(`✅ ${data.message}`);
-        await fetchBonusRun();
-      } else {
-        alert(`❌ エラー: ${data.error}`);
-      }
-    } catch (err: unknown) { alert(`❌ エラー: ${(err as Error).message}`); }
-    finally { setConfirming(false); }
-  };
-
   // ─── 全員に一括公開 ───
   const handlePublishAll = async (isPublished: boolean) => {
     if (!selectedMonth || !bonusRun) return;
-    if (bonusRun.status !== "confirmed") { alert("確定済みのボーナスのみ公開できます。先に「計算して確定」を実行してください。"); return; }
+    if (bonusRun.status !== "confirmed") { alert("確定済みのボーナスのみ公開できます。"); return; }
     const msg = isPublished
       ? `${selectedMonth}のボーナス明細を全会員に公開しますか？\n\n貯金ポイントが各会員に付与されます。`
       : `${selectedMonth}のボーナス明細を非公開に戻しますか？`;
@@ -931,18 +907,6 @@ export default function BonusCalculatePage() {
             >
               {executing ? "計算中..." : "ボーナス計算実行"}
             </button>
-            {/* 確定ボタン（draft のみ表示） */}
-            {bonusRun && bonusRun.status === "draft" && (
-              <button
-                onClick={handleConfirm}
-                disabled={confirming}
-                className="bg-emerald-600 text-white px-5 py-2 rounded-lg font-semibold text-sm hover:bg-emerald-700 transition disabled:opacity-50"
-                title="計算結果を確定し、各会員の称号レベルを更新します"
-              >
-                <i className="fas fa-check-circle mr-1.5"></i>
-                {confirming ? "確定中..." : "計算して確定"}
-              </button>
-            )}
             {/* 削除ボタン */}
             {bonusRun && (
               <button
@@ -959,16 +923,10 @@ export default function BonusCalculatePage() {
               </button>
             )}
           </div>
-          {/* 確定済みの警告 */}
+          {/* 強制削除の警告 */}
           {bonusRun?.status === "confirmed" && (
             <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
               ⚠️ このボーナスは確定済みです。強制削除すると全ボーナス結果・明細が削除されます。調整金・過不足金は残ります。
-            </div>
-          )}
-          {/* draft 時の案内 */}
-          {bonusRun?.status === "draft" && (
-            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              📋 計算結果を確認後、「計算して確定」ボタンで称号レベルを更新し確定してください。
             </div>
           )}
           {/* 支払調整率 */}
@@ -1063,15 +1021,7 @@ export default function BonusCalculatePage() {
             </div>
           )}
 
-          {/* draft 時：確定の案内 */}
-          {bonusRun.status === "draft" && (
-            <div className="mt-4 pt-4 border-t border-amber-200">
-              <p className="text-xs text-amber-700">
-                <i className="fas fa-info-circle mr-1"></i>
-                計算結果を確認し、問題なければ「計算して確定」ボタンで確定してください。確定後に会員マイページへの公開が可能になります。
-              </p>
-            </div>
-          )}
+
         </div>
       )}
 
