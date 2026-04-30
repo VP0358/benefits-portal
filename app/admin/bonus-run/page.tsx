@@ -32,7 +32,8 @@ type BonusResultRow = {
   directBonus: number;
   unilevelBonus: number;
   structureBonus: number;
-  totalBonus: number;
+  bonusTotal: number;        // = amountBeforeAdjustment
+  paymentAmount: number;
   unilevelDetail: Record<string, number> | null;
   savingsPointsAdded: number;
 };
@@ -139,7 +140,7 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
                   <td className="py-2 px-3 text-right">{yen(r.directBonus)}</td>
                   <td className="py-2 px-3 text-right">{yen(r.unilevelBonus)}</td>
                   <td className="py-2 px-3 text-right">{yen(r.structureBonus)}</td>
-                  <td className="py-2 px-3 text-right font-black text-slate-900">{yen(r.totalBonus)}</td>
+                  <td className="py-2 px-3 text-right font-black text-slate-900">{yen(r.bonusTotal)}</td>
                 </tr>
               );
             })}
@@ -158,7 +159,7 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
                 {yen(filtered.reduce((s, r) => s + r.structureBonus, 0))}
               </td>
               <td className="py-2 px-3 text-right font-black text-violet-800 text-sm">
-                {yen(filtered.reduce((s, r) => s + r.totalBonus, 0))}
+                {yen(filtered.reduce((s, r) => s + r.bonusTotal, 0))}
               </td>
             </tr>
           </tfoot>
@@ -197,10 +198,23 @@ export default function BonusRunPage() {
 
   // 詳細取得
   const fetchDetail = useCallback(async (month: string) => {
-    const res = await fetch(`/api/admin/bonus-run?month=${month}`);
-    if (!res.ok) return;
-    const data = await res.json();
-    setDetail(data);
+    try {
+      const res = await fetch(`/api/admin/bonus-results/detail?bonusMonth=${month}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.bonusRun) {
+        // BonusRunSummary 形式にマージ
+        setDetail({
+          ...data.bonusRun,
+          closingDate: data.bonusRun.confirmedAt ?? data.bonusRun.createdAt,
+          results: Array.isArray(data.results) ? data.results : [],
+        });
+      } else {
+        setDetail(null);
+      }
+    } catch {
+      // ignore
+    }
   }, []);
 
   // 公開状態を取得

@@ -77,14 +77,14 @@ export async function GET(req: NextRequest) {
     unilevelBonus: number;
     structureBonus: number;
     savingsBonus: number;
-    totalBonus: number;
+    totalBonus: number;        // = amountBeforeAdjustment（調整前合計ボーナス）
     positionCount: number; // 合算したポジション数
   };
 
   const mergedMap = new Map<string, MergedBonus>();
 
   for (const result of bonusRun.results) {
-    if (result.totalBonus <= 0) continue; // ボーナスがない会員はスキップ
+    if (result.amountBeforeAdjustment <= 0) continue; // ボーナスがない会員はスキップ
 
     const mc = result.mlmMember.memberCode;
     const normalized = mc.replace(/-/g, "");
@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
       existing.unilevelBonus += result.unilevelBonus;
       existing.structureBonus += result.structureBonus;
       existing.savingsBonus += result.savingsBonus;
-      existing.totalBonus += result.totalBonus;
+      existing.totalBonus += result.amountBeforeAdjustment;
       existing.positionCount += 1;
       // レベルは最高値を採用
       if (result.achievedLevel > existing.achievedLevel) {
@@ -134,7 +134,7 @@ export async function GET(req: NextRequest) {
         unilevelBonus: result.unilevelBonus,
         structureBonus: result.structureBonus,
         savingsBonus: result.savingsBonus,
-        totalBonus: result.totalBonus,
+        totalBonus: result.amountBeforeAdjustment,
         positionCount: 1,
       });
     }
