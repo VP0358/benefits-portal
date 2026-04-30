@@ -92,10 +92,12 @@ export async function POST(req: NextRequest) {
     }
 
     // ボーナス計算実行（エンジン呼び出し）
-    const result = await executeBonusCalculation(
-      bonusMonth,
-      paymentAdjustmentRate ? Number(paymentAdjustmentRate) : null
-    );
+    // UIは%単位（例: 2）で送ってくるので、エンジンが期待する小数（例: 0.02）に変換する
+    const rateDecimal =
+      paymentAdjustmentRate != null && Number(paymentAdjustmentRate) > 0
+        ? Number(paymentAdjustmentRate) / 100
+        : null;
+    const result = await executeBonusCalculation(bonusMonth, rateDecimal);
 
     return NextResponse.json({
       success: true,
@@ -139,6 +141,7 @@ export async function PATCH(req: NextRequest) {
 
     const updateData: Record<string, unknown> = {};
     if (paymentAdjustmentRate != null) {
+      // UIは%単位（例: 2）で送ってくるので、DBには%のまま保存（表示用）
       updateData.paymentAdjustmentRate = Number(paymentAdjustmentRate);
     }
     if (body.note !== undefined) {

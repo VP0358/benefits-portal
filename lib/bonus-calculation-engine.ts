@@ -242,7 +242,7 @@ export async function executeBonusCalculation(
       structureBonus,
       savingsBonus: 0,          // ボーナス計算には含めない
       amountBeforeAdjustment: totalBonus,
-      paymentAdjustmentRate: paymentAdjustmentRate || 0,
+      paymentAdjustmentRate: paymentAdjustmentRate != null ? paymentAdjustmentRate * 100 : 0, // DB保存は%単位
       paymentAdjustmentAmount,
       finalAmount,
       withholdingTax,
@@ -254,12 +254,14 @@ export async function executeBonusCalculation(
   }
 
   // 7. データベースに保存
+  // paymentAdjustmentRate はエンジン内では小数（例: 0.02）で受け取るが、
+  // DBには%単位（例: 2）で保存する（UI表示と一致させるため）
   const bonusRun = await prisma.bonusRun.create({
     data: {
       bonusMonth,
       closingDate: new Date(),
       status: "draft",
-      paymentAdjustmentRate: paymentAdjustmentRate || 0,
+      paymentAdjustmentRate: paymentAdjustmentRate != null ? paymentAdjustmentRate * 100 : 0,
       totalMembers: members.length,
       totalActiveMembers,
       totalBonusAmount: Math.floor(totalBonusAmount),
