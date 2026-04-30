@@ -16,7 +16,8 @@ type BonusRunSummary = {
   createdAt: string;
 };
 
-type BonusResultRow = {
+/** 1ポジション分のデータ（ポジション別詳細タブで使用） */
+type PositionRow = {
   id: string;
   memberCode: string;
   memberName: string;
@@ -31,18 +32,43 @@ type BonusResultRow = {
   newTitleLevel: number;
   directBonus: number;
   unilevelBonus: number;
+  rankUpBonus: number;
+  shareBonus: number;
   structureBonus: number;
+  savingsBonus: number;
   bonusTotal: number;
-  paymentAmount: number;
-  withholdingTax: number;
-  serviceFee: number;
+  carryoverAmount: number;
+  adjustmentAmount: number;
+  otherPositionAmount: number;
+  amountBeforeAdjustment: number;
   paymentAdjustmentRate: number | null;
   paymentAdjustmentAmount: number;
   finalAmount: number;
-  amountBeforeAdjustment: number;
-  carryoverAmount: number;
-  adjustmentAmount: number;
+  consumptionTax: number;
+  withholdingTax: number;
+  shortageAmount: number;
+  otherPositionShortage: number;
+  serviceFee: number;
+  paymentAmount: number;
+  groupActiveCount: number;
+  minLinePoints: number;
+  lineCount: number;
+  level1Lines: number;
+  level2Lines: number;
+  level3Lines: number;
+  forcedLevel: number;
+  conditions: string | null;
+  savingsPoints: number;
   unilevelDetail: Record<string, number> | null;
+  savingsPointsAdded: number;
+  createdAt: string;
+};
+
+/** テーブル行 = ポジション合算済み（positionCount≥2 なら複数ポジション持ち） */
+type BonusResultRow = PositionRow & {
+  baseCode: string;          // memberCodeの先頭6桁
+  positionCount: number;     // ポジション数（1=単独, 2以上=複数）
+  positions: PositionRow[];  // ポジション別詳細（positionCount=1 でも格納）
 };
 
 type AdjustmentRow = {
@@ -101,12 +127,164 @@ function generateMonthOptions() {
   return options;
 }
 
+/* ─── ボーナス内訳パネル（1行分を表示する共通コンポーネント） ─── */
+function BonusBreakdown({ d }: { d: PositionRow }) {
+  const unilevelEntries = d.unilevelDetail
+    ? Object.entries(d.unilevelDetail).sort((a, b) => Number(a[0]) - Number(b[0]))
+    : [];
+  return (
+    <div className="space-y-5">
+      {/* 活動状況 */}
+      <section>
+        <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">活動状況</h4>
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: "自己購入PT", value: d.selfPurchasePoints, unit: "pt" },
+            { label: "グループPT", value: d.groupPoints, unit: "pt" },
+            { label: "直下アクティブ", value: d.directActiveCount, unit: "名" },
+          ].map(({ label, value, unit }) => (
+            <div key={label} className="bg-slate-50 rounded-xl p-3 text-center">
+              <p className="text-xs text-slate-500 mb-1">{label}</p>
+              <p className="text-xl font-bold text-slate-800">{value}<span className="text-xs font-normal text-slate-400 ml-1">{unit}</span></p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* レベル情報 */}
+      <section>
+        <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">レベル情報</h4>
+        <div className="flex items-center gap-4 bg-indigo-50 rounded-xl px-5 py-4">
+          <div className="text-center">
+            <p className="text-xs text-indigo-400 mb-1">前回称号</p>
+            <p className="text-base font-bold text-indigo-700">{LEVEL_LABELS[d.previousTitleLevel]}</p>
+          </div>
+          {d.previousTitleLevel !== d.newTitleLevel ? (
+            <>
+              <div className="text-2xl text-indigo-300">→</div>
+              <div className="text-center">
+                <p className="text-xs text-indigo-400 mb-1">新称号</p>
+                <p className="text-base font-bold text-indigo-700">{LEVEL_LABELS[d.newTitleLevel]}</p>
+              </div>
+              <span className={`ml-auto text-xs px-3 py-1 rounded-full font-semibold ${d.newTitleLevel > d.previousTitleLevel ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                {d.newTitleLevel > d.previousTitleLevel ? "▲ 昇格" : "▼ 降格"}
+              </span>
+            </>
+          ) : (
+            <span className="ml-auto text-xs px-3 py-1 rounded-full font-semibold bg-gray-100 text-gray-500">変動なし</span>
+          )}
+          <div className="text-center ml-4 pl-4 border-l border-indigo-200">
+            <p className="text-xs text-indigo-400 mb-1">当月達成LV</p>
+            <p className="text-base font-bold text-indigo-700">{LEVEL_LABELS[d.achievedLevel]}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* ボーナス内訳 */}
+      <section>
+        <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">ボーナス内訳</h4>
+        <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <tbody className="divide-y divide-gray-50">
+              <tr className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-gray-600">ダイレクトボーナス</td>
+                <td className="px-4 py-3 text-right font-semibold text-gray-800">{yen(d.directBonus)}</td>
+              </tr>
+              <tr className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-gray-600">ユニレベルボーナス</td>
+                <td className="px-4 py-3 text-right font-semibold text-gray-800">{yen(d.unilevelBonus)}</td>
+              </tr>
+              {unilevelEntries.map(([depth, pts]) => (
+                <tr key={depth} className="bg-blue-50/40">
+                  <td className="px-4 py-2 text-xs text-blue-500 pl-10">└ {depth}段目</td>
+                  <td className="px-4 py-2 text-right text-xs text-blue-600 font-medium">{yen(pts)}</td>
+                </tr>
+              ))}
+              <tr className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-gray-600">組織構築ボーナス</td>
+                <td className="px-4 py-3 text-right font-semibold text-gray-800">{yen(d.structureBonus)}</td>
+              </tr>
+              {d.carryoverAmount > 0 && (
+                <tr className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-gray-600">繰越金</td>
+                  <td className="px-4 py-3 text-right font-semibold text-gray-800">{yen(d.carryoverAmount)}</td>
+                </tr>
+              )}
+              {d.adjustmentAmount !== 0 && (
+                <tr className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-gray-600">調整金</td>
+                  <td className="px-4 py-3 text-right font-semibold text-gray-800">{yen(d.adjustmentAmount)}</td>
+                </tr>
+              )}
+              <tr className="bg-blue-50 font-bold">
+                <td className="px-4 py-3 text-blue-800">ボーナス合計</td>
+                <td className="px-4 py-3 text-right text-blue-800">{yen(d.bonusTotal)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* 支払計算 */}
+      <section>
+        <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">支払計算</h4>
+        <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <tbody className="divide-y divide-gray-50">
+              <tr className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-gray-600">調整前取得額</td>
+                <td className="px-4 py-3 text-right font-semibold text-gray-800">{yen(d.amountBeforeAdjustment)}</td>
+              </tr>
+              {(d.paymentAdjustmentRate ?? 0) > 0 && (
+                <>
+                  <tr className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-gray-600">支払調整率</td>
+                    <td className="px-4 py-3 text-right text-orange-600">{d.paymentAdjustmentRate}%</td>
+                  </tr>
+                  <tr className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-gray-600">支払調整額（差引）</td>
+                    <td className="px-4 py-3 text-right text-red-500">－{yen(d.paymentAdjustmentAmount)}</td>
+                  </tr>
+                </>
+              )}
+              <tr className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-gray-600">調整後取得額</td>
+                <td className="px-4 py-3 text-right font-semibold text-gray-800">{yen(d.finalAmount)}</td>
+              </tr>
+              <tr className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-gray-600">源泉徴収税（10.21%）</td>
+                <td className="px-4 py-3 text-right text-red-500">－{yen(d.withholdingTax)}</td>
+              </tr>
+              {d.serviceFee > 0 && (
+                <tr className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-gray-600">事務手数料</td>
+                  <td className="px-4 py-3 text-right text-red-500">－{yen(d.serviceFee)}</td>
+                </tr>
+              )}
+              <tr className="bg-emerald-50 font-bold">
+                <td className="px-4 py-3 text-emerald-800 text-base">最終支払額</td>
+                <td className="px-4 py-3 text-right text-emerald-800 text-lg">{yen(d.paymentAmount)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 /* ─── 個別報酬詳細モーダル ─── */
 function BonusDetailModal({ row, onClose }: { row: BonusResultRow; onClose: () => void }) {
   const name = row.companyName || row.memberName;
-  const unilevelEntries = row.unilevelDetail
-    ? Object.entries(row.unilevelDetail).sort((a, b) => Number(a[0]) - Number(b[0]))
-    : [];
+  const isMulti = row.positionCount >= 2;
+  // タブ: "merged" | "pos-0" | "pos-1" | ...
+  const [activeTab, setActiveTab] = useState<string>("merged");
+
+  // 現在表示するデータ
+  const displayData: PositionRow =
+    activeTab === "merged"
+      ? row
+      : row.positions[Number(activeTab.replace("pos-", ""))] ?? row;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
@@ -114,166 +292,79 @@ function BonusDetailModal({ row, onClose }: { row: BonusResultRow; onClose: () =
         className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ヘッダー */}
+        {/* ── ヘッダー ── */}
         <div className="flex justify-between items-start px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
           <div>
             <p className="text-xs font-semibold text-blue-500 tracking-widest uppercase mb-0.5">Bonus Detail</p>
             <h3 className="text-xl font-bold text-gray-900">{name}</h3>
             {row.companyName && <p className="text-sm text-gray-500 mt-0.5">{row.memberName}</p>}
-            <p className="text-xs text-gray-400 mt-1 font-mono">{row.memberCode}</p>
+            <p className="text-xs text-gray-400 mt-1 font-mono">
+              {isMulti ? `${row.baseCode}-** （${row.positionCount}ポジション）` : row.memberCode}
+            </p>
           </div>
           <div className="flex flex-col items-end gap-2">
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">✕</button>
             <span className={`text-xs px-2 py-1 rounded-full font-semibold ${row.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
               {row.isActive ? "アクティブ" : "非アクティブ"}
             </span>
+            {isMulti && (
+              <span className="text-xs px-2 py-1 rounded-full font-semibold bg-purple-100 text-purple-700">
+                {row.positionCount} POS
+              </span>
+            )}
           </div>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+        {/* ── ポジション切り替えタブ（複数ポジション時のみ） ── */}
+        {isMulti && (
+          <div className="flex border-b border-gray-200 bg-gray-50 overflow-x-auto">
+            <button
+              onClick={() => setActiveTab("merged")}
+              className={`px-5 py-3 text-xs font-bold whitespace-nowrap transition border-b-2 ${
+                activeTab === "merged"
+                  ? "border-blue-600 text-blue-700 bg-white"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              📊 合算（支払口座単位）
+            </button>
+            {row.positions.map((pos, i) => (
+              <button
+                key={pos.id}
+                onClick={() => setActiveTab(`pos-${i}`)}
+                className={`px-5 py-3 text-xs font-bold whitespace-nowrap transition border-b-2 ${
+                  activeTab === `pos-${i}`
+                    ? "border-purple-600 text-purple-700 bg-white"
+                    : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                🔷 {pos.memberCode}
+              </button>
+            ))}
+          </div>
+        )}
 
-          {/* ── 活動状況 ── */}
-          <section>
-            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">活動状況</h4>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-slate-50 rounded-xl p-3 text-center">
-                <p className="text-xs text-slate-500 mb-1">自己購入PT</p>
-                <p className="text-xl font-bold text-slate-800">{row.selfPurchasePoints}<span className="text-xs font-normal text-slate-400 ml-1">pt</span></p>
-              </div>
-              <div className="bg-slate-50 rounded-xl p-3 text-center">
-                <p className="text-xs text-slate-500 mb-1">グループPT</p>
-                <p className="text-xl font-bold text-slate-800">{row.groupPoints}<span className="text-xs font-normal text-slate-400 ml-1">pt</span></p>
-              </div>
-              <div className="bg-slate-50 rounded-xl p-3 text-center">
-                <p className="text-xs text-slate-500 mb-1">直下アクティブ</p>
-                <p className="text-xl font-bold text-slate-800">{row.directActiveCount}<span className="text-xs font-normal text-slate-400 ml-1">名</span></p>
-              </div>
+        {/* ── コンテンツ ── */}
+        <div className="overflow-y-auto flex-1 px-6 py-5">
+          {/* 合算タブのみ：複数ポジション注記 */}
+          {isMulti && activeTab === "merged" && (
+            <div className="mb-4 px-4 py-3 bg-purple-50 border border-purple-200 rounded-xl text-xs text-purple-700">
+              <p className="font-bold mb-1">💡 複数ポジション合算表示</p>
+              <p>同一口座への振込となるため、全{row.positionCount}ポジションの報酬を合算しています。</p>
+              <p className="mt-1">各ポジションの個別内訳はタブで切り替えて確認できます。</p>
             </div>
-          </section>
-
-          {/* ── レベル情報 ── */}
-          <section>
-            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">レベル情報</h4>
-            <div className="flex items-center gap-4 bg-indigo-50 rounded-xl px-5 py-4">
-              <div className="text-center">
-                <p className="text-xs text-indigo-400 mb-1">前回称号</p>
-                <p className="text-base font-bold text-indigo-700">{LEVEL_LABELS[row.previousTitleLevel]}</p>
-              </div>
-              {row.previousTitleLevel !== row.newTitleLevel ? (
-                <>
-                  <div className="text-2xl text-indigo-300">→</div>
-                  <div className="text-center">
-                    <p className="text-xs text-indigo-400 mb-1">新称号</p>
-                    <p className="text-base font-bold text-indigo-700">{LEVEL_LABELS[row.newTitleLevel]}</p>
-                  </div>
-                  <span className={`ml-auto text-xs px-3 py-1 rounded-full font-semibold ${row.newTitleLevel > row.previousTitleLevel ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                    {row.newTitleLevel > row.previousTitleLevel ? "▲ 昇格" : "▼ 降格"}
-                  </span>
-                </>
-              ) : (
-                <span className="ml-auto text-xs px-3 py-1 rounded-full font-semibold bg-gray-100 text-gray-500">変動なし</span>
-              )}
-              <div className="text-center ml-4 pl-4 border-l border-indigo-200">
-                <p className="text-xs text-indigo-400 mb-1">当月達成LV</p>
-                <p className="text-base font-bold text-indigo-700">{LEVEL_LABELS[row.achievedLevel]}</p>
-              </div>
+          )}
+          {/* ポジション個別タブ：コード表示 */}
+          {isMulti && activeTab !== "merged" && (
+            <div className="mb-4 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600">
+              <p className="font-bold">🔷 ポジション: {displayData.memberCode}</p>
+              <p className="mt-0.5">このポジション単独の報酬内訳です。</p>
             </div>
-          </section>
-
-          {/* ── ボーナス内訳 ── */}
-          <section>
-            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">ボーナス内訳</h4>
-            <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
-              <table className="w-full text-sm">
-                <tbody className="divide-y divide-gray-50">
-                  <tr className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-600">ダイレクトボーナス</td>
-                    <td className="px-4 py-3 text-right font-semibold text-gray-800">{yen(row.directBonus)}</td>
-                  </tr>
-                  <tr className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-600">ユニレベルボーナス</td>
-                    <td className="px-4 py-3 text-right font-semibold text-gray-800">{yen(row.unilevelBonus)}</td>
-                  </tr>
-                  {/* ユニレベル段数別内訳 */}
-                  {unilevelEntries.length > 0 && unilevelEntries.map(([depth, pts]) => (
-                    <tr key={depth} className="bg-blue-50/40">
-                      <td className="px-4 py-2 text-xs text-blue-500 pl-10">└ {depth}段目</td>
-                      <td className="px-4 py-2 text-right text-xs text-blue-600 font-medium">{yen(pts)}</td>
-                    </tr>
-                  ))}
-                  <tr className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-600">組織構築ボーナス</td>
-                    <td className="px-4 py-3 text-right font-semibold text-gray-800">{yen(row.structureBonus)}</td>
-                  </tr>
-                  {row.carryoverAmount > 0 && (
-                    <tr className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-600">繰越金</td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-800">{yen(row.carryoverAmount)}</td>
-                    </tr>
-                  )}
-                  {row.adjustmentAmount !== 0 && (
-                    <tr className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-600">調整金</td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-800">{yen(row.adjustmentAmount)}</td>
-                    </tr>
-                  )}
-                  <tr className="bg-blue-50 font-bold">
-                    <td className="px-4 py-3 text-blue-800">ボーナス合計</td>
-                    <td className="px-4 py-3 text-right text-blue-800">{yen(row.bonusTotal)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          {/* ── 支払計算 ── */}
-          <section>
-            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">支払計算</h4>
-            <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
-              <table className="w-full text-sm">
-                <tbody className="divide-y divide-gray-50">
-                  <tr className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-600">調整前取得額</td>
-                    <td className="px-4 py-3 text-right font-semibold text-gray-800">{yen(row.amountBeforeAdjustment)}</td>
-                  </tr>
-                  {(row.paymentAdjustmentRate ?? 0) > 0 && (
-                    <>
-                      <tr className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-gray-600">支払調整率</td>
-                        <td className="px-4 py-3 text-right text-orange-600">{row.paymentAdjustmentRate}%</td>
-                      </tr>
-                      <tr className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-gray-600">支払調整額（差引）</td>
-                        <td className="px-4 py-3 text-right text-red-500">－{yen(row.paymentAdjustmentAmount)}</td>
-                      </tr>
-                    </>
-                  )}
-                  <tr className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-600">調整後取得額</td>
-                    <td className="px-4 py-3 text-right font-semibold text-gray-800">{yen(row.finalAmount)}</td>
-                  </tr>
-                  <tr className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-600">源泉徴収税（10.21%）</td>
-                    <td className="px-4 py-3 text-right text-red-500">－{yen(row.withholdingTax)}</td>
-                  </tr>
-                  {row.serviceFee > 0 && (
-                    <tr className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-600">事務手数料</td>
-                      <td className="px-4 py-3 text-right text-red-500">－{yen(row.serviceFee)}</td>
-                    </tr>
-                  )}
-                  <tr className="bg-emerald-50 font-bold">
-                    <td className="px-4 py-3 text-emerald-800 text-base">最終支払額</td>
-                    <td className="px-4 py-3 text-right text-emerald-800 text-lg">{yen(row.paymentAmount)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-
+          )}
+          <BonusBreakdown d={displayData} />
         </div>
 
-        {/* フッター */}
+        {/* ── フッター ── */}
         <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end">
           <button onClick={onClose} className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300 transition">
             閉じる
@@ -369,9 +460,22 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
               <tr><td colSpan={15} className="text-center py-8 text-gray-400">データがありません</td></tr>
             ) : filtered.map((r) => (
               <tr key={r.id} className={`border-b hover:bg-blue-50/30 transition ${r.paymentAmount > 0 ? "" : "opacity-60"}`}>
-                <td className="p-2 font-mono text-xs text-slate-600">{r.memberCode}</td>
+                {/* 会員コード：複数ポジションは baseCode-** 表示 */}
+                <td className="p-2 font-mono text-xs text-slate-600">
+                  {r.positionCount >= 2
+                    ? <span>{r.baseCode}<span className="text-purple-400">-**</span></span>
+                    : r.memberCode}
+                </td>
                 <td className="p-2">
-                  <div className="font-medium text-gray-800">{r.companyName || r.memberName}</div>
+                  <div className="font-medium text-gray-800 flex items-center gap-1">
+                    {r.companyName || r.memberName}
+                    {/* 複数ポジションバッジ */}
+                    {r.positionCount >= 2 && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-700 leading-none">
+                        {r.positionCount}POS
+                      </span>
+                    )}
+                  </div>
                   {r.companyName && <div className="text-gray-500 text-[10px]">{r.memberName}</div>}
                 </td>
                 <td className="p-2">
@@ -406,9 +510,13 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
                 <td className="p-2 text-center">
                   <button
                     onClick={() => setDetailRow(r)}
-                    className="px-2 py-1 bg-indigo-50 border border-indigo-200 text-indigo-600 text-[10px] rounded hover:bg-indigo-100 transition font-semibold"
+                    className={`px-2 py-1 border text-[10px] rounded transition font-semibold ${
+                      r.positionCount >= 2
+                        ? "bg-purple-50 border-purple-200 text-purple-600 hover:bg-purple-100"
+                        : "bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100"
+                    }`}
                   >
-                    詳細
+                    {r.positionCount >= 2 ? `詳細(${r.positionCount}POS)` : "詳細"}
                   </button>
                 </td>
               </tr>

@@ -3,16 +3,16 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 import { NextRequest, NextResponse } from "next/server";
-
-
-
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getMlmDisplayName } from "@/lib/mlm-display-name";
 
 /**
  * GET /api/admin/bonus-results/detail?bonusMonth=2026-02
- * ボーナス計算結果の詳細データを取得（30+項目）
+ * ボーナス計算結果の詳細データを取得
+ *
+ * 複数ポジション取得者は baseCode（memberCode先頭6桁）で合算し、
+ * 各ポジションの詳細は positions[] 配列に格納する。
  */
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -28,96 +28,186 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // ボーナス実行を取得
     const bonusRun = await prisma.bonusRun.findUnique({
       where: { bonusMonth },
       include: {
         results: {
           include: {
             mlmMember: {
-              include: {
-                user: true,
-              },
+              include: { user: true },
             },
           },
-          orderBy: { paymentAmount: "desc" },
+          orderBy: { mlmMember: { memberCode: "asc" } },
         },
       },
     });
 
     if (!bonusRun) {
-      return NextResponse.json({
-        bonusRun: null,
-        results: [],
-      });
+      return NextResponse.json({ bonusRun: null, results: [] });
     }
 
-    // 結果を詳細フォーマットに変換
-    const results = bonusRun.results.map((r) => ({
+    // ── 1ポジション分のデータを正規化するヘルパー ──
+    type PositionRow = {
+      id: string;
+      memberCode: string;
+      memberName: string;
+      companyName: string | null;
+      status: string;
+      isActive: boolean;
+      selfPurchasePoints: number;
+      groupPoints: number;
+      directActiveCount: number;
+      achievedLevel: number;
+      previousTitleLevel: number;
+      newTitleLevel: number;
+      directBonus: number;
+      unilevelBonus: number;
+      rankUpBonus: number;
+      shareBonus: number;
+      structureBonus: number;
+      savingsBonus: number;
+      bonusTotal: number;
+      carryoverAmount: number;
+      adjustmentAmount: number;
+      otherPositionAmount: number;
+      amountBeforeAdjustment: number;
+      paymentAdjustmentRate: number | null;
+      paymentAdjustmentAmount: number;
+      finalAmount: number;
+      consumptionTax: number;
+      withholdingTax: number;
+      shortageAmount: number;
+      otherPositionShortage: number;
+      serviceFee: number;
+      paymentAmount: number;
+      groupActiveCount: number;
+      groupPoints2: number;  // alias for display
+      minLinePoints: number;
+      lineCount: number;
+      level1Lines: number;
+      level2Lines: number;
+      level3Lines: number;
+      forcedLevel: number;
+      conditions: string | null;
+      savingsPoints: number;
+      unilevelDetail: Record<string, number> | null;
+      savingsPointsAdded: number;
+      createdAt: string;
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const toPositionRow = (r: any): PositionRow => ({
       id: r.id.toString(),
       memberCode: r.mlmMember.memberCode,
       memberName: getMlmDisplayName(r.mlmMember.user.name, r.mlmMember.companyName),
       companyName: r.mlmMember.companyName,
       status: r.mlmMember.status,
-
-      // ボーナス項目
+      isActive: r.isActive,
+      selfPurchasePoints: r.selfPurchasePoints,
+      groupPoints: r.groupPoints,
+      directActiveCount: r.directActiveCount,
+      achievedLevel: r.achievedLevel,
+      previousTitleLevel: r.previousTitleLevel,
+      newTitleLevel: r.newTitleLevel,
       directBonus: r.directBonus,
       unilevelBonus: r.unilevelBonus,
       rankUpBonus: r.rankUpBonus || 0,
       shareBonus: r.shareBonus || 0,
       structureBonus: r.structureBonus,
       savingsBonus: r.savingsBonus,
-
-      // 合計・調整
       bonusTotal: r.amountBeforeAdjustment,
       carryoverAmount: r.carryoverAmount || 0,
       adjustmentAmount: r.adjustmentAmount || 0,
       otherPositionAmount: r.otherPositionAmount || 0,
       amountBeforeAdjustment: r.amountBeforeAdjustment || 0,
-
-      // 支払調整
       paymentAdjustmentRate: r.paymentAdjustmentRate,
       paymentAdjustmentAmount: r.paymentAdjustmentAmount || 0,
       finalAmount: r.finalAmount || 0,
-
-      // 税金・手数料
       consumptionTax: r.consumptionTax || 0,
       withholdingTax: r.withholdingTax || 0,
       shortageAmount: r.shortageAmount || 0,
       otherPositionShortage: r.otherPositionShortage || 0,
       serviceFee: r.serviceFee || 0,
       paymentAmount: r.paymentAmount || 0,
-
-      // グループ情報
       groupActiveCount: r.groupActiveCount || 0,
-      groupPoints: r.groupPoints,
+      groupPoints2: r.groupPoints,
       minLinePoints: r.minLinePoints || 0,
       lineCount: r.lineCount || 0,
       level1Lines: r.level1Lines || 0,
       level2Lines: r.level2Lines || 0,
       level3Lines: r.level3Lines || 0,
-
-      // 個人情報
-      selfPurchasePoints: r.selfPurchasePoints,
-      directActiveCount: r.directActiveCount,
-
-      // レベル情報
-      previousTitleLevel: r.previousTitleLevel,
-      newTitleLevel: r.newTitleLevel,
-      achievedLevel: r.achievedLevel,
       forcedLevel: r.forcedLevel || 0,
-
-      // 条件・フラグ
       conditions: r.conditions,
       savingsPoints: r.savingsPoints || 0,
-      isActive: r.isActive,
-
-      // ユニレベル段数別詳細
       unilevelDetail: r.unilevelDetail as Record<string, number> | null,
       savingsPointsAdded: r.savingsPointsAdded || 0,
-
       createdAt: r.createdAt.toISOString(),
-    }));
+    });
+
+    // ── baseCode（先頭6桁）でグループ化 ──
+    // memberCode 形式: "XXXXXX-NN"  → baseCode = "XXXXXX"
+    type MergedRow = PositionRow & {
+      baseCode: string;
+      positionCount: number;
+      positions: PositionRow[];  // ポジション別詳細
+    };
+
+    const mergedMap = new Map<string, MergedRow>();
+
+    for (const r of bonusRun.results) {
+      const mc = r.mlmMember.memberCode;
+      // "123456-01" → "123456"  /  "123456" → "123456"
+      const baseCode = mc.replace(/-\d+$/, "");
+      const pos = toPositionRow(r);
+
+      if (mergedMap.has(baseCode)) {
+        const merged = mergedMap.get(baseCode)!;
+
+        // 数値フィールドを合算
+        merged.selfPurchasePoints   += pos.selfPurchasePoints;
+        merged.groupPoints          += pos.groupPoints;
+        merged.directActiveCount    += pos.directActiveCount;
+        merged.directBonus          += pos.directBonus;
+        merged.unilevelBonus        += pos.unilevelBonus;
+        merged.rankUpBonus          += pos.rankUpBonus;
+        merged.shareBonus           += pos.shareBonus;
+        merged.structureBonus       += pos.structureBonus;
+        merged.savingsBonus         += pos.savingsBonus;
+        merged.bonusTotal           += pos.bonusTotal;
+        merged.carryoverAmount      += pos.carryoverAmount;
+        merged.adjustmentAmount     += pos.adjustmentAmount;
+        merged.amountBeforeAdjustment += pos.amountBeforeAdjustment;
+        merged.paymentAdjustmentAmount += pos.paymentAdjustmentAmount;
+        merged.finalAmount          += pos.finalAmount;
+        merged.consumptionTax       += pos.consumptionTax;
+        merged.withholdingTax       += pos.withholdingTax;
+        merged.shortageAmount       += pos.shortageAmount;
+        merged.serviceFee           += pos.serviceFee;
+        merged.paymentAmount        += pos.paymentAmount;
+
+        // レベルは最高値
+        if (pos.achievedLevel   > merged.achievedLevel)   merged.achievedLevel   = pos.achievedLevel;
+        if (pos.newTitleLevel   > merged.newTitleLevel)   merged.newTitleLevel   = pos.newTitleLevel;
+
+        // いずれかがアクティブならアクティブ
+        if (pos.isActive) merged.isActive = true;
+
+        merged.positionCount += 1;
+        merged.positions.push(pos);
+      } else {
+        mergedMap.set(baseCode, {
+          ...pos,
+          baseCode,
+          positionCount: 1,
+          positions: [pos],
+        });
+      }
+    }
+
+    // ── 合算済みリストを支払額降順でソート ──
+    const results = Array.from(mergedMap.values()).sort(
+      (a, b) => b.paymentAmount - a.paymentAmount
+    );
 
     return NextResponse.json({
       bonusRun: {
@@ -138,7 +228,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error("Error fetching bonus results detail:", error);
     return NextResponse.json(
-      { error: "Failed to fetch bonus results" },
+      { error: "Failed to fetch bonus results", detail: String(error) },
       { status: 500 }
     );
   }
