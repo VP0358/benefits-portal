@@ -433,6 +433,7 @@ export default function BonusCalculatePage() {
   const [shortages, setShortages] = useState<ShortageRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [executing, setExecuting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
@@ -492,11 +493,21 @@ export default function BonusCalculatePage() {
         setBonusRun(data.bonusRun);
         if (data.bonusRun?.paymentAdjustmentRate != null) setPaymentAdjustmentRate(data.bonusRun.paymentAdjustmentRate);
         if (data.bonusRun) {
-          const resDetail = await fetch(`/api/admin/bonus-results/detail?bonusMonth=${selectedMonth}`);
-          const detailData = await resDetail.json();
-          if (resDetail.ok && detailData.results) setResults(detailData.results);
+          // 計算結果の詳細を取得（エラーでも bonusRun は表示する）
+          try {
+            const resDetail = await fetch(`/api/admin/bonus-results/detail?bonusMonth=${selectedMonth}`);
+            const detailData = await resDetail.json();
+            if (resDetail.ok && Array.isArray(detailData.results)) {
+              setResults(detailData.results);
+            } else {
+              setResults([]);
+            }
+          } catch (detailErr) {
+            console.error("計算結果取得エラー:", detailErr);
+            setResults([]);
+          }
           // 公開状況も取得
-          await fetchPublishStatus();
+          try { await fetchPublishStatus(); } catch {}
         } else {
           setResults([]);
           setPublishStatus(null);
@@ -578,7 +589,7 @@ export default function BonusCalculatePage() {
   // ─── ボーナス計算実行 ───
   const handleExecute = async () => {
     if (!selectedMonth) return;
-    if (!confirm(`${selectedMonth}のボーナス計算を実行しますか？`)) return;
+    if (!confirm(`${selectedMonth}のボーナス計算を実行しますか？\n\n計算完了後、即座に「確定」状態で保存されます。`)) return;
     setExecuting(true);
     try {
       const res = await fetch("/api/admin/bonus-run", {
@@ -591,9 +602,34 @@ export default function BonusCalculatePage() {
         alert(`✅ ボーナス計算・確定が完了しました\n対象: ${data.totalMembers}名 / アクティブ: ${data.totalActiveMembers}名\n合計ボーナス: ¥${Number(data.totalBonusAmount).toLocaleString()}\n\n次のステップ: 計算結果を確認して「全員に一括公開」を実行してください`);
         await fetchBonusRun();
         setActiveTab("calculation");
-      } else alert(`❌ エラー: ${data.error}`);
+      } else {
+        alert(`❌ エラー: ${data.error}`);
+      }
     } catch (err: unknown) { alert(`❌ エラー: ${(err as Error).message}`); }
     finally { setExecuting(false); }
+  };
+
+  // ─── draft → confirmed 強制切り替え（古いdraftレコードの救済用） ───
+  const handleForceConfirm = async () => {
+    if (!selectedMonth || !bonusRun) return;
+    if (bonusRun.status === "confirmed") { alert("すでに確定済みです。"); return; }
+    if (!confirm(`${selectedMonth}のボーナス計算を「確定」に切り替えますか？\n\n称号レベルが各会員に反映されます。`)) return;
+    setConfirming(true);
+    try {
+      const res = await fetch("/api/admin/bonus-run", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bonusMonth: selectedMonth }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`✅ ${data.message}`);
+        await fetchBonusRun();
+      } else {
+        alert(`❌ エラー: ${data.error}`);
+      }
+    } catch (err: unknown) { alert(`❌ エラー: ${(err as Error).message}`); }
+    finally { setConfirming(false); }
   };
 
   // ─── 全員に一括公開 ───
@@ -907,6 +943,17 @@ export default function BonusCalculatePage() {
             >
               {executing ? "計算中..." : "ボーナス計算実行"}
             </button>
+            {/* draft → confirmed 切り替えボタン（draftの場合のみ表示） */}
+            {bonusRun?.status === "draft" && (
+              <button
+                onClick={handleForceConfirm}
+                disabled={confirming}
+                className="bg-emerald-600 text-white px-5 py-2 rounded-lg font-semibold text-sm hover:bg-emerald-700 transition disabled:opacity-50"
+                title="下書き状態のボーナス計算を確定に切り替えます（称号レベルを会員に反映）"
+              >
+                {confirming ? "確定中..." : "✅ 確定に切り替え"}
+              </button>
+            )}
             {/* 削除ボタン */}
             {bonusRun && (
               <button
@@ -927,6 +974,11 @@ export default function BonusCalculatePage() {
           {bonusRun?.status === "confirmed" && (
             <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
               ⚠️ このボーナスは確定済みです。強制削除すると全ボーナス結果・明細が削除されます。調整金・過不足金は残ります。
+            </div>
+          )}
+          {bonusRun?.status === "draft" && (
+            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              ⚠️ 計算済み（未確定）状態です。「✅ 確定に切り替え」ボタンで称号レベルを反映して確定できます。
             </div>
           )}
           {/* 支払調整率 */}
