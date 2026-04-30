@@ -165,6 +165,83 @@ export async function PATCH(req: NextRequest) {
 }
 
 /**
+ * PUT /api/admin/bonus-run
+ * ボーナス計算を確定（status=confirmed + MlmMember.currentLevel を newTitleLevel で更新）
+ * body: { bonusMonth: "2026-03" }
+ */
+export async function PUT(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user || session.user.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+    const { bonusMonth } = body;
+
+    if (!bonusMonth) {
+      return NextResponse.json({ error: "bonusMonth required" }, { status: 400 });
+    }
+
+    // ボーナス実行レコードを取得
+    const bonusRun = await prisma.bonusRun.findUnique({ where: { bonusMonth } });
+    if (!bonusRun) {
+      return NextResponse.json({ error: "Bonus run not found" }, { status: 404 });
+    }
+    if (bonusRun.status === "confirmed") {
+      return NextResponse.json({ error: "すでに確定済みです" }, { status: 409 });
+    }
+
+    // 当月の全ボーナス結果を取得（newTitleLevel を持つもの）
+    const results = await prisma.bonusResult.findMany({
+      where: { bonusRunId: bonusRun.id },
+      select: { mlmMemberId: true, newTitleLevel: true },
+    });
+
+    // トランザクション：BonusRun を confirmed に + 各会員の currentLevel を更新
+    const updatedCount = await prisma.$transaction(async (tx) => {
+      // BonusRun を確定
+      await tx.bonusRun.update({
+        where: { bonusMonth },
+        data: {
+          status: "confirmed",
+          confirmedAt: new Date(),
+        },
+      });
+
+      // 各 BonusResult の newTitleLevel → MlmMember.currentLevel へ反映
+      let count = 0;
+      for (const r of results) {
+        // newTitleLevel が 0 以上（レベルなし含む）の場合に更新
+        await tx.mlmMember.update({
+          where: { id: r.mlmMemberId },
+          data: { currentLevel: r.newTitleLevel },
+        });
+        count++;
+      }
+      return count;
+    });
+
+    console.log(
+      `✅ ボーナス確定完了: ${bonusMonth} / 会員称号更新 ${updatedCount}名`
+    );
+
+    return NextResponse.json({
+      success: true,
+      bonusMonth,
+      updatedMemberCount: updatedCount,
+      message: `${bonusMonth}のボーナスを確定しました（称号レベル更新: ${updatedCount}名）`,
+    });
+  } catch (error) {
+    console.error("Error confirming bonus run:", error);
+    return NextResponse.json(
+      { error: "Failed to confirm bonus run" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
  * DELETE /api/admin/bonus-run?bonusMonth=2026-02
  * ボーナス計算を削除
  */

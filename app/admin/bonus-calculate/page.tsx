@@ -434,6 +434,12 @@ export default function BonusCalculatePage() {
   const [loading, setLoading] = useState(false);
   const [executing, setExecuting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+
+  // 公開状況
+  type PublishStatus = { total: number; published: number; unpublished: number; allPublished: boolean } | null;
+  const [publishStatus, setPublishStatus] = useState<PublishStatus>(null);
 
   // タブ
   const [activeTab, setActiveTab] = useState<"calculation" | "adjustment" | "shortage">("calculation");
@@ -469,6 +475,14 @@ export default function BonusCalculatePage() {
   const shorCsvRef = useRef<HTMLInputElement>(null);
 
   // ─── API 呼び出し ───
+  const fetchPublishStatus = useCallback(async () => {
+    if (!selectedMonth) return;
+    try {
+      const res = await fetch(`/api/admin/bonus-results/publish-all?bonusMonth=${selectedMonth}`);
+      if (res.ok) { const data = await res.json(); setPublishStatus(data); }
+    } catch (err) { console.error(err); }
+  }, [selectedMonth]);
+
   const fetchBonusRun = useCallback(async () => {
     if (!selectedMonth) return;
     setLoading(true);
@@ -482,8 +496,11 @@ export default function BonusCalculatePage() {
           const resDetail = await fetch(`/api/admin/bonus-results/detail?bonusMonth=${selectedMonth}`);
           const detailData = await resDetail.json();
           if (resDetail.ok && detailData.results) setResults(detailData.results);
+          // 公開状況も取得
+          await fetchPublishStatus();
         } else {
           setResults([]);
+          setPublishStatus(null);
         }
       }
     } catch (err) { console.error(err); }
@@ -506,6 +523,7 @@ export default function BonusCalculatePage() {
 
   useEffect(() => { fetchBonusRun(); }, [fetchBonusRun]);
   useEffect(() => { fetchAdjustments(); fetchShortages(); }, [fetchAdjustments, fetchShortages]);
+  useEffect(() => { if (bonusRun?.status === "confirmed") fetchPublishStatus(); }, [bonusRun, fetchPublishStatus]);
 
   // ─── 会員コード検索（調整金） ───
   const lookupAdjMember = async () => {
@@ -577,6 +595,55 @@ export default function BonusCalculatePage() {
       } else alert(`❌ エラー: ${data.error}`);
     } catch (err: unknown) { alert(`❌ エラー: ${(err as Error).message}`); }
     finally { setExecuting(false); }
+  };
+
+  // ─── ボーナス確定 ───
+  const handleConfirm = async () => {
+    if (!selectedMonth || !bonusRun) return;
+    if (bonusRun.status === "confirmed") { alert("すでに確定済みです"); return; }
+    if (!confirm(`${selectedMonth}のボーナス計算を確定しますか？\n\n確定すると各会員の称号レベル（currentLevel）が更新されます。\nこの操作は取り消せません。`)) return;
+    setConfirming(true);
+    try {
+      const res = await fetch("/api/admin/bonus-run", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bonusMonth: selectedMonth }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`✅ ${data.message}`);
+        await fetchBonusRun();
+      } else {
+        alert(`❌ エラー: ${data.error}`);
+      }
+    } catch (err: unknown) { alert(`❌ エラー: ${(err as Error).message}`); }
+    finally { setConfirming(false); }
+  };
+
+  // ─── 全員に一括公開 ───
+  const handlePublishAll = async (isPublished: boolean) => {
+    if (!selectedMonth || !bonusRun) return;
+    if (bonusRun.status !== "confirmed") { alert("確定済みのボーナスのみ公開できます。先に「計算して確定」を実行してください。"); return; }
+    const msg = isPublished
+      ? `${selectedMonth}のボーナス明細を全会員に公開しますか？\n\n貯金ポイントが各会員に付与されます。`
+      : `${selectedMonth}のボーナス明細を非公開に戻しますか？`;
+    if (!confirm(msg)) return;
+    setPublishing(true);
+    try {
+      const res = await fetch("/api/admin/bonus-results/publish-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bonusMonth: selectedMonth, isPublished }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`✅ ${data.message}`);
+        await fetchPublishStatus();
+      } else {
+        alert(`❌ エラー: ${data.error}`);
+      }
+    } catch (err: unknown) { alert(`❌ エラー: ${(err as Error).message}`); }
+    finally { setPublishing(false); }
   };
 
   // ─── ボーナス計算削除（確定済み含む強制削除対応） ───
@@ -864,6 +931,18 @@ export default function BonusCalculatePage() {
             >
               {executing ? "計算中..." : "ボーナス計算実行"}
             </button>
+            {/* 確定ボタン（draft のみ表示） */}
+            {bonusRun && bonusRun.status === "draft" && (
+              <button
+                onClick={handleConfirm}
+                disabled={confirming}
+                className="bg-emerald-600 text-white px-5 py-2 rounded-lg font-semibold text-sm hover:bg-emerald-700 transition disabled:opacity-50"
+                title="計算結果を確定し、各会員の称号レベルを更新します"
+              >
+                <i className="fas fa-check-circle mr-1.5"></i>
+                {confirming ? "確定中..." : "計算して確定"}
+              </button>
+            )}
             {/* 削除ボタン */}
             {bonusRun && (
               <button
@@ -880,9 +959,16 @@ export default function BonusCalculatePage() {
               </button>
             )}
           </div>
+          {/* 確定済みの警告 */}
           {bonusRun?.status === "confirmed" && (
             <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
               ⚠️ このボーナスは確定済みです。強制削除すると全ボーナス結果・明細が削除されます。調整金・過不足金は残ります。
+            </div>
+          )}
+          {/* draft 時の案内 */}
+          {bonusRun?.status === "draft" && (
+            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              📋 計算結果を確認後、「計算して確定」ボタンで称号レベルを更新し確定してください。
             </div>
           )}
           {/* 支払調整率 */}
@@ -912,7 +998,7 @@ export default function BonusCalculatePage() {
         </div>
       </div>
 
-      {/* ステータス */}
+      {/* ステータス + 公開エリア */}
       {bonusRun && (
         <div className={`rounded-xl p-5 border ${STATUS_STYLES[bonusRun.status].bg} ${STATUS_STYLES[bonusRun.status].border}`}>
           <div className="flex items-center gap-3 mb-2 flex-wrap">
@@ -920,12 +1006,72 @@ export default function BonusCalculatePage() {
               {STATUS_STYLES[bonusRun.status].label}
             </span>
             <span className="text-gray-700 font-semibold">{selectedMonth}</span>
+            {bonusRun.confirmedAt && (
+              <span className="text-xs text-gray-500">確定日時: {new Date(bonusRun.confirmedAt).toLocaleString("ja-JP")}</span>
+            )}
           </div>
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div><span className="text-gray-600">対象会員:</span> <span className="font-bold">{bonusRun.totalMembers}名</span></div>
             <div><span className="text-gray-600">アクティブ:</span> <span className="font-bold">{bonusRun.totalActiveMembers}名</span></div>
             <div><span className="text-gray-600">合計ボーナス:</span> <span className="font-bold text-blue-600">{yen(bonusRun.totalBonusAmount)}</span></div>
           </div>
+
+          {/* 公開エリア（確定済みのみ表示） */}
+          {bonusRun.status === "confirmed" && (
+            <div className="mt-4 pt-4 border-t border-emerald-200">
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-emerald-800 mb-1">
+                    <i className="fas fa-eye mr-1.5"></i>会員マイページへの公開
+                  </p>
+                  {publishStatus ? (
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="text-gray-600">全件: <strong>{publishStatus.total}</strong></span>
+                      <span className="text-emerald-600">公開済み: <strong>{publishStatus.published}</strong></span>
+                      <span className="text-orange-500">未公開: <strong>{publishStatus.unpublished}</strong></span>
+                      {publishStatus.allPublished && (
+                        <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">✅ 全員公開済み</span>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400">公開状況を読み込み中...</p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  {/* 一括公開ボタン */}
+                  <button
+                    onClick={() => handlePublishAll(true)}
+                    disabled={publishing || publishStatus?.allPublished === true}
+                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-emerald-700 transition disabled:opacity-50"
+                    title="確定済みの全ボーナスを会員マイページに公開し、貯金ポイントを付与します"
+                  >
+                    <i className="fas fa-globe mr-1.5"></i>
+                    {publishing ? "公開中..." : "全員に一括公開"}
+                  </button>
+                  {/* 非公開に戻す */}
+                  {publishStatus && publishStatus.published > 0 && (
+                    <button
+                      onClick={() => handlePublishAll(false)}
+                      disabled={publishing}
+                      className="bg-gray-200 text-gray-600 px-4 py-2 rounded-lg font-semibold text-sm hover:bg-gray-300 transition disabled:opacity-50"
+                    >
+                      非公開に戻す
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* draft 時：確定の案内 */}
+          {bonusRun.status === "draft" && (
+            <div className="mt-4 pt-4 border-t border-amber-200">
+              <p className="text-xs text-amber-700">
+                <i className="fas fa-info-circle mr-1"></i>
+                計算結果を確認し、問題なければ「計算して確定」ボタンで確定してください。確定後に会員マイページへの公開が可能になります。
+              </p>
+            </div>
+          )}
         </div>
       )}
 
