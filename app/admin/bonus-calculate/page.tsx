@@ -1118,6 +1118,16 @@ export default function BonusCalculatePage() {
                         <button onClick={fetchBonusRun} className="text-blue-500 underline ml-1">再読み込み</button>
                         してください
                       </p>
+                      {debugInfo && (
+                        <div className="mt-4 text-left mx-auto max-w-lg bg-red-50 border border-red-200 rounded-lg p-4 text-xs">
+                          <p className="font-bold text-red-700 mb-2">🔍 診断情報</p>
+                          <p>HTTPステータス: <strong>{debugInfo.status}</strong></p>
+                          <p>results配列あり: <strong>{String(debugInfo.hasResults)}</strong></p>
+                          <p>件数: <strong>{debugInfo.resultsCount}</strong></p>
+                          {debugInfo.error && <p className="text-red-600 mt-1">エラー: <strong>{debugInfo.error}</strong></p>}
+                          {debugInfo.detail && <p className="text-red-600 mt-1">詳細: <strong>{debugInfo.detail}</strong></p>}
+                        </div>
+                      )}
                     </div>
           )}
 
