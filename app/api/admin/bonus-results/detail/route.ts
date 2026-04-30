@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
               },
             },
           },
-          orderBy: { totalBonus: "desc" },
+          orderBy: { paymentAmount: "desc" },
         },
       },
     });
@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
       savingsBonus: r.savingsBonus,
 
       // 合計・調整
-      bonusTotal: r.totalBonus,
+      bonusTotal: r.amountBeforeAdjustment,
       carryoverAmount: r.carryoverAmount || 0,
       adjustmentAmount: r.adjustmentAmount || 0,
       otherPositionAmount: r.otherPositionAmount || 0,

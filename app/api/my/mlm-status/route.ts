@@ -63,6 +63,7 @@ export async function GET() {
       where: {
         mlmMemberId: mlmMember.id,
         bonusRun: { status: "confirmed" },
+        isPublished: true,
       },
       include: {
         bonusRun: { select: { bonusMonth: true, confirmedAt: true } },
@@ -112,7 +113,7 @@ export async function GET() {
             confirmedAt: latestBonus.bonusRun.confirmedAt?.toISOString() ?? null,
             isActive: latestBonus.isActive,
             paymentAmount: latestBonus.paymentAmount,
-            totalBonus: latestBonus.totalBonus,
+            totalBonus: latestBonus.amountBeforeAdjustment,
             groupPoints: latestBonus.groupPoints,
             groupActiveCount: latestBonus.groupActiveCount,
           }

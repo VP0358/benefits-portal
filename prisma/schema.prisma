@@ -865,6 +865,9 @@ model BonusResult {
   // ユニレベルボーナス段数内訳（JSON）
   unilevelDetail      Json?                         // { "1": pt, "2": pt, ... }
   savingsPointsAdded  Int         @default(0)       // 今月追加貯金pt
+  // 公開管理
+  isPublished         Boolean     @default(false)   // 会員マイページへの公開フラグ
+  publishedAt         DateTime?                     // 公開日時
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
 
@@ -874,6 +877,7 @@ model BonusResult {
   @@unique([bonusRunId, mlmMemberId])
   @@index([bonusMonth])
   @@index([mlmMemberId])
+  @@index([isPublished])
   @@map("bonus_results")
 }
 
