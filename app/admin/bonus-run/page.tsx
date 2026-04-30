@@ -21,7 +21,11 @@ type BonusResultRow = {
   memberId: string;
   memberName: string;
   memberEmail: string;
-  mlmMemberCode: string;
+  memberCode: string;        // API returns memberCode (not mlmMemberCode)
+  mlmMemberCode: string;     // kept for compatibility
+  // 複数ポジション対応
+  baseCode: string;
+  positionCount: number;
   isActive: boolean;
   selfPurchasePoints: number;
   groupPoints: number;
@@ -74,12 +78,16 @@ function getPrevMonth() {
 /* ─── 計算結果テーブル ─── */
 function ResultTable({ results }: { results: BonusResultRow[] }) {
   const [search, setSearch] = useState("");
-  const filtered = results.filter(
-    (r) =>
-      r.memberName.includes(search) ||
-      r.memberEmail.includes(search) ||
-      r.mlmMemberCode.includes(search)
-  );
+  const filtered = results.filter((r) => {
+    const code = r.baseCode || r.memberCode || r.mlmMemberCode || "";
+    const q = search.toLowerCase();
+    return (
+      !search ||
+      r.memberName.toLowerCase().includes(q) ||
+      (r.memberEmail || "").toLowerCase().includes(q) ||
+      code.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-3">
@@ -110,12 +118,26 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
           </thead>
           <tbody>
             {filtered.map((r) => {
+              const isMulti = (r.positionCount ?? 1) >= 2;
+              const displayCode = r.baseCode || r.memberCode || r.mlmMemberCode;
               const levelChanged = r.previousTitleLevel !== r.newTitleLevel;
               return (
                 <tr key={r.id} className={`border-b border-slate-50 hover:bg-slate-50 ${r.isActive ? "" : "opacity-60"}`}>
                   <td className="py-2 px-3">
-                    <div className="font-semibold text-slate-800">{r.memberName}</div>
-                    <div className="text-slate-400">{r.mlmMemberCode}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-slate-800">{r.memberName}</span>
+                      {isMulti && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
+                          {r.positionCount}POS
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-slate-400 font-mono">
+                      {isMulti
+                        ? <span>{displayCode}<span className="text-purple-400">-**</span></span>
+                        : displayCode
+                      }
+                    </div>
                   </td>
                   <td className="py-2 px-3 text-center">
                     <span className={`rounded-full px-2 py-0.5 font-semibold ${r.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
@@ -140,7 +162,10 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
                   <td className="py-2 px-3 text-right">{yen(r.directBonus)}</td>
                   <td className="py-2 px-3 text-right">{yen(r.unilevelBonus)}</td>
                   <td className="py-2 px-3 text-right">{yen(r.structureBonus)}</td>
-                  <td className="py-2 px-3 text-right font-black text-slate-900">{yen(r.bonusTotal)}</td>
+                  <td className={`py-2 px-3 text-right font-black ${isMulti ? "text-purple-800" : "text-slate-900"}`}>
+                    {yen(r.bonusTotal)}
+                    {isMulti && <span className="ml-1 text-[9px] text-purple-400">合算</span>}
+                  </td>
                 </tr>
               );
             })}
