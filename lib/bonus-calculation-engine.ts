@@ -129,7 +129,30 @@ export async function executeBonusCalculation(
     }
   }
 
-  // 6. 各会員のボーナス計算
+  // 6. 対象月の調整金を取得（bonusMonthが一致するもの全件）
+  const adjustments = await prisma.bonusAdjustment.findMany({
+    where: { bonusMonth },
+  });
+
+  // 会員IDごとに調整金を合算するMap
+  const adjustmentMap = new Map<bigint, { total: number; items: { amount: number; comment: string | null; adjustmentType: string }[] }>();
+  for (const adj of adjustments) {
+    const key = adj.mlmMemberId;
+    if (!adjustmentMap.has(key)) {
+      adjustmentMap.set(key, { total: 0, items: [] });
+    }
+    const entry = adjustmentMap.get(key)!;
+    entry.total += adj.amount;
+    entry.items.push({
+      amount: adj.amount,
+      comment: adj.comment ?? null,
+      adjustmentType: adj.adjustmentType,
+    });
+  }
+
+  console.log(`💰 調整金対象会員: ${adjustmentMap.size}名（合計件数: ${adjustments.length}件）`);
+
+  // 7. 各会員のボーナス計算
   const results: any[] = [];
   let totalActiveMembers = 0;
   let totalBonusAmount = 0;
@@ -203,13 +226,20 @@ export async function executeBonusCalculation(
     const totalBonus = directBonus + unilevelResult.total + structureBonus;
     const savingsBonus = 0; // 貯金ボーナスはボーナス計算対象外（ポイントとして別途付与）
 
-    // 支払調整
+    // 調整金を取得（対象月・対象会員の調整金合計）
+    const adjEntry = adjustmentMap.get(member.id);
+    const adjustmentAmount = adjEntry ? adjEntry.total : 0;
+
+    // 支払調整前取得額 = ボーナス合計 + 調整金
+    const amountBeforeAdjustment = totalBonus + adjustmentAmount;
+
+    // 支払調整（調整金込みの合計に対して適用）
     const paymentAdjustmentAmount =
       paymentAdjustmentRate !== null
-        ? Math.floor(totalBonus * paymentAdjustmentRate)
+        ? Math.floor(amountBeforeAdjustment * paymentAdjustmentRate)
         : 0;
 
-    const finalAmount = totalBonus - paymentAdjustmentAmount;
+    const finalAmount = amountBeforeAdjustment - paymentAdjustmentAmount;
 
     // 源泉徴収税（10.21%）
     const withholdingTax = Math.floor(finalAmount * 0.1021);
@@ -240,16 +270,17 @@ export async function executeBonusCalculation(
       directBonus,
       unilevelBonus: unilevelResult.total,
       structureBonus,
-      savingsBonus: 0,          // ボーナス計算には含めない
-      amountBeforeAdjustment: totalBonus,
-      paymentAdjustmentRate: paymentAdjustmentRate != null ? paymentAdjustmentRate * 100 : 0, // DB保存は%単位
+      savingsBonus: 0,
+      adjustmentAmount,              // ← 調整金を反映
+      amountBeforeAdjustment,        // ← ボーナス合計 + 調整金
+      paymentAdjustmentRate: paymentAdjustmentRate != null ? paymentAdjustmentRate * 100 : 0,
       paymentAdjustmentAmount,
       finalAmount,
       withholdingTax,
       serviceFee,
       paymentAmount,
       unilevelDetail: unilevelResult.detail,
-      savingsPointsAdded: 0,    // ボーナス公開時に別途付与
+      savingsPointsAdded: 0,
     });
   }
 
@@ -277,6 +308,15 @@ export async function executeBonusCalculation(
       bonusRunId: bonusRun.id,
     })),
   });
+
+  // BonusAdjustmentにbonusRunIdを紐付け（計算後に紐付け）
+  if (adjustments.length > 0) {
+    await prisma.bonusAdjustment.updateMany({
+      where: { bonusMonth, bonusRunId: null },
+      data: { bonusRunId: bonusRun.id },
+    });
+    console.log(`🔗 調整金 ${adjustments.length}件をBonusRunに紐付けました`);
+  }
 
   // 8. 会員レベルを自動更新（Phase 6: 昇格・降格判定）
   let upgradedCount = 0;

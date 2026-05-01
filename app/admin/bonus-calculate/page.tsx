@@ -544,6 +544,7 @@ export default function BonusCalculatePage() {
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [applyingAdj, setApplyingAdj] = useState(false);
 
   // 公開状況
   type PublishStatus = { total: number; published: number; unpublished: number; allPublished: boolean } | null;
@@ -693,6 +694,50 @@ export default function BonusCalculatePage() {
       }
     } catch { setNewShor(prev => ({ ...prev, memberName: "検索エラー" })); }
     finally { setShorLookingUp(false); }
+  };
+
+  // ─── 調整金を既存ボーナス結果に反映 ───
+  const handleApplyAdjustments = async () => {
+    if (!bonusRun) {
+      alert("先にボーナス計算を実行してください。");
+      return;
+    }
+    if (adjustments.length === 0) {
+      alert("この月の調整金がありません。");
+      return;
+    }
+    if (!confirm(
+      `【${selectedMonth}】の調整金 ${adjustments.length}件をボーナス結果に反映しますか？\n\n` +
+      `・各会員のボーナス結果（adjustmentAmount・paymentAmount等）が更新されます\n` +
+      `・調整金合計: ¥${adjustments.reduce((s, a) => s + a.amount, 0).toLocaleString()}\n` +
+      `・対象会員: ${new Set(adjustments.map(a => a.memberCode)).size}名`
+    )) return;
+
+    setApplyingAdj(true);
+    try {
+      const res = await fetch("/api/admin/bonus-run/apply-adjustments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bonusMonth: selectedMonth }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(
+          `✅ 調整金を反映しました\n\n` +
+          `更新会員数: ${data.updatedCount}名\n` +
+          `調整金対象: ${data.adjustmentMembersCount}名\n` +
+          `調整金合計: ¥${Number(data.totalAdjustmentAmount).toLocaleString()}\n` +
+          `総支払額（更新後）: ¥${Number(data.totalBonusAmount).toLocaleString()}`
+        );
+        await fetchBonusRun();
+      } else {
+        alert(`❌ エラー: ${data.error}`);
+      }
+    } catch (err: unknown) {
+      alert(`❌ エラー: ${(err as Error).message}`);
+    } finally {
+      setApplyingAdj(false);
+    }
   };
 
   // ─── 支払調整率保存 ───
@@ -1278,8 +1323,48 @@ export default function BonusCalculatePage() {
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition">
                     <i className="fas fa-plus text-[11px]"></i>手動追加
                   </button>
+                  {bonusRun && adjustments.length > 0 && (
+                    <button
+                      onClick={handleApplyAdjustments}
+                      disabled={applyingAdj}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 text-white text-xs rounded-lg hover:bg-orange-600 transition disabled:opacity-50"
+                      title="調整金をボーナス計算結果に反映します（支払額が更新されます）"
+                    >
+                      {applyingAdj
+                        ? <><i className="fas fa-spinner fa-spin text-[11px]"></i>反映中…</>
+                        : <><i className="fas fa-sync-alt text-[11px]"></i>報酬に反映</>
+                      }
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {/* 調整金サマリー */}
+              {adjustments.length > 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 flex flex-wrap gap-4 text-sm">
+                  <div>
+                    <span className="text-orange-500 font-semibold">調整金合計：</span>
+                    <span className="font-bold text-orange-700 ml-1">
+                      ¥{adjustments.reduce((s, a) => s + a.amount, 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-orange-500 font-semibold">対象会員：</span>
+                    <span className="font-bold text-orange-700 ml-1">
+                      {new Set(adjustments.map(a => a.memberCode)).size}名
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-orange-500 font-semibold">件数：</span>
+                    <span className="font-bold text-orange-700 ml-1">{adjustments.length}件</span>
+                  </div>
+                  {!bonusRun && (
+                    <span className="text-xs text-orange-400 flex items-center gap-1">
+                      ⚠️ ボーナス計算未実行のため「報酬に反映」は計算実行後に行ってください
+                    </span>
+                  )}
+                </div>
+              )}
 
               <div className="bg-gray-50 rounded-xl overflow-x-auto border border-gray-200">
                 <table className="w-full text-sm">
