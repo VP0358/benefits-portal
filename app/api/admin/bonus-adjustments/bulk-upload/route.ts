@@ -65,15 +65,22 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
+        // 対象月のBonusRunを検索（あれば紐付け、なければnull）
+        const bonusRun = await prisma.bonusRun.findUnique({
+          where: { bonusMonth },
+        });
+
         // 調整金を作成
         await prisma.bonusAdjustment.create({
           data: {
             bonusMonth,
             mlmMemberId: mlmMember.id,
+            ...(bonusRun ? { bonusRunId: bonusRun.id } : {}),
             adjustmentType: "manual", // 手動入力
             amount: Number(amount),
             comment: comment || "",
             isTaxable: isTaxable ?? true,
+            isLocked: false,
           },
         });
 

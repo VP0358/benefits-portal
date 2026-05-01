@@ -1020,18 +1020,23 @@ model DeliveryNote {
 // ボーナス調整金（手動入力）
 model BonusAdjustment {
   id              BigInt   @id @default(autoincrement())
-  bonusRunId      BigInt
+  bonusRunId      BigInt?                  // BonusRun紐付け（任意：CSV一括登録時はnull可）
   mlmMemberId     BigInt
+  bonusMonth      String   @db.Char(7)    // "YYYY-MM"（bonusRunIdがnullの場合に使用）
+  adjustmentType  String   @default("manual") @db.VarChar(50) // manual / carryover / other
   amount          Int                      // 調整金額（円）
   comment         String?  @db.VarChar(500)
+  isTaxable       Boolean  @default(true)  // 源泉課税対象フラグ
+  isLocked        Boolean  @default(false) // 編集ロックフラグ
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  bonusRun        BonusRun  @relation(fields: [bonusRunId], references: [id], onDelete: Cascade)
-  mlmMember       MlmMember @relation(fields: [mlmMemberId], references: [id], onDelete: Cascade)
+  bonusRun        BonusRun?  @relation(fields: [bonusRunId], references: [id], onDelete: Cascade)
+  mlmMember       MlmMember  @relation(fields: [mlmMemberId], references: [id], onDelete: Cascade)
 
   @@index([bonusRunId])
   @@index([mlmMemberId])
+  @@index([bonusMonth])
   @@map("bonus_adjustments")
 }
 
