@@ -55,10 +55,13 @@ export async function POST(req: NextRequest) {
     let updatedCount = 0;
     let totalBonusAmount = 0;
 
+    // トランザクションで一括更新（パフォーマンス向上・整合性確保）
+    const updateOps = [];
+
     for (const result of bonusRun.results) {
       const adjustmentAmount = adjustmentMap.get(result.mlmMemberId) ?? 0;
 
-      // 旧amountBeforeAdjustmentから調整金分を除いた純ボーナス合計
+      // 純ボーナス合計（調整金・支払調整を除く各ボーナスの合計）
       const pureBonus = (result.directBonus ?? 0)
         + (result.unilevelBonus ?? 0)
         + (result.structureBonus ?? 0)
@@ -77,7 +80,7 @@ export async function POST(req: NextRequest) {
 
       const finalAmount = amountBeforeAdjustment - paymentAdjustmentAmount;
 
-      // 源泉徴収税
+      // 源泉徴収税（10.21%）
       const withholdingTax = Math.floor(finalAmount * 0.1021);
 
       // 事務手数料
@@ -91,43 +94,50 @@ export async function POST(req: NextRequest) {
 
       totalBonusAmount += paymentAmount;
 
-      // BonusResultを更新
-      await prisma.bonusResult.update({
-        where: { id: result.id },
-        data: {
-          adjustmentAmount,
-          amountBeforeAdjustment,
-          paymentAdjustmentAmount,
-          finalAmount,
-          withholdingTax,
-          serviceFee,
-          paymentAmount,
-        },
-      });
+      // 更新データを蓄積（調整金0の会員も必ず更新してリセットを保証）
+      updateOps.push(
+        prisma.bonusResult.update({
+          where: { id: result.id },
+          data: {
+            adjustmentAmount,        // 調整金（なければ0）
+            amountBeforeAdjustment,  // 純ボーナス + 調整金
+            paymentAdjustmentAmount, // 支払調整額
+            finalAmount,             // 調整後取得額
+            withholdingTax,          // 源泉徴収税
+            serviceFee,              // 事務手数料
+            paymentAmount,           // 最終支払額
+          },
+        })
+      );
 
       updatedCount++;
     }
 
-    // BonusRunのtotalBonusAmountも更新
+    // 一括実行
+    await prisma.$transaction(updateOps);
+
+    // BonusRunのtotalBonusAmount（総支払額）を調整金反映後の値で更新
     await prisma.bonusRun.update({
       where: { bonusMonth },
       data: { totalBonusAmount: Math.floor(totalBonusAmount) },
     });
 
-    // 調整金にbonusRunIdを紐付け
+    // 調整金にbonusRunIdを紐付け（未紐付けのもの全件）
     await prisma.bonusAdjustment.updateMany({
       where: { bonusMonth, bonusRunId: null },
       data: { bonusRunId: bonusRun.id },
     });
+
+    const totalAdjustmentAmount = Array.from(adjustmentMap.values()).reduce((a, b) => a + b, 0);
 
     return NextResponse.json({
       success: true,
       bonusMonth,
       updatedCount,
       adjustmentMembersCount: adjustmentMap.size,
-      totalAdjustmentAmount: Array.from(adjustmentMap.values()).reduce((a, b) => a + b, 0),
+      totalAdjustmentAmount,
       totalBonusAmount: Math.floor(totalBonusAmount),
-      message: `${updatedCount}名のボーナス結果に調整金を反映しました（調整金対象: ${adjustmentMap.size}名）`,
+      message: `${updatedCount}名のボーナス結果を再計算・更新しました（調整金対象: ${adjustmentMap.size}名、調整金合計: ¥${totalAdjustmentAmount.toLocaleString()}）`,
     });
   } catch (error) {
     console.error("Error applying adjustments:", error);

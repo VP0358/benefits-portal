@@ -389,6 +389,7 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
 
   const totalBonus = filtered.reduce((s, r) => s + r.bonusTotal, 0);
   const totalPayment = filtered.reduce((s, r) => s + r.paymentAmount, 0);
+  const totalAdjustment = filtered.reduce((s, r) => s + (r.adjustmentAmount || 0), 0);
   const paymentCount = filtered.filter((r) => r.paymentAmount > 0).length;
 
   return (
@@ -418,10 +419,16 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
       </div>
 
       {/* サマリーバー */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
-          <p className="text-xs text-blue-500 font-semibold mb-0.5">ボーナス合計（表示中）</p>
+          <p className="text-xs text-blue-500 font-semibold mb-0.5">ボーナス合計（調整金込み）</p>
           <p className="text-lg font-bold text-blue-800">{yen(totalBonus)}</p>
+        </div>
+        <div className={`border rounded-xl px-4 py-3 ${totalAdjustment !== 0 ? "bg-orange-50 border-orange-100" : "bg-gray-50 border-gray-100"}`}>
+          <p className={`text-xs font-semibold mb-0.5 ${totalAdjustment !== 0 ? "text-orange-500" : "text-gray-400"}`}>調整金合計</p>
+          <p className={`text-lg font-bold ${totalAdjustment > 0 ? "text-orange-700" : totalAdjustment < 0 ? "text-red-600" : "text-gray-400"}`}>
+            {totalAdjustment !== 0 ? yen(totalAdjustment) : "¥0"}
+          </p>
         </div>
         <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
           <p className="text-xs text-emerald-500 font-semibold mb-0.5">支払総額（表示中）</p>
@@ -449,15 +456,17 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
               <th className="text-right p-2 font-semibold">ダイレクト</th>
               <th className="text-right p-2 font-semibold">ユニレベル</th>
               <th className="text-right p-2 font-semibold">組織</th>
+              <th className="text-right p-2 font-semibold">調整金</th>
               <th className="text-right p-2 font-semibold">ボーナス合計</th>
               <th className="text-right p-2 font-semibold">源泉税</th>
+              <th className="text-right p-2 font-semibold">事務費</th>
               <th className="text-right p-2 font-semibold">支払額</th>
               <th className="text-center p-2 font-semibold">詳細</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={15} className="text-center py-8 text-gray-400">データがありません</td></tr>
+              <tr><td colSpan={17} className="text-center py-8 text-gray-400">データがありません</td></tr>
             ) : filtered.map((r) => (
               <tr key={r.id} className={`border-b hover:bg-blue-50/30 transition ${r.paymentAmount > 0 ? "" : "opacity-60"}`}>
                 {/* 会員コード：複数ポジションは baseCode-** 表示 */}
@@ -502,8 +511,12 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
                 <td className="p-2 text-right text-gray-800">{yen(r.directBonus)}</td>
                 <td className="p-2 text-right text-gray-800">{yen(r.unilevelBonus)}</td>
                 <td className="p-2 text-right text-gray-800">{yen(r.structureBonus)}</td>
+                <td className={`p-2 text-right font-semibold ${r.adjustmentAmount !== 0 ? (r.adjustmentAmount > 0 ? "text-emerald-700" : "text-red-600") : "text-gray-400"}`}>
+                  {r.adjustmentAmount !== 0 ? yen(r.adjustmentAmount) : "—"}
+                </td>
                 <td className="p-2 text-right font-bold text-slate-700">{yen(r.bonusTotal)}</td>
                 <td className="p-2 text-right text-red-600">{yen(r.withholdingTax)}</td>
+                <td className="p-2 text-right text-red-500">{r.serviceFee > 0 ? yen(r.serviceFee) : "—"}</td>
                 <td className={`p-2 text-right font-bold ${r.paymentAmount > 0 ? "text-blue-600" : "text-gray-400"}`}>
                   {yen(r.paymentAmount)}
                 </td>
