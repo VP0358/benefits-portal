@@ -81,32 +81,45 @@ export function calcLevelFromGP(gp: number): number {
 
 /**
  * アクティブ判定
- * ①契約締結日が当月末まで ②ビジネス会員 ③当月150pt以上 ④商品1000or2000を1個以上
+ * 条件:
+ *   ① 商品コード1000 or 2000（スミサイ）を当月購入していること
+ *   ② 自己購入ポイントが150pt以上であること
+ * ※ forceActive=true の場合は強制的にアクティブとみなす
+ * ※ contractDate・memberType による制限は行わない
  */
 export function isActiveMember(params: {
-  contractDate: Date | null;
-  memberType: string;
   selfPoints: number;
-  purchasedRequiredProduct: boolean;
+  purchasedRequiredProduct: boolean; // 商品コード1000 or 2000 の購入フラグ
   forceActive: boolean;
-  targetMonth: string; // "YYYY-MM"
+  // 以下は後方互換用（使用しない）
+  contractDate?: Date | null;
+  memberType?: string;
+  targetMonth?: string;
 }): boolean {
+  // 強制アクティブフラグが立っている場合はそのままアクティブ
   if (params.forceActive) return true;
-  if (!params.contractDate) return false;
-  if (params.memberType !== "business") return false;
 
-  // ①契約締結日が対象月末まで
-  const [y, m] = params.targetMonth.split("-").map(Number);
-  const monthEnd = new Date(y, m, 0); // 月末日
-  if (params.contractDate > monthEnd) return false;
-
-  // ③150pt以上
-  if (params.selfPoints < ACTIVE_MIN_POINTS) return false;
-
-  // ④スミサイ購入あり
+  // ①スミサイ（商品コード1000 or 2000）の購入があること
   if (!params.purchasedRequiredProduct) return false;
 
+  // ②自己購入ポイントが150pt以上であること
+  if (params.selfPoints < ACTIVE_MIN_POINTS) return false;
+
   return true;
+}
+
+/**
+ * 報酬受取資格判定
+ * 条件:
+ *   ① 自身がアクティブ（スミサイ購入あり かつ 150pt以上）
+ *   ② 直接紹介者のうちアクティブが2人以上
+ *      （各紹介者もスミサイ購入あり かつ 150pt以上であること）
+ */
+export function isEligibleForBonus(params: {
+  isActive: boolean;
+  directActiveCount: number;
+}): boolean {
+  return params.isActive && params.directActiveCount >= 2;
 }
 
 /**
@@ -127,15 +140,20 @@ export function isPointGrantTarget(productCode: string): boolean {
 /**
  * ユニレベルボーナス算出率を取得（段数ごと）
  * 2026年3月4日版: レベル別に獲得段数が異なる
- * 直接紹介2人以上が購入していることが条件
+ *
+ * 報酬受取条件（両方満たすこと）:
+ *   ① 自身がアクティブ（スミサイ購入 かつ 150pt以上）
+ *   ② 直接紹介者のアクティブが2人以上（各自スミサイ購入 かつ 150pt以上）
+ *
+ * いずれかを満たさない場合は全レートを0として報酬なし
  */
 export function getUnilevelRates(
   achievedLevel: number,
   directActiveCount: number
 ): number[] {
-  // 直接紹介2人以上が購入していない場合は獲得なし
+  // 直接紹介アクティブが2人未満 → 報酬なし（0レートを返す）
   if (directActiveCount < 2) return UNILEVEL_RATES[0];
-  
+
   return UNILEVEL_RATES[achievedLevel] ?? UNILEVEL_RATES[0];
 }
 

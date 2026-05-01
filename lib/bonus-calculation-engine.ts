@@ -7,6 +7,7 @@ import { prisma } from "./prisma";
 import {
   calcLevelFromItemCount,
   isActiveMember,
+  isEligibleForBonus,
   getUnilevelRates,
   getUnilevelMaxDepth,
   calcUnilevelBonus,
@@ -116,7 +117,8 @@ export async function executeBonusCalculation(
   }
 
   // 5. 組織構造を構築（ユニレベル）
-  const memberMap = new Map(members.map((m) => [m.id, m]));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const memberMap = new Map<bigint, any>(members.map((m: any) => [m.id, m]));
   const childrenMap = new Map<bigint, bigint[]>();
 
   for (const member of members) {
@@ -166,13 +168,11 @@ export async function executeBonusCalculation(
     };
 
     // アクティブ判定
+    // 条件: ①商品1000 or 2000（スミサイ）を当月購入 かつ ②自己購入ポイントが150pt以上
     const isActive = isActiveMember({
-      contractDate: member.contractDate,
-      memberType: member.memberType,
       selfPoints: purchaseData.selfPurchasePoints,
       purchasedRequiredProduct: purchaseData.purchasedRequiredProduct,
       forceActive: member.forceActive || false,
-      targetMonth: bonusMonth,
     });
 
     if (isActive) totalActiveMembers++;
@@ -192,27 +192,36 @@ export async function executeBonusCalculation(
       calcDownlineSumiSaiCount(member.id, childrenMap, memberPurchaseMap, 7); // 7段目以内
     const achievedLevel = calcLevelFromItemCount(totalSumiSaiCount);
 
-    // ダイレクトボーナス計算
-    const directBonus = purchaseData.directBonusCount * DIRECT_BONUS_AMOUNT;
+    // ━━━ 報酬受取資格の判定 ━━━
+    // 条件: 自身がアクティブ かつ 直紹介者のうちアクティブが2人以上
+    const eligible = isEligibleForBonus({ isActive, directActiveCount });
 
-    // ユニレベルボーナス計算
-    const depthPoints = calcDepthPoints(
-      member.id,
-      childrenMap,
-      memberPurchaseMap,
-      memberMap,
-      bonusMonth,
-      achievedLevel
-    );
-    const unilevelResult = calcUnilevelBonus(
-      depthPoints,
-      achievedLevel,
-      directActiveCount
-    );
+    // ダイレクトボーナス計算（報酬受取資格がある場合のみ）
+    const directBonus = eligible
+      ? purchaseData.directBonusCount * DIRECT_BONUS_AMOUNT
+      : 0;
 
-    // 組織構築ボーナス計算（LV3以上）
+    // ユニレベルボーナス計算（報酬受取資格がある場合のみ）
+    let unilevelResult = { total: 0, detail: {} as Record<number, number> };
+    if (eligible) {
+      const depthPoints = calcDepthPoints(
+        member.id,
+        childrenMap,
+        memberPurchaseMap,
+        memberMap,
+        bonusMonth,
+        achievedLevel
+      );
+      unilevelResult = calcUnilevelBonus(
+        depthPoints,
+        achievedLevel,
+        directActiveCount
+      );
+    }
+
+    // 組織構築ボーナス計算（LV3以上 かつ 報酬受取資格がある場合のみ）
     let structureBonus = 0;
-    if (achievedLevel >= 3 && isActive) {
+    if (eligible && achievedLevel >= 3) {
       const minSeriesPoints = calcMinSeriesPoints(
         member.id,
         childrenMap,
@@ -384,13 +393,11 @@ function calcGroupData(
 
     if (!childPurchase || !childMember) continue;
 
+    // 直紹介アクティブ判定: 商品1000 or 2000購入あり かつ 150pt以上
     const childIsActive = isActiveMember({
-      contractDate: childMember.contractDate,
-      memberType: childMember.memberType,
       selfPoints: childPurchase.selfPurchasePoints,
       purchasedRequiredProduct: childPurchase.purchasedRequiredProduct,
       forceActive: childMember.forceActive || false,
-      targetMonth: bonusMonth,
     });
 
     if (childIsActive) {
@@ -468,16 +475,15 @@ function calcDepthPoints(
 
       if (!childPurchase || !childMember) continue;
 
+      // ユニレベル対象判定: スミサイ購入あり かつ 150pt以上
       const childIsActive = isActiveMember({
-        contractDate: childMember.contractDate,
-        memberType: childMember.memberType,
         selfPoints: childPurchase.selfPurchasePoints,
         purchasedRequiredProduct: childPurchase.purchasedRequiredProduct,
         forceActive: childMember.forceActive || false,
-        targetMonth: bonusMonth,
       });
 
       if (childIsActive) {
+        // アクティブな下位の購入ptをユニレベルボーナス対象に加算
         depthPoints[depth] = (depthPoints[depth] || 0) + childPurchase.selfPurchasePoints;
       }
 
