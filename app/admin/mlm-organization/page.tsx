@@ -254,28 +254,23 @@ function MemberDetailModal({
                 <span className="text-xs text-slate-400">なし（トップ）</span>
               )}
             </div>
-            {orgType === "unilevel" && (
-              <div className="flex items-start gap-2">
-                <span className="w-14 shrink-0 text-[10px] font-semibold text-slate-400 pt-0.5">紹介者</span>
-                {node.referrerCode ? (
-                  <div>
-                    <span className="text-xs font-bold text-slate-800">{node.referrerName ?? "—"}</span>
-                    <span className="ml-1.5 text-[10px] text-slate-400 font-mono">({node.referrerCode})</span>
-                  </div>
-                ) : (
-                  <span className="text-xs text-slate-400">なし</span>
-                )}
-              </div>
-            )}
-            {orgType === "matrix" && node.referrerCode && node.referrerCode !== node.uplineCode && (
-              <div className="flex items-start gap-2">
-                <span className="w-14 shrink-0 text-[10px] font-semibold text-slate-400 pt-0.5">紹介者</span>
-                <div>
+            {/* 紹介者: matrixモード・unilevelモード共に常に表示（直上者と同一人物でも必ず表示） */}
+            <div className="flex items-start gap-2">
+              <span className="w-14 shrink-0 text-[10px] font-semibold text-slate-400 pt-0.5">紹介者</span>
+              {node.referrerCode ? (
+                <div className="flex items-center gap-1 flex-wrap">
                   <span className="text-xs font-bold text-slate-800">{node.referrerName ?? "—"}</span>
-                  <span className="ml-1.5 text-[10px] text-slate-400 font-mono">({node.referrerCode})</span>
+                  <span className="text-[10px] text-slate-400 font-mono">({node.referrerCode})</span>
+                  {node.referrerCode === node.uplineCode && (
+                    <span className="text-[9px] bg-amber-100 text-amber-700 border border-amber-300 rounded px-1 py-0.5 font-semibold">
+                      直上者と同一
+                    </span>
+                  )}
                 </div>
-              </div>
-            )}
+              ) : (
+                <span className="text-xs text-slate-400">なし</span>
+              )}
+            </div>
           </div>
 
           {/* 傘下数・グループPT */}

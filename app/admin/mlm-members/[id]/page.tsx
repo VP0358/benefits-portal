@@ -171,7 +171,7 @@ type MemberDetail = {
   };
   referrer: { id: string; memberCode: string; user: { name: string }; companyName: string | null } | null;
   upline: { id: string; memberCode: string; user: { name: string }; companyName: string | null } | null;
-  downlines: { id: string; memberCode: string; currentLevel: number; status: string; user: { name: string }; companyName: string | null }[];
+  downlines: { id: string; memberCode: string; currentLevel: number; status: string; user: { name: string }; companyName: string | null; referrer: { id: string; memberCode: string; user: { name: string }; companyName: string | null } | null }[];
   // 初回パスワード（新規登録直後のみ）
   initialPassword?: string;
 };
@@ -1329,6 +1329,7 @@ export default function MlmMemberDetailPage() {
                 <tr>
                   <th className="px-4 py-2.5 text-left text-xs font-semibold">会員コード</th>
                   <th className="px-4 py-2.5 text-left text-xs font-semibold">氏名</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold">紹介者</th>
                   <th className="px-4 py-2.5 text-center text-xs font-semibold">LV</th>
                   <th className="px-4 py-2.5 text-center text-xs font-semibold">ステータス</th>
                   <th className="px-4 py-2.5 text-center text-xs font-semibold">操作</th>
@@ -1339,6 +1340,21 @@ export default function MlmMemberDetailPage() {
                   <tr key={child.id} className="hover:bg-violet-50 transition">
                     <td className="px-4 py-2.5 font-mono text-xs">{child.memberCode}</td>
                     <td className="px-4 py-2.5 text-sm">{child.companyName || child.user.name}</td>
+                    <td className="px-4 py-2.5 text-xs text-slate-600">
+                      {child.referrer ? (
+                        <div>
+                          <Link href={`/admin/mlm-members/${child.referrer.id}`} className="font-mono text-blue-600 hover:underline text-[11px]">
+                            {child.referrer.memberCode}
+                          </Link>
+                          <div className="text-slate-500">{child.referrer.companyName || child.referrer.user.name}</div>
+                          {child.referrer.memberCode === m.memberCode && (
+                            <span className="text-[9px] bg-amber-100 text-amber-700 border border-amber-300 rounded px-1">直上者と同一</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-2.5 text-center"><span className="text-xs">{LEVEL_LABELS[child.currentLevel] ?? child.currentLevel}</span></td>
                     <td className="px-4 py-2.5 text-center">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_COLOR[child.status] ?? ""}`}>

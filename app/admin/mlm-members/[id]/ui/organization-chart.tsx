@@ -15,6 +15,13 @@ type MemberNode = {
   currentMonthPoints?: number;
   directDownlines?: MemberNode[];
   activeMarker?: ActiveMarker;
+  // 紹介者・直上者（ツリーAPIから取得）
+  uplineId?: string | null;
+  uplineCode?: string | null;
+  uplineName?: string | null;
+  referrerId?: string | null;
+  referrerCode?: string | null;
+  referrerName?: string | null;
 };
 
 const ACTIVE_MARKER_BG: Record<ActiveMarker, string> = {
@@ -41,21 +48,20 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = {
   active: "text-green-600 font-semibold",
   autoship: "text-blue-600 font-semibold",
-  // 退会: 灰色（danger=赤、LV2=紫と区別）
   withdrawn: "text-gray-500",
   midCancel: "text-orange-600",
   lapsed: "text-gray-400",
   suspended: "text-yellow-600",
 };
 
-// 退会会員のノード全体に適用する背景・ボーダースタイル（danger=赤、LV2=紫と区別して灰色）
+// 退会会員のノード全体に適用する背景・ボーダースタイル
 const WITHDRAWN_NODE_STYLE = {
-  background: "rgba(209,213,219,0.4)",    // gray-300 薄め
-  border: "1px solid rgba(107,114,128,0.5)", // gray-500
+  background: "rgba(209,213,219,0.4)",
+  border: "1px solid rgba(107,114,128,0.5)",
 };
 
 const LEVEL_COLORS: Record<number, string> = {
-  0: "",           // LV0は白背景・黒縁（下記 getLevelStyle 参照）
+  0: "",
   1: "bg-blue-500",
   2: "bg-green-500",
   3: "bg-yellow-500",
@@ -104,32 +110,34 @@ export default function OrganizationChart({ memberCode }: { memberCode: string }
     fetchOrgChart(orgType);
   }, [orgType, fetchOrgChart]);
 
-  const renderTreeNode = (node: MemberNode, depth: number = 0): JSX.Element => {
+  const renderTreeNode = (node: MemberNode, depth: number = 0): React.ReactElement => {
     const indent = depth * 36;
     const hasChildren = node.directDownlines && node.directDownlines.length > 0;
     const levelLabel = node.level === 0 ? "未設定" : `LV.${node.level}`;
     const ls = getLevelStyle(node.level);
     const isWithdrawn = node.status === "withdrawn";
+    const isSameReferrerAndUpline =
+      node.referrerCode && node.uplineCode && node.referrerCode === node.uplineCode;
 
     return (
       <div key={node.id} className="mb-1">
         <div
-          className="flex items-center gap-2 p-2 rounded-lg border hover:shadow-sm transition"
+          className="flex items-start gap-2 p-2 rounded-lg border hover:shadow-sm transition"
           style={{
             paddingLeft: `${indent + 8}px`,
             ...(isWithdrawn ? WITHDRAWN_NODE_STYLE : { background: "white" }),
           }}
         >
           <div
-            className={`w-9 h-9 ${ls.className} rounded-full flex items-center justify-center font-bold text-xs shrink-0`}
+            className={`w-9 h-9 ${ls.className} rounded-full flex items-center justify-center font-bold text-xs shrink-0 mt-0.5`}
             style={ls.style}
           >
             {levelLabel}
           </div>
           <div className="flex-1 min-w-0">
+            {/* 会員コード・名前 */}
             <div className="font-semibold text-gray-800 text-sm truncate">
               <Link href={`/admin/mlm-members/${node.id}`}>
-                {/* 退会会員にはアクティブマーカー色付けをしない（紫ノード自体で識別） */}
                 {(!isWithdrawn && node.activeMarker && node.activeMarker !== "none") ? (
                   <span
                     className={`${ACTIVE_MARKER_BG[node.activeMarker]} rounded px-1 font-bold text-blue-600 hover:text-blue-700`}
@@ -146,6 +154,8 @@ export default function OrganizationChart({ memberCode }: { memberCode: string }
               {" - "}{node.name}
               {isWithdrawn && <span className="ml-1 text-xs text-gray-400">（退会）</span>}
             </div>
+
+            {/* ステータス・ポイント */}
             <div className="text-xs flex items-center gap-2">
               <span className={STATUS_COLORS[node.status] ?? "text-gray-500"}>
                 {STATUS_LABELS[node.status] ?? node.status}
@@ -157,9 +167,36 @@ export default function OrganizationChart({ memberCode }: { memberCode: string }
                 <span className="text-pink-600">今月:{node.currentMonthPoints}pt</span>
               )}
             </div>
+
+            {/* 直上者・紹介者（常に両方表示。同一人物の場合はバッジ表示） */}
+            {depth > 0 && (
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                {/* 直上者 */}
+                <span className="text-[10px] text-slate-400">
+                  <span className="font-semibold text-slate-500">直上者:</span>{" "}
+                  {node.uplineCode ? (
+                    <span className="font-mono">{node.uplineName ?? "—"}({node.uplineCode})</span>
+                  ) : "—"}
+                </span>
+                {/* 紹介者（同一人物でも必ず表示） */}
+                <span className="text-[10px] text-slate-400">
+                  <span className="font-semibold text-slate-500">紹介者:</span>{" "}
+                  {node.referrerCode ? (
+                    <>
+                      <span className="font-mono">{node.referrerName ?? "—"}({node.referrerCode})</span>
+                      {isSameReferrerAndUpline && (
+                        <span className="ml-1 text-[9px] bg-amber-100 text-amber-700 border border-amber-300 rounded px-0.5">
+                          直上者と同一
+                        </span>
+                      )}
+                    </>
+                  ) : "—"}
+                </span>
+              </div>
+            )}
           </div>
           {hasChildren && (
-            <div className="text-xs text-gray-500 shrink-0">
+            <div className="text-xs text-gray-500 shrink-0 mt-1">
               ▼{node.directDownlines!.length}名
             </div>
           )}
@@ -197,8 +234,8 @@ export default function OrganizationChart({ memberCode }: { memberCode: string }
 
       <p className="text-xs text-gray-500 mb-3">
         {orgType === "matrix"
-          ? "直上者（uplineId）に基づくマトリックス組織図（最大5段）"
-          : "直紹介者（referrerId）に基づくユニレベル組織図（最大5段）"}
+          ? "直上者（uplineId）に基づくマトリックス組織図（最大5段）— 各ノードに紹介者も表示"
+          : "直紹介者（referrerId）に基づくユニレベル組織図（最大5段）— 各ノードに直上者も表示"}
       </p>
 
       {loading ? (

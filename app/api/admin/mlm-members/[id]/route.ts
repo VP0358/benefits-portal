@@ -282,7 +282,11 @@ export async function GET(
         referrer: { select: { id: true, memberCode: true, companyName: true, user: { select: { name: true } } } },
         upline:   { select: { id: true, memberCode: true, companyName: true, user: { select: { name: true } } } },
         downlines: {
-          select: { id: true, memberCode: true, currentLevel: true, status: true, companyName: true, user: { select: { name: true } } },
+          select: {
+            id: true, memberCode: true, currentLevel: true, status: true, companyName: true,
+            user: { select: { name: true } },
+            referrer: { select: { id: true, memberCode: true, companyName: true, user: { select: { name: true } } } },
+          },
           take: 20,
         },
       },
