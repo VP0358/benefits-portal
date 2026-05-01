@@ -102,7 +102,8 @@ export async function executeBonusCalculation(
       });
     }
     const data = memberPurchaseMap.get(memberId)!;
-    data.selfPurchasePoints += purchase.points || 0;
+    // totalPoints = quantity × points（数量込みのポイント合計）を使用
+    data.selfPurchasePoints += purchase.totalPoints || 0;
 
     // s1000（登録料）のカウント
     if (purchase.productCode === DIRECT_BONUS_PRODUCT) {

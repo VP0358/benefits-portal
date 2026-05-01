@@ -39,7 +39,7 @@ export async function GET() {
       take: 36, // 直近3年分
     });
 
-    const history = results.map((r) => {
+    const history = results.map((r: (typeof results)[number]) => {
       // ユニレベル段数詳細
       const detail = r.unilevelDetail as Record<string, number> | null;
       // 算出率テーブル（当月の実績レベルベース）
