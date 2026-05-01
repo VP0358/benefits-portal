@@ -55,6 +55,8 @@ export async function executeBonusCalculation(
         },
       },
     },
+    // forceLevel（強制タイトルレベル）も取得
+    // ※ prisma.mlmMember には forceLevel フィールドが含まれるためinclude不要
   });
 
   console.log(`📊 対象会員数: ${members.length}名`);
@@ -191,7 +193,21 @@ export async function executeBonusCalculation(
     const totalSumiSaiCount =
       purchaseData.sumiSaiCount +
       calcDownlineSumiSaiCount(member.id, childrenMap, memberPurchaseMap, 7); // 7段目以内
-    const achievedLevel = calcLevelFromItemCount(totalSumiSaiCount);
+    const naturalLevel = calcLevelFromItemCount(totalSumiSaiCount);
+
+    // 強制タイトルレベルが設定されている場合はそれを優先適用
+    // forceLevel が null/undefined でない場合は強制レベルを使用
+    const forceLevel = (member as any).forceLevel;
+    const achievedLevel =
+      forceLevel !== null && forceLevel !== undefined
+        ? forceLevel
+        : naturalLevel;
+
+    if (forceLevel !== null && forceLevel !== undefined) {
+      console.log(
+        `  🏅 強制タイトル適用: ${(member as any).memberCode} forceLevel=${forceLevel} (自然レベル=${naturalLevel})`
+      );
+    }
 
     // ━━━ 報酬受取資格の判定 ━━━
     // 条件: 自身がアクティブ かつ 直紹介者のうちアクティブが2人以上
@@ -273,9 +289,14 @@ export async function executeBonusCalculation(
       groupPoints,
       directActiveCount,
       achievedLevel,
+      forcedLevel: forceLevel ?? 0,            // 強制タイトルレベル（DBに記録）
       previousTitleLevel: member.currentLevel || 0,
+      // 強制タイトルが設定されている場合は forceLevel で固定
+      // 設定がない場合は Math.max(currentLevel, achievedLevel) で昇格のみ（降格なし）
       newTitleLevel: isActive
-        ? Math.max(member.currentLevel || 0, achievedLevel)
+        ? (forceLevel !== null && forceLevel !== undefined
+            ? forceLevel
+            : Math.max(member.currentLevel || 0, achievedLevel))
         : 0,
       directBonus,
       unilevelBonus: unilevelResult.total,
@@ -338,6 +359,7 @@ export async function executeBonusCalculation(
 
     const oldLevel = member.currentLevel || 0;
     const newLevel = result.newTitleLevel;
+    const memberForceLevel = (member as any).forceLevel;
 
     if (newLevel !== oldLevel) {
       await prisma.mlmMember.update({
@@ -345,15 +367,22 @@ export async function executeBonusCalculation(
         data: { currentLevel: newLevel },
       });
 
-      if (newLevel > oldLevel) {
+      if (memberForceLevel !== null && memberForceLevel !== undefined) {
+        // 強制タイトル設定による変更
+        console.log(
+          `  🏅 強制タイトル適用でcurrentLevel更新: ${(member as any).memberCode} LV.${oldLevel} → LV.${newLevel} (forceLevel=${memberForceLevel})`
+        );
+        if (newLevel > oldLevel) upgradedCount++;
+        else downgradedCount++;
+      } else if (newLevel > oldLevel) {
         upgradedCount++;
         console.log(
-          `  🎉 レベルアップ: ${member.memberCode} LV.${oldLevel} → LV.${newLevel}`
+          `  🎉 レベルアップ: ${(member as any).memberCode} LV.${oldLevel} → LV.${newLevel}`
         );
       } else {
         downgradedCount++;
         console.log(
-          `  ⬇️ レベルダウン: ${member.memberCode} LV.${oldLevel} → LV.${newLevel}`
+          `  ⬇️ レベルダウン: ${(member as any).memberCode} LV.${oldLevel} → LV.${newLevel}`
         );
       }
     }

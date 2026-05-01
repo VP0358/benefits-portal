@@ -1075,7 +1075,16 @@ export default function MlmMemberDetailPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
           <div>
-            <InfoRow label="現在レベル（タイトル）" value={<span className="font-bold text-blue-600 text-base">{LEVEL_LABELS[m.currentLevel] ?? m.currentLevel}</span>} />
+            <InfoRow label="現在レベル（タイトル）" value={
+              m.forceLevel !== null && m.forceLevel !== undefined ? (
+                <span className="font-bold text-orange-600 text-base">
+                  🏅 {LEVEL_LABELS[m.forceLevel] ?? `LV.${m.forceLevel}`}
+                  <span className="ml-1 text-xs font-normal text-slate-400">（強制タイトル）</span>
+                </span>
+              ) : (
+                <span className="font-bold text-blue-600 text-base">{LEVEL_LABELS[m.currentLevel] ?? m.currentLevel}</span>
+              )
+            } />
             <InfoRow label="称号レベル" value={LEVEL_LABELS[m.titleLevel] ?? m.titleLevel} />
             <InfoRow label="強制レベル" value={m.forceLevel !== null ? LEVEL_LABELS[m.forceLevel ?? 0] : "—"} />
           </div>

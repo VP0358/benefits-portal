@@ -562,8 +562,16 @@ export default function MlmMembersPage() {
                       <div className="text-xs text-orange-600 mt-0.5 font-semibold">⚡強制Active</div>
                     )}
                   </td>
-                  <td className="py-3 px-4 text-center text-xs font-bold text-violet-700">
-                    {LEVEL_LABELS[m.currentLevel] ?? "—"}
+                  <td className="py-3 px-4 text-center text-xs font-bold">
+                    {m.forceLevel !== null && m.forceLevel !== undefined ? (
+                      <span className="text-orange-600" title={`強制タイトル設定: LV.${m.forceLevel}（通常計算: ${LEVEL_LABELS[m.currentLevel] ?? "—"}）`}>
+                        🏅 {LEVEL_LABELS[m.forceLevel] ?? `LV.${m.forceLevel}`}
+                      </span>
+                    ) : (
+                      <span className="text-violet-700">
+                        {LEVEL_LABELS[m.currentLevel] ?? "—"}
+                      </span>
+                    )}
                   </td>
                   <td className="py-3 px-4 text-right text-xs text-slate-600">
                     ↓{m.downlineCount}名
