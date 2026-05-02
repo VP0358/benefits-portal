@@ -17,9 +17,9 @@ const iconOptions = [
 
 const menuTypes = [
   { value: "url",        label: "🔗 外部URLリンク",   desc: "管理ページで設定したURLを開く（肌診断・細胞浴・ショッピングなど）" },
-  { value: "vp_phone",   label: "📱 VPphone",          desc: "VP未来phone申込ページへ遷移" },
+  { value: "vp_phone",   label: "📱 VPphone",          desc: "VP未来phone申込ページへ遷移（内容を管理で変更可）" },
   { value: "travel_sub", label: "✈️ 格安旅行",          desc: "格安旅行申込モーダルを表示" },
-  { value: "used_car",   label: "🚗 中古車販売",        desc: "中古車専用問い合わせページへ遷移" },
+  { value: "used_car",   label: "🚗 中古車販売",        desc: "中古車専用問い合わせページへ遷移（内容を管理で変更可）" },
   { value: "contact",    label: "📞 相談窓口",          desc: "相談窓口フォームへ遷移" },
   { value: "skin",       label: "💆 肌診断",            desc: "外部URLリンクで設定（linkUrlにURLを入力）" },
 ];
@@ -35,6 +35,16 @@ type MenuForm = {
   linkUrl: string;
   skinShops: SkinShop[];
   contactNote: string;
+  // VPphone設定
+  vpHeadline: string;
+  vpDescription: string;
+  vpBadges: string;        // カンマ区切り
+  vpNote: string;
+  // 中古車設定
+  carHeadline: string;
+  carDescription: string;
+  carBadges: string;       // カンマ区切り
+  carNote: string;
   isActive: boolean;
   isHighlight: boolean;
   sortOrder: number;
@@ -49,7 +59,16 @@ export default function AdminMenuNewPage() {
   const [form, setForm] = useState<MenuForm>({
     title: "", subtitle: "", iconType: "smartphone", imageUrl: "",
     menuType: "url", linkUrl: "", skinShops: [{ ...defaultShop }],
-    contactNote: "", isActive: true, isHighlight: false, sortOrder: 0,
+    contactNote: "",
+    vpHeadline: "VP未来phone",
+    vpDescription: "下記内容をご確認の上、お申し込みください。担当者よりご連絡いたします。",
+    vpBadges: "💰 お得な料金,📶 安定した通信,🛡️ 安心サポート,📱 最新機種対応",
+    vpNote: "※ 審査結果によってはご希望に添えない場合がございます。",
+    carHeadline: "中古車購入申込フォーム",
+    carDescription: "下記内容をご記入の上、送信してください。確認後、担当より記載メールアドレスへご連絡いたします。",
+    carBadges: "💰 お得な価格,🔍 豊富な在庫,🛡️ 安心サポート,🚚 全国対応",
+    carNote: "通常2〜3営業日以内にご連絡いたします。",
+    isActive: true, isHighlight: false, sortOrder: 0,
   });
 
   function updateShop(idx: number, field: keyof SkinShop, value: string) {
@@ -61,6 +80,18 @@ export default function AdminMenuNewPage() {
   function buildContentData() {
     if (form.menuType === "skin")    return JSON.stringify({ shops: form.skinShops.filter(s => s.name) });
     if (form.menuType === "contact") return JSON.stringify({ note: form.contactNote });
+    if (form.menuType === "vp_phone") return JSON.stringify({
+      headline:    form.vpHeadline,
+      description: form.vpDescription,
+      badges:      form.vpBadges.split(",").map(s => s.trim()).filter(Boolean),
+      note:        form.vpNote,
+    });
+    if (form.menuType === "used_car") return JSON.stringify({
+      headline:    form.carHeadline,
+      description: form.carDescription,
+      badges:      form.carBadges.split(",").map(s => s.trim()).filter(Boolean),
+      note:        form.carNote,
+    });
     return null;
   }
 
@@ -215,12 +246,12 @@ export default function AdminMenuNewPage() {
                 🔗 リンク先URL <span className="text-red-500">*</span>
               </label>
               <p className="text-xs text-blue-600">
-                タップすると移動します。VPphoneの場合は <code className="bg-blue-100 px-1 rounded">/vp-phone</code> を入力するとモーダルで表示されます。外部サイトはhttps://〜で入力してください。
+                タップすると移動します。外部サイトは https://〜 で入力してください。
               </p>
               <input
                 required={form.menuType === "url"}
                 className="w-full rounded-xl border border-blue-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 focus:outline-none focus:border-blue-400"
-                placeholder="/vp-phone または https://example.com"
+                placeholder="https://example.com"
                 value={form.linkUrl}
                 onChange={e => setForm({ ...form, linkUrl: e.target.value })}
               />
@@ -286,6 +317,36 @@ export default function AdminMenuNewPage() {
                 onChange={e => setForm({ ...form, contactNote: e.target.value })} />
             </div>
           )}
+
+          {/* VPphone 設定 */}
+          {form.menuType === "vp_phone" && (
+            <WelfareContentEditor
+              color="green"
+              headline={form.vpHeadline}
+              description={form.vpDescription}
+              badges={form.vpBadges}
+              note={form.vpNote}
+              onChange={(field, val) => setForm(f => ({ ...f, [`vp${field}`]: val }))}
+              badgePlaceholder="💰 お得な料金,📶 安定した通信,🛡️ 安心サポート"
+              descPlaceholder="下記内容をご確認の上、お申し込みください。"
+              notePlaceholder="※ 審査結果によってはご希望に添えない場合がございます。"
+            />
+          )}
+
+          {/* 中古車販売 設定 */}
+          {form.menuType === "used_car" && (
+            <WelfareContentEditor
+              color="amber"
+              headline={form.carHeadline}
+              description={form.carDescription}
+              badges={form.carBadges}
+              note={form.carNote}
+              onChange={(field, val) => setForm(f => ({ ...f, [`car${field}`]: val }))}
+              badgePlaceholder="💰 お得な価格,🔍 豊富な在庫,🛡️ 安心サポート,🚚 全国対応"
+              descPlaceholder="下記内容をご記入の上、送信してください。"
+              notePlaceholder="通常2〜3営業日以内にご連絡いたします。"
+            />
+          )}
         </div>
 
         {/* ━━━ ④ プレビュー ━━━ */}
@@ -326,6 +387,91 @@ export default function AdminMenuNewPage() {
         </div>
 
       </form>
+    </div>
+  );
+}
+
+// ── 共通: VPphone / 中古車 コンテンツ編集コンポーネント ──────────────
+type WelfareEditorProps = {
+  color: "green" | "amber";
+  headline: string;
+  description: string;
+  badges: string;
+  note: string;
+  onChange: (field: "Headline" | "Description" | "Badges" | "Note", val: string) => void;
+  badgePlaceholder: string;
+  descPlaceholder: string;
+  notePlaceholder: string;
+};
+
+function WelfareContentEditor({ color, headline, description, badges, note, onChange, badgePlaceholder, descPlaceholder, notePlaceholder }: WelfareEditorProps) {
+  const colors = {
+    green: { bg: "bg-emerald-50", border: "border-emerald-200", label: "text-emerald-800", focus: "focus:border-emerald-400", badge: "bg-emerald-100 text-emerald-700" },
+    amber: { bg: "bg-amber-50",   border: "border-amber-200",   label: "text-amber-800",   focus: "focus:border-amber-400",   badge: "bg-amber-100 text-amber-700" },
+  }[color];
+
+  const previewBadges = badges.split(",").map(s => s.trim()).filter(Boolean);
+
+  return (
+    <div className={`rounded-2xl ${colors.bg} p-5 space-y-4`}>
+      <div className="flex items-center gap-2 mb-1">
+        <span className={`text-sm font-bold ${colors.label}`}>
+          {color === "green" ? "📱 VP未来phone ページ内容設定" : "🚗 中古車販売 ページ内容設定"}
+        </span>
+        <span className="text-xs text-slate-500">（会員が見るページに反映されます）</span>
+      </div>
+
+      {/* 見出し */}
+      <div>
+        <label className={`block text-xs font-bold mb-1 ${colors.label}`}>ページ見出し</label>
+        <input
+          className={`w-full rounded-xl border ${colors.border} bg-white px-4 py-2.5 text-sm text-slate-800 focus:outline-none ${colors.focus}`}
+          placeholder="例: VP未来phone"
+          value={headline}
+          onChange={e => onChange("Headline", e.target.value)}
+        />
+      </div>
+
+      {/* 説明文 */}
+      <div>
+        <label className={`block text-xs font-bold mb-1 ${colors.label}`}>説明文（ページ上部に表示）</label>
+        <textarea rows={3}
+          className={`w-full rounded-xl border ${colors.border} bg-white px-4 py-2.5 text-sm text-slate-800 focus:outline-none ${colors.focus} resize-none`}
+          placeholder={descPlaceholder}
+          value={description}
+          onChange={e => onChange("Description", e.target.value)}
+        />
+      </div>
+
+      {/* 特徴バッジ */}
+      <div>
+        <label className={`block text-xs font-bold mb-1 ${colors.label}`}>特徴バッジ（カンマ区切りで入力）</label>
+        <input
+          className={`w-full rounded-xl border ${colors.border} bg-white px-4 py-2.5 text-sm text-slate-800 focus:outline-none ${colors.focus}`}
+          placeholder={badgePlaceholder}
+          value={badges}
+          onChange={e => onChange("Badges", e.target.value)}
+        />
+        {previewBadges.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {previewBadges.map((b, i) => (
+              <span key={i} className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${colors.badge}`}>{b}</span>
+            ))}
+          </div>
+        )}
+        <p className="text-xs text-slate-500 mt-1">例: 💰 お得な料金,📶 安定した通信,🛡️ 安心サポート</p>
+      </div>
+
+      {/* 注意書き */}
+      <div>
+        <label className={`block text-xs font-bold mb-1 ${colors.label}`}>注意書き・フッター文（ページ下部に表示）</label>
+        <input
+          className={`w-full rounded-xl border ${colors.border} bg-white px-4 py-2.5 text-sm text-slate-800 focus:outline-none ${colors.focus}`}
+          placeholder={notePlaceholder}
+          value={note}
+          onChange={e => onChange("Note", e.target.value)}
+        />
+      </div>
     </div>
   );
 }

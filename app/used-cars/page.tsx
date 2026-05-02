@@ -47,6 +47,20 @@ export default function UsedCarsPage() {
   const [error,     setError]     = useState("");
   const [userInfo,  setUserInfo]  = useState<UserInfo | null>(null);
 
+  // 管理側設定（contentData）
+  type WelfareContent = { headline?: string; description?: string; badges?: string[]; note?: string };
+  const [welfareContent, setWelfareContent] = useState<WelfareContent | null>(null);
+  useEffect(() => {
+    fetch("/api/my/welfare-content?type=used_car")
+      .then(r => r.json())
+      .then(d => { if (d.content) setWelfareContent(d.content); })
+      .catch(() => {});
+  }, []);
+  const carHeadline    = welfareContent?.headline    ?? "中古車購入申込フォーム";
+  const carDescription = welfareContent?.description ?? "下記内容をご記入の上、送信してください。\n確認後、担当より記載メールアドレスへご連絡いたします。";
+  const carBadges      = welfareContent?.badges      ?? ["💰 お得な価格", "🔍 豊富な在庫", "🛡️ 安心サポート", "🚚 全国対応"];
+  const carNote        = welfareContent?.note        ?? "通常2〜3営業日以内にご連絡いたします";
+
   const [form, setForm] = useState<FormState>({
     memberId: "",
     name:     "",
@@ -261,22 +275,23 @@ export default function UsedCarsPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[9px] tracking-[0.20em] mb-0.5 uppercase" style={{ color: `${GOLD}80` }}>USED CAR SALES</p>
-                <h2 className="text-white text-lg font-semibold leading-tight">中古車購入申込フォーム</h2>
-                <p className="text-xs mt-1.5 leading-relaxed" style={{ color: "rgba(255,255,255,0.60)" }}>
-                  下記内容をご記入の上、送信してください。<br />
-                  確認後、担当より記載メールアドレスへご連絡いたします。
+                <h2 className="text-white text-lg font-semibold leading-tight">{carHeadline}</h2>
+                <p className="text-xs mt-1.5 leading-relaxed whitespace-pre-line" style={{ color: "rgba(255,255,255,0.60)" }}>
+                  {carDescription}
                 </p>
               </div>
             </div>
-            {/* 特徴バッジ */}
-            <div className="mt-4 flex flex-wrap gap-2">
-              {["💰 お得な価格", "🔍 豊富な在庫", "🛡️ 安心サポート", "🚚 全国対応"].map(item => (
-                <span key={item} className="text-[10px] px-2.5 py-1 rounded-full"
-                  style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.65)" }}>
-                  {item}
-                </span>
-              ))}
-            </div>
+            {/* 特徴バッジ（管理側で設定） */}
+            {carBadges.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {carBadges.map((item, i) => (
+                  <span key={i} className="text-[10px] px-2.5 py-1 rounded-full"
+                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.65)" }}>
+                    {item}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <div className="h-px" style={{ background: `linear-gradient(90deg,transparent,${GOLD}30,transparent)` }}/>
         </div>
@@ -585,7 +600,7 @@ export default function UsedCarsPage() {
         </div>
 
         <p className="text-center text-xs pb-4" style={{ color: `${NAVY}45` }}>
-          通常2〜3営業日以内にご連絡いたします
+          {carNote}
         </p>
       </main>
     </div>

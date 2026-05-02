@@ -386,6 +386,21 @@ export default function VpPhoneClient({
   const app = existingApplication;
   const hasActiveApp = app && !["rejected", "canceled"].includes(app.status);
 
+  // ── 管理側設定（contentData）を取得
+  type WelfareContent = { headline?: string; description?: string; badges?: string[]; note?: string };
+  const [welfareContent, setWelfareContent] = useState<WelfareContent | null>(null);
+  useEffect(() => {
+    fetch("/api/my/welfare-content?type=vp_phone")
+      .then(r => r.json())
+      .then(d => { if (d.content) setWelfareContent(d.content); })
+      .catch(() => {});
+  }, []);
+
+  const vpHeadline    = welfareContent?.headline    ?? "VP未来phone 申し込み";
+  const vpDescription = welfareContent?.description ?? "申し込み後、担当者より順次ご連絡いたします。ご紹介いただいた方に紹介ポイントが付与されます。";
+  const vpBadges      = welfareContent?.badges      ?? [];
+  const vpNote        = welfareContent?.note        ?? "※ 審査結果によってはご希望に添えない場合がございます。";
+
   const [voiceSelected, setVoiceSelected] = useState(false);
   const [dataSelected,  setDataSelected]  = useState(false);
   const contractType = voiceSelected && dataSelected ? "both" : voiceSelected ? "voice" : dataSelected ? "data" : "";
@@ -585,16 +600,25 @@ export default function VpPhoneClient({
                       style={{ background: "rgba(110,231,183,0.10)", border: "1px solid rgba(110,231,183,0.20)" }}>📱</div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h2 className="font-bold text-white text-sm font-jp">VP未来phone 申し込み</h2>
+                        <h2 className="font-bold text-white text-sm font-jp">{vpHeadline}</h2>
                         <span className="rounded-full px-2.5 py-0.5 text-[10px] font-bold" style={{ background: "rgba(107,114,128,0.25)", color: "#9ca3af" }}>未申込</span>
                       </div>
-                      <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.45)" }}>お得なスマートフォン回線サービス</p>
                     </div>
                   </div>
-                  <div className="space-y-2 text-xs mb-4" style={{ color: "rgba(255,255,255,0.60)" }}>
-                    <div className="flex items-start gap-2"><span style={{ color: "#6ee7b7" }}>✓</span><span>申し込み後、担当者より順次ご連絡いたします</span></div>
-                    <div className="flex items-start gap-2"><span style={{ color: "#6ee7b7" }}>✓</span><span>ご紹介いただいた方に紹介ポイントが付与されます</span></div>
-                  </div>
+                  {/* 管理側で設定した説明文・バッジ */}
+                  {vpDescription && (
+                    <p className="text-xs mb-3 leading-relaxed" style={{ color: "rgba(255,255,255,0.65)" }}>{vpDescription}</p>
+                  )}
+                  {vpBadges.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-4">
+                      {vpBadges.map((badge, i) => (
+                        <span key={i} className="rounded-full px-2.5 py-0.5 text-[10px] font-medium"
+                          style={{ background: "rgba(110,231,183,0.12)", border: "1px solid rgba(110,231,183,0.22)", color: "#6ee7b7" }}>
+                          {badge}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <div className="flex flex-col gap-2 pt-3" style={{ borderTop: `1px solid ${GOLD}18` }}>
                     <Link href="/vp-phone/terms"
                       className="flex items-center justify-between rounded-xl px-4 py-2.5 transition"
