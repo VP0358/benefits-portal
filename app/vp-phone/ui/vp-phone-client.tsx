@@ -45,9 +45,9 @@ const STATUS_INFO: Record<string, {
   canceled:   { label: "キャンセル済み", icon: "🚫", bg: "rgba(107,114,128,0.08)",border: "rgba(107,114,128,0.25)",badgeBg: "rgba(107,114,128,0.20)",badgeText: "#9ca3af" },
 };
 
-// ── 音声回線プラン
+// ── 音声回線プラン（デフォルト値 — DBに設定がない場合のフォールバック）
 type VoicePlan = { id: string; label: string; price: number; note?: string; popular?: boolean };
-const VOICE_DATA_PLANS: VoicePlan[] = [
+const DEFAULT_VOICE_DATA_PLANS: VoicePlan[] = [
   { id: "rakuraku", label: "★定額・らくらくプラン", price: 5500, note: "25GB＋無制限かけ放題", popular: true },
   { id: "no_data",  label: "データ通信なし",         price: 825 },
   { id: "1gb",      label: "1GB",                     price: 1155 },
@@ -55,27 +55,27 @@ const VOICE_DATA_PLANS: VoicePlan[] = [
   { id: "10gb",     label: "10GB",                    price: 2695 },
   { id: "25gb",     label: "25GB",                    price: 3806 },
 ];
-type KakehoudaiPlan = { id: string; label: string; price: number | null };
-const KAKEHOUDAI_PLANS: KakehoudaiPlan[] = [
-  { id: "none",      label: "かけ放題なし",   price: null },
+type KakehoudaiPlan = { id: string; label: string; price: number | null; isFree?: boolean };
+const DEFAULT_KAKEHOUDAI_PLANS: KakehoudaiPlan[] = [
+  { id: "none",      label: "かけ放題なし",   price: null,  isFree: true },
   { id: "5min",      label: "5分かけ放題",    price: 1100 },
   { id: "10min",     label: "10分かけ放題",   price: 1430 },
   { id: "unlimited", label: "無制限かけ放題", price: 2860 },
 ];
 type VoiceOption = { id: string; label: string; price: number };
-const VOICE_OPTIONS: VoiceOption[] = [
+const DEFAULT_VOICE_OPTIONS: VoiceOption[] = [
   { id: "rusuban",   label: "留守番電話",   price: 495 },
   { id: "catchhon",  label: "キャッチホン", price: 385 },
 ];
 
-// ── 大容量データ回線プラン
+// ── 大容量データ回線プラン（デフォルト値）
 type DataCapacityPlan = { id: string; label: string; price: number };
-const DATA_CAPACITY_PLANS: DataCapacityPlan[] = [
+const DEFAULT_DATA_CAPACITY_PLANS: DataCapacityPlan[] = [
   { id: "50gb",      label: "50GB",  price: 2860 },
   { id: "unlimited", label: "無制限", price: 3278 },
 ];
 type DataTypePlan = { id: string; label: string; price: number | null; priceType: "monthly" | "onetime" | "none"; note?: string };
-const DATA_TYPE_PLANS: DataTypePlan[] = [
+const DEFAULT_DATA_TYPE_PLANS: DataTypePlan[] = [
   { id: "esim",        label: "eSIM（本体一体型）",        price: null,  priceType: "none" },
   { id: "sim",         label: "SIMカード",                  price: null,  priceType: "none" },
   { id: "pocket_rent", label: "ポケットWi-Fi（レンタル）", price: 330,   priceType: "monthly" },
@@ -85,17 +85,25 @@ const DATA_TYPE_PLANS: DataTypePlan[] = [
 ];
 
 function fmt(n: number) { return n.toLocaleString(); }
-function calcVoiceTotal(dataId: string, kakehoudaiId: string, opts: string[]) {
-  const base = VOICE_DATA_PLANS.find(p => p.id === dataId)?.price ?? 0;
-  const kake = KAKEHOUDAI_PLANS.find(p => p.id === kakehoudaiId)?.price ?? 0;
-  const optTotal = opts.reduce((s, id) => s + (VOICE_OPTIONS.find(o => o.id === id)?.price ?? 0), 0);
+// プラン配列を受け取って計算する関数（動的対応）
+function calcVoiceTotalDyn(
+  dataId: string, kakehoudaiId: string, opts: string[],
+  voicePlans: VoicePlan[], kakePlans: KakehoudaiPlan[], voiceOpts: VoiceOption[]
+) {
+  const base = voicePlans.find(p => p.id === dataId)?.price ?? 0;
+  const kakeObj = kakePlans.find(p => p.id === kakehoudaiId);
+  const kake = (kakeObj?.isFree || kakeObj?.price == null) ? 0 : (kakeObj.price ?? 0);
+  const optTotal = opts.reduce((s, id) => s + (voiceOpts.find(o => o.id === id)?.price ?? 0), 0);
   return base + kake + optTotal;
 }
-function calcDataMonthly(capacityId: string, typeId: string) {
-  const base = DATA_CAPACITY_PLANS.find(p => p.id === capacityId)?.price ?? 0;
-  const tp = DATA_TYPE_PLANS.find(p => p.id === typeId);
-  const typeMonthly = (tp?.priceType === "monthly"  ? tp.price : 0) ?? 0;
-  const typeOnetime = (tp?.priceType === "onetime"  ? tp.price : 0) ?? 0;
+function calcDataMonthlyDyn(
+  capacityId: string, typeId: string,
+  dataCapacityPlans: DataCapacityPlan[], dataTypePlans: DataTypePlan[]
+) {
+  const base = dataCapacityPlans.find(p => p.id === capacityId)?.price ?? 0;
+  const tp = dataTypePlans.find(p => p.id === typeId);
+  const typeMonthly = (tp?.priceType === "monthly"  ? (tp.price ?? 0) : 0);
+  const typeOnetime = (tp?.priceType === "onetime"  ? (tp.price ?? 0) : 0);
   return { base, type: typeMonthly, total: base + typeMonthly, typeOnetime };
 }
 
@@ -389,10 +397,33 @@ export default function VpPhoneClient({
   // ── 管理側設定（contentData）を取得
   type WelfareContent = { headline?: string; description?: string; badges?: string[]; note?: string };
   const [welfareContent, setWelfareContent] = useState<WelfareContent | null>(null);
+
+  // ── 動的プラン設定（管理画面で編集可能）
+  const [voicePlans,    setVoicePlans]    = useState<VoicePlan[]>(DEFAULT_VOICE_DATA_PLANS);
+  const [kakePlans,     setKakePlans]     = useState<KakehoudaiPlan[]>(DEFAULT_KAKEHOUDAI_PLANS);
+  const [voiceOptions,  setVoiceOptions]  = useState<VoiceOption[]>(DEFAULT_VOICE_OPTIONS);
+  const [dataCapacityPlans, setDataCapacityPlans] = useState<DataCapacityPlan[]>(DEFAULT_DATA_CAPACITY_PLANS);
+  const [dataTypePlans, setDataTypePlans] = useState<DataTypePlan[]>(DEFAULT_DATA_TYPE_PLANS);
+
   useEffect(() => {
+    // ページ見出し・説明文設定
     fetch("/api/my/welfare-content?type=vp_phone")
       .then(r => r.json())
       .then(d => { if (d.content) setWelfareContent(d.content); })
+      .catch(() => {});
+    // プラン・金額設定
+    fetch("/api/my/welfare-plans")
+      .then(r => r.json())
+      .then(d => {
+        const vp = d.vpPhonePlans;
+        if (vp) {
+          if (Array.isArray(vp.voiceDataPlans)    && vp.voiceDataPlans.length > 0)    setVoicePlans(vp.voiceDataPlans);
+          if (Array.isArray(vp.kakehoudaiPlans)   && vp.kakehoudaiPlans.length > 0)   setKakePlans(vp.kakehoudaiPlans);
+          if (Array.isArray(vp.voiceOptions)      && vp.voiceOptions.length > 0)      setVoiceOptions(vp.voiceOptions);
+          if (Array.isArray(vp.dataCapacityPlans) && vp.dataCapacityPlans.length > 0) setDataCapacityPlans(vp.dataCapacityPlans);
+          if (Array.isArray(vp.dataTypePlans)     && vp.dataTypePlans.length > 0)     setDataTypePlans(vp.dataTypePlans);
+        }
+      })
       .catch(() => {});
   }, []);
 
@@ -409,6 +440,23 @@ export default function VpPhoneClient({
   const [voiceOpts,     setVoiceOpts]     = useState<string[]>([]);
   const [dataCapacity,  setDataCapacity]  = useState("50gb");
   const [dataType,      setDataType]      = useState("sim");
+
+  // プラン一覧が更新されたら初期選択値をリセット（IDが存在しない場合は先頭に）
+  useEffect(() => {
+    if (voicePlans.length > 0 && !voicePlans.find(p => p.id === voiceDataPlan)) {
+      setVoiceDataPlan(voicePlans[0].id);
+    }
+  }, [voicePlans]);
+  useEffect(() => {
+    if (dataCapacityPlans.length > 0 && !dataCapacityPlans.find(p => p.id === dataCapacity)) {
+      setDataCapacity(dataCapacityPlans[0].id);
+    }
+  }, [dataCapacityPlans]);
+  useEffect(() => {
+    if (dataTypePlans.length > 0 && !dataTypePlans.find(p => p.id === dataType)) {
+      setDataType(dataTypePlans[0].id);
+    }
+  }, [dataTypePlans]);
   const [form, setForm] = useState({
     nameKanji: defaultName, nameKana: defaultNameKana,
     email: defaultEmail, password: "", passwordConfirm: "",
@@ -439,17 +487,17 @@ export default function VpPhoneClient({
       .catch(() => {});
   }, []);
 
-  const voiceTotal = calcVoiceTotal(voiceDataPlan, kakehoudai, voiceOpts);
-  const dataTotals = calcDataMonthly(dataCapacity, dataType);
+  const voiceTotal = calcVoiceTotalDyn(voiceDataPlan, kakehoudai, voiceOpts, voicePlans, kakePlans, voiceOptions);
+  const dataTotals = calcDataMonthlyDyn(dataCapacity, dataType, dataCapacityPlans, dataTypePlans);
   const grandMonthly = (voiceSelected ? voiceTotal : 0) + (dataSelected ? dataTotals.total : 0);
   const grandOnetime = dataSelected ? dataTotals.typeOnetime : 0;
 
   function buildDesiredPlan(): string {
     const parts: string[] = [];
     if (voiceSelected) {
-      const data = VOICE_DATA_PLANS.find(p => p.id === voiceDataPlan);
-      const kake = KAKEHOUDAI_PLANS.find(p => p.id === kakehoudai);
-      const opts = voiceOpts.map(id => VOICE_OPTIONS.find(o => o.id === id)?.label).filter(Boolean).join("・");
+      const data = voicePlans.find(p => p.id === voiceDataPlan);
+      const kake = kakePlans.find(p => p.id === kakehoudai);
+      const opts = voiceOpts.map(id => voiceOptions.find(o => o.id === id)?.label).filter(Boolean).join("・");
       let s = `[音声回線] ${data?.label}（¥${fmt(data?.price ?? 0)}）`;
       if (kake && kake.id !== "none") s += ` ／ ${kake.label}（¥${fmt(kake.price ?? 0)}）`;
       if (opts) s += ` ／ オプション:${opts}`;
@@ -457,8 +505,8 @@ export default function VpPhoneClient({
       parts.push(s);
     }
     if (dataSelected) {
-      const cap = DATA_CAPACITY_PLANS.find(p => p.id === dataCapacity);
-      const tp  = DATA_TYPE_PLANS.find(p => p.id === dataType);
+      const cap = dataCapacityPlans.find(p => p.id === dataCapacity);
+      const tp  = dataTypePlans.find(p => p.id === dataType);
       let s = `[大容量データ回線] ${cap?.label}（¥${fmt(cap?.price ?? 0)}/月）`;
       if (tp) {
         if (tp.priceType === "monthly")  s += ` ／ ${tp.label}（＋¥${fmt(tp.price ?? 0)}/月）`;
@@ -816,19 +864,19 @@ export default function VpPhoneClient({
                     <div className="p-5">
                       <SectionLabel en="DATA PLAN" ja="データプラン（docomo回線）"/>
                       <p className="text-[10px] mb-3" style={{ color: "rgba(255,255,255,0.35)" }}>※料金は税込月額料金</p>
-                      <div className="space-y-2">{VOICE_DATA_PLANS.map(p => <RadioCard key={p.id} item={p} selected={voiceDataPlan === p.id} onSelect={() => setVoiceDataPlan(p.id)} color="green" />)}</div>
+                      <div className="space-y-2">{voicePlans.map(p => <RadioCard key={p.id} item={p} selected={voiceDataPlan === p.id} onSelect={() => setVoiceDataPlan(p.id)} color="green" />)}</div>
                     </div>
                   </NavyCard>
                   <NavyCard accent="rgba(110,231,183,0.25)">
                     <div className="p-5">
                       <SectionLabel en="CALL PLAN" ja="かけ放題"/>
-                      <div className="space-y-2">{KAKEHOUDAI_PLANS.map(p => <RadioCard key={p.id} item={{ ...p, price: p.price }} selected={kakehoudai === p.id} onSelect={() => setKakehoudai(p.id)} color="green" priceLabel={p.price == null ? "無料" : `¥${fmt(p.price)}/月`} />)}</div>
+                      <div className="space-y-2">{kakePlans.map(p => <RadioCard key={p.id} item={{ ...p, price: p.isFree ? null : p.price }} selected={kakehoudai === p.id} onSelect={() => setKakehoudai(p.id)} color="green" priceLabel={p.isFree || p.price == null ? "無料" : `¥${fmt(p.price)}/月`} />)}</div>
                     </div>
                   </NavyCard>
                   <NavyCard accent="rgba(110,231,183,0.20)">
                     <div className="p-5">
                       <SectionLabel en="OPTIONS" ja="オプション（複数選択可）"/>
-                      <div className="space-y-2">{VOICE_OPTIONS.map(o => <CheckCard key={o.id} item={o} checked={voiceOpts.includes(o.id)} onChange={checked => setVoiceOpts(prev => checked ? [...prev, o.id] : prev.filter(id => id !== o.id))} />)}</div>
+                      <div className="space-y-2">{voiceOptions.map(o => <CheckCard key={o.id} item={o} checked={voiceOpts.includes(o.id)} onChange={checked => setVoiceOpts(prev => checked ? [...prev, o.id] : prev.filter(id => id !== o.id))} />)}</div>
                     </div>
                   </NavyCard>
                 </>
@@ -850,14 +898,14 @@ export default function VpPhoneClient({
                     <div className="p-5">
                       <SectionLabel en="DATA CAPACITY" ja="データ容量（VP未来Wi-Fi）"/>
                       <p className="text-[10px] mb-3" style={{ color: "rgba(255,255,255,0.35)" }}>※料金は税込月額料金</p>
-                      <div className="space-y-2">{DATA_CAPACITY_PLANS.map(p => <RadioCard key={p.id} item={{ ...p, note: undefined, popular: undefined }} selected={dataCapacity === p.id} onSelect={() => setDataCapacity(p.id)} color="purple" />)}</div>
+                      <div className="space-y-2">{dataCapacityPlans.map(p => <RadioCard key={p.id} item={{ ...p, note: undefined, popular: undefined }} selected={dataCapacity === p.id} onSelect={() => setDataCapacity(p.id)} color="purple" />)}</div>
                     </div>
                   </NavyCard>
                   <NavyCard accent="rgba(196,181,253,0.25)">
                     <div className="p-5">
                       <SectionLabel en="DATA TYPE" ja="データ通信のタイプ"/>
                       <p className="text-[10px] mb-3" style={{ color: "rgba(255,255,255,0.35)" }}>※SIM・レンタル機器の破損時は¥10,780（税込）を申し受けます</p>
-                      <div className="space-y-2">{DATA_TYPE_PLANS.map(p => <RadioCard key={p.id} item={p} selected={dataType === p.id} onSelect={() => setDataType(p.id)} color="purple" priceLabel={p.priceType === "monthly" ? `+¥${fmt(p.price ?? 0)}/月` : p.priceType === "onetime" ? `買取 ¥${fmt(p.price ?? 0)}` : "追加料金なし"} />)}</div>
+                      <div className="space-y-2">{dataTypePlans.map(p => <RadioCard key={p.id} item={p} selected={dataType === p.id} onSelect={() => setDataType(p.id)} color="purple" priceLabel={p.priceType === "monthly" ? `+¥${fmt(p.price ?? 0)}/月` : p.priceType === "onetime" ? `買取 ¥${fmt(p.price ?? 0)}` : "追加料金なし"} />)}</div>
                     </div>
                   </NavyCard>
                 </>
@@ -872,9 +920,9 @@ export default function VpPhoneClient({
                       <div className="p-4">
                         <p className="text-[10px] font-label tracking-widest mb-3" style={{ color: "#6ee7b7" }}>📱 音声回線 内訳</p>
                         <div className="space-y-2 text-sm">
-                          <div className="flex justify-between"><span style={{ color: "rgba(255,255,255,0.55)" }}>データプラン</span><span className="font-semibold text-white">¥{fmt(VOICE_DATA_PLANS.find(p => p.id === voiceDataPlan)?.price ?? 0)}/月</span></div>
-                          {kakehoudai !== "none" && <div className="flex justify-between"><span style={{ color: "rgba(255,255,255,0.55)" }}>かけ放題</span><span className="font-semibold text-white">¥{fmt(KAKEHOUDAI_PLANS.find(p => p.id === kakehoudai)?.price ?? 0)}/月</span></div>}
-                          {voiceOpts.map(id => { const opt = VOICE_OPTIONS.find(o => o.id === id); return opt ? <div key={id} className="flex justify-between"><span style={{ color: "rgba(255,255,255,0.55)" }}>{opt.label}</span><span className="font-semibold text-white">¥{fmt(opt.price)}/月</span></div> : null; })}
+                          <div className="flex justify-between"><span style={{ color: "rgba(255,255,255,0.55)" }}>データプラン</span><span className="font-semibold text-white">¥{fmt(voicePlans.find(p => p.id === voiceDataPlan)?.price ?? 0)}/月</span></div>
+                          {(() => { const kk = kakePlans.find(p => p.id === kakehoudai); return (kk && !kk.isFree && kk.price != null) ? <div className="flex justify-between"><span style={{ color: "rgba(255,255,255,0.55)" }}>かけ放題</span><span className="font-semibold text-white">¥{fmt(kk.price)}/月</span></div> : null; })()}
+                          {voiceOpts.map(id => { const opt = voiceOptions.find(o => o.id === id); return opt ? <div key={id} className="flex justify-between"><span style={{ color: "rgba(255,255,255,0.55)" }}>{opt.label}</span><span className="font-semibold text-white">¥{fmt(opt.price)}/月</span></div> : null; })}
                           <div className="flex justify-between pt-2" style={{ borderTop: "1px solid rgba(110,231,183,0.20)" }}>
                             <span className="font-bold" style={{ color: "#6ee7b7" }}>音声回線 小計</span>
                             <span className="font-black" style={{ color: "#6ee7b7" }}>¥{fmt(voiceTotal)}<span className="text-xs">/月</span></span>
@@ -888,8 +936,8 @@ export default function VpPhoneClient({
                       <div className="p-4">
                         <p className="text-[10px] font-label tracking-widest mb-3" style={{ color: "#c4b5fd" }}>📶 データ回線 内訳</p>
                         <div className="space-y-2 text-sm">
-                          <div className="flex justify-between"><span style={{ color: "rgba(255,255,255,0.55)" }}>データ容量</span><span className="font-semibold text-white">¥{fmt(DATA_CAPACITY_PLANS.find(p => p.id === dataCapacity)?.price ?? 0)}/月</span></div>
-                          {(() => { const tp = DATA_TYPE_PLANS.find(p => p.id === dataType); if (!tp) return null; if (tp.priceType === "monthly") return <div className="flex justify-between"><span style={{ color: "rgba(255,255,255,0.55)" }}>{tp.label}</span><span className="font-semibold text-white">+¥{fmt(tp.price ?? 0)}/月</span></div>; if (tp.priceType === "onetime") return <div className="flex justify-between"><span style={{ color: "rgba(255,255,255,0.55)" }}>{tp.label}</span><span className="font-semibold" style={{ color: ORANGE }}>¥{fmt(tp.price ?? 0)}（一括）</span></div>; return <div className="flex justify-between"><span style={{ color: "rgba(255,255,255,0.55)" }}>{tp.label}</span><span style={{ color: "rgba(255,255,255,0.40)" }}>追加料金なし</span></div>; })()}
+                          <div className="flex justify-between"><span style={{ color: "rgba(255,255,255,0.55)" }}>データ容量</span><span className="font-semibold text-white">¥{fmt(dataCapacityPlans.find(p => p.id === dataCapacity)?.price ?? 0)}/月</span></div>
+                          {(() => { const tp = dataTypePlans.find(p => p.id === dataType); if (!tp) return null; if (tp.priceType === "monthly") return <div className="flex justify-between"><span style={{ color: "rgba(255,255,255,0.55)" }}>{tp.label}</span><span className="font-semibold text-white">+¥{fmt(tp.price ?? 0)}/月</span></div>; if (tp.priceType === "onetime") return <div className="flex justify-between"><span style={{ color: "rgba(255,255,255,0.55)" }}>{tp.label}</span><span className="font-semibold" style={{ color: ORANGE }}>¥{fmt(tp.price ?? 0)}（一括）</span></div>; return <div className="flex justify-between"><span style={{ color: "rgba(255,255,255,0.55)" }}>{tp.label}</span><span style={{ color: "rgba(255,255,255,0.40)" }}>追加料金なし</span></div>; })()}
                           <div className="flex justify-between pt-2" style={{ borderTop: "1px solid rgba(196,181,253,0.20)" }}>
                             <span className="font-bold" style={{ color: "#c4b5fd" }}>データ回線 小計</span>
                             <span className="font-black" style={{ color: "#c4b5fd" }}>¥{fmt(dataTotals.total)}<span className="text-xs">/月</span></span>

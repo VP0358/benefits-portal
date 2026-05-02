@@ -47,15 +47,36 @@ export default function UsedCarsPage() {
   const [error,     setError]     = useState("");
   const [userInfo,  setUserInfo]  = useState<UserInfo | null>(null);
 
-  // 管理側設定（contentData）
+  // 管理側設定（contentData + welfare-plans）
   type WelfareContent = { headline?: string; description?: string; badges?: string[]; note?: string };
   const [welfareContent, setWelfareContent] = useState<WelfareContent | null>(null);
+  // 動的フォーム設定（管理画面で変更可能）
+  const [paymentOptions,  setPaymentOptions]  = useState<string[]>(PAYMENT_OPTIONS);
+  const [driveOptions,    setDriveOptions]    = useState<string[]>(DRIVE_OPTIONS);
+  const [studlessOptions, setStudlessOptions] = useState<string[]>(STUDLESS_OPTIONS);
+
   useEffect(() => {
+    // ページ表示内容
     fetch("/api/my/welfare-content?type=used_car")
       .then(r => r.json())
       .then(d => { if (d.content) setWelfareContent(d.content); })
       .catch(() => {});
+    // フォーム選択肢
+    fetch("/api/my/welfare-plans")
+      .then(r => r.json())
+      .then(d => {
+        const uc = d.usedCarSettings;
+        if (uc) {
+          if (Array.isArray(uc.paymentOptions)  && uc.paymentOptions.length > 0)  setPaymentOptions(uc.paymentOptions);
+          if (Array.isArray(uc.driveOptions)    && uc.driveOptions.length > 0)    setDriveOptions(uc.driveOptions);
+          if (Array.isArray(uc.studlessOptions) && uc.studlessOptions.length > 0) setStudlessOptions(uc.studlessOptions);
+          // フッターメモも上書き
+          if (uc.footerNote) setWelfareContent(prev => ({ ...prev, note: uc.footerNote }));
+        }
+      })
+      .catch(() => {});
   }, []);
+
   const carHeadline    = welfareContent?.headline    ?? "中古車購入申込フォーム";
   const carDescription = welfareContent?.description ?? "下記内容をご記入の上、送信してください。\n確認後、担当より記載メールアドレスへご連絡いたします。";
   const carBadges      = welfareContent?.badges      ?? ["💰 お得な価格", "🔍 豊富な在庫", "🛡️ 安心サポート", "🚚 全国対応"];
@@ -492,7 +513,7 @@ export default function UsedCarsPage() {
                 <RadioGroup
                   label="現金 or ローン"
                   name="payment"
-                  options={PAYMENT_OPTIONS}
+                  options={paymentOptions}
                   value={form.payment}
                   onChange={v => set("payment", v)}
                   required
@@ -515,7 +536,7 @@ export default function UsedCarsPage() {
                 <RadioGroup
                   label="駆動式"
                   name="drive"
-                  options={DRIVE_OPTIONS}
+                  options={driveOptions}
                   value={form.drive}
                   onChange={v => set("drive", v)}
                 />
@@ -525,7 +546,7 @@ export default function UsedCarsPage() {
                   <RadioGroup
                     label="スタッドレスタイヤ"
                     name="studless"
-                    options={STUDLESS_OPTIONS}
+                    options={studlessOptions}
                     value={form.studless}
                     onChange={v => set("studless", v)}
                   />
