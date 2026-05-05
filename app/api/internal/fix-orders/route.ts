@@ -234,20 +234,28 @@ export async function GET(req: NextRequest) {
         // MlmMember 作成
         const mlmMember = await prisma.mlmMember.create({
           data: {
-            userId:              user.id,
-            memberCode:          m.memberCode,
+            userId:       user.id,
+            memberCode:   m.memberCode,
             status,
             contractDate,
             firstPayDate,
-            disclosureDocNumber: m.disclosureNo,
-            referrerId:          referrerMlm?.id ?? null,
-            uplineId:            uplineMlm?.id   ?? null,
+            referrerId:   referrerMlm?.id ?? null,
+            uplineId:     uplineMlm?.id   ?? null,
             birthDate,
             gender,
-            mobile:              m.phone,
-            prefecture:          m.prefecture,
-            address1:            m.addressLine,
-            address2:            m.building || null,
+            mobile:       m.phone,
+            prefecture:   m.prefecture,
+            address1:     m.addressLine,
+            address2:     m.building || null,
+          },
+        });
+
+        // MlmRegistration 作成（概要書面番号を保存）
+        await prisma.mlmRegistration.create({
+          data: {
+            userId:             user.id,
+            disclosureDocNumber: m.disclosureNo,
+            nickname:           m.nickname,
           },
         });
 
