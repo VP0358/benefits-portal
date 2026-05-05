@@ -198,7 +198,7 @@ export async function GET(request: NextRequest) {
             contractDate,
             firstPayDate,
             gender: m.gender,
-            birthDate: birthDate ? birthDate.toISOString().slice(0, 10) : null,
+            birthDate: birthDate ?? null,
             mobile: m.phone || null,
             prefecture: m.pref || null,
             city: m.addr ? m.addr.replace(m.pref || '', '') : null,
