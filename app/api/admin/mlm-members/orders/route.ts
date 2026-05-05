@@ -47,6 +47,15 @@ const SLIP_LABELS: Record<string, string> = {
   mypage: "MyPage",
 };
 
+// slipType → purchaseStatus マッピング（共通）
+const SLIP_TO_PURCHASE_STATUS: Record<string, string> = {
+  autoship: "autoship",
+  new_member: "new_member",
+  cooling_off: "cooling_off",
+  cancel: "canceled",
+  return: "canceled",
+};
+
 // ── GET: 会員の伝票一覧取得 ──────────────────────────────────────
 export async function GET(request: NextRequest) {
   try {
@@ -229,15 +238,11 @@ export async function POST(request: NextRequest) {
     });
 
     // OrderItems作成
-    // productId が未設定（手入力商品）の場合は productId フィールド自体を省略して保存
-    // ※ DBマイグレーション適用前でも動作するよう、null ではなくフィールド除外で対応
     if (items && Array.isArray(items)) {
       for (const item of items) {
-        // 商品名もproductIdもない行はスキップ
         if (!item.productName && !item.productId) continue;
         const lineAmount = (item.unitPrice || 0) * (item.quantity || 1);
         if (item.productId) {
-          // 商品マスターから選択した場合: productId あり
           await prisma.orderItem.create({
             data: {
               orderId: order.id,
@@ -249,7 +254,6 @@ export async function POST(request: NextRequest) {
             },
           });
         } else {
-          // 手入力商品（商品マスター未登録）: productId を省略
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           await (prisma.orderItem as any).create({
             data: {
@@ -295,23 +299,14 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // slipType → purchaseStatus マッピング
-    const slipToPurchaseStatus: Record<string, string> = {
-      autoship: "autoship",
-      new_member: "new_member",
-      cooling_off: "cooling_off",
-      cancel: "canceled",
-      return: "canceled",
-    };
-    const purchaseStatus = slipToPurchaseStatus[slipType || ""] || "one_time";
-
-    // MlmPurchase記録（ポイント対象商品のみ）
+    // MlmPurchase記録（ポイント対象商品コード1000〜2999のみ）
     if (items && Array.isArray(items)) {
       const mlmMember = await prisma.mlmMember.findUnique({
         where: { userId: user.id },
         select: { id: true },
       });
       if (mlmMember) {
+        const purchaseStatus = SLIP_TO_PURCHASE_STATUS[slipType || ""] || "one_time";
         for (const item of items) {
           if (!item.points || item.points <= 0) continue;
           const code = item.productCode || "";
@@ -320,7 +315,7 @@ export async function POST(request: NextRequest) {
             await prisma.mlmPurchase.create({
               data: {
                 mlmMemberId: mlmMember.id,
-                orderId: order.id,  // 伝票IDを紐づけ
+                orderNumber,                          // 伝票番号を紐づけ
                 productCode: code,
                 productName: item.productName || "",
                 quantity: item.quantity || 1,
@@ -364,6 +359,7 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const {
       orderId,
+      memberCode,
       orderedAt,
       shippedAt,
       paidAt,
@@ -444,15 +440,12 @@ export async function PUT(request: NextRequest) {
     });
 
     // OrderItems削除→再作成
-    // productId が未設定（手入力商品）の場合は productId フィールド自体を省略して保存
     if (items && Array.isArray(items)) {
       await prisma.orderItem.deleteMany({ where: { orderId: orderIdBig } });
       for (const item of items) {
-        // 商品名もproductIdもない行はスキップ
         if (!item.productName && !item.productId) continue;
         const lineAmount = (item.unitPrice || 0) * (item.quantity || 1);
         if (item.productId) {
-          // 商品マスターから選択した場合: productId あり
           await prisma.orderItem.create({
             data: {
               orderId: orderIdBig,
@@ -464,7 +457,6 @@ export async function PUT(request: NextRequest) {
             },
           });
         } else {
-          // 手入力商品（商品マスター未登録）: productId を省略
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           await (prisma.orderItem as any).create({
             data: {
@@ -509,64 +501,64 @@ export async function PUT(request: NextRequest) {
       });
     }
 
-    // ─── MlmPurchase 同期（伝票に紐づく購入履歴を削除→再作成）───
-    // 対象注文のOrderを取得して会員情報を確認
-    const orderWithUser = await prisma.order.findUnique({
+    // ─── MlmPurchase 同期 ────────────────────────────────────────
+    // Order から orderNumber・orderedAt・MLM会員IDをすべて取得
+    const orderForSync = await prisma.order.findUnique({
       where: { id: orderIdBig },
       select: {
-        id: true,
+        orderNumber: true,
         orderedAt: true,
-        slipType: true,
-        user: { select: { id: true } },
+        user: {
+          select: {
+            mlmMember: { select: { id: true } },
+          },
+        },
       },
     });
 
-    if (orderWithUser) {
-      const mlmMember = await prisma.mlmMember.findUnique({
-        where: { userId: orderWithUser.user.id },
-        select: { id: true },
+    if (orderForSync?.user?.mlmMember && orderForSync.orderNumber) {
+      const syncMlmMemberId = orderForSync.user.mlmMember.id;
+      const syncOrderNumber  = orderForSync.orderNumber;
+      const originalOrderedAt = orderForSync.orderedAt;
+
+      // 更新後の注文月を決定
+      const newPurchaseMonth = orderedAt
+        ? (orderedAt as string).slice(0, 7)
+        : (originalOrderedAt?.toISOString() ?? new Date().toISOString()).slice(0, 7);
+
+      // ── この伝票（orderNumber）に紐づくMlmPurchaseのみ削除
+      //    → 一括登録データ（orderNumber=null）や他の伝票のデータは一切触らない
+      await prisma.mlmPurchase.deleteMany({
+        where: {
+          mlmMemberId: syncMlmMemberId,
+          orderNumber: syncOrderNumber,
+        },
       });
 
-      if (mlmMember) {
-        // 既存の紐づき購入履歴を削除
-        await prisma.mlmPurchase.deleteMany({
-          where: { orderId: orderIdBig },
-        });
-
-        // slipType → purchaseStatus マッピング
-        const slipToPurchaseStatus: Record<string, string> = {
-          autoship: "autoship",
-          new_member: "new_member",
-          cooling_off: "cooling_off",
-          cancel: "canceled",
-          return: "canceled",
-        };
-        const purchaseStatus = slipToPurchaseStatus[slipType || ""] || "one_time";
-
-        // 新しい商品内容で再作成（ポイント対象商品コード1000〜2999のみ）
-        if (items && Array.isArray(items)) {
-          for (const item of items) {
-            if (!item.points || item.points <= 0) continue;
-            const code = item.productCode || "";
-            const codeNum = parseInt(code.replace(/[^0-9]/g, ""));
-            if (codeNum >= 1000 && codeNum <= 2999) {
-              await prisma.mlmPurchase.create({
-                data: {
-                  mlmMemberId: mlmMember.id,
-                  orderId: orderIdBig,  // 伝票IDを紐づけ
-                  productCode: code,
-                  productName: item.productName || "",
-                  quantity: item.quantity || 1,
-                  unitPrice: item.unitPrice || 0,
-                  points: item.points || 0,
-                  totalPoints: (item.points || 0) * (item.quantity || 1),
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  purchaseStatus: purchaseStatus as any,
-                  purchaseMonth: (orderedAt || orderWithUser.orderedAt.toISOString()).slice(0, 7),
-                  purchasedAt: orderedAt ? new Date(orderedAt) : orderWithUser.orderedAt,
-                },
-              });
-            }
+      // ── 新しい商品情報で再作成（orderNumberを必ず付与）
+      const purchaseStatus = SLIP_TO_PURCHASE_STATUS[slipType || ""] || "one_time";
+      if (items && Array.isArray(items)) {
+        for (const item of items) {
+          if (!item.points || item.points <= 0) continue;
+          const code = item.productCode || "";
+          const codeNum = parseInt(code.replace(/[^0-9]/g, ""));
+          if (codeNum >= 1000 && codeNum <= 2999) {
+            await prisma.mlmPurchase.create({
+              data: {
+                mlmMemberId: syncMlmMemberId,
+                orderNumber: syncOrderNumber,           // 伝票番号を必ず付与
+                productCode: code,
+                productName: item.productName || "",
+                quantity: item.quantity || 1,
+                unitPrice: item.unitPrice || 0,
+                points: item.points || 0,
+                totalPoints: (item.points || 0) * (item.quantity || 1),
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                purchaseStatus: purchaseStatus as any,
+                purchaseMonth: newPurchaseMonth,
+                purchasedAt: orderedAt ? new Date(orderedAt) : (originalOrderedAt ?? new Date()),
+              },
+            });
           }
         }
       }
