@@ -318,22 +318,41 @@ export default function PurchasePanel({
       const res = await fetch(`/api/admin/product-purchases?memberCode=${memberCode}`);
       if (res.ok) {
         const data = await res.json();
-        // orderId → orderNumber マップを構築
+
+        // orderId → orderNumber マップを構築（主キーによる照合）
         const orderIdMap = new Map<string, string>();
+        // purchaseMonth → [orderNumber] マップ（fallback用：orderId=nullのレコード向け）
+        const monthOrderMap = new Map<string, string[]>();
         for (const order of currentOrders) {
           orderIdMap.set(order.id, order.orderNumber);
+          const month = order.orderedAt.slice(0, 7); // "YYYY-MM"
+          if (!monthOrderMap.has(month)) monthOrderMap.set(month, []);
+          monthOrderMap.get(month)!.push(order.orderNumber);
         }
 
-        // 商品コード1000・2000のみ表示し、orderIdでorderNumberを付与
+        // 商品コード1000・2000のみ表示
         const filtered = (data.purchases || [])
           .filter((p: MlmPurchaseRecord) =>
             p.productCode === "1000" || p.productCode === "2000"
           )
-          .map((p: MlmPurchaseRecord) => ({
-            ...p,
-            // orderId=nullはバッチ登録データ（orderNumberなし）
-            orderNumber: p.orderId ? (orderIdMap.get(p.orderId) ?? null) : null,
-          }));
+          .map((p: MlmPurchaseRecord) => {
+            let resolvedOrderNumber: string | null = null;
+            if (p.orderId) {
+              // orderId が存在する場合は正確にマッピング
+              resolvedOrderNumber = orderIdMap.get(p.orderId) ?? null;
+            } else {
+              // orderId=null（旧データ・バッチ登録）の場合は purchaseMonth で照合
+              const monthOrders = monthOrderMap.get(p.purchaseMonth) || [];
+              if (monthOrders.length === 1) {
+                // その月に伝票が1件のみなら確実に対応付け可能
+                resolvedOrderNumber = monthOrders[0];
+              } else if (monthOrders.length > 1) {
+                // 複数伝票がある月は「複数伝票あり」と表示
+                resolvedOrderNumber = `(${monthOrders.length}件)`;
+              }
+            }
+            return { ...p, orderNumber: resolvedOrderNumber };
+          });
 
         // 購入月の降順 → 同月内は purchasedAt の昇順でソート
         filtered.sort((a: MlmPurchaseRecord, b: MlmPurchaseRecord) => {
