@@ -83,6 +83,19 @@ function SlipDatePicker({
   );
 }
 
+// ── MLM購入履歴 型定義 ─────────────────────────────────────
+type MlmPurchaseRecord = {
+  id: string;
+  productCode: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  points: number;
+  totalPoints: number;
+  purchaseMonth: string;
+  purchasedAt: string;
+};
+
 // ── 型定義 ────────────────────────────────────────────────────
 type Product = {
   id: string;
@@ -260,6 +273,10 @@ export default function PurchasePanel({
   const [orders, setOrders] = useState<MemberOrder[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  // MLM購入履歴
+  const [mlmPurchases, setMlmPurchases] = useState<MlmPurchaseRecord[]>([]);
+  const [mlmLoading, setMlmLoading] = useState(true);
+  const [deletingMlmId, setDeletingMlmId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -293,6 +310,41 @@ export default function PurchasePanel({
     }
   }, [memberCode]);
 
+  // MLM購入履歴取得
+  const fetchMlmPurchases = useCallback(async () => {
+    setMlmLoading(true);
+    try {
+      const res = await fetch(`/api/admin/product-purchases?memberCode=${memberCode}`);
+      if (res.ok) {
+        const data = await res.json();
+        // 商品コード1000・2000のみ表示
+        const filtered = (data.purchases || []).filter(
+          (p: MlmPurchaseRecord) => p.productCode === "1000" || p.productCode === "2000"
+        );
+        // 購入月の降順でソート
+        filtered.sort((a: MlmPurchaseRecord, b: MlmPurchaseRecord) =>
+          b.purchaseMonth.localeCompare(a.purchaseMonth)
+        );
+        setMlmPurchases(filtered);
+      }
+    } finally {
+      setMlmLoading(false);
+    }
+  }, [memberCode]);
+
+  // MLM購入履歴削除
+  async function handleDeleteMlmPurchase(id: string, month: string, productName: string) {
+    if (!confirm(`購入履歴を削除しますか？\n${productName} / ${month}\nこの操作は取り消せません。`)) return;
+    setDeletingMlmId(id);
+    try {
+      const res = await fetch(`/api/admin/product-purchases?id=${id}`, { method: "DELETE" });
+      if (!res.ok) { const d = await res.json(); alert(d.error || "削除に失敗しました"); return; }
+      await fetchMlmPurchases();
+    } finally {
+      setDeletingMlmId(null);
+    }
+  }
+
   // 商品マスター取得
   const fetchProducts = useCallback(async () => {
     try {
@@ -307,7 +359,8 @@ export default function PurchasePanel({
   useEffect(() => {
     fetchOrders();
     fetchProducts();
-  }, [fetchOrders, fetchProducts]);
+    fetchMlmPurchases();
+  }, [fetchOrders, fetchProducts, fetchMlmPurchases]);
 
   // 商品選択時に価格・ポイントを自動反映
   function onProductSelect(idx: number, productId: string, setter: React.Dispatch<React.SetStateAction<SlipItem[]>>) {
@@ -895,6 +948,93 @@ export default function PurchasePanel({
           </table>
         </div>
       )}
+
+      {/* ═══════════════════════════════════════════
+          MLM購入履歴セクション（商品コード1000・2000）
+      ═══════════════════════════════════════════ */}
+      <div className="mt-6 border-t pt-5">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold text-slate-700">
+            <i className="fas fa-box mr-2 text-slate-500" />
+            商品購入履歴
+            <span className="ml-2 text-xs font-normal text-slate-400">（商品コード1000・2000）</span>
+          </h3>
+          <button
+            onClick={fetchMlmPurchases}
+            disabled={mlmLoading}
+            className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded hover:bg-slate-200 transition disabled:opacity-50"
+          >
+            <i className={`fas fa-sync text-[10px] ${mlmLoading ? "animate-spin" : ""}`} />
+            {mlmLoading ? "読込中..." : "更新"}
+          </button>
+        </div>
+
+        {mlmLoading ? (
+          <p className="text-gray-400 text-sm">読み込み中...</p>
+        ) : mlmPurchases.length === 0 ? (
+          <p className="text-gray-500 text-sm">商品購入履歴なし</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse min-w-[600px]">
+              <thead className="bg-slate-100 text-slate-600">
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold">購入月</th>
+                  <th className="px-3 py-2 text-left font-semibold">商品コード</th>
+                  <th className="px-3 py-2 text-left font-semibold">商品名</th>
+                  <th className="px-3 py-2 text-center font-semibold">数量</th>
+                  <th className="px-3 py-2 text-right font-semibold">単価</th>
+                  <th className="px-3 py-2 text-right font-semibold">PV</th>
+                  <th className="px-3 py-2 text-center font-semibold">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mlmPurchases.map((p) => (
+                  <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
+                    <td className="px-3 py-2 font-semibold text-slate-700">{p.purchaseMonth}</td>
+                    <td className="px-3 py-2">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                        p.productCode === "1000"
+                          ? "bg-violet-100 text-violet-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}>
+                        {p.productCode}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-slate-600">{p.productName}</td>
+                    <td className="px-3 py-2 text-center font-medium">{p.quantity}</td>
+                    <td className="px-3 py-2 text-right">¥{p.unitPrice.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-blue-700">{p.totalPoints.toLocaleString()}pt</td>
+                    <td className="px-3 py-2 text-center">
+                      <button
+                        onClick={() => handleDeleteMlmPurchase(p.id, p.purchaseMonth, p.productName)}
+                        disabled={deletingMlmId === p.id}
+                        className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded text-[10px] hover:bg-red-100 disabled:opacity-50"
+                      >
+                        {deletingMlmId === p.id ? "..." : <><i className="fas fa-trash mr-0.5" />削除</>}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-slate-50 border-t-2 border-slate-200">
+                <tr>
+                  <td colSpan={3} className="px-3 py-2 text-xs font-bold text-slate-600">合計</td>
+                  <td className="px-3 py-2 text-center text-xs font-bold text-slate-700">
+                    {mlmPurchases.reduce((s, p) => s + p.quantity, 0)}
+                  </td>
+                  <td className="px-3 py-2 text-right text-xs font-bold text-slate-700">
+                    ¥{mlmPurchases.reduce((s, p) => s + p.unitPrice * p.quantity, 0).toLocaleString()}
+                  </td>
+                  <td className="px-3 py-2 text-right text-xs font-bold text-blue-700">
+                    {mlmPurchases.reduce((s, p) => s + p.totalPoints, 0).toLocaleString()}pt
+                  </td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* ═══════════════════════════════════════════
           伝票編集モーダル
