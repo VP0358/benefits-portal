@@ -774,7 +774,7 @@ model MlmProduct {
 model MlmPurchase {
   id              BigInt         @id @default(autoincrement())
   mlmMemberId     BigInt
-  orderId         BigInt?                          // 伝票ID（伝票から作成した場合のみ設定。バッチ登録はnull）
+  orderId         BigInt?        @map("order_id")  // 伝票ID（伝票から作成した場合のみ設定。バッチ登録はnull）
   productCode     String         @db.VarChar(20)   // 商品コード (s1000, 1000, 1002, 2000 等)
   productName     String         @db.VarChar(255)
   quantity        Int            @default(1)
