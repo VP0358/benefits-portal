@@ -179,9 +179,9 @@ export async function GET(request: NextRequest) {
           },
         })
 
-        // PointWallet作成
+        // PointWallet作成（全フィールドにデフォルト値あり）
         await prisma.pointWallet.create({
-          data: { userId: newUser.id, points: 0 }
+          data: { userId: newUser.id }
         })
 
         // MlmMember作成
