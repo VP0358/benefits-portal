@@ -22,12 +22,16 @@ interface ImportResult {
 // ヘルパー関数
 // ──────────────────────────────────────────────
 
-/** CSVの会員ID → memberCode (XXXXXX-NN 形式) */
+/** CSVの会員ID → memberCode (XXXXXX-NN 形式)
+ *  末尾2桁を枝番 (NN) とし、それ以外をベースコードとする汎用変換
+ *  例: 10234001 → 102340-01 / 10885802 → 108858-02 / 99901 → 999-01
+ */
 function idToMemberCode(mid: string): string {
   mid = mid.trim()
-  if (mid.length === 8) return `${mid.slice(0, 6)}-${mid.slice(6)}`
-  if (mid.length === 5) return `0${mid.slice(0, 4)}-${mid.slice(4)}`
-  return mid
+  if (mid.length < 3) return mid  // 変換不可
+  const base = mid.slice(0, mid.length - 2)
+  const pos  = mid.slice(-2)
+  return `${base}-${pos}`
 }
 
 /** "YYYY/M/D" → Date (UTC 00:00:00) | null */

@@ -37,17 +37,16 @@ const prisma = new PrismaClient({ adapter });
 const CSV_PATH = join(process.cwd(), "../uploaded_files/2026-5-5-14-8-23member_mst.csv");
 const DEFAULT_PASSWORD = "0000";
 
-/** CSVの会員ID → memberCode (XXXXXX-NN) に変換 */
+/** CSVの会員ID → memberCode (XXXXXX-NN) に変換
+ *  末尾2桁を枝番、それ以外をベースコードとする汎用変換
+ *  例: 10234001 → 102340-01 / 99901 → 999-01
+ */
 function idToMemberCode(mid: string): string {
   mid = mid.trim();
-  if (mid.length === 8) {
-    return `${mid.slice(0, 6)}-${mid.slice(6)}`;
-  }
-  if (mid.length === 5) {
-    // テスト用5桁ID (例: 99901)
-    return `0${mid.slice(0, 4)}-${mid.slice(4)}`;
-  }
-  return mid;
+  if (mid.length < 3) return mid;
+  const base = mid.slice(0, mid.length - 2);
+  const pos  = mid.slice(-2);
+  return `${base}-${pos}`;
 }
 
 /** YYYY/M/D → Date | null */
