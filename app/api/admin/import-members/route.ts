@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/app/api/admin/route-guard"
 import { prisma } from "@/lib/prisma"
 import Iconv from "iconv-lite"
+import { parseDateJST } from "@/lib/japan-time"
 
 // ──────────────────────────────────────────────
 // 型定義
@@ -34,16 +35,20 @@ function idToMemberCode(mid: string): string {
   return `${base}-${pos}`
 }
 
-/** "YYYY/M/D" → Date (UTC 00:00:00) | null */
+/** "YYYY/M/D" → Date (JST 00:00:00 を UTC に変換) | null
+ *  parseDateJST は "YYYY-MM-DD" 形式を期待するため、スラッシュ区切りを変換する
+ */
 function parseDate(raw: string): Date | null {
   if (!raw?.trim()) return null
   const p = raw.trim().split("/")
   if (p.length !== 3) return null
   const y = parseInt(p[0], 10)
-  const m = parseInt(p[1], 10) - 1
+  const m = parseInt(p[1], 10)
   const d = parseInt(p[2], 10)
   if (isNaN(y) || isNaN(m) || isNaN(d)) return null
-  return new Date(Date.UTC(y, m, d))
+  // YYYY-MM-DD 形式に変換してから parseDateJST に渡す（JST 00:00 = UTC 前日 15:00）
+  const iso = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`
+  return parseDateJST(iso)
 }
 
 /** CSVステータス → DB enum */

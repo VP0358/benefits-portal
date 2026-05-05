@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma';
 import { generateMemberCode } from "@/lib/mlm-utils";
 import { getMlmDisplayName } from "@/lib/mlm-display-name";
 import bcrypt from "bcryptjs";
+import { parseDateJST, jstMonthRange } from "@/lib/japan-time";
 
 
 // 初期パスワード：全会員一律「0000」
@@ -63,30 +64,38 @@ export async function GET(req: NextRequest) {
         orConditions.push({ user: { mlmRegistration: { nickname: { contains: search } } } });
       }
       if (searchField === "birthDate") {
-        // 生年月日は日付文字列で部分一致（例: "1990-01"）
+        // 生年月日は日付文字列で部分一致（例: "1990-01" or "1990-01-15"）
         try {
-          const dateStart = new Date(search + (search.length === 7 ? "-01" : ""));
-          const dateEnd   = new Date(dateStart);
           if (search.length === 7) {
-            dateEnd.setMonth(dateEnd.getMonth() + 1);
-          } else {
-            dateEnd.setDate(dateEnd.getDate() + 1);
+            // YYYY-MM → JST月範囲で検索
+            const { start: dateStart, end: dateEnd } = jstMonthRange(search);
+            orConditions.push({ birthDate: { gte: dateStart, lt: dateEnd } });
+          } else if (search.length === 10) {
+            // YYYY-MM-DD → JST日範囲で検索
+            const dateStart = parseDateJST(search);
+            if (dateStart) {
+              const dateEnd = new Date(dateStart.getTime() + 24 * 60 * 60 * 1000);
+              orConditions.push({ birthDate: { gte: dateStart, lt: dateEnd } });
+            }
           }
-          orConditions.push({ birthDate: { gte: dateStart, lt: dateEnd } });
         } catch {
           // 日付パース失敗時は無視
         }
       }
       if (searchField === "contractDate") {
         try {
-          const dateStart = new Date(search + (search.length === 7 ? "-01" : ""));
-          const dateEnd   = new Date(dateStart);
           if (search.length === 7) {
-            dateEnd.setMonth(dateEnd.getMonth() + 1);
-          } else {
-            dateEnd.setDate(dateEnd.getDate() + 1);
+            // YYYY-MM → JST月範囲で検索
+            const { start: dateStart, end: dateEnd } = jstMonthRange(search);
+            orConditions.push({ contractDate: { gte: dateStart, lt: dateEnd } });
+          } else if (search.length === 10) {
+            // YYYY-MM-DD → JST日範囲で検索
+            const dateStart = parseDateJST(search);
+            if (dateStart) {
+              const dateEnd = new Date(dateStart.getTime() + 24 * 60 * 60 * 1000);
+              orConditions.push({ contractDate: { gte: dateStart, lt: dateEnd } });
+            }
           }
-          orConditions.push({ contractDate: { gte: dateStart, lt: dateEnd } });
         } catch {
           // 日付パース失敗時は無視
         }
@@ -323,9 +332,9 @@ export async function POST(req: NextRequest) {
           titleLevel: parseInt(data.titleLevel) || 0,
           forceActive: data.forceActive || false,
           forceLevel: data.forceLevel ? parseInt(data.forceLevel) : null,
-          contractDate: data.contractDate ? new Date(data.contractDate) : null,
+          contractDate: parseDateJST(data.contractDate),
           autoshipEnabled: data.autoshipEnabled || false,
-          autoshipStartDate: data.autoshipStartDate ? new Date(data.autoshipStartDate) : null,
+          autoshipStartDate: parseDateJST(data.autoshipStartDate),
           paymentMethod: data.paymentMethod || "credit_card",
           note: data.note || null,
           // 銀行情報
@@ -340,7 +349,7 @@ export async function POST(req: NextRequest) {
           companyName: data.companyName || null,
           companyNameKana: data.companyNameKana || null,
           // 追加の個人情報
-          birthDate: data.birthDate ? new Date(data.birthDate) : null,
+          birthDate: parseDateJST(data.birthDate),
           gender: data.gender || null,
           mobile: data.mobile || null,
           prefecture: data.prefecture || null,

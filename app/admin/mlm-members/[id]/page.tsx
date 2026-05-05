@@ -276,16 +276,41 @@ function convertYucho(kigo: string, bango: string): YuchoConvertResult {
 }
 
 // ─── ヘルパー ────────────────────────────────────────
+/** UTC ISO 文字列 → JST の日本語表示（タイムゾーンずれ対策）*/
 function fmtDate(s: string | null | undefined) {
   if (!s) return "—";
   try {
     const d = new Date(s);
     if (isNaN(d.getTime())) return s;
-    const y = d.getUTCFullYear();
-    const m = d.getUTCMonth() + 1;
-    const day = d.getUTCDate();
-    return `${y}年${m}月${day}日`;
+    // JST（Asia/Tokyo）基準で表示する
+    return d.toLocaleDateString("ja-JP", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+    });
   } catch { return s; }
+}
+
+/**
+ * UTC ISO 文字列 → JST 基準の "YYYY-MM-DD" 文字列
+ * 編集フォームの初期値設定に使用（slice(0,10)ではUTC日付になるためずれる）
+ */
+function toJSTDateStr(s: string | null | undefined): string {
+  if (!s) return "";
+  try {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return "";
+    // Intl.DateTimeFormat で JST の年月日を取得
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+    // en-CA は "YYYY-MM-DD" 形式を返す
+    return parts;
+  } catch { return ""; }
 }
 function displayName(m: { user: { name: string }; companyName: string | null } | null) {
   if (!m) return "—";
@@ -700,14 +725,14 @@ export default function MlmMemberDetailPage() {
         email: m.user.email, phone: m.user.phone ?? "",
         mobile: m.mobile ?? "", companyName: m.companyName ?? "",
         companyNameKana: m.companyNameKana ?? "",
-        birthDate: m.birthDate ? m.birthDate.slice(0, 10) : "",
+        birthDate: toJSTDateStr(m.birthDate),
         gender: m.gender ?? "",
         postalCode: m.user.postalCode ?? "",
         prefecture: m.prefecture ?? "", city: m.city ?? "",
         address1: m.address1 ?? "", address2: m.address2 ?? "",
         memberType: m.memberType, status: m.status,
-        contractDate: m.contractDate ? m.contractDate.slice(0, 10) : "",
-        firstPayDate: m.firstPayDate ? m.firstPayDate.slice(0, 10) : "",
+        contractDate: toJSTDateStr(m.contractDate),
+        firstPayDate: toJSTDateStr(m.firstPayDate),
         creditCardId: m.creditCardId ?? "",
         creditCardExpiry: m.creditCardExpiry ?? "",
         creditCardLast4: m.creditCardLast4 ?? "",
@@ -754,13 +779,13 @@ export default function MlmMemberDetailPage() {
     } else if (section === "autoship") {
       Object.assign(d, {
         autoshipEnabled: m.autoshipEnabled,
-        autoshipStartDate: m.autoshipStartDate ? m.autoshipStartDate.slice(0, 10) : "",
+        autoshipStartDate: toJSTDateStr(m.autoshipStartDate),
         // 停止日は常に空欄でモーダルを開く（手動入力時のみ保存）
         autoshipStopDate: "",
         autoshipSuspendMonths: m.autoshipSuspendMonths ?? "",
         paymentMethod: m.paymentMethod,
         // 現在の停止日をDBから表示用に保持（読み取り専用）
-        _currentStopDate: m.autoshipStopDate ? m.autoshipStopDate.slice(0, 10) : "",
+        _currentStopDate: toJSTDateStr(m.autoshipStopDate),
       });
     }
     setEditData(d);

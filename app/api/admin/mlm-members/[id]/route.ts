@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { parseDateJST } from "@/lib/japan-time";
 
 
 // DELETE: 会員削除（継続購入自動停止 + User含む全データ削除）
@@ -118,10 +119,10 @@ export async function PATCH(
         const memberUpdate: Record<string, unknown> = {};
         if (data.memberType    !== undefined) memberUpdate.memberType   = data.memberType;
         if (data.status        !== undefined) memberUpdate.status       = data.status;
-        if (data.contractDate  !== undefined) memberUpdate.contractDate = data.contractDate ? new Date(data.contractDate) : null;
+        if (data.contractDate  !== undefined) memberUpdate.contractDate = parseDateJST(data.contractDate);
         if (data.companyName   !== undefined) memberUpdate.companyName  = data.companyName || null;
         if (data.companyNameKana !== undefined) memberUpdate.companyNameKana = data.companyNameKana || null;
-        if (data.birthDate     !== undefined) memberUpdate.birthDate    = data.birthDate ? new Date(data.birthDate) : null;
+        if (data.birthDate     !== undefined) memberUpdate.birthDate    = parseDateJST(data.birthDate);
         if (data.gender        !== undefined) memberUpdate.gender       = data.gender || null;
         if (data.mobile        !== undefined) memberUpdate.mobile       = data.mobile || null;
         if (data.prefecture    !== undefined) memberUpdate.prefecture   = data.prefecture || null;
@@ -129,7 +130,7 @@ export async function PATCH(
         if (data.address1      !== undefined) memberUpdate.address1     = data.address1 || null;
         if (data.address2      !== undefined) memberUpdate.address2     = data.address2 || null;
         if (data.note            !== undefined) memberUpdate.note           = data.note || null;
-        if (data.firstPayDate    !== undefined) memberUpdate.firstPayDate   = data.firstPayDate ? new Date(data.firstPayDate) : null;
+        if (data.firstPayDate    !== undefined) memberUpdate.firstPayDate   = parseDateJST(data.firstPayDate);
         // クレジットカード情報（クレディックス）3枠
         if (data.creditCardId    !== undefined) memberUpdate.creditCardId    = data.creditCardId    || null;
         if (data.creditCardExpiry  !== undefined) memberUpdate.creditCardExpiry  = data.creditCardExpiry  || null;
@@ -194,8 +195,8 @@ export async function PATCH(
       // オートシップ設定
       const asUpdate: Record<string, unknown> = {};
       if (data.autoshipEnabled   !== undefined) asUpdate.autoshipEnabled   = Boolean(data.autoshipEnabled);
-      if (data.autoshipStartDate !== undefined) asUpdate.autoshipStartDate = data.autoshipStartDate ? new Date(data.autoshipStartDate) : null;
-      if (data.autoshipStopDate  !== undefined) asUpdate.autoshipStopDate  = data.autoshipStopDate ? new Date(data.autoshipStopDate) : null;
+      if (data.autoshipStartDate !== undefined) asUpdate.autoshipStartDate = parseDateJST(data.autoshipStartDate);
+      if (data.autoshipStopDate  !== undefined) asUpdate.autoshipStopDate  = parseDateJST(data.autoshipStopDate);
       if (data.paymentMethod     !== undefined) asUpdate.paymentMethod     = data.paymentMethod;
       if (data.autoshipSuspendMonths !== undefined) asUpdate.autoshipSuspendMonths = data.autoshipSuspendMonths || null;
       await prisma.mlmMember.update({ where: { id: memberId }, data: asUpdate });
