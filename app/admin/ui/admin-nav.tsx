@@ -79,6 +79,7 @@ const menuGroups = [
     labelColor: "#cbd5e1",
     items: [
       { href: "/admin/members", label: "会員管理", icon: "fas fa-user" },
+      { href: "/admin/import-members", label: "会員CSVインポート", icon: "fas fa-file-import" },
       { href: "/admin/points/monthly", label: "月次ポイント計算", icon: "fas fa-calendar-check" },
       { href: "/admin/points/expire", label: "ポイント失効処理", icon: "fas fa-clock" },
       { href: "/admin/monthly-runs", label: "月次実行履歴", icon: "fas fa-calendar-alt" },
