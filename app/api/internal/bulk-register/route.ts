@@ -129,19 +129,41 @@ export async function GET(request: NextRequest) {
     for (const m of MEMBERS_DATA) {
       const mc = memberCodeFromId(m.id)
       try {
-        // 既存チェック
-        const existingUser = await prisma.user.findUnique({ where: { memberCode: mc } })
-        if (existingUser) {
-          skipped.push({ memberCode: mc, name: m.name, reason: "既にUser存在" })
+        // 既存User確認
+        let targetUser = await prisma.user.findUnique({ where: { memberCode: mc } })
+        const existingMlm = await prisma.mlmMember.findUnique({ where: { memberCode: mc } })
+
+        // MlmMemberも既存ならスキップ
+        if (existingMlm) {
+          skipped.push({ memberCode: mc, name: m.name, reason: "既にMlmMember存在" })
           continue
         }
-
-        // メールアドレス生成（なければダミー）
-        const email = `member-${m.id}@noemail.viola-pure.net`
 
         // 住所結合
         const address = [m.pref, m.addr, m.building].filter(Boolean).join(' ')
         const postalCode = m.postal.replace(/^(\d{3})(\d{4})$/, '$1-$2')
+
+        // Userが存在しない場合は新規作成
+        if (!targetUser) {
+          const email = `member-${m.id}@noemail.viola-pure.net`
+          targetUser = await prisma.user.create({
+            data: {
+              memberCode: mc,
+              name: m.name,
+              nameKana: m.kana,
+              email,
+              passwordHash,
+              phone: m.phone || null,
+              postalCode,
+              address,
+              status: "active",
+            },
+          })
+          // PointWallet作成（全フィールドにデフォルト値あり）
+          await prisma.pointWallet.create({
+            data: { userId: targetUser.id }
+          })
+        }
 
         // 紹介者・直上者のMlmMember IDを取得
         let uplineDbId: bigint | null = null
@@ -164,30 +186,10 @@ export async function GET(request: NextRequest) {
         const firstPayDate = parseDateJST(m.firstPayDate)
         const birthDate = m.birth ? parseDateJST(m.birth) : null
 
-        // User作成
-        const newUser = await prisma.user.create({
-          data: {
-            memberCode: mc,
-            name: m.name,
-            nameKana: m.kana,
-            email,
-            passwordHash,
-            phone: m.phone || null,
-            postalCode,
-            address,
-            status: "active",
-          },
-        })
-
-        // PointWallet作成（全フィールドにデフォルト値あり）
-        await prisma.pointWallet.create({
-          data: { userId: newUser.id }
-        })
-
         // MlmMember作成
         const newMlm = await prisma.mlmMember.create({
           data: {
-            userId: newUser.id,
+            userId: targetUser.id,
             memberCode: mc,
             memberType: "business",
             status: "active",
@@ -203,18 +205,21 @@ export async function GET(request: NextRequest) {
           },
         })
 
-        // MlmRegistration作成（概要書面No）
-        await prisma.mlmRegistration.create({
-          data: {
-            userId: newUser.id,
-            disclosureDocNumber: m.disclosureDocNo || null,
-          },
-        })
+        // MlmRegistration作成（概要書面No）- 既存チェック
+        const existingReg = await prisma.mlmRegistration.findUnique({ where: { userId: targetUser.id } })
+        if (!existingReg) {
+          await prisma.mlmRegistration.create({
+            data: {
+              userId: targetUser.id,
+              disclosureDocNumber: m.disclosureDocNo || null,
+            },
+          })
+        }
 
         created.push({
           memberCode: mc,
           name: m.name,
-          userId: newUser.id.toString(),
+          userId: targetUser.id.toString(),
           mlmId: newMlm.id.toString(),
         })
       } catch (err) {
