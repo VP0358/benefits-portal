@@ -770,7 +770,6 @@ model MlmProduct {
 model MlmPurchase {
   id              BigInt         @id @default(autoincrement())
   mlmMemberId     BigInt
-  orderNumber     String?        @db.VarChar(100)  // 紐づく伝票の注文番号（NULLの場合は一括登録データ）
   productCode     String         @db.VarChar(20)   // 商品コード (s1000, 1000, 1002, 2000 等)
   productName     String         @db.VarChar(255)
   quantity        Int            @default(1)
@@ -787,7 +786,6 @@ model MlmPurchase {
   @@index([mlmMemberId])
   @@index([purchaseMonth])
   @@index([purchaseStatus])
-  @@index([orderNumber])
   @@map("mlm_purchases")
 }
 
