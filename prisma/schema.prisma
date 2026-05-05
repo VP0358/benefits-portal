@@ -299,6 +299,7 @@ model Order {
   items         OrderItem[]
   pointUsages   PointUsage[]
   shippingLabel ShippingLabel?
+  mlmPurchases  MlmPurchase[]
 
   @@index([userId])
   @@index([slipType])
@@ -770,6 +771,7 @@ model MlmProduct {
 model MlmPurchase {
   id              BigInt         @id @default(autoincrement())
   mlmMemberId     BigInt
+  orderId         BigInt?        // 紐づく伝票ID（伝票作成時に設定）
   productCode     String         @db.VarChar(20)   // 商品コード (s1000, 1000, 1002, 2000 等)
   productName     String         @db.VarChar(255)
   quantity        Int            @default(1)
@@ -782,8 +784,10 @@ model MlmPurchase {
   createdAt       DateTime       @default(now())
 
   mlmMember       MlmMember      @relation(fields: [mlmMemberId], references: [id], onDelete: Cascade)
+  order           Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([mlmMemberId])
+  @@index([orderId])
   @@index([purchaseMonth])
   @@index([purchaseStatus])
   @@map("mlm_purchases")

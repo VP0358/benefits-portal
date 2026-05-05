@@ -506,7 +506,8 @@ export default function PurchasePanel({
       alert("伝票を更新しました");
       setEditOrder(null);
       setEditForm(null);
-      await fetchOrders();
+      // 伝票更新後、伝票一覧と商品購入履歴の両方を再取得して同期
+      await Promise.all([fetchOrders(), fetchMlmPurchases()]);
     } finally {
       setEditSubmitting(false);
     }
