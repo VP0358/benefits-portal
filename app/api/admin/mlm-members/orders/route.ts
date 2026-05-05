@@ -105,11 +105,12 @@ export async function GET(request: NextRequest) {
         id: item.id.toString(),
         productId: item.productId?.toString() ?? "",
         productName: item.productName,
-        productCode: item.mlmProduct?.productCode || "",
+        // OrderItemに保存済みのproductCode/pointsを優先、なければmlmProductから補完
+        productCode: (item as any).productCode || item.mlmProduct?.productCode || "",
         unitPrice: item.unitPrice,
         quantity: item.quantity,
         lineAmount: item.lineAmount,
-        points: item.mlmProduct?.pv || 0,
+        points: (item as any).points ?? item.mlmProduct?.pv ?? 0,
       })),
       shippingLabel: o.shippingLabel
         ? {
@@ -242,29 +243,18 @@ export async function POST(request: NextRequest) {
       for (const item of items) {
         if (!item.productName && !item.productId) continue;
         const lineAmount = (item.unitPrice || 0) * (item.quantity || 1);
-        if (item.productId) {
-          await prisma.orderItem.create({
-            data: {
-              orderId: order.id,
-              productId: BigInt(item.productId),
-              productName: item.productName || "",
-              unitPrice: item.unitPrice || 0,
-              quantity: item.quantity || 1,
-              lineAmount,
-            },
-          });
-        } else {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (prisma.orderItem as any).create({
-            data: {
-              orderId: order.id,
-              productName: item.productName || "",
-              unitPrice: item.unitPrice || 0,
-              quantity: item.quantity || 1,
-              lineAmount,
-            },
-          });
-        }
+        await prisma.orderItem.create({
+          data: {
+            orderId: order.id,
+            ...(item.productId ? { productId: BigInt(item.productId) } : {}),
+            productCode: item.productCode || null,
+            productName: item.productName || "",
+            unitPrice: item.unitPrice || 0,
+            quantity: item.quantity || 1,
+            lineAmount,
+            points: item.points || 0,
+          },
+        });
       }
     }
 
@@ -448,29 +438,18 @@ export async function PUT(request: NextRequest) {
       for (const item of items) {
         if (!item.productName && !item.productId) continue;
         const lineAmount = (item.unitPrice || 0) * (item.quantity || 1);
-        if (item.productId) {
-          await prisma.orderItem.create({
-            data: {
-              orderId: orderIdBig,
-              productId: BigInt(item.productId),
-              productName: item.productName || "",
-              unitPrice: item.unitPrice || 0,
-              quantity: item.quantity || 1,
-              lineAmount,
-            },
-          });
-        } else {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (prisma.orderItem as any).create({
-            data: {
-              orderId: orderIdBig,
-              productName: item.productName || "",
-              unitPrice: item.unitPrice || 0,
-              quantity: item.quantity || 1,
-              lineAmount,
-            },
-          });
-        }
+        await prisma.orderItem.create({
+          data: {
+            orderId: orderIdBig,
+            ...(item.productId ? { productId: BigInt(item.productId) } : {}),
+            productCode: item.productCode || null,
+            productName: item.productName || "",
+            unitPrice: item.unitPrice || 0,
+            quantity: item.quantity || 1,
+            lineAmount,
+            points: item.points || 0,
+          },
+        });
       }
     }
 
