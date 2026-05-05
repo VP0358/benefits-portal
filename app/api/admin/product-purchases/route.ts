@@ -49,6 +49,8 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     purchases: purchases.map(p => ({
       id: p.id.toString(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      orderId: (p as any).orderId ? (p as any).orderId.toString() : null,
       memberCode: p.mlmMember.memberCode,
       memberName: p.mlmMember.user.name,
       productCode: p.productCode,
@@ -59,8 +61,6 @@ export async function GET(request: NextRequest) {
       totalPoints: p.totalPoints,
       purchaseMonth: p.purchaseMonth,
       purchasedAt: p.purchasedAt.toISOString(),
-      // msMarker: purchasedAt の ms 部分（伝票IDの下3桁）。0はバッチ登録データ
-      msMarker: p.purchasedAt.getMilliseconds(),
     }))
   })
 }

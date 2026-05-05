@@ -82,8 +82,8 @@ function SlipDatePicker({
 // ── MLM購入履歴 型定義 ─────────────────────────────────────
 type MlmPurchaseRecord = {
   id: string;
-  orderNumber: string | null;  // 伝票番号（バッチ登録データはnull）
-  msMarker: number;            // purchasedAt の ms 部分（orderId % 1000）
+  orderId: string | null;      // 伝票ID（バッチ登録データはnull）
+  orderNumber: string | null;  // 伝票番号（orderId→orderNumberで解決）
   productCode: string;
   productName: string;
   quantity: number;
@@ -311,37 +311,28 @@ export default function PurchasePanel({
     }
   }, [memberCode]);
 
-  // MLM購入履歴取得（ordersを引数で受け取りmsMarker→orderNumber解決）
+  // MLM購入履歴取得（ordersを引数で受け取りorderId→orderNumber解決）
   const fetchMlmPurchasesWithOrders = useCallback(async (currentOrders: MemberOrder[]) => {
     setMlmLoading(true);
     try {
       const res = await fetch(`/api/admin/product-purchases?memberCode=${memberCode}`);
       if (res.ok) {
         const data = await res.json();
-        // msMarker（orderId % 1000）→ orderNumber マップを構築
-        const markerMap = new Map<number, string>();
+        // orderId → orderNumber マップを構築
+        const orderIdMap = new Map<string, string>();
         for (const order of currentOrders) {
-          const marker = Number(BigInt(order.id) % BigInt(1000));
-          if (!markerMap.has(marker)) {
-            markerMap.set(marker, order.orderNumber);
-          } else {
-            // 衝突時（1000件に1回）は両方記録
-            const existing = markerMap.get(marker) || "";
-            if (!existing.includes(order.orderNumber)) {
-              markerMap.set(marker, existing + "," + order.orderNumber);
-            }
-          }
+          orderIdMap.set(order.id, order.orderNumber);
         }
 
-        // 商品コード1000・2000のみ表示し、msMarkerでorderNumberを付与
+        // 商品コード1000・2000のみ表示し、orderIdでorderNumberを付与
         const filtered = (data.purchases || [])
-          .filter((p: MlmPurchaseRecord & { msMarker: number }) =>
+          .filter((p: MlmPurchaseRecord) =>
             p.productCode === "1000" || p.productCode === "2000"
           )
-          .map((p: MlmPurchaseRecord & { msMarker: number }) => ({
+          .map((p: MlmPurchaseRecord) => ({
             ...p,
-            // msMarker=0はバッチ登録データ（orderNumberなし）
-            orderNumber: p.msMarker > 0 ? (markerMap.get(p.msMarker) ?? null) : null,
+            // orderId=nullはバッチ登録データ（orderNumberなし）
+            orderNumber: p.orderId ? (orderIdMap.get(p.orderId) ?? null) : null,
           }));
 
         // 購入月の降順 → 同月内は purchasedAt の昇順でソート
@@ -359,7 +350,6 @@ export default function PurchasePanel({
 
   // 外部から呼び出し可能なラッパー（伝票一覧を再取得してからorderNumber照合）
   const fetchMlmPurchases = useCallback(async () => {
-    // fetchOrdersで最新ordersを取得してからmsMarker照合
     const latestOrders = await fetchOrders();
     await fetchMlmPurchasesWithOrders(latestOrders);
   }, [fetchOrders, fetchMlmPurchasesWithOrders]);
