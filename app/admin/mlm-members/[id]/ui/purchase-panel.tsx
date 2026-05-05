@@ -21,14 +21,14 @@ function SlipDatePicker({
   allowEmpty?: boolean;    // true のとき「未設定」選択肢を表示
   highlightBg?: string;    // 強調背景クラス（例: "bg-blue-50"）
 }) {
-  const curYear = new Date().getFullYear(); // 年リスト生成用（ブラウザローカル時刻で十分）
+  const curYear = new Date().getFullYear();
+  const jstToday = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).split("/");
+  const curMonth = parseInt(jstToday[1]);
+  const curDay   = parseInt(jstToday[2]);
 
   // value から年・月・日を分解
   const parts = value ? value.split("-") : [];
   const selYear  = parts[0] ? parseInt(parts[0]) : (allowEmpty ? 0 : curYear);
-  const jstToday  = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).split("/");
-  const curMonth  = parseInt(jstToday[1]);
-  const curDay    = parseInt(jstToday[2]);
   const selMonth = parts[1] ? parseInt(parts[1]) : (allowEmpty ? 0 : curMonth);
   const selDay   = parts[2] ? parseInt(parts[2]) : (allowEmpty ? 0 : curDay);
 
@@ -38,35 +38,31 @@ function SlipDatePicker({
     return new Date(selYear, selMonth, 0).getDate();
   }, [selYear, selMonth]);
 
-  const years = Array.from({ length: 11 }, (_, i) => curYear - 5 + i); // 過去5年〜未来5年
+  const years = Array.from({ length: 11 }, (_, i) => curYear - 5 + i);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
   const days   = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
   const selCls = `border border-gray-300 rounded px-1 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 ${highlightBg}`;
 
   function update(y: number, m: number, d: number) {
-    if (allowEmpty && (!y || !m || !d)) { onChange(""); return; }
-    const safeD = Math.min(d, new Date(y, m, 0).getDate());
-    onChange(`${y}-${String(m).padStart(2,"0")}-${String(safeD).padStart(2,"0")}`);
+    // allowEmpty かつ年が 0（未設定）の場合は空文字を返す
+    // 年が選択済みなら月・日が 0 でも現在値で補完して確定させる
+    if (allowEmpty && y === 0) { onChange(""); return; }
+    // 年が未設定のまま月・日だけ選んだ場合は今年で補完
+    const safeY = y || curYear;
+    const safeM = m || 1;
+    const safeD = Math.min(d || 1, new Date(safeY, safeM, 0).getDate());
+    onChange(`${safeY}-${String(safeM).padStart(2,"0")}-${String(safeD).padStart(2,"0")}`);
   }
 
   return (
     <div className={`flex items-center gap-0.5 ${className || ""}`}>
-      {allowEmpty && (
-        <select value={selYear}
-          onChange={(e) => update(Number(e.target.value), selMonth, selDay)}
-          className={`${selCls} w-16`}>
-          <option value={0}>未設定</option>
-          {years.map((y) => <option key={y} value={y}>{y}年</option>)}
-        </select>
-      )}
-      {!allowEmpty && (
-        <select value={selYear}
-          onChange={(e) => update(Number(e.target.value), selMonth, selDay)}
-          className={`${selCls} w-16`}>
-          {years.map((y) => <option key={y} value={y}>{y}年</option>)}
-        </select>
-      )}
+      <select value={selYear}
+        onChange={(e) => update(Number(e.target.value), selMonth, selDay)}
+        className={`${selCls} w-16`}>
+        {allowEmpty && <option value={0}>未設定</option>}
+        {years.map((y) => <option key={y} value={y}>{y}年</option>)}
+      </select>
       <select value={selMonth}
         onChange={(e) => update(selYear, Number(e.target.value), selDay)}
         className={`${selCls} w-12`}>

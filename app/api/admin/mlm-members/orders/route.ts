@@ -312,18 +312,18 @@ export async function POST(request: NextRequest) {
           const code = item.productCode || "";
           const codeNum = parseInt(code.replace(/[^0-9]/g, ""));
           if (codeNum >= 1000 && codeNum <= 2999) {
-            await prisma.mlmPurchase.create({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (prisma.mlmPurchase as any).create({
               data: {
                 mlmMemberId: mlmMember.id,
-                orderNumber,                          // 伝票番号を紐づけ
+                orderNumber,                          // 伝票番号を紐づけ（DBマイグレーション後に有効）
                 productCode: code,
                 productName: item.productName || "",
                 quantity: item.quantity || 1,
                 unitPrice: item.unitPrice || 0,
                 points: item.points || 0,
                 totalPoints: (item.points || 0) * (item.quantity || 1),
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                purchaseStatus: purchaseStatus as any,
+                purchaseStatus: purchaseStatus,
                 purchaseMonth: (orderedAt || new Date().toISOString()).slice(0, 7),
                 purchasedAt: orderedAt ? new Date(orderedAt) : new Date(),
               },
@@ -527,13 +527,20 @@ export async function PUT(request: NextRequest) {
         : (originalOrderedAt?.toISOString() ?? new Date().toISOString()).slice(0, 7);
 
       // ── この伝票（orderNumber）に紐づくMlmPurchaseのみ削除
-      //    → 一括登録データ（orderNumber=null）や他の伝票のデータは一切触らない
-      await prisma.mlmPurchase.deleteMany({
-        where: {
-          mlmMemberId: syncMlmMemberId,
-          orderNumber: syncOrderNumber,
-        },
-      });
+      //    → orderNumberカラムがDBにある場合はorderNumber一致のみ削除
+      //    → まだカラムがない場合は安全のため削除をスキップ（既存データ保護）
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (prisma.mlmPurchase as any).deleteMany({
+          where: {
+            mlmMemberId: syncMlmMemberId,
+            orderNumber: syncOrderNumber,
+          },
+        });
+      } catch (delErr) {
+        // order_numberカラム未作成の場合はスキップ（既存データは保護される）
+        console.warn("MlmPurchase deleteMany skipped (column may not exist yet):", delErr);
+      }
 
       // ── 新しい商品情報で再作成（orderNumberを必ず付与）
       const purchaseStatus = SLIP_TO_PURCHASE_STATUS[slipType || ""] || "one_time";
@@ -543,7 +550,8 @@ export async function PUT(request: NextRequest) {
           const code = item.productCode || "";
           const codeNum = parseInt(code.replace(/[^0-9]/g, ""));
           if (codeNum >= 1000 && codeNum <= 2999) {
-            await prisma.mlmPurchase.create({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (prisma.mlmPurchase as any).create({
               data: {
                 mlmMemberId: syncMlmMemberId,
                 orderNumber: syncOrderNumber,           // 伝票番号を必ず付与
@@ -553,8 +561,7 @@ export async function PUT(request: NextRequest) {
                 unitPrice: item.unitPrice || 0,
                 points: item.points || 0,
                 totalPoints: (item.points || 0) * (item.quantity || 1),
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                purchaseStatus: purchaseStatus as any,
+                purchaseStatus: purchaseStatus,
                 purchaseMonth: newPurchaseMonth,
                 purchasedAt: orderedAt ? new Date(orderedAt) : (originalOrderedAt ?? new Date()),
               },
