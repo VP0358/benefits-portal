@@ -16,10 +16,6 @@ const PRODUCT_1000 = { code: "1000", name: "[新規]VIOLA Pure 翠彩-SUMISAI-",
 const PRODUCT_2000 = { code: "2000", name: "VIOLA Pure 翠彩-SUMISAI-",       price: 16500, pv: 150 }
 const PRODUCT_4000 = { code: "4000", name: "出荷事務手数料" }
 
-function getBranchNumber(memberCode: string): string {
-  return memberCode.slice(-2)
-}
-
 function generateOrderNumber(memberCode: string, month: string, productCode: string): string {
   const [year, mon] = month.split("-")
   const ym = `${year}${mon}`
@@ -28,88 +24,98 @@ function generateOrderNumber(memberCode: string, month: string, productCode: str
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
-  const token = searchParams.get("token")
-  const mode  = searchParams.get("mode") || "check"
+  const token  = searchParams.get("token")
+  const mode   = searchParams.get("mode") || "check1"
+  const offset = parseInt(searchParams.get("offset") || "0",   10)
+  const limit  = parseInt(searchParams.get("limit")  || "100", 10)
 
   if (token !== TOKEN) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   // ======================================================
-  // CHECK モード
+  // CHECK1: MlmPurchase (商品1000 2026-05) の確認
   // ======================================================
-  if (mode === "check") {
-    // --- ① 商品1000 MlmPurchase チェック ---
-    const purchaseChecks = []
+  if (mode === "check1") {
+    const results = []
     for (const d of MAY_PURCHASE_DATA) {
       const member = await prisma.mlmMember.findFirst({
         where: { memberCode: d.memberCode },
-        include: { user: { select: { id: true, name: true } } }
+        select: { id: true, memberCode: true },
       })
       if (!member) {
-        purchaseChecks.push({ ...d, status: "NO_MEMBER" })
+        results.push({ ...d, status: "NO_MEMBER" })
         continue
       }
       const existing = await prisma.mlmPurchase.findFirst({
-        where: { mlmMemberId: member.id, productCode: PRODUCT_1000.code, purchaseMonth: d.month }
+        where: { mlmMemberId: member.id, productCode: PRODUCT_1000.code, purchaseMonth: d.month },
+        select: { id: true },
       })
-      purchaseChecks.push({
+      results.push({
         ...d,
         status: existing ? "ALREADY_EXISTS" : "READY",
         memberId: member.id.toString(),
-        existingId: existing?.id.toString() ?? null,
+        existingPurchaseId: existing?.id.toString() ?? null,
       })
     }
+    return NextResponse.json({ mode: "check1", total: MAY_PURCHASE_DATA.length, results })
+  }
 
-    // --- ② 伝票作成チェック（1000/2000で伝票未作成分）---
-    const purchases1000 = await prisma.mlmPurchase.findMany({
+  // ======================================================
+  // CHECK2: 伝票作成対象数の確認（offset/limit対応）
+  // ======================================================
+  if (mode === "check2") {
+    const totalCount = await prisma.mlmPurchase.count({
       where: { productCode: { in: [PRODUCT_1000.code, PRODUCT_2000.code] } },
-      include: { mlmMember: { include: { user: { select: { id: true, memberCode: true, name: true } } } } },
+    })
+    const purchases = await prisma.mlmPurchase.findMany({
+      where: { productCode: { in: [PRODUCT_1000.code, PRODUCT_2000.code] } },
+      include: {
+        mlmMember: { select: { memberCode: true } },
+      },
       orderBy: { id: "asc" },
+      skip: offset,
+      take: limit,
     })
 
-    let orderNeedCreate = 0, orderAlreadyExists = 0, orderNoUser = 0
-    for (const p of purchases1000) {
-      const memberCode = p.mlmMember.user?.memberCode ?? ""
-      const orderNum = generateOrderNumber(memberCode, p.purchaseMonth, p.productCode)
-      const existing = await prisma.order.findFirst({ where: { orderNumber: orderNum } })
-      if (!p.mlmMember.user) { orderNoUser++; continue }
-      if (existing) { orderAlreadyExists++ } else { orderNeedCreate++ }
+    // 作成済みの注文番号を一括取得して高速化
+    const orderNums = purchases.map(p =>
+      generateOrderNumber(p.mlmMember.memberCode ?? "", p.purchaseMonth, p.productCode)
+    )
+    const existingOrders = await prisma.order.findMany({
+      where: { orderNumber: { in: orderNums } },
+      select: { orderNumber: true },
+    })
+    const existingSet = new Set(existingOrders.map(o => o.orderNumber))
+
+    let needCreate = 0, alreadyExists = 0
+    for (const p of purchases) {
+      const orderNum = generateOrderNumber(p.mlmMember.memberCode ?? "", p.purchaseMonth, p.productCode)
+      if (existingSet.has(orderNum)) { alreadyExists++ } else { needCreate++ }
     }
 
     return NextResponse.json({
-      mode: "check",
-      step1_purchases: {
-        total: MAY_PURCHASE_DATA.length,
-        results: purchaseChecks,
-      },
-      step2_orders: {
-        totalPurchases: purchases1000.length,
-        needCreate: orderNeedCreate,
-        alreadyExists: orderAlreadyExists,
-        noUser: orderNoUser,
-      },
+      mode: "check2",
+      pagination: { total: totalCount, offset, limit, batchSize: purchases.length, hasMore: offset + limit < totalCount },
+      summary: { needCreate, alreadyExists },
     })
   }
 
   // ======================================================
-  // CREATE モード（①MlmPurchase + ②Order + ③ShippingFee）
+  // STEP1: MlmPurchase 登録（商品1000 2026-05）
   // ======================================================
-  if (mode === "create") {
-    const results: Record<string, unknown> = {}
-
-    // --- STEP 1: MlmPurchase 登録 ---
-    let p_created = 0, p_skipped = 0, p_errors = 0
-    const p_errs: object[] = []
+  if (mode === "step1") {
+    let created = 0, skipped = 0, errors = 0
+    const errs: object[] = []
     for (const d of MAY_PURCHASE_DATA) {
       try {
-        const member = await prisma.mlmMember.findFirst({ where: { memberCode: d.memberCode } })
-        if (!member) { p_errors++; p_errs.push({ ...d, reason: "NO_MEMBER" }); continue }
+        const member = await prisma.mlmMember.findFirst({ where: { memberCode: d.memberCode }, select: { id: true } })
+        if (!member) { errors++; errs.push({ ...d, reason: "NO_MEMBER" }); continue }
         const existing = await prisma.mlmPurchase.findFirst({
-          where: { mlmMemberId: member.id, productCode: PRODUCT_1000.code, purchaseMonth: d.month }
+          where: { mlmMemberId: member.id, productCode: PRODUCT_1000.code, purchaseMonth: d.month },
+          select: { id: true },
         })
-        if (existing) { p_skipped++; continue }
-        const purchasedAt = new Date(`${d.month}-01T00:00:00Z`)
+        if (existing) { skipped++; continue }
         await prisma.mlmPurchase.create({
           data: {
             mlmMemberId:    member.id,
@@ -121,26 +127,29 @@ export async function GET(request: NextRequest) {
             totalPoints:    d.quantity * PRODUCT_1000.pv,
             purchaseStatus: "one_time",
             purchaseMonth:  d.month,
-            purchasedAt,
+            purchasedAt:    new Date(`${d.month}-01T00:00:00Z`),
           }
         })
-        p_created++
+        created++
       } catch (err) {
-        p_errors++
-        p_errs.push({ memberCode: d.memberCode, reason: String(err).slice(0, 200) })
+        errors++
+        errs.push({ memberCode: d.memberCode, reason: String(err).slice(0, 200) })
       }
     }
-    results.step1_purchases = { created: p_created, skipped: p_skipped, errors: p_errors, errorDetail: p_errs }
+    return NextResponse.json({ mode: "step1", summary: { created, skipped, errors }, errors: errs })
+  }
 
-    // --- STEP 2: Order + OrderItem + ShippingLabel 作成 ---
-    // 商品マスター取得
-    const prod1000 = await prisma.mlmProduct.findUnique({ where: { productCode: PRODUCT_1000.code } })
-    const prod2000 = await prisma.mlmProduct.findUnique({ where: { productCode: PRODUCT_2000.code } })
-    const prod4000 = await prisma.mlmProduct.findUnique({ where: { productCode: PRODUCT_4000.code } })
-
-    const productMap: Record<string, typeof prod1000> = {
-      [PRODUCT_1000.code]: prod1000,
-      [PRODUCT_2000.code]: prod2000,
+  // ======================================================
+  // STEP2: Order + OrderItem + ShippingLabel 作成（offset/limit対応）
+  // ======================================================
+  if (mode === "step2") {
+    const [prod1000, prod2000] = await Promise.all([
+      prisma.mlmProduct.findUnique({ where: { productCode: PRODUCT_1000.code }, select: { id: true } }),
+      prisma.mlmProduct.findUnique({ where: { productCode: PRODUCT_2000.code }, select: { id: true } }),
+    ])
+    const productIdMap: Record<string, bigint | null> = {
+      [PRODUCT_1000.code]: prod1000?.id ?? null,
+      [PRODUCT_2000.code]: prod2000?.id ?? null,
     }
     const productPriceMap: Record<string, number> = {
       [PRODUCT_1000.code]: PRODUCT_1000.price,
@@ -151,39 +160,49 @@ export async function GET(request: NextRequest) {
       [PRODUCT_2000.code]: PRODUCT_2000.name,
     }
 
+    const totalCount = await prisma.mlmPurchase.count({
+      where: { productCode: { in: [PRODUCT_1000.code, PRODUCT_2000.code] } },
+    })
     const purchases = await prisma.mlmPurchase.findMany({
       where: { productCode: { in: [PRODUCT_1000.code, PRODUCT_2000.code] } },
       include: {
         mlmMember: {
           include: {
             user: {
-              select: {
-                id: true, memberCode: true, name: true, phone: true,
-                email: true, postalCode: true, address: true,
-              }
-            }
-          }
-        }
+              select: { id: true, memberCode: true, name: true, phone: true, address: true },
+            },
+          },
+        },
       },
       orderBy: { id: "asc" },
+      skip: offset,
+      take: limit,
     })
 
-    let o_created = 0, o_skipped = 0, o_errors = 0
-    const o_errs: object[] = []
+    // 既存注文番号を一括取得
+    const orderNums = purchases
+      .filter(p => p.mlmMember.user?.memberCode)
+      .map(p => generateOrderNumber(p.mlmMember.user!.memberCode!, p.purchaseMonth, p.productCode))
+    const existingOrders = await prisma.order.findMany({
+      where: { orderNumber: { in: orderNums } },
+      select: { orderNumber: true },
+    })
+    const existingSet = new Set(existingOrders.map(o => o.orderNumber))
+
+    let created = 0, skipped = 0, errors = 0
+    const errs: object[] = []
 
     for (const p of purchases) {
       const user = p.mlmMember.user
-      if (!user?.memberCode) { o_errors++; continue }
+      if (!user?.memberCode) { errors++; continue }
 
-      const memberCode  = user.memberCode
-      const orderNum    = generateOrderNumber(memberCode, p.purchaseMonth, p.productCode)
-      const existing    = await prisma.order.findFirst({ where: { orderNumber: orderNum } })
-      if (existing) { o_skipped++; continue }
+      const orderNum = generateOrderNumber(user.memberCode, p.purchaseMonth, p.productCode)
+      if (existingSet.has(orderNum)) { skipped++; continue }
 
       try {
-        const prod    = productMap[p.productCode]
         const unitPrice = productPriceMap[p.productCode] ?? p.unitPrice
         const prodName  = productNameMap[p.productCode] ?? p.productName
+        const prodId    = productIdMap[p.productCode] ?? null
         const qty       = p.quantity
         const lineAmt   = unitPrice * qty
         const slipType  = p.productCode === PRODUCT_1000.code ? "new_member" : "one_time"
@@ -191,113 +210,120 @@ export async function GET(request: NextRequest) {
 
         await prisma.order.create({
           data: {
-            userId:          user.id,
-            orderNumber:     orderNum,
-            status:          "completed",
+            userId:         user.id,
+            orderNumber:    orderNum,
+            status:         "completed",
             slipType,
-            paymentMethod:   "bank_transfer",
-            paymentStatus:   "paid",
-            shippingStatus:  "shipped",
-            subtotalAmount:  lineAmt,
-            totalAmount:     lineAmt,
+            paymentMethod:  "bank_transfer",
+            paymentStatus:  "paid",
+            shippingStatus: "shipped",
+            subtotalAmount: lineAmt,
+            totalAmount:    lineAmt,
             orderedAt,
             items: {
               create: {
-                productId:   prod?.id ?? null,
+                productId:   prodId,
                 productName: prodName,
                 unitPrice,
                 quantity:    qty,
                 lineAmount:  lineAmt,
-              }
+              },
             },
             shippingLabel: {
               create: {
-                recipientName:    user.name ?? "",
-                recipientPhone:   user.phone ?? "",
+                recipientName:    user.name    ?? "",
+                recipientPhone:   user.phone   ?? "",
                 recipientAddress: user.address ?? "",
                 status:           "shipped",
-              }
+              },
             },
-          }
+          },
         })
-        o_created++
+        created++
       } catch (err) {
-        o_errors++
-        o_errs.push({ orderNumber: orderNum, reason: String(err).slice(0, 200) })
+        errors++
+        errs.push({ orderNumber: orderNum, reason: String(err).slice(0, 200) })
       }
     }
-    results.step2_orders = { created: o_created, skipped: o_skipped, errors: o_errors, errorDetail: o_errs.slice(0, 5) }
 
-    // --- STEP 3: 枝番01の新規伝票に出荷事務手数料(4000)を追加 ---
-    // step2で新規作成した伝票(or まだ4000のない枝番01伝票)に追加
-    const feePrice = prod4000?.price ?? 800
+    return NextResponse.json({
+      mode: "step2",
+      pagination: { total: totalCount, offset, limit, batchSize: purchases.length, hasMore: offset + limit < totalCount },
+      summary: { created, skipped, errors },
+      errors: errs.slice(0, 5),
+    })
+  }
+
+  // ======================================================
+  // STEP3: 枝番01の伝票に出荷事務手数料(4000)追加（offset/limit対応）
+  // ======================================================
+  if (mode === "step3") {
+    const prod4000 = await prisma.mlmProduct.findUnique({
+      where: { productCode: PRODUCT_4000.code },
+      select: { id: true, price: true },
+    })
+    const feePrice     = prod4000?.price ?? 800
     const feeProductId = prod4000?.id ?? null
 
-    // 枝番01ユーザーの、4000を持っていない1000/2000伝票を検索
-    const ordersWithout4000 = await prisma.order.findMany({
+    const totalCount = await prisma.order.count({
       where: {
-        user: { memberCode: { endsWith: "01" } },
+        user:  { memberCode: { endsWith: "01" } },
         items: {
-          some:  { mlmProduct: { productCode: { in: [PRODUCT_1000.code, PRODUCT_2000.code] } } },
-          none:  { mlmProduct: { productCode: PRODUCT_4000.code } },
-        }
+          some: { mlmProduct: { productCode: { in: [PRODUCT_1000.code, PRODUCT_2000.code] } } },
+          none: { mlmProduct: { productCode: PRODUCT_4000.code } },
+        },
       },
-      include: {
-        user: { select: { memberCode: true, name: true } },
+    })
+    const orders = await prisma.order.findMany({
+      where: {
+        user:  { memberCode: { endsWith: "01" } },
+        items: {
+          some: { mlmProduct: { productCode: { in: [PRODUCT_1000.code, PRODUCT_2000.code] } } },
+          none: { mlmProduct: { productCode: PRODUCT_4000.code } },
+        },
       },
+      select: { id: true, orderNumber: true },
       orderBy: { id: "asc" },
+      skip: offset,
+      take: limit,
     })
 
-    let f_added = 0, f_errors = 0
-    const f_errs: object[] = []
+    let added = 0, errors = 0
+    const errs: object[] = []
 
-    for (const order of ordersWithout4000) {
+    for (const order of orders) {
       try {
-        if (feeProductId) {
-          await prisma.orderItem.create({
-            data: {
-              orderId:     order.id,
-              productId:   feeProductId,
-              productName: PRODUCT_4000.name,
-              unitPrice:   feePrice,
-              quantity:    1,
-              lineAmount:  feePrice,
-            }
-          })
-        } else {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (prisma.orderItem as any).create({
-            data: {
-              orderId:     order.id,
-              productName: PRODUCT_4000.name,
-              unitPrice:   feePrice,
-              quantity:    1,
-              lineAmount:  feePrice,
-            }
-          })
-        }
+        await prisma.orderItem.create({
+          data: {
+            orderId:     order.id,
+            productId:   feeProductId,
+            productName: PRODUCT_4000.name,
+            unitPrice:   feePrice,
+            quantity:    1,
+            lineAmount:  feePrice,
+          },
+        })
         await prisma.order.update({
           where: { id: order.id },
           data: {
             subtotalAmount: { increment: feePrice },
             totalAmount:    { increment: feePrice },
-          }
+          },
         })
-        f_added++
+        added++
       } catch (err) {
-        f_errors++
-        f_errs.push({ orderId: order.id.toString(), reason: String(err).slice(0, 200) })
+        errors++
+        errs.push({ orderId: order.id.toString(), orderNumber: order.orderNumber, reason: String(err).slice(0, 200) })
       }
     }
-    results.step3_shippingFee = {
-      targetOrders: ordersWithout4000.length,
-      added: f_added,
-      errors: f_errors,
-      errorDetail: f_errs.slice(0, 5),
-    }
 
-    return NextResponse.json({ mode: "create", results })
+    return NextResponse.json({
+      mode: "step3",
+      pagination: { total: totalCount, offset, limit, batchSize: orders.length, hasMore: offset + limit < totalCount },
+      summary: { added, errors },
+      errors: errs.slice(0, 5),
+    })
   }
 
-  return NextResponse.json({ error: "mode must be check/create" }, { status: 400 })
+  return NextResponse.json({ error: "mode must be check1/check2/step1/step2/step3" }, { status: 400 })
 }
