@@ -82,6 +82,8 @@ function SlipDatePicker({
 // ── MLM購入履歴 型定義 ─────────────────────────────────────
 type MlmPurchaseRecord = {
   id: string;
+  orderNumber: string | null;  // 伝票番号（バッチ登録データはnull）
+  msMarker: number;            // purchasedAt の ms 部分（orderId % 1000）
   productCode: string;
   productName: string;
   quantity: number;
@@ -292,41 +294,75 @@ export default function PurchasePanel({
     { productId: "", productCode: "", productName: "", unitPrice: 0, quantity: 1, points: 0, taxRate: 10 },
   ]);
 
-  // 伝票一覧取得
-  const fetchOrders = useCallback(async () => {
+  // 伝票一覧取得（取得したordersを返す）
+  const fetchOrders = useCallback(async (): Promise<MemberOrder[]> => {
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/mlm-members/orders?memberCode=${memberCode}`);
       if (res.ok) {
         const data = await res.json();
-        setOrders(data.orders || []);
+        const fetched: MemberOrder[] = data.orders || [];
+        setOrders(fetched);
+        return fetched;
       }
+      return [];
     } finally {
       setLoading(false);
     }
   }, [memberCode]);
 
-  // MLM購入履歴取得
-  const fetchMlmPurchases = useCallback(async () => {
+  // MLM購入履歴取得（ordersを引数で受け取りmsMarker→orderNumber解決）
+  const fetchMlmPurchasesWithOrders = useCallback(async (currentOrders: MemberOrder[]) => {
     setMlmLoading(true);
     try {
       const res = await fetch(`/api/admin/product-purchases?memberCode=${memberCode}`);
       if (res.ok) {
         const data = await res.json();
-        // 商品コード1000・2000のみ表示
-        const filtered = (data.purchases || []).filter(
-          (p: MlmPurchaseRecord) => p.productCode === "1000" || p.productCode === "2000"
-        );
-        // 購入月の降順でソート
-        filtered.sort((a: MlmPurchaseRecord, b: MlmPurchaseRecord) =>
-          b.purchaseMonth.localeCompare(a.purchaseMonth)
-        );
+        // msMarker（orderId % 1000）→ orderNumber マップを構築
+        const markerMap = new Map<number, string>();
+        for (const order of currentOrders) {
+          const marker = Number(BigInt(order.id) % BigInt(1000));
+          if (!markerMap.has(marker)) {
+            markerMap.set(marker, order.orderNumber);
+          } else {
+            // 衝突時（1000件に1回）は両方記録
+            const existing = markerMap.get(marker) || "";
+            if (!existing.includes(order.orderNumber)) {
+              markerMap.set(marker, existing + "," + order.orderNumber);
+            }
+          }
+        }
+
+        // 商品コード1000・2000のみ表示し、msMarkerでorderNumberを付与
+        const filtered = (data.purchases || [])
+          .filter((p: MlmPurchaseRecord & { msMarker: number }) =>
+            p.productCode === "1000" || p.productCode === "2000"
+          )
+          .map((p: MlmPurchaseRecord & { msMarker: number }) => ({
+            ...p,
+            // msMarker=0はバッチ登録データ（orderNumberなし）
+            orderNumber: p.msMarker > 0 ? (markerMap.get(p.msMarker) ?? null) : null,
+          }));
+
+        // 購入月の降順 → 同月内は purchasedAt の昇順でソート
+        filtered.sort((a: MlmPurchaseRecord, b: MlmPurchaseRecord) => {
+          const monthCmp = b.purchaseMonth.localeCompare(a.purchaseMonth);
+          if (monthCmp !== 0) return monthCmp;
+          return a.purchasedAt.localeCompare(b.purchasedAt);
+        });
         setMlmPurchases(filtered);
       }
     } finally {
       setMlmLoading(false);
     }
   }, [memberCode]);
+
+  // 外部から呼び出し可能なラッパー（伝票一覧を再取得してからorderNumber照合）
+  const fetchMlmPurchases = useCallback(async () => {
+    // fetchOrdersで最新ordersを取得してからmsMarker照合
+    const latestOrders = await fetchOrders();
+    await fetchMlmPurchasesWithOrders(latestOrders);
+  }, [fetchOrders, fetchMlmPurchasesWithOrders]);
 
   // MLM購入履歴削除
   async function handleDeleteMlmPurchase(id: string, month: string, productName: string) {
@@ -353,10 +389,14 @@ export default function PurchasePanel({
   }, []);
 
   useEffect(() => {
-    fetchOrders();
-    fetchProducts();
-    fetchMlmPurchases();
-  }, [fetchOrders, fetchProducts, fetchMlmPurchases]);
+    // 伝票一覧を先に取得してから購入履歴のorderNumber照合を行う
+    const init = async () => {
+      const [fetchedOrders] = await Promise.all([fetchOrders(), fetchProducts()]);
+      await fetchMlmPurchasesWithOrders(fetchedOrders);
+    };
+    init();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memberCode]);
 
   // 商品選択時に価格・ポイントを自動反映
   function onProductSelect(idx: number, productId: string, setter: React.Dispatch<React.SetStateAction<SlipItem[]>>) {
@@ -421,7 +461,9 @@ export default function PurchasePanel({
       setShowForm(false);
       setSlipItems([{ productId: "", productCode: "", productName: "", unitPrice: 0, quantity: 1, points: 0, taxRate: 10 }]);
       setForm(makeEmptyForm(memberCode, memberName || "", memberPostal || "", memberAddress || "", memberPhone || ""));
-      await fetchOrders();
+      // 伝票作成後、伝票一覧を再取得してからorderNumber照合付きで購入履歴を更新
+      const newOrders = await fetchOrders();
+      await fetchMlmPurchasesWithOrders(newOrders);
     } finally {
       setSubmitting(false);
     }
@@ -502,8 +544,9 @@ export default function PurchasePanel({
       alert("伝票を更新しました");
       setEditOrder(null);
       setEditForm(null);
-      // 伝票更新後、伝票一覧と商品購入履歴の両方を再取得して同期
-      await Promise.all([fetchOrders(), fetchMlmPurchases()]);
+      // 伝票更新後、伝票一覧を再取得してからorderNumber照合付きで購入履歴を更新
+      const updatedOrders = await fetchOrders();
+      await fetchMlmPurchasesWithOrders(updatedOrders);
     } finally {
       setEditSubmitting(false);
     }
@@ -518,7 +561,9 @@ export default function PurchasePanel({
       if (!res.ok) { const d = await res.json(); alert(d.error || "削除に失敗しました"); return; }
       alert("伝票を削除しました");
       setEditOrder(null);
-      await fetchOrders();
+      // 伝票削除後、伝票一覧を再取得してからorderNumber照合付きで購入履歴を更新
+      const remainOrders = await fetchOrders();
+      await fetchMlmPurchasesWithOrders(remainOrders);
     } finally {
       setDeletingId(null);
     }
@@ -972,10 +1017,11 @@ export default function PurchasePanel({
           <p className="text-gray-500 text-sm">商品購入履歴なし</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse min-w-[600px]">
+            <table className="w-full text-xs border-collapse min-w-[700px]">
               <thead className="bg-slate-100 text-slate-600">
                 <tr>
                   <th className="px-3 py-2 text-left font-semibold">購入月</th>
+                  <th className="px-3 py-2 text-left font-semibold">注文番号</th>
                   <th className="px-3 py-2 text-left font-semibold">商品コード</th>
                   <th className="px-3 py-2 text-left font-semibold">商品名</th>
                   <th className="px-3 py-2 text-center font-semibold">数量</th>
@@ -988,6 +1034,15 @@ export default function PurchasePanel({
                 {mlmPurchases.map((p) => (
                   <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
                     <td className="px-3 py-2 font-semibold text-slate-700">{p.purchaseMonth}</td>
+                    <td className="px-3 py-2">
+                      {p.orderNumber ? (
+                        <span className="font-mono text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                          {p.orderNumber}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400">—</span>
+                      )}
+                    </td>
                     <td className="px-3 py-2">
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                         p.productCode === "1000"
@@ -1015,7 +1070,7 @@ export default function PurchasePanel({
               </tbody>
               <tfoot className="bg-slate-50 border-t-2 border-slate-200">
                 <tr>
-                  <td colSpan={3} className="px-3 py-2 text-xs font-bold text-slate-600">合計</td>
+                  <td colSpan={4} className="px-3 py-2 text-xs font-bold text-slate-600">合計</td>
                   <td className="px-3 py-2 text-center text-xs font-bold text-slate-700">
                     {mlmPurchases.reduce((s, p) => s + p.quantity, 0)}
                   </td>

@@ -37,9 +37,14 @@ export async function GET(request: NextRequest) {
         include: { user: { select: { name: true } } }
       }
     },
-    orderBy: { purchasedAt: "desc" },
-    take: 100,
+    orderBy: [{ purchaseMonth: "desc" }, { purchasedAt: "asc" }],
+    take: 200,
   })
+
+  // purchasedAt のミリ秒部分が同じ = 同一伝票（msMarker = orderId % 1000）
+  // 同一会員・同一月でmsが同じグループごとに orderNumber の代わりとして
+  // 「購入日時（ミリ秒を除く）＋連番」で伝票を識別して表示する
+  // ※ msMarker が 0 のものはバッチ登録データの可能性あり（orderNumberなし扱い）
 
   return NextResponse.json({
     purchases: purchases.map(p => ({
@@ -54,6 +59,8 @@ export async function GET(request: NextRequest) {
       totalPoints: p.totalPoints,
       purchaseMonth: p.purchaseMonth,
       purchasedAt: p.purchasedAt.toISOString(),
+      // msMarker: purchasedAt の ms 部分（伝票IDの下3桁）。0はバッチ登録データ
+      msMarker: p.purchasedAt.getMilliseconds(),
     }))
   })
 }
