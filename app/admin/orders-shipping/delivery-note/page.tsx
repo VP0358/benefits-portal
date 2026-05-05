@@ -79,18 +79,21 @@ function DeliveryNoteContent() {
       let subtotal10 = 0
       const SHIPPING_FEE = 880
 
-      const itemRows = o.items.map(item => {
-        const is8 = item.productName.startsWith("※")
-        if (is8) subtotal8 += item.lineAmount
-        else subtotal10 += item.lineAmount
-        return `
-          <tr>
-            <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;font-size:13px;line-height:1.5;">${item.productName}</td>
-            <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:13px;white-space:nowrap;">¥${item.unitPrice.toLocaleString()}</td>
-            <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;text-align:center;font-size:13px;">${item.quantity}</td>
-            <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:13px;font-weight:600;white-space:nowrap;">¥${item.lineAmount.toLocaleString()}</td>
-          </tr>`
-      }).join("")
+      // 「出荷事務手数料」はコードで別途追加するため、itemRowsから除外して重複を防ぐ
+      const itemRows = o.items
+        .filter(item => item.productName !== "出荷事務手数料")
+        .map(item => {
+          const is8 = item.productName.startsWith("※")
+          if (is8) subtotal8 += item.lineAmount
+          else subtotal10 += item.lineAmount
+          return `
+            <tr>
+              <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;font-size:13px;line-height:1.5;">${item.productName}</td>
+              <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:13px;white-space:nowrap;">¥${item.unitPrice.toLocaleString()}</td>
+              <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;text-align:center;font-size:13px;">${item.quantity}</td>
+              <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:13px;font-weight:600;white-space:nowrap;">¥${item.lineAmount.toLocaleString()}</td>
+            </tr>`
+        }).join("")
 
       subtotal10 += SHIPPING_FEE
       const shippingFeeRow = `
