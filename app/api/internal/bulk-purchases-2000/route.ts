@@ -1067,17 +1067,24 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
   const token = searchParams.get("token")
   const mode = searchParams.get("mode") || "check"
+  // バッチ処理: offset(開始インデックス), limit(処理件数, デフォルト100)
+  const offset = parseInt(searchParams.get("offset") || "0", 10)
+  const limit  = parseInt(searchParams.get("limit")  || "100", 10)
 
   if (token !== TOKEN) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
+
+  const batch = PURCHASE_DATA.slice(offset, offset + limit)
+  const hasMore = offset + limit < PURCHASE_DATA.length
+  const nextOffset = offset + limit
 
   // ---- CHECK モード ----
   if (mode === "check") {
     const results = []
     let noMember = 0, alreadyExists = 0, ready = 0
 
-    for (const d of PURCHASE_DATA) {
+    for (const d of batch) {
       const mlm = await prisma.mlmMember.findUnique({
         where: { memberCode: d.memberCode },
         include: {
@@ -1100,7 +1107,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       mode: "check",
-      summary: { total: PURCHASE_DATA.length, ready, alreadyExists, noMember },
+      pagination: { total: PURCHASE_DATA.length, offset, limit, batchSize: batch.length, hasMore, nextOffset },
+      summary: { ready, alreadyExists, noMember },
       results,
     })
   }
@@ -1109,9 +1117,9 @@ export async function GET(request: NextRequest) {
   if (mode === "create") {
     const created = []
     const skipped = []
-    const errors = []
+    const errors  = []
 
-    for (const d of PURCHASE_DATA) {
+    for (const d of batch) {
       try {
         const mlm = await prisma.mlmMember.findUnique({
           where: { memberCode: d.memberCode },
@@ -1159,7 +1167,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       mode: "create",
-      summary: { total: PURCHASE_DATA.length, created: created.length, skipped: skipped.length, errors: errors.length },
+      pagination: { total: PURCHASE_DATA.length, offset, limit, batchSize: batch.length, hasMore, nextOffset },
+      summary: { created: created.length, skipped: skipped.length, errors: errors.length },
       created, skipped, errors,
     })
   }
