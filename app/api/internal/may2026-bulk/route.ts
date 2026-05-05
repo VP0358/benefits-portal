@@ -169,7 +169,7 @@ export async function GET(request: NextRequest) {
         mlmMember: {
           include: {
             user: {
-              select: { id: true, memberCode: true, name: true, phone: true, address: true },
+              select: { id: true, memberCode: true, name: true, phone: true, address: true, postalCode: true },
             },
           },
         },
@@ -231,9 +231,11 @@ export async function GET(request: NextRequest) {
             },
             shippingLabel: {
               create: {
-                recipientName:    user.name    ?? "",
-                recipientPhone:   user.phone   ?? "",
-                recipientAddress: user.address ?? "",
+                orderNumber:      orderNum,
+                recipientName:    user.name       ?? "",
+                recipientPhone:   user.phone      ?? "",
+                recipientPostal:  user.postalCode ?? "",
+                recipientAddress: user.address    ?? "",
                 status:           "shipped",
               },
             },
