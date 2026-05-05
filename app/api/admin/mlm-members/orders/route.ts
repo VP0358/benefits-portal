@@ -106,11 +106,11 @@ export async function GET(request: NextRequest) {
         productId: item.productId?.toString() ?? "",
         productName: item.productName,
         // OrderItemに保存済みのproductCode/pointsを優先、なければmlmProductから補完
-        productCode: (item as any).productCode || item.mlmProduct?.productCode || "",
+        productCode: item.productCode || item.mlmProduct?.productCode || "",
         unitPrice: item.unitPrice,
         quantity: item.quantity,
         lineAmount: item.lineAmount,
-        points: (item as any).points ?? item.mlmProduct?.pv ?? 0,
+        points: item.points ?? item.mlmProduct?.pv ?? 0,
       })),
       shippingLabel: o.shippingLabel
         ? {

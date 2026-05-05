@@ -299,6 +299,7 @@ model Order {
   items         OrderItem[]
   pointUsages   PointUsage[]
   shippingLabel ShippingLabel?
+  mlmPurchases  MlmPurchase[]
 
   @@index([userId])
   @@index([slipType])
@@ -786,6 +787,7 @@ model MlmPurchase {
   createdAt       DateTime       @default(now())
 
   mlmMember       MlmMember      @relation(fields: [mlmMemberId], references: [id], onDelete: Cascade)
+  order           Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([mlmMemberId])
   @@index([orderId])

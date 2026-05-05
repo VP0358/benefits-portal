@@ -49,8 +49,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     purchases: purchases.map(p => ({
       id: p.id.toString(),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      orderId: (p as any).orderId ? (p as any).orderId.toString() : null,
+      orderId: p.orderId ? p.orderId.toString() : null,
       memberCode: p.mlmMember.memberCode,
       memberName: p.mlmMember.user.name,
       productCode: p.productCode,
