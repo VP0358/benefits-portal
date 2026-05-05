@@ -63,8 +63,6 @@ export async function GET(request: NextRequest) {
               phone: true,
               postalCode: true,
               address: true,
-              prefecture: true,
-              city: true,
             }
           }
         }
@@ -235,8 +233,7 @@ export async function GET(request: NextRequest) {
         }
 
         // ShippingLabel作成
-        const recipientAddress = [user.prefecture || "", user.city || ""]
-          .filter(Boolean).join(" ") || user.address || ""
+        const recipientAddress = user.address || ""
 
         await prisma.shippingLabel.create({
           data: {

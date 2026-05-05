@@ -38,8 +38,6 @@ export async function GET(request: NextRequest) {
                 phone: true,
                 postalCode: true,
                 address: true,
-                prefecture: true,
-                city: true,
               }
             }
           }
