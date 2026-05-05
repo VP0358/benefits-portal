@@ -312,18 +312,17 @@ export async function POST(request: NextRequest) {
           const code = item.productCode || "";
           const codeNum = parseInt(code.replace(/[^0-9]/g, ""));
           if (codeNum >= 1000 && codeNum <= 2999) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (prisma.mlmPurchase as any).create({
+            await prisma.mlmPurchase.create({
               data: {
                 mlmMemberId: mlmMember.id,
-                orderNumber,                          // 伝票番号を紐づけ（DBマイグレーション後に有効）
                 productCode: code,
                 productName: item.productName || "",
                 quantity: item.quantity || 1,
                 unitPrice: item.unitPrice || 0,
                 points: item.points || 0,
                 totalPoints: (item.points || 0) * (item.quantity || 1),
-                purchaseStatus: purchaseStatus,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                purchaseStatus: purchaseStatus as any,
                 purchaseMonth: (orderedAt || new Date().toISOString()).slice(0, 7),
                 purchasedAt: orderedAt ? new Date(orderedAt) : new Date(),
               },
@@ -526,23 +525,37 @@ export async function PUT(request: NextRequest) {
         ? (orderedAt as string).slice(0, 7)
         : (originalOrderedAt?.toISOString() ?? new Date().toISOString()).slice(0, 7);
 
-      // ── この伝票（orderNumber）に紐づくMlmPurchaseのみ削除
-      //    → orderNumberカラムがDBにある場合はorderNumber一致のみ削除
-      //    → まだカラムがない場合は安全のため削除をスキップ（既存データ保護）
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (prisma.mlmPurchase as any).deleteMany({
-          where: {
-            mlmMemberId: syncMlmMemberId,
-            orderNumber: syncOrderNumber,
-          },
-        });
-      } catch (delErr) {
-        // order_numberカラム未作成の場合はスキップ（既存データは保護される）
-        console.warn("MlmPurchase deleteMany skipped (column may not exist yet):", delErr);
+      // ── この伝票に紐づくMlmPurchaseを purchaseMonth で特定して削除
+      //    orderNumberカラムはDB未追加のため mlmMemberId + purchaseMonth で絞り込む
+      //    ただし同月の他伝票・バッチデータを消さないよう
+      //    「今回の伝票の商品コード」に一致するものだけを削除する
+      const newTargetCodes: string[] = [];
+      if (items && Array.isArray(items)) {
+        for (const item of items) {
+          if (!item.points || item.points <= 0) continue;
+          const code = item.productCode || "";
+          const codeNum = parseInt(code.replace(/[^0-9]/g, ""));
+          if (codeNum >= 1000 && codeNum <= 2999) newTargetCodes.push(code);
+        }
       }
 
-      // ── 新しい商品情報で再作成（orderNumberを必ず付与）
+      // 元の注文月（変更前）も考慮して削除対象を特定
+      const originalPurchaseMonth = (originalOrderedAt?.toISOString() ?? new Date().toISOString()).slice(0, 7);
+      const monthsToClean = Array.from(new Set([newPurchaseMonth, originalPurchaseMonth]));
+
+      if (newTargetCodes.length > 0) {
+        for (const month of monthsToClean) {
+          await prisma.mlmPurchase.deleteMany({
+            where: {
+              mlmMemberId: syncMlmMemberId,
+              purchaseMonth: month,
+              productCode: { in: newTargetCodes },
+            },
+          });
+        }
+      }
+
+      // ── 新しい商品情報で再作成
       const purchaseStatus = SLIP_TO_PURCHASE_STATUS[slipType || ""] || "one_time";
       if (items && Array.isArray(items)) {
         for (const item of items) {
@@ -550,18 +563,17 @@ export async function PUT(request: NextRequest) {
           const code = item.productCode || "";
           const codeNum = parseInt(code.replace(/[^0-9]/g, ""));
           if (codeNum >= 1000 && codeNum <= 2999) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (prisma.mlmPurchase as any).create({
+            await prisma.mlmPurchase.create({
               data: {
                 mlmMemberId: syncMlmMemberId,
-                orderNumber: syncOrderNumber,           // 伝票番号を必ず付与
                 productCode: code,
                 productName: item.productName || "",
                 quantity: item.quantity || 1,
                 unitPrice: item.unitPrice || 0,
                 points: item.points || 0,
                 totalPoints: (item.points || 0) * (item.quantity || 1),
-                purchaseStatus: purchaseStatus,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                purchaseStatus: purchaseStatus as any,
                 purchaseMonth: newPurchaseMonth,
                 purchasedAt: orderedAt ? new Date(orderedAt) : (originalOrderedAt ?? new Date()),
               },
