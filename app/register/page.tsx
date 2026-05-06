@@ -134,9 +134,9 @@ function RegisterForm() {
     if (!refCode) return;
     setRefLoading(true);
     fetch(`/api/register?ref=${encodeURIComponent(refCode)}`)
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : null)
       .then(d => {
-        const ref = d?.id ? d : (d.referrer ?? null);
+        const ref = d?.id ? d : (d?.referrer ?? null);
         setReferrer(ref);
         if (ref) {
           setForm(f => ({
@@ -145,6 +145,7 @@ function RegisterForm() {
             referrerName: ref.name ?? "",
           }));
         }
+        // ref が null でも refCode がある限り POST 時に紐づけを試みる
         setRefLoading(false);
       })
       .catch(() => setRefLoading(false));
@@ -336,8 +337,8 @@ function RegisterForm() {
           </div>
         )}
         {!refLoading && refCode && !referrer && (
-          <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-700">
-            ⚠️ 紹介コードが無効です。一般登録として進みます。
+          <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-700">
+            🎁 紹介URLから登録します。登録後に紹介者として自動で紐づけされます。
           </div>
         )}
 

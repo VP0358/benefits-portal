@@ -8,16 +8,28 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { sendMlmWelcomeEmail } from "@/lib/mailer";
 
-/** GET: 紹介コードから紹介者情報を取得（MLM会員のreferralCode） */
+/** GET: 紹介コードから紹介者情報を取得
+ *  検索順: ① referralCode（ランダム文字列） → ② memberCode（会員ID）
+ */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const ref = searchParams.get("ref");
   if (!ref) return NextResponse.json({ error: "ref is required" }, { status: 400 });
 
-  const referrer = await prisma.user.findUnique({
+  // ① referralCode で検索
+  let referrer = await prisma.user.findUnique({
     where: { referralCode: ref },
     select: { id: true, name: true, memberCode: true },
   });
+
+  // ② 見つからなければ memberCode で検索
+  if (!referrer) {
+    referrer = await prisma.user.findUnique({
+      where: { memberCode: ref },
+      select: { id: true, name: true, memberCode: true },
+    });
+  }
+
   if (!referrer) return NextResponse.json({ error: "紹介コードが無効です" }, { status: 404 });
   return NextResponse.json(referrer);
 }
@@ -70,14 +82,21 @@ export async function POST(request: Request) {
   const memberCode = `${baseCode}-01`;
   const newReferralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
 
-  // 紹介者を検索（通常の referralCode で検索）
+  // 紹介者を検索
+  // ① referralCode（ランダム文字列）→ ② memberCode（会員ID）の順で検索
   let referrerId: bigint | null = null;
   let mlmReferrerId: bigint | null = null;
   if (referralCode) {
-    const referrer = await prisma.user.findUnique({
+    let referrer = await prisma.user.findUnique({
       where: { referralCode },
       select: { id: true, mlmMember: { select: { id: true } } },
     });
+    if (!referrer) {
+      referrer = await prisma.user.findUnique({
+        where: { memberCode: referralCode },
+        select: { id: true, mlmMember: { select: { id: true } } },
+      });
+    }
     if (referrer) {
       referrerId = referrer.id;
       mlmReferrerId = referrer.mlmMember?.id ?? null;

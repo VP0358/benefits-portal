@@ -13,10 +13,21 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const ref = searchParams.get("ref");
   if (!ref) return NextResponse.json({ error: "ref is required" }, { status: 400 });
-  const referrer = await prisma.user.findUnique({
+
+  // ① referralCode（ランダム文字列）で検索
+  let referrer = await prisma.user.findUnique({
     where: { referralCode: ref },
     select: { id: true, name: true, memberCode: true },
   });
+
+  // ② 見つからなければ memberCode（会員ID）で検索
+  if (!referrer) {
+    referrer = await prisma.user.findUnique({
+      where: { memberCode: ref },
+      select: { id: true, name: true, memberCode: true },
+    });
+  }
+
   if (!referrer) return NextResponse.json({ error: "紹介コードが無効です" }, { status: 404 });
   return NextResponse.json(referrer);
 }
