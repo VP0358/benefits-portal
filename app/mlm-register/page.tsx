@@ -378,6 +378,44 @@ function MlmRegisterForm() {
             </div>
           </div>
 
+          {/* ━━━ 紹介者情報 ━━━ */}
+          {refCode && (
+            <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
+              <h2 className="text-base font-bold text-slate-800 border-b pb-2">🤝 紹介者情報</h2>
+              {refLoading ? (
+                <p className="text-sm text-slate-500">紹介者情報を確認中...</p>
+              ) : referrer ? (
+                <div className="rounded-2xl bg-green-50 border border-green-200 p-4 space-y-2">
+                  <p className="text-sm font-semibold text-green-800">✅ 紹介者が確認されました</p>
+                  <div className="grid grid-cols-2 gap-3 mt-2">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">紹介者名</label>
+                      <div className="rounded-xl border border-green-200 bg-green-100 px-4 py-3 text-sm font-semibold text-green-900">
+                        {referrer.name}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">会員番号</label>
+                      <div className="rounded-xl border border-green-200 bg-green-100 px-4 py-3 text-sm font-semibold text-green-900">
+                        {referrer.memberCode}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-green-700 mt-1">
+                    登録後、上記の方があなたの直紹介者として自動で紐づけされます。
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-2xl bg-green-50 border border-green-200 p-4">
+                  <p className="text-sm font-semibold text-green-800">🤝 紹介URLから登録します</p>
+                  <p className="text-xs text-green-700 mt-1">
+                    登録後、紹介者として自動で紐づけされます。
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ━━━ 概要書面番号 ━━━ */}
           <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
             <h2 className="text-base font-bold text-slate-800 border-b pb-2">📄 概要書面</h2>
