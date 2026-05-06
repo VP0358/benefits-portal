@@ -111,7 +111,8 @@ function RegisterForm() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
-  const [countdown, setCountdown] = useState(3);
+  const [issuedMemberCode, setIssuedMemberCode] = useState("");
+  const [countdown, setCountdown] = useState(5);
 
   // ─── 新規登録金額（固定表示）───
   const REG_FEE        = 3000;   // 登録料
@@ -242,13 +243,15 @@ function RegisterForm() {
       return;
     }
 
+    const resData = await res.json().catch(() => null);
+    setIssuedMemberCode(resData?.memberCode ?? "");
     setDone(true);
   }
 
   /* ── 登録完了後の自動リダイレクト ── */
   useEffect(() => {
     if (!done) return;
-    setCountdown(3);
+    setCountdown(5);
     const tick = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
@@ -271,8 +274,20 @@ function RegisterForm() {
           <h1 className="text-2xl font-bold text-slate-800">登録完了！</h1>
           <p className="text-slate-600 text-sm">
             ご登録ありがとうございます。<br />
-            登録いただいたメールアドレスとパスワードでログインできます。
+            以下の <span className="font-semibold text-slate-800">会員ID</span> とパスワードでログインしてください。
           </p>
+
+          {/* 発行された会員ID */}
+          {issuedMemberCode && (
+            <div className="rounded-2xl bg-slate-900 px-6 py-4 text-center">
+              <p className="text-xs text-slate-400 mb-1 tracking-widest">あなたの会員ID</p>
+              <p className="text-2xl font-bold text-yellow-400 tracking-widest font-mono">
+                {issuedMemberCode}
+              </p>
+              <p className="text-xs text-slate-400 mt-2">※ログイン時に使用します。メモしておいてください。</p>
+            </div>
+          )}
+
           {referrer && (
             <div className="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-700">
               <span className="font-semibold">{referrer.name}</span> さんの紹介で登録されました。
@@ -465,26 +480,70 @@ function RegisterForm() {
 
             {/* 紹介者ID・紹介者名 */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="紹介者ID" required hint="紹介者の会員IDを入力">
-                <input
-                  required
-                  placeholder="例: M12345678"
-                  className={inputCls}
-                  value={form.referrerId}
-                  onChange={e => setForm({ ...form, referrerId: e.target.value })}
-                />
+              <Field
+                label="紹介者ID"
+                required={!refCode}
+                hint={refCode ? undefined : "紹介者の会員IDを入力"}
+              >
+                {refCode && referrer ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      readOnly
+                      className={`${inputCls} bg-emerald-50 text-emerald-700 cursor-default`}
+                      value={form.referrerId}
+                    />
+                    <span className="text-emerald-500 flex-shrink-0" title="紹介URLから自動設定済み">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </span>
+                  </div>
+                ) : (
+                  <input
+                    required={!refCode}
+                    placeholder="例: A00001"
+                    className={inputCls}
+                    value={form.referrerId}
+                    onChange={e => setForm({ ...form, referrerId: e.target.value })}
+                  />
+                )}
               </Field>
 
-              <Field label="紹介者名" required>
-                <input
-                  required
-                  placeholder="例: 田中 花子"
-                  className={inputCls}
-                  value={form.referrerName}
-                  onChange={e => setForm({ ...form, referrerName: e.target.value })}
-                />
+              <Field label="紹介者名" required={!refCode}>
+                {refCode && referrer ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      readOnly
+                      className={`${inputCls} bg-emerald-50 text-emerald-700 cursor-default`}
+                      value={form.referrerName}
+                    />
+                    <span className="text-emerald-500 flex-shrink-0">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </span>
+                  </div>
+                ) : (
+                  <input
+                    required={!refCode}
+                    placeholder="例: 田中 花子"
+                    className={inputCls}
+                    value={form.referrerName}
+                    onChange={e => setForm({ ...form, referrerName: e.target.value })}
+                  />
+                )}
               </Field>
             </div>
+
+            {/* 紹介URLから来た場合の説明 */}
+            {refCode && referrer && (
+              <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-xs text-emerald-700 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                紹介URLから開いたため、<strong>{referrer.name}</strong> さんが紹介者として自動設定されています。登録後に直紹介者として紐づけられます。
+              </div>
+            )}
 
             {/* 概要書面番号 */}
             <Field

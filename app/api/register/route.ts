@@ -32,7 +32,8 @@ export async function POST(request: Request) {
     mobile,
     postalCode,
     address,
-    referralCode,
+    referralCode,      // URLの ?ref= パラメータ（紹介者の referralCode）
+    referrerId,        // フォーム手動入力の紹介者会員コード（例: A00001）
     disclosureDocNumber,
     // 任意
     companyName,
@@ -102,14 +103,24 @@ export async function POST(request: Request) {
 
   const newReferralCode = Math.random().toString(36).substring(2, 10).toUpperCase();
 
-  // 紹介者を検索（URLパラメータの紹介コード経由）
-  let referrerId: bigint | null = null;
+  // 紹介者を検索
+  // 優先順位: ① URLの referralCode（?ref=XXX）→ ② フォーム入力の referrerId（会員コード）
+  let referrerUserId: bigint | null = null;
   if (referralCode) {
-    const referrer = await prisma.user.findUnique({
+    // ① URLパラメータの紹介コードで検索
+    const referrerByCode = await prisma.user.findUnique({
       where: { referralCode },
       select: { id: true },
     });
-    if (referrer) referrerId = referrer.id;
+    if (referrerByCode) referrerUserId = referrerByCode.id;
+  }
+  if (!referrerUserId && referrerId) {
+    // ② 会員コードで直接検索（フォーム手動入力 または URLで見つからなかった場合）
+    const referrerByMemberCode = await prisma.user.findUnique({
+      where: { memberCode: String(referrerId).trim() },
+      select: { id: true },
+    });
+    if (referrerByMemberCode) referrerUserId = referrerByMemberCode.id;
   }
 
   // 生年月日の変換（YYYY-MM-DD → DateTime UTC 00:00）
@@ -141,10 +152,10 @@ export async function POST(request: Request) {
     });
 
     // 紹介者がいれば UserReferral を作成
-    if (referrerId) {
+    if (referrerUserId) {
       await tx.userReferral.create({
         data: {
-          referrerUserId: referrerId,
+          referrerUserId: referrerUserId,
           userId: newUser.id,
           isActive: true,
           validFrom: new Date(),
@@ -173,7 +184,7 @@ export async function POST(request: Request) {
         deliveryName: deliveryName ?? null,
         agreedToTerms: true,
         agreedAt: new Date(),
-        registeredViaMLM: Boolean(referralCode),
+        registeredViaMLM: Boolean(referrerUserId),
       },
     });
 
