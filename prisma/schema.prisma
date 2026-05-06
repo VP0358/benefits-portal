@@ -79,6 +79,7 @@ model User {
   vpPhoneApplications VpPhoneApplication[]
   mlmMember       MlmMember?
   mlmRegistration MlmRegistration?
+  welfareUsages   WelfareUsage[]
 }
 
 model Admin {
@@ -135,6 +136,7 @@ model Menu {
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  welfareUsages WelfareUsage[]
 }
 
 model ContactInquiry {
@@ -1137,3 +1139,22 @@ model BonusSettings {
   @@map("bonus_settings")
 }
 
+// ── 福利厚生利用記録 ────────────────────────────────────────────
+model WelfareUsage {
+  id         BigInt   @id @default(autoincrement())
+  menuId     BigInt
+  userId     BigInt
+  usedAt     DateTime @default(now())
+  note       String?  @db.VarChar(500)   // 備考（プラン名・申込内容など）
+  adminNote  String?  @db.VarChar(500)   // 管理者メモ
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  menu       Menu     @relation(fields: [menuId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@index([menuId])
+  @@index([userId])
+  @@index([usedAt])
+  @@map("welfare_usages")
+}

@@ -48,6 +48,8 @@ const menuGroups = [
       // 格安旅行
       { href: "/admin/travel-subscriptions",       label: "旅行サブスク一覧", icon: "fas fa-plane" },
       { href: "/admin/travel-subscriptions/stats", label: "旅行サブスク統計", icon: "fas fa-chart-bar" },
+      // 福利厚生 利用状況
+      { href: "/admin/welfare-usage", label: "福利厚生 利用状況", icon: "fas fa-clipboard-list" },
       // 福利厚生メニュー管理
       { href: "/admin/menus",     label: "福利厚生メニュー管理", icon: "fas fa-list" },
       { href: "/admin/menus/new", label: "新規メニュー追加",     icon: "fas fa-plus-circle" },
