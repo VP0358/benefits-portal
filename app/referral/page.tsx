@@ -35,11 +35,10 @@ export default function ReferralPage() {
   const [referralCode, setReferralCode] = useState("");
   const [loading,      setLoading]      = useState(true);
   const [copied,       setCopied]       = useState(false);
-  const [copiedMlm,    setCopiedMlm]    = useState(false);
+  const [shareMode,    setShareMode]    = useState<"line" | "email" | null>(null);
 
-  const baseUrl       = typeof window !== "undefined" ? window.location.origin : "";
-  const referralUrl   = referralCode ? `${baseUrl}/register?ref=${referralCode}` : "";
-  const mlmReferralUrl= referralCode ? `${baseUrl}/mlm-register?ref=${referralCode}` : "";
+  const baseUrl      = typeof window !== "undefined" ? window.location.origin : "";
+  const referralUrl  = referralCode ? `${baseUrl}/mlm-register?ref=${referralCode}` : "";
 
   useEffect(() => {
     fetch("/api/member/referral")
@@ -48,7 +47,7 @@ export default function ReferralPage() {
       .catch(() => setLoading(false));
   }, []);
 
-  async function copyToClipboard(text: string, setter: (v: boolean) => void) {
+  async function copyToClipboard(text: string) {
     try {
       await navigator.clipboard.writeText(text);
     } catch {
@@ -59,9 +58,12 @@ export default function ReferralPage() {
       document.execCommand("copy");
       document.body.removeChild(el);
     }
-    setter(true);
-    setTimeout(() => setter(false), 2000);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
+
+  const lineHref  = `https://line.me/R/msg/text/?${encodeURIComponent(`VP会員紹介URLをお送りします。\n以下のURLから登録してください。\n\n${referralUrl}`)}`;
+  const emailHref = `mailto:?subject=${encodeURIComponent("VP会員紹介URL")}&body=${encodeURIComponent(`VP会員紹介URLをお送りします。\n以下のURLから登録してください。\n\n${referralUrl}`)}`;
 
   return (
     <div className="min-h-screen pb-10" style={{ background: PAGE_BG }}>
@@ -96,18 +98,25 @@ export default function ReferralPage() {
 
       <main className="max-w-lg mx-auto px-4 py-5 space-y-4 relative">
 
-        {/* ── 一般会員紹介カード ── */}
+        {/* ── VP会員紹介URLカード ── */}
         <NavyCard>
-          {/* ゴールドライン */}
           <div className="h-px" style={{ background: `linear-gradient(90deg,transparent,${GOLD}90 30%,${GOLD_LIGHT} 50%,${GOLD}90 70%,transparent)` }}/>
-          <div className="px-5 pt-5 pb-5">
-            <div className="flex items-center gap-3 mb-4">
+          <div className="px-5 pt-5 pb-5 space-y-4">
+
+            {/* タイトル */}
+            <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-                style={{ background: `${GOLD}18`, border: `1px solid ${GOLD}30` }}>🎁</div>
+                style={{ background: `${GOLD}18`, border: `1px solid ${GOLD}30` }}>🤝</div>
               <div>
-                <p className="font-jp font-semibold text-white text-sm">紹介して一緒に使おう！</p>
-                <p className="text-xs mt-0.5" style={{ color: `${GOLD}70` }}>友達が登録すると紹介者として自動で紐づけられます</p>
+                <p className="font-jp font-semibold text-white text-sm">VP会員紹介URL</p>
+                <p className="text-xs mt-0.5" style={{ color: `${GOLD}80` }}>登録者はあなたの直紹介として自動で紐づけられます</p>
               </div>
+            </div>
+
+            {/* 注意書き */}
+            <div className="rounded-2xl px-4 py-3 text-xs font-jp leading-relaxed"
+              style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.22)", color: "rgba(251,191,36,0.85)" }}>
+              ⚠️ MLM（連鎖販売取引）の勧誘は特定商取引法の規制を受けます。概要書面を必ず事前に交付し、クーリング・オフ制度の説明を含む適切な説明を行った上でご案内ください。
             </div>
 
             {loading ? (
@@ -116,8 +125,9 @@ export default function ReferralPage() {
                 <span className="text-sm font-jp" style={{ color: `${GOLD}60` }}>読み込み中...</span>
               </div>
             ) : (
-              <div className="space-y-3">
-                {/* 紹介コード */}
+              <div className="space-y-4">
+
+                {/* 紹介コード表示 */}
                 <div className="rounded-2xl px-4 py-3 text-center"
                   style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${GOLD}20` }}>
                   <p className="text-[9px] font-label tracking-[0.20em] mb-1" style={{ color: `${GOLD}55` }}>YOUR REFERRAL CODE</p>
@@ -126,7 +136,7 @@ export default function ReferralPage() {
                   </p>
                 </div>
 
-                {/* 紹介URL */}
+                {/* URL表示＋コピー */}
                 <div>
                   <p className="text-xs font-semibold font-jp mb-1.5" style={{ color: `${GOLD}70` }}>紹介URL</p>
                   <div className="flex gap-2">
@@ -134,7 +144,7 @@ export default function ReferralPage() {
                       onClick={e => (e.target as HTMLInputElement).select()}
                       className="flex-1 rounded-xl px-3 py-2.5 text-xs focus:outline-none"
                       style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${GOLD}18`, color: "rgba(255,255,255,0.55)" }}/>
-                    <button onClick={() => copyToClipboard(referralUrl, setCopied)}
+                    <button onClick={() => copyToClipboard(referralUrl)}
                       className="rounded-xl px-4 py-2.5 text-xs font-semibold font-jp transition whitespace-nowrap"
                       style={copied
                         ? { background: "rgba(52,211,153,0.20)", border: "1px solid rgba(52,211,153,0.35)", color: "#34d399" }
@@ -144,83 +154,62 @@ export default function ReferralPage() {
                   </div>
                 </div>
 
-                {/* シェアボタン */}
-                <div className="grid grid-cols-2 gap-2.5">
-                  <a href={`https://line.me/R/msg/text/?${encodeURIComponent(`福利厚生ポータルに招待します！\n${referralUrl}`)}`}
-                    target="_blank" rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold text-white transition"
-                    style={{ background: "#06C755" }}>
-                    <span>💬</span> LINEで送る
-                  </a>
-                  <a href={`mailto:?subject=${encodeURIComponent("福利厚生ポータルへの招待")}&body=${encodeURIComponent(`福利厚生ポータルに招待します！\n以下のURLから登録してください。\n\n${referralUrl}`)}`}
-                    className="flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold text-white transition"
-                    style={{ background: "rgba(255,255,255,0.12)", border: `1px solid ${GOLD}20` }}>
-                    <span>✉️</span> メールで送る
-                  </a>
-                </div>
-              </div>
-            )}
-          </div>
-        </NavyCard>
-
-        {/* ── MLMビジネス会員紹介カード ── */}
-        <NavyCard>
-          <div className="h-px" style={{ background: "linear-gradient(90deg,transparent,rgba(52,211,153,0.8) 30%,#34d399 50%,rgba(52,211,153,0.8) 70%,transparent)" }}/>
-          <div className="px-5 pt-5 pb-5">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-                style={{ background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.25)" }}>🤝</div>
-              <div>
-                <p className="font-jp font-semibold text-white text-sm">MLMビジネス会員 紹介URL</p>
-                <p className="text-xs mt-0.5" style={{ color: "rgba(52,211,153,0.70)" }}>登録者はあなたの直紹介として自動で配置されます</p>
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="flex items-center justify-center py-6 gap-2">
-                <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(52,211,153,0.25)", borderTopColor: "#34d399" }}/>
-                <span className="text-sm font-jp" style={{ color: "rgba(52,211,153,0.55)" }}>読み込み中...</span>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {/* MLM紹介URL */}
+                {/* 送信方法選択 */}
                 <div>
-                  <p className="text-xs font-semibold font-jp mb-1.5" style={{ color: "rgba(52,211,153,0.75)" }}>MLMビジネス会員登録URL</p>
-                  <div className="flex gap-2">
-                    <input readOnly value={mlmReferralUrl}
-                      onClick={e => (e.target as HTMLInputElement).select()}
-                      className="flex-1 rounded-xl px-3 py-2.5 text-xs focus:outline-none"
-                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(52,211,153,0.18)", color: "rgba(255,255,255,0.55)" }}/>
-                    <button onClick={() => copyToClipboard(mlmReferralUrl, setCopiedMlm)}
-                      className="rounded-xl px-4 py-2.5 text-xs font-semibold font-jp transition whitespace-nowrap"
-                      style={copiedMlm
-                        ? { background: "rgba(52,211,153,0.20)", border: "1px solid rgba(52,211,153,0.35)", color: "#34d399" }
-                        : { background: "linear-gradient(135deg,#10b981,#34d399)", color: "white" }}>
-                      {copiedMlm ? "✓ コピー済" : "コピー"}
+                  <p className="text-xs font-semibold font-jp mb-2" style={{ color: `${GOLD}70` }}>送信方法を選択</p>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      onClick={() => setShareMode(shareMode === "line" ? null : "line")}
+                      className="flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold text-white transition"
+                      style={shareMode === "line"
+                        ? { background: "#059244", border: "2px solid #34d399" }
+                        : { background: "#06C755" }}>
+                      <span>💬</span> LINEで送る
+                    </button>
+                    <button
+                      onClick={() => setShareMode(shareMode === "email" ? null : "email")}
+                      className="flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold text-white transition"
+                      style={shareMode === "email"
+                        ? { background: `rgba(255,255,255,0.22)`, border: `2px solid ${GOLD}` }
+                        : { background: "rgba(255,255,255,0.12)", border: `1px solid ${GOLD}20` }}>
+                      <span>✉️</span> メールで送る
                     </button>
                   </div>
                 </div>
 
-                {/* MLMシェアボタン */}
-                <div className="grid grid-cols-2 gap-2.5">
-                  <a href={`https://line.me/R/msg/text/?${encodeURIComponent(`CLAIRホールディングスMLMビジネス会員に招待します！\n${mlmReferralUrl}`)}`}
-                    target="_blank" rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold text-white transition"
-                    style={{ background: "#06C755" }}>
-                    <span>💬</span> LINEで送る
-                  </a>
-                  <a href={`mailto:?subject=${encodeURIComponent("CLAIRホールディングス MLMビジネス会員へのご招待")}&body=${encodeURIComponent(`CLAIRホールディングスのMLMビジネス会員にご招待します。\n以下のURLから登録してください。\n\n${mlmReferralUrl}`)}`}
-                    className="flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold text-white transition"
-                    style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(52,211,153,0.20)" }}>
-                    <span>✉️</span> メールで送る
-                  </a>
-                </div>
+                {/* LINE送信エリア */}
+                {shareMode === "line" && (
+                  <div className="rounded-2xl p-4 space-y-3"
+                    style={{ background: "rgba(6,199,85,0.08)", border: "1px solid rgba(6,199,85,0.25)" }}>
+                    <p className="text-xs font-jp text-white/70">以下のボタンをタップするとLINEが開きます</p>
+                    <a href={lineHref}
+                      target="_blank" rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 w-full rounded-xl py-3 text-sm font-bold text-white"
+                      style={{ background: "#06C755" }}>
+                      💬 LINEアプリで開く
+                    </a>
+                    <p className="text-[10px] text-white/40 leading-relaxed">
+                      ※ LINEアプリがインストールされている必要があります
+                    </p>
+                  </div>
+                )}
 
-                {/* 注意書き */}
-                <div className="rounded-2xl px-4 py-3 text-xs font-jp"
-                  style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.20)", color: "rgba(251,191,36,0.80)" }}>
-                  ⚠️ MLM（連鎖販売取引）の勧誘は特定商取引法の規制を受けます。概要書面を必ず事前に交付し、適切な説明を行ってください。
-                </div>
+                {/* メール送信エリア */}
+                {shareMode === "email" && (
+                  <div className="rounded-2xl p-4 space-y-3"
+                    style={{ background: `rgba(201,168,76,0.07)`, border: `1px solid ${GOLD}25` }}>
+                    <p className="text-xs font-jp text-white/70">以下のボタンをタップするとメールアプリが開きます</p>
+                    <a href={emailHref}
+                      className="flex items-center justify-center gap-2 w-full rounded-xl py-3 text-sm font-bold text-white"
+                      style={{ background: `linear-gradient(135deg,${GOLD},${ORANGE})` }}>
+                      ✉️ メールアプリで開く
+                    </a>
+                    <p className="text-[10px] text-white/40 leading-relaxed">
+                      ※ 端末のメールアプリが起動します
+                    </p>
+                  </div>
+                )}
+
               </div>
             )}
           </div>
@@ -238,10 +227,10 @@ export default function ReferralPage() {
           </div>
           <div className="px-5 py-4 space-y-3">
             {[
-              { step: "1", label: "紹介URLをコピーまたは共有" },
-              { step: "2", label: "友達・知人がURLから会員登録" },
-              { step: "3", label: "登録完了後、紹介者として自動で紐づけ" },
-              { step: "4", label: "紹介した方の月額料金に応じてポイントを獲得" },
+              { step: "1", label: "紹介URLをコピーまたはLINE・メールで共有" },
+              { step: "2", label: "相手がURLから会員登録を完了" },
+              { step: "3", label: "登録完了後、あなたの直紹介者として自動で紐づけ" },
+              { step: "4", label: "紹介した方の活動に応じてボーナスを獲得" },
             ].map(item => (
               <div key={item.step} className="flex items-center gap-3">
                 <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
