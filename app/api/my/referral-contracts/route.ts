@@ -16,12 +16,12 @@ const REWARD_RATE = 0.25;
  */
 export async function GET() {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
   const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
+    where: { id: BigInt(session.user.id) },
     select: { id: true },
   });
   if (!user) return NextResponse.json({ error: "user not found" }, { status: 404 });

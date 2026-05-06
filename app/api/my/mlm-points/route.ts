@@ -19,13 +19,13 @@ export const revalidate = 0
 export async function GET() {
   try {
     const session = await auth()
-    if (!session?.user?.email) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: '認証が必要です' }, { status: 401 })
     }
 
     // ユーザー情報取得
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { id: BigInt(session.user.id) },
       include: {
         mlmMember: true
       }

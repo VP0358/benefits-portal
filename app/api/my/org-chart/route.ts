@@ -16,7 +16,7 @@ import { startOfMonthJST, endOfMonthJST, nowJST } from "@/lib/japan-time";
  */
 export async function GET() {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -26,7 +26,7 @@ export async function GET() {
 
   // 自分の情報を取得
   const me = await prisma.user.findUnique({
-    where: { email: session.user.email },
+    where: { id: BigInt(session.user.id) },
     select: {
       id: true,
       name: true,

@@ -13,13 +13,13 @@ function parseId(id: string) {
 
 export async function POST(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
-  if (!session?.user?.email) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!session?.user?.id) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const { id } = await params;
   const orderId = parseId(id);
   if (!orderId) return NextResponse.json({ error: "invalid order id" }, { status: 400 });
 
-  const user = await prisma.user.findUnique({ where: { email: session.user.email }, include: { pointWallet: true } });
+  const user = await prisma.user.findUnique({ where: { id: BigInt(session.user.id) }, include: { pointWallet: true } });
   if (!user?.pointWallet) return NextResponse.json({ error: "user or wallet not found" }, { status: 404 });
 
   const order = await prisma.order.findFirst({ where: { id: orderId, userId: user.id } });

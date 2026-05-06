@@ -21,12 +21,12 @@ async function generateReferralCode(): Promise<string> {
 /** GET: 自分の紹介コードを取得（なければ自動生成） */
 export async function GET() {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
   const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
+    where: { id: BigInt(session.user.id) },
     select: { id: true, name: true, referralCode: true },
   });
 

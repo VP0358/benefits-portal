@@ -11,12 +11,12 @@ import { compare, hash } from "bcryptjs";
 // GET /api/my/profile - 現在のプロフィール取得
 export async function GET() {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
   const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
+    where: { id: BigInt(session.user.id) },
     select: {
       id: true, memberCode: true, name: true, nameKana: true,
       email: true, phone: true, postalCode: true, address: true,
@@ -42,7 +42,7 @@ export async function GET() {
 // PATCH /api/my/profile - プロフィール更新
 export async function PATCH(req: NextRequest) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -51,7 +51,7 @@ export async function PATCH(req: NextRequest) {
           currentPassword, newPassword } = body;
 
   const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
+    where: { id: BigInt(session.user.id) },
   });
   if (!user) return NextResponse.json({ error: "not found" }, { status: 404 });
 

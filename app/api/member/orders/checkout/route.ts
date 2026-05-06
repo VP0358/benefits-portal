@@ -29,13 +29,13 @@ function createOrderNumber() {
 
 export async function POST(req: NextRequest) {
   const session = await auth();
-  if (!session?.user?.email) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!session?.user?.id) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const json = await req.json();
   const parsed = schema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const user = await prisma.user.findUnique({ where: { email: session.user.email }, include: { pointWallet: true } });
+  const user = await prisma.user.findUnique({ where: { id: BigInt(session.user.id) }, include: { pointWallet: true } });
   if (!user?.pointWallet) return NextResponse.json({ error: "point wallet not found" }, { status: 404 });
 
   const wallet = user.pointWallet;

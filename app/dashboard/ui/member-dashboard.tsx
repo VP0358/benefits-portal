@@ -1000,6 +1000,12 @@ export default function MemberDashboard({
               if(m.menuType==="used_car") return (
                 <a key={m.id} href="/used-cars" className="rounded-2xl overflow-hidden transition-all hover:scale-[1.03] active:scale-95" style={cardStyle}>{cardContent}</a>
               );
+              if(m.menuType==="life_insurance") return (
+                <a key={m.id} href="/insurance?tab=life" className="rounded-2xl overflow-hidden transition-all hover:scale-[1.03] active:scale-95" style={cardStyle}>{cardContent}</a>
+              );
+              if(m.menuType==="non_life_insurance") return (
+                <a key={m.id} href="/insurance?tab=non_life" className="rounded-2xl overflow-hidden transition-all hover:scale-[1.03] active:scale-95" style={cardStyle}>{cardContent}</a>
+              );
               if(isVpPhone) return (
                 <a key={m.id} href="/vp-phone" className="rounded-2xl overflow-hidden transition-all hover:scale-[1.03] active:scale-95" style={cardStyle}>{cardContent}</a>
               );
