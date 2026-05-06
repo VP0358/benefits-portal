@@ -17,7 +17,11 @@ const AUTO_SUB       = PRODUCT_FEE + SHIPPING_FEE;             // 15,800
 const AUTO_TAX       = Math.floor(AUTO_SUB * 0.1);             // 1,580
 const AUTO_TOTAL     = AUTO_SUB + AUTO_TAX;                     // 17,380
 
-const TRANSFER_INFO  = "三菱UFJ銀行 盛岡支店 普通 1234567 CLAIRホールディングス（株）";
+const TRANSFER_BANK    = "GMOあおぞらネット銀行";
+const TRANSFER_BRANCH  = "法人第二営業部";
+const TRANSFER_TYPE    = "普通";
+const TRANSFER_NUMBER  = "1953440";
+const TRANSFER_HOLDER  = "CLAIRホールディングス株式会社";
 
 // 共通inputクラス
 const INPUT = "w-full rounded-xl border px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300";
@@ -546,10 +550,23 @@ function MlmRegisterForm() {
             </div>
 
             {payMethod === "transfer" && (
-              <div className="rounded-2xl bg-slate-50 border p-4 space-y-2 text-sm">
+              <div className="rounded-2xl bg-slate-50 border p-4 space-y-3 text-sm">
                 <p className="font-semibold text-slate-700">振込先情報</p>
-                <p className="text-slate-600 leading-relaxed">{TRANSFER_INFO}</p>
-                <p className="text-xs text-slate-400">※ 登録後7営業日以内にお振込みください。</p>
+                <div className="space-y-2">
+                  {[
+                    { label: "銀行名",   value: TRANSFER_BANK   },
+                    { label: "支店名",   value: TRANSFER_BRANCH },
+                    { label: "口座種別", value: TRANSFER_TYPE   },
+                    { label: "口座番号", value: TRANSFER_NUMBER },
+                    { label: "口座名義", value: TRANSFER_HOLDER },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="flex items-center gap-3">
+                      <span className="w-20 flex-shrink-0 text-xs text-slate-400">{label}</span>
+                      <span className="font-medium text-slate-800">{value}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-400 border-t pt-2">※ 登録後7営業日以内にお振込みください。</p>
               </div>
             )}
 
