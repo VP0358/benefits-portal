@@ -976,6 +976,7 @@ export interface InsuranceApplicationData {
   name:         string
   phone:        string
   email:        string
+  agency:       string                 // 紹介代理店
   schedule1:    string
   schedule2:    string
   schedule3:    string
@@ -991,7 +992,7 @@ export async function sendInsuranceApplicationEmail({
   isAdmin: boolean
   data: InsuranceApplicationData
 }) {
-  const { memberId, name, phone, email, schedule1, schedule2, schedule3, insuranceType, products, note } = data
+  const { memberId, name, phone, email, agency, schedule1, schedule2, schedule3, insuranceType, products, note } = data
   const isLife = insuranceType === "life"
   const typeName = isLife ? "生命保険" : "損害保険"
   const icon     = isLife ? "🛡️" : "🚗"
@@ -1016,6 +1017,7 @@ ${typeName}相談申込フォームに新しいお申し込みが届きました
 お名前       : ${name}
 電話番号     : ${phone}
 メール       : ${email}
+紹介代理店   : ${agency}
 ────────────────────────────────────
 ご相談希望日程
 ────────────────────────────────────
@@ -1054,6 +1056,7 @@ ${rows.map(([k, v]) => `${String(k).padEnd(16, "　")} : ${v}`).join("\n")}
               <tr><td style="padding:8px 14px;font-size:13px;font-weight:600;color:#374151;background:#f9fafb;border:1px solid #e5e7eb;">お名前</td><td style="padding:8px 14px;font-size:14px;font-weight:700;color:#0a1628;border:1px solid #e5e7eb;">${name} 様</td></tr>
               <tr><td style="padding:8px 14px;font-size:13px;font-weight:600;color:#374151;background:#f9fafb;border:1px solid #e5e7eb;">電話番号</td><td style="padding:8px 14px;font-size:13px;color:#1f2937;border:1px solid #e5e7eb;">${phone}</td></tr>
               <tr><td style="padding:8px 14px;font-size:13px;font-weight:600;color:#374151;background:#f9fafb;border:1px solid #e5e7eb;">メールアドレス</td><td style="padding:8px 14px;font-size:13px;color:#1f2937;border:1px solid #e5e7eb;">${email}</td></tr>
+              <tr><td style="padding:8px 14px;font-size:13px;font-weight:600;color:#374151;background:#f9fafb;border:1px solid #e5e7eb;">紹介代理店</td><td style="padding:8px 14px;font-size:13px;color:#1f2937;border:1px solid #e5e7eb;">${agency}</td></tr>
             </table>
             <div style="font-size:11px;font-weight:700;color:#c9a84c;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">ご相談希望日程</div>
             <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;">

@@ -22,6 +22,7 @@ interface LifeForm {
   name: string;
   phone: string;
   email: string;
+  agency: string;
   schedule1: string;
   schedule2: string;
   schedule3: string;
@@ -33,6 +34,7 @@ interface NonLifeForm {
   name: string;
   phone: string;
   email: string;
+  agency: string;
   schedule1: string;
   schedule2: string;
   schedule3: string;
@@ -41,12 +43,12 @@ interface NonLifeForm {
 }
 
 const emptyLife = (): LifeForm => ({
-  memberId: "", name: "", phone: "", email: "",
+  memberId: "", name: "", phone: "", email: "", agency: "",
   schedule1: "", schedule2: "", schedule3: "", note: "",
 });
 
 const emptyNonLife = (): NonLifeForm => ({
-  memberId: "", name: "", phone: "", email: "",
+  memberId: "", name: "", phone: "", email: "", agency: "",
   schedule1: "", schedule2: "", schedule3: "", products: [], note: "",
 });
 
@@ -84,8 +86,8 @@ export default function InsurancePage() {
         if (d?.name) {
           setUserInfo(d);
           const base = { memberId: d.memberCode ?? "", name: d.name ?? "", phone: d.phone ?? "", email: d.email ?? "" };
-          setLifeForm(p => ({ ...p, ...base }));
-          setNonLifeForm(p => ({ ...p, ...base }));
+          setLifeForm(p => ({ ...p, ...base, agency: p.agency }));
+          setNonLifeForm(p => ({ ...p, ...base, agency: p.agency }));
         }
       }).catch(() => {});
 
@@ -224,7 +226,7 @@ export default function InsurancePage() {
               footerNote={lifeFooterNote}
               onReset={() => {
                 setLifeSubmitted(false);
-                setLifeForm(p => ({ ...p, schedule1: "", schedule2: "", schedule3: "", note: "" }));
+                setLifeForm(p => ({ ...p, agency: "", schedule1: "", schedule2: "", schedule3: "", note: "" }));
               }}
             />
           ) : (
@@ -252,6 +254,8 @@ export default function InsurancePage() {
                     onChangeName={v => setLifeForm(p => ({ ...p, name: v }))}
                     onChangePhone={v => setLifeForm(p => ({ ...p, phone: v }))}
                     onChangeEmail={v => setLifeForm(p => ({ ...p, email: v }))}
+                    agency={lifeForm.agency}
+                    onChangeAgency={v => setLifeForm(p => ({ ...p, agency: v }))}
                     fieldStyle={fieldStyle}
                     labelStyle={labelStyle}
                     userInfo={userInfo}
@@ -288,7 +292,7 @@ export default function InsurancePage() {
               footerNote={nonLifeFooterNote}
               onReset={() => {
                 setNonLifeSubmitted(false);
-                setNonLifeForm(p => ({ ...p, schedule1: "", schedule2: "", schedule3: "", products: [], note: "" }));
+                setNonLifeForm(p => ({ ...p, agency: "", schedule1: "", schedule2: "", schedule3: "", products: [], note: "" }));
               }}
             />
           ) : (
@@ -315,6 +319,8 @@ export default function InsurancePage() {
                   onChangeName={v => setNonLifeForm(p => ({ ...p, name: v }))}
                   onChangePhone={v => setNonLifeForm(p => ({ ...p, phone: v }))}
                   onChangeEmail={v => setNonLifeForm(p => ({ ...p, email: v }))}
+                  agency={nonLifeForm.agency}
+                  onChangeAgency={v => setNonLifeForm(p => ({ ...p, agency: v }))}
                   fieldStyle={fieldStyle}
                   labelStyle={labelStyle}
                   userInfo={userInfo}
@@ -491,12 +497,13 @@ function InsuranceFormCard({ headline, description, badges, footerNote, error, l
 }
 
 // ── 基本情報フィールド ────────────────────────────────
-function BasicFields({ memberId, name, phone, email, onChangeMemberId, onChangeName, onChangePhone, onChangeEmail, fieldStyle, labelStyle, userInfo }: {
-  memberId: string; name: string; phone: string; email: string;
+function BasicFields({ memberId, name, phone, email, agency, onChangeMemberId, onChangeName, onChangePhone, onChangeEmail, onChangeAgency, fieldStyle, labelStyle, userInfo }: {
+  memberId: string; name: string; phone: string; email: string; agency: string;
   onChangeMemberId: (v: string) => void;
   onChangeName: (v: string) => void;
   onChangePhone: (v: string) => void;
   onChangeEmail: (v: string) => void;
+  onChangeAgency: (v: string) => void;
   fieldStyle: React.CSSProperties;
   labelStyle: React.CSSProperties;
   userInfo: UserInfo | null;
@@ -522,9 +529,13 @@ function BasicFields({ memberId, name, phone, email, onChangeMemberId, onChangeN
         <label style={labelStyle}>電話番号 <span style={{ color: "#f87171" }}>*</span></label>
         <input style={fieldStyle} required type="tel" value={phone} onChange={e => onChangePhone(e.target.value)} placeholder="090-0000-0000" />
       </div>
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 14 }}>
         <label style={labelStyle}>メールアドレス <span style={{ color: "#f87171" }}>*</span></label>
         <input style={fieldStyle} required type="email" value={email} onChange={e => onChangeEmail(e.target.value)} placeholder="example@email.com" />
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <label style={labelStyle}>紹介代理店 <span style={{ color: "#f87171" }}>*</span></label>
+        <input style={fieldStyle} required value={agency} onChange={e => onChangeAgency(e.target.value)} placeholder="例: ○○代理店" />
       </div>
     </>
   );
