@@ -967,3 +967,186 @@ TEL：019-681-3667　FAX：050-3385-7788
   })
   return { success: true, id: result.data?.id }
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 保険相談申込メール（生命保険 / 損害保険 共通）
+// ──────────────────────────────────────────────────────────────────────────────
+export interface InsuranceApplicationData {
+  memberId:     string
+  name:         string
+  phone:        string
+  email:        string
+  schedule1:    string
+  schedule2:    string
+  schedule3:    string
+  insuranceType: "life" | "non_life"   // life=生命保険, non_life=損害保険
+  products?:    string[]               // 損害保険のみ：希望商品
+  note?:        string
+}
+
+export async function sendInsuranceApplicationEmail({
+  to, isAdmin, data,
+}: {
+  to: string
+  isAdmin: boolean
+  data: InsuranceApplicationData
+}) {
+  const { memberId, name, phone, email, schedule1, schedule2, schedule3, insuranceType, products, note } = data
+  const isLife = insuranceType === "life"
+  const typeName = isLife ? "生命保険" : "損害保険"
+  const icon     = isLife ? "🛡️" : "🚗"
+
+  const rows = [
+    ["第1希望日時", schedule1],
+    ["第2希望日時", schedule2],
+    ["第3希望日時", schedule3],
+    ...(!isLife && products && products.length > 0 ? [["希望損保商品", products.join("、")]] : []),
+    ["備考", note || "なし"],
+  ]
+
+  if (isAdmin) {
+    const subject = `【${typeName}相談申込】${name} 様からのお申し込みが届きました`
+    const textBody = `
+${typeName}相談申込フォームに新しいお申し込みが届きました。
+
+────────────────────────────────────
+お申込者情報
+────────────────────────────────────
+会員ID       : ${memberId || "未入力"}
+お名前       : ${name}
+電話番号     : ${phone}
+メール       : ${email}
+────────────────────────────────────
+ご相談希望日程
+────────────────────────────────────
+${rows.map(([k, v]) => `${String(k).padEnd(16, "　")} : ${v}`).join("\n")}
+────────────────────────────────────
+
+このメールはVIOLA Pure福利厚生ポータルより自動送信されています。
+`.trim()
+
+    const htmlRows = rows.map(([k, v]) => `
+      <tr>
+        <td style="padding:8px 14px;font-size:13px;font-weight:600;color:#374151;background:#f9fafb;border:1px solid #e5e7eb;white-space:nowrap;width:160px;">${k}</td>
+        <td style="padding:8px 14px;font-size:13px;color:#1f2937;border:1px solid #e5e7eb;">${v || "―"}</td>
+      </tr>`).join("")
+
+    const htmlBody = `<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+        <tr>
+          <td style="background:linear-gradient(135deg,#0a1628 0%,#122444 100%);padding:28px 36px;text-align:center;">
+            <div style="font-size:28px;margin-bottom:8px;">${icon}</div>
+            <div style="color:#c9a84c;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:4px;">NEW APPLICATION</div>
+            <div style="color:#ffffff;font-size:20px;font-weight:700;">${typeName}相談申込</div>
+            <div style="color:rgba(255,255,255,0.55);font-size:12px;margin-top:4px;">新しいお申し込みが届きました</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px 36px 20px;">
+            <div style="font-size:11px;font-weight:700;color:#c9a84c;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">お申込者情報</div>
+            <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+              <tr><td style="padding:8px 14px;font-size:13px;font-weight:600;color:#374151;background:#f9fafb;border:1px solid #e5e7eb;white-space:nowrap;width:160px;">会員ID</td><td style="padding:8px 14px;font-size:13px;color:#1f2937;border:1px solid #e5e7eb;">${memberId || "未入力"}</td></tr>
+              <tr><td style="padding:8px 14px;font-size:13px;font-weight:600;color:#374151;background:#f9fafb;border:1px solid #e5e7eb;">お名前</td><td style="padding:8px 14px;font-size:14px;font-weight:700;color:#0a1628;border:1px solid #e5e7eb;">${name} 様</td></tr>
+              <tr><td style="padding:8px 14px;font-size:13px;font-weight:600;color:#374151;background:#f9fafb;border:1px solid #e5e7eb;">電話番号</td><td style="padding:8px 14px;font-size:13px;color:#1f2937;border:1px solid #e5e7eb;">${phone}</td></tr>
+              <tr><td style="padding:8px 14px;font-size:13px;font-weight:600;color:#374151;background:#f9fafb;border:1px solid #e5e7eb;">メールアドレス</td><td style="padding:8px 14px;font-size:13px;color:#1f2937;border:1px solid #e5e7eb;">${email}</td></tr>
+            </table>
+            <div style="font-size:11px;font-weight:700;color:#c9a84c;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">ご相談希望日程</div>
+            <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;">
+              ${htmlRows}
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f8fafc;padding:16px 36px;border-top:1px solid #e2e8f0;text-align:center;">
+            <p style="margin:0;font-size:11px;color:#94a3b8;">このメールはVIOLA Pure福利厚生ポータルより自動送信されています。</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim()
+
+    const resend = getResend()
+    const result = await resend.emails.send({
+      from: `CLAIRホールディングス株式会社 <${FROM_ADDRESS}>`,
+      to,
+      subject,
+      text: textBody,
+      html: htmlBody,
+    })
+    return { success: true, id: result.data?.id }
+  } else {
+    // お客様確認メール
+    const subject = `【${typeName}相談申込】お申し込みを受け付けました`
+    const textBody = `
+${name} 様
+
+${typeName}のご相談をお申し込みいただきありがとうございます。
+以下の内容でお申し込みを受け付けました。
+
+────────────────────────────────────
+ご相談希望日程
+────────────────────────────────────
+${rows.map(([k, v]) => `${String(k).padEnd(16, "　")} : ${v}`).join("\n")}
+────────────────────────────────────
+
+※初回ご相談はオンラインでのご相談となります。
+日程調整後、担当者よりご連絡いたします。
+
+VIOLA Pure福利厚生ポータル
+`.trim()
+
+    const htmlBody = `<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+        <tr>
+          <td style="background:linear-gradient(135deg,#0a1628 0%,#122444 100%);padding:28px 36px;text-align:center;">
+            <div style="font-size:28px;margin-bottom:8px;">${icon}</div>
+            <div style="color:#ffffff;font-size:20px;font-weight:700;">${typeName}相談申込</div>
+            <div style="color:rgba(255,255,255,0.7);font-size:13px;margin-top:8px;">お申し込みを受け付けました</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 36px;">
+            <p style="margin:0 0 16px;font-size:15px;color:#1f2937;">${name} 様</p>
+            <p style="margin:0 0 24px;font-size:14px;color:#374151;line-height:1.7;">${typeName}のご相談をお申し込みいただきありがとうございます。<br/>以下の内容でお申し込みを受け付けました。</p>
+            <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+              ${rows.map(([k, v]) => `<tr><td style="padding:8px 14px;font-size:13px;font-weight:600;color:#374151;background:#f9fafb;border:1px solid #e5e7eb;white-space:nowrap;width:160px;">${k}</td><td style="padding:8px 14px;font-size:13px;color:#1f2937;border:1px solid #e5e7eb;">${v || "―"}</td></tr>`).join("")}
+            </table>
+            <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:12px;padding:14px 18px;font-size:13px;color:#92400e;">
+              ※初回ご相談はオンラインでのご相談となります。<br/>日程調整後、担当者よりご連絡いたします。
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f8fafc;padding:16px 36px;border-top:1px solid #e2e8f0;text-align:center;">
+            <p style="margin:0;font-size:11px;color:#94a3b8;">このメールはVIOLA Pure福利厚生ポータルより自動送信されています。<br/>心当たりのない場合はこのメールを破棄してください。</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim()
+
+    const resend = getResend()
+    const result = await resend.emails.send({
+      from: `CLAIRホールディングス株式会社 <${FROM_ADDRESS}>`,
+      to,
+      subject,
+      text: textBody,
+      html: htmlBody,
+    })
+    return { success: true, id: result.data?.id }
+  }
+}

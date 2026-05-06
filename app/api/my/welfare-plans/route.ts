@@ -16,19 +16,19 @@ export async function GET() {
   }
 
   const rows = await prisma.siteSetting.findMany({
-    where: { settingKey: { in: ["vpPhonePlans", "usedCarSettings"] } },
+    where: { settingKey: { in: ["vpPhonePlans", "usedCarSettings", "lifeInsuranceSettings", "nonLifeInsuranceSettings"] } },
   });
   const map = Object.fromEntries(rows.map(r => [r.settingKey, r.settingValue]));
 
   let vpPhonePlans = null;
   let usedCarSettings = null;
+  let lifeInsuranceSettings = null;
+  let nonLifeInsuranceSettings = null;
 
-  if (map.vpPhonePlans) {
-    try { vpPhonePlans = JSON.parse(map.vpPhonePlans); } catch { /* ignore */ }
-  }
-  if (map.usedCarSettings) {
-    try { usedCarSettings = JSON.parse(map.usedCarSettings); } catch { /* ignore */ }
-  }
+  if (map.vpPhonePlans)             { try { vpPhonePlans             = JSON.parse(map.vpPhonePlans);             } catch { /* ignore */ } }
+  if (map.usedCarSettings)          { try { usedCarSettings          = JSON.parse(map.usedCarSettings);          } catch { /* ignore */ } }
+  if (map.lifeInsuranceSettings)    { try { lifeInsuranceSettings    = JSON.parse(map.lifeInsuranceSettings);    } catch { /* ignore */ } }
+  if (map.nonLifeInsuranceSettings) { try { nonLifeInsuranceSettings = JSON.parse(map.nonLifeInsuranceSettings); } catch { /* ignore */ } }
 
-  return NextResponse.json({ vpPhonePlans, usedCarSettings });
+  return NextResponse.json({ vpPhonePlans, usedCarSettings, lifeInsuranceSettings, nonLifeInsuranceSettings });
 }

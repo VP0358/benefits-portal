@@ -54,8 +54,9 @@ const menuGroups = [
       { href: "/admin/menus",     label: "福利厚生メニュー管理", icon: "fas fa-list" },
       { href: "/admin/menus/new", label: "新規メニュー追加",     icon: "fas fa-plus-circle" },
       // プラン・金額設定
-      { href: "/admin/vp-phone-settings",  label: "VPphoneプラン設定",  icon: "fas fa-sliders-h" },
-      { href: "/admin/used-car-settings",  label: "中古車ページ設定",   icon: "fas fa-car" },
+      { href: "/admin/vp-phone-settings",    label: "VPphoneプラン設定",  icon: "fas fa-sliders-h" },
+      { href: "/admin/used-car-settings",    label: "中古車ページ設定",   icon: "fas fa-car" },
+      { href: "/admin/insurance-settings",   label: "保険ページ設定",     icon: "fas fa-shield-alt" },
     ]
   },
   {

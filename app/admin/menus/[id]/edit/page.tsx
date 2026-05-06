@@ -20,8 +20,10 @@ const menuTypes = [
   { value: "vp_phone",   label: "📱 VPphone",          desc: "VP未来phone申込ページへ遷移（内容を管理で変更可）" },
   { value: "travel_sub", label: "✈️ 格安旅行",          desc: "格安旅行申込モーダルを表示" },
   { value: "used_car",   label: "🚗 中古車販売",        desc: "中古車専用問い合わせページへ遷移（内容を管理で変更可）" },
-  { value: "contact",    label: "📞 相談窓口",          desc: "相談窓口フォームへ遷移" },
-  { value: "skin",       label: "💆 肌診断",            desc: "外部URLリンクで設定（linkUrlにURLを入力）" },
+  { value: "contact",          label: "📞 相談窓口",          desc: "相談窓口フォームへ遷移" },
+  { value: "skin",             label: "💆 肌診断",            desc: "外部URLリンクで設定（linkUrlにURLを入力）" },
+  { value: "life_insurance",   label: "🛡️ 生命保険相談",       desc: "生命保険相談申込ページへ遷移（内容を管理で変更可）" },
+  { value: "non_life_insurance", label: "🚗 損害保険相談",     desc: "損害保険相談申込ページへ遷移（内容を管理で変更可）" },
 ];
 
 type SkinShop = { name: string; area: string; address: string; phone: string; url?: string };
