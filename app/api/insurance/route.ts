@@ -2,6 +2,8 @@ export const dynamic   = 'force-dynamic'
 export const revalidate = 0
 
 import { NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
+import { auth } from "@/auth"
 import { sendInsuranceApplicationEmail } from "@/lib/mailer"
 
 const NOTIFY_TO = "info@c-p.link"
@@ -22,7 +24,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "メールアドレスの形式が正しくありません" }, { status: 400 })
     }
 
-    const data = { memberId: memberId || "", name, phone, email, agency: agency.trim(), schedule1, schedule2, schedule3, insuranceType: insuranceType || "life", products: products || [], note: note || "" }
+    // ログインユーザー取得（任意）
+    let userId: bigint | null = null
+    try {
+      const session = await auth()
+      if (session?.user?.id) userId = BigInt(session.user.id)
+    } catch { /* セッション取得失敗は無視 */ }
+
+    // DB保存
+    await prisma.insuranceApplication.create({
+      data: {
+        memberId:      memberId || null,
+        userId:        userId   || null,
+        name,
+        phone,
+        email,
+        agency:        agency.trim(),
+        insuranceType: insuranceType || "life",
+        products:      products?.length ? JSON.stringify(products) : null,
+        schedule1,
+        schedule2,
+        schedule3,
+        note:          note || null,
+        status:        "pending",
+      },
+    })
+
+    const data = {
+      memberId: memberId || "",
+      name, phone, email, agency: agency.trim(),
+      schedule1, schedule2, schedule3,
+      insuranceType: insuranceType || "life",
+      products: products || [],
+      note: note || "",
+    }
 
     await sendInsuranceApplicationEmail({ to: NOTIFY_TO, isAdmin: true,  data }).catch(e => console.error("[insurance] admin mail error:", e))
     await sendInsuranceApplicationEmail({ to: email,     isAdmin: false, data }).catch(e => console.error("[insurance] customer mail error:", e))

@@ -40,11 +40,13 @@ const menuGroups = [
     borderColor: "rgba(244,114,182,0.28)",
     labelColor: "#f9a8d4",
     items: [
+      // ★ 契約履歴 統合一覧
+      { href: "/admin/welfare-contracts",    label: "契約履歴一覧（統合）", icon: "fas fa-table" },
       // 携帯契約
       { href: "/admin/vp-phone",              label: "VP未来phone申し込み", icon: "fas fa-mobile-alt" },
-      { href: "/admin/vp-phone/stats",        label: "携帯契約統計",       icon: "fas fa-chart-bar" },
-      { href: "/admin/contracts",             label: "携帯契約一覧",       icon: "fas fa-file-contract" },
-      { href: "/admin/referral-rewards",      label: "紹介者報酬計算",     icon: "fas fa-gift" },
+      { href: "/admin/vp-phone/stats",        label: "携帯契約統計",        icon: "fas fa-chart-bar" },
+      { href: "/admin/contracts",             label: "携帯契約一覧",        icon: "fas fa-file-contract" },
+      { href: "/admin/referral-rewards",      label: "紹介者報酬計算",      icon: "fas fa-gift" },
       // 格安旅行
       { href: "/admin/travel-subscriptions",       label: "旅行サブスク一覧", icon: "fas fa-plane" },
       { href: "/admin/travel-subscriptions/stats", label: "旅行サブスク統計", icon: "fas fa-chart-bar" },

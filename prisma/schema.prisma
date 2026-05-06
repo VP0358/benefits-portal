@@ -79,7 +79,10 @@ model User {
   vpPhoneApplications VpPhoneApplication[]
   mlmMember       MlmMember?
   mlmRegistration MlmRegistration?
-  welfareUsages   WelfareUsage[]
+  welfareUsages        WelfareUsage[]
+  usedCarApplications  UsedCarApplication[]  @relation("UsedCarUser")
+  usedCarReferrals     UsedCarApplication[]  @relation("UsedCarReferrer")
+  insuranceApplications InsuranceApplication[] @relation("InsuranceUser")
 }
 
 model Admin {
@@ -1137,6 +1140,70 @@ model BonusSettings {
   createdAt               DateTime @default(now())
 
   @@map("bonus_settings")
+}
+
+// ── 中古車販売申込 ───────────────────────────────────────────────
+model UsedCarApplication {
+  id          BigInt    @id @default(autoincrement())
+  memberId    String?   @db.VarChar(50)    // 会員ID（任意）
+  userId      BigInt?                       // ログインユーザー紐付け（任意）
+  name        String    @db.VarChar(100)
+  phone       String    @db.VarChar(50)
+  email       String    @db.VarChar(255)
+  referrerId  BigInt?                       // 紹介者（個人）
+  carType     String    @db.VarChar(100)
+  grade       String    @db.VarChar(100)
+  year        String    @db.VarChar(50)
+  mileage     String    @db.VarChar(50)
+  colors      String    @db.VarChar(255)
+  budget      String    @db.VarChar(100)
+  payment     String    @db.VarChar(100)
+  drive       String?   @db.VarChar(50)
+  studless    Boolean   @default(false)
+  note        String?   @db.VarChar(1000)
+  status      String    @default("pending") @db.VarChar(30) // pending/contacted/contracted/canceled
+  adminNote   String?   @db.VarChar(500)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        User?     @relation("UsedCarUser",     fields: [userId],     references: [id])
+  referrer    User?     @relation("UsedCarReferrer",  fields: [referrerId], references: [id])
+
+  @@index([userId])
+  @@index([referrerId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("used_car_applications")
+}
+
+// ── 保険申込 ─────────────────────────────────────────────────────
+model InsuranceApplication {
+  id            BigInt    @id @default(autoincrement())
+  memberId      String?   @db.VarChar(50)
+  userId        BigInt?
+  name          String    @db.VarChar(100)
+  phone         String    @db.VarChar(50)
+  email         String    @db.VarChar(255)
+  agency        String    @db.VarChar(100)   // 紹介代理店
+  insuranceType String    @db.VarChar(20)    // life / non_life
+  products      String?   @db.VarChar(500)   // 損害保険：希望商品（JSON配列文字列）
+  schedule1     String    @db.VarChar(200)
+  schedule2     String    @db.VarChar(200)
+  schedule3     String    @db.VarChar(200)
+  note          String?   @db.VarChar(1000)
+  status        String    @default("pending") @db.VarChar(30) // pending/contacted/contracted/canceled
+  adminNote     String?   @db.VarChar(500)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User?     @relation("InsuranceUser", fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([insuranceType])
+  @@index([agency])
+  @@index([status])
+  @@index([createdAt])
+  @@map("insurance_applications")
 }
 
 // ── 福利厚生利用記録 ────────────────────────────────────────────
