@@ -7,7 +7,7 @@ import { loginAction } from "./actions";
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({ memberCode: "", password: "" });
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -15,7 +15,7 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const result = await loginAction(form.email, form.password);
+      const result = await loginAction(form.memberCode, form.password);
 
       if (!result.success) {
         setError(result.error ?? "ログインに失敗しました。");
@@ -89,14 +89,15 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={onSubmit} className="space-y-4">
+            {/* 会員ID */}
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: "#44403c" }}>
-                メールアドレス
+                会員ID
               </label>
               <input
-                type="email"
+                type="text"
                 required
-                autoComplete="email"
+                autoComplete="username"
                 className="w-full rounded-xl px-4 py-3 text-sm transition"
                 style={{
                   border: "1px solid rgba(201,168,76,0.25)",
@@ -104,9 +105,9 @@ export default function LoginPage() {
                   background: "rgba(255,255,255,0.9)",
                   outline: "none",
                 }}
-                placeholder="example@mail.com"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                placeholder="例: A00001"
+                value={form.memberCode}
+                onChange={(e) => setForm({ ...form, memberCode: e.target.value })}
                 onFocus={(e) => {
                   e.target.style.borderColor = "#c9a84c";
                   e.target.style.boxShadow = "0 0 0 3px rgba(201,168,76,0.12)";
@@ -118,6 +119,7 @@ export default function LoginPage() {
               />
             </div>
 
+            {/* パスワード */}
             <div>
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: "#44403c" }}>
                 パスワード

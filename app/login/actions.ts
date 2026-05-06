@@ -4,19 +4,16 @@ import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
 
 /**
- * Next Auth v5 beta の Server Action ログイン
- *
- * signIn("credentials", { redirect: false }) の動作:
- * - 認証成功: Cookieをセットしてリダイレクト先URLを返す（例外なし）
- * - 認証失敗: CredentialsSignin 例外を throw する（raw モード時）
+ * 会員ログイン Server Action
+ * 会員ID（memberCode）＋パスワードで認証
  */
 export async function loginAction(
-  email: string,
+  memberCode: string,
   password: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     await signIn("credentials", {
-      email,
+      loginId: memberCode,
       password,
       redirect: false,
     });
@@ -28,7 +25,7 @@ export async function loginAction(
         case "CredentialsSignin":
           return {
             success: false,
-            error: "メールアドレスまたはパスワードが正しくありません。",
+            error: "会員IDまたはパスワードが正しくありません。",
           };
         default:
           return {

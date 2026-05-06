@@ -29,20 +29,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Credentials({
       name: "credentials",
       credentials: {
-        email:    { label: "メールアドレス", type: "email" },
-        password: { label: "パスワード",     type: "password" },
+        // 会員は memberCode でログイン、管理者は email でログイン
+        // loginId フィールドに両方を受け取る
+        loginId:  { label: "会員ID / メールアドレス", type: "text" },
+        password: { label: "パスワード", type: "password" },
       },
       async authorize(credentials) {
         try {
-          if (!credentials?.email || !credentials?.password) return null;
+          if (!credentials?.loginId || !credentials?.password) return null;
 
-          const email    = credentials.email    as string;
-          const password = credentials.password as string;
+          const loginId  = (credentials.loginId  as string).trim();
+          const password =  credentials.password as string;
 
           const { prisma } = await import("@/lib/prisma");
 
-          // 管理者チェック
-          const admin = await prisma.admin.findUnique({ where: { email } });
+          // ── 管理者チェック（メールアドレスで検索）──────────────
+          const admin = await prisma.admin.findUnique({ where: { email: loginId } });
           if (admin) {
             const ok = await compare(password, admin.passwordHash);
             if (!ok) return null;
@@ -54,13 +56,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             };
           }
 
-          // 会員チェック
-          const user = await prisma.user.findUnique({ where: { email } });
+          // ── 会員チェック（会員IDで検索）──────────────────────
+          const user = await prisma.user.findUnique({ where: { memberCode: loginId } });
           if (user) {
             const ok = await compare(password, user.passwordHash);
             if (!ok) return null;
-            if (user.status !== "active") return null;
 
+            // 退会者（canceled）はログイン不可
+            if (user.status === "canceled") return null;
+
+            // 停止中（suspended）もログイン不可
+            if (user.status === "suspended") return null;
+
+            // invited（未アクティベート）はそのままログイン可
+            // active のみ通常ログイン可
             await prisma.user.update({
               where: { id: user.id },
               data:  { lastLoginAt: new Date() },

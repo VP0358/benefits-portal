@@ -9,7 +9,7 @@ export async function adminLoginAction(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     await signIn("credentials", {
-      email,
+      loginId: email,   // auth.ts の loginId フィールドにメールアドレスを渡す
       password,
       redirect: false,
     });
