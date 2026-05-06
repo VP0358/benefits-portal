@@ -551,6 +551,97 @@ export async function PUT(request: NextRequest) {
   }
 }
 
+// ── PATCH: 伝票一括更新 ──────────────────────────────────────────
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { orderIds, fields } = body as {
+      orderIds: string[];
+      fields: {
+        orderedAt?: string;       // "YYYY-MM-DD" | null（変更しない場合はキー自体なし）
+        slipType?: string;
+        paymentMethod?: string;
+        paymentStatus?: string;   // "paid" | "unpaid"
+        shippingStatus?: string;  // "shipped" | "unshipped"
+        paidAt?: string | null;   // "YYYY-MM-DD" | null
+        shippedAt?: string | null;
+      };
+    };
+
+    if (!orderIds || orderIds.length === 0) {
+      return NextResponse.json({ error: "伝票IDが指定されていません" }, { status: 400 });
+    }
+    if (!fields || Object.keys(fields).length === 0) {
+      return NextResponse.json({ error: "更新するフィールドがありません" }, { status: 400 });
+    }
+
+    // 更新データを構築（undefined のキーはスキップ）
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const orderData: Record<string, any> = {};
+    if (fields.orderedAt !== undefined) {
+      orderData.orderedAt = fields.orderedAt ? new Date(fields.orderedAt) : undefined;
+    }
+    if (fields.slipType !== undefined)      orderData.slipType = fields.slipType;
+    if (fields.paymentMethod !== undefined) orderData.paymentMethod = fields.paymentMethod;
+    if (fields.paymentStatus !== undefined) orderData.paymentStatus = fields.paymentStatus;
+    if (fields.shippingStatus !== undefined) orderData.shippingStatus = fields.shippingStatus;
+    if (fields.paidAt !== undefined) {
+      orderData.paidAt = fields.paidAt ? new Date(fields.paidAt) : null;
+    }
+
+    // 発送日は ShippingLabel も同期
+    let shippedAtDate: Date | null | undefined = undefined;
+    if (fields.shippedAt !== undefined) {
+      shippedAtDate = fields.shippedAt ? new Date(fields.shippedAt) : null;
+      // shippingStatus も連動
+      if (!("shippingStatus" in fields)) {
+        orderData.shippingStatus = fields.shippedAt ? "shipped" : "unshipped";
+      }
+    }
+
+    // 入金日が設定された場合は paymentStatus を自動連動
+    if (fields.paidAt !== undefined && !("paymentStatus" in fields)) {
+      orderData.paymentStatus = fields.paidAt ? "paid" : "unpaid";
+    }
+
+    let updatedCount = 0;
+    const errors: string[] = [];
+
+    for (const orderId of orderIds) {
+      try {
+        const orderIdBig = BigInt(orderId);
+        await prisma.order.update({
+          where: { id: orderIdBig },
+          data: orderData,
+        });
+
+        // ShippingLabel の発送日を同期
+        if (shippedAtDate !== undefined) {
+          const label = await prisma.shippingLabel.findUnique({ where: { orderId: orderIdBig } });
+          if (label) {
+            await prisma.shippingLabel.update({
+              where: { orderId: orderIdBig },
+              data: { shippedAt: shippedAtDate },
+            });
+          }
+        }
+        updatedCount++;
+      } catch (err) {
+        errors.push(`ID:${orderId} - ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      updatedCount,
+      ...(errors.length > 0 ? { errors } : {}),
+    });
+  } catch (error) {
+    console.error("❌ MLM member orders PATCH error:", error);
+    return NextResponse.json({ error: "一括更新に失敗しました" }, { status: 500 });
+  }
+}
+
 // ── DELETE: 伝票削除 ─────────────────────────────────────────────
 export async function DELETE(request: NextRequest) {
   try {

@@ -15,24 +15,22 @@ function SlipDatePicker({
   allowEmpty = false,
   highlightBg = "",
 }: {
-  value: string;           // "YYYY-MM-DD" or ""
+  value: string;
   onChange: (v: string) => void;
   className?: string;
-  allowEmpty?: boolean;    // true のとき「未設定」選択肢を表示
-  highlightBg?: string;    // 強調背景クラス（例: "bg-blue-50"）
+  allowEmpty?: boolean;
+  highlightBg?: string;
 }) {
   const curYear = new Date().getFullYear();
   const jstToday = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).split("/");
   const curMonth = parseInt(jstToday[1]);
   const curDay   = parseInt(jstToday[2]);
 
-  // value から年・月・日を分解
   const parts = value ? value.split("-") : [];
   const selYear  = parts[0] ? parseInt(parts[0]) : (allowEmpty ? 0 : curYear);
   const selMonth = parts[1] ? parseInt(parts[1]) : (allowEmpty ? 0 : curMonth);
   const selDay   = parts[2] ? parseInt(parts[2]) : (allowEmpty ? 0 : curDay);
 
-  // 月ごとの日数（閏年対応）
   const daysInMonth = useMemo(() => {
     if (!selYear || !selMonth) return 31;
     return new Date(selYear, selMonth, 0).getDate();
@@ -45,10 +43,7 @@ function SlipDatePicker({
   const selCls = `border border-gray-300 rounded px-1 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 ${highlightBg}`;
 
   function update(y: number, m: number, d: number) {
-    // allowEmpty かつ年が 0（未設定）の場合は空文字を返す
-    // 年が選択済みなら月・日が 0 でも現在値で補完して確定させる
     if (allowEmpty && y === 0) { onChange(""); return; }
-    // 年が未設定のまま月・日だけ選んだ場合は今年で補完
     const safeY = y || curYear;
     const safeM = m || 1;
     const safeD = Math.min(d || 1, new Date(safeY, safeM, 0).getDate());
@@ -79,11 +74,11 @@ function SlipDatePicker({
   );
 }
 
-// ── MLM購入履歴 型定義 ─────────────────────────────────────
+// ── MLM購入履歴 型定義 ─────────────────────────────────────────────
 type MlmPurchaseRecord = {
   id: string;
-  orderId: string | null;      // 伝票ID（バッチ登録データはnull）
-  orderNumber: string | null;  // 伝票番号（orderId→orderNumberで解決）
+  orderId: string | null;
+  orderNumber: string | null;
   productCode: string;
   productName: string;
   quantity: number;
@@ -143,6 +138,17 @@ type MemberOrder = {
     shippedAt: string | null;
     trackingNumber: string;
   } | null;
+};
+
+// ── 一括編集フィールド型 ────────────────────────────────────────
+type BulkEditFields = {
+  orderedAt: { enabled: boolean; value: string };
+  slipType: { enabled: boolean; value: string };
+  paymentMethod: { enabled: boolean; value: string };
+  paymentStatus: { enabled: boolean; value: string };
+  shippingStatus: { enabled: boolean; value: string };
+  paidAt: { enabled: boolean; value: string };
+  shippedAt: { enabled: boolean; value: string };
 };
 
 // ── 選択肢定数 ────────────────────────────────────────────────
@@ -254,6 +260,19 @@ type SlipItem = {
   taxRate: number;
 };
 
+// 一括編集フィールドの初期値
+function makeEmptyBulkFields(): BulkEditFields {
+  return {
+    orderedAt:     { enabled: false, value: todayJST() },
+    slipType:      { enabled: false, value: "normal" },
+    paymentMethod: { enabled: false, value: "" },
+    paymentStatus: { enabled: false, value: "paid" },
+    shippingStatus:{ enabled: false, value: "shipped" },
+    paidAt:        { enabled: false, value: "" },
+    shippedAt:     { enabled: false, value: "" },
+  };
+}
+
 // ── コンポーネント ────────────────────────────────────────────
 export default function PurchasePanel({
   memberCode,
@@ -271,7 +290,6 @@ export default function PurchasePanel({
   const [orders, setOrders] = useState<MemberOrder[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  // MLM購入履歴
   const [mlmPurchases, setMlmPurchases] = useState<MlmPurchaseRecord[]>([]);
   const [mlmLoading, setMlmLoading] = useState(true);
   const [deletingMlmId, setDeletingMlmId] = useState<string | null>(null);
@@ -286,6 +304,12 @@ export default function PurchasePanel({
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // ── 一括選択・一括編集 ─────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkEdit, setShowBulkEdit] = useState(false);
+  const [bulkFields, setBulkFields] = useState<BulkEditFields>(makeEmptyBulkFields());
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+
   const [form, setForm] = useState(() =>
     makeEmptyForm(memberCode, memberName || "", memberPostal || "", memberAddress || "", memberPhone || "")
   );
@@ -294,7 +318,7 @@ export default function PurchasePanel({
     { productId: "", productCode: "", productName: "", unitPrice: 0, quantity: 1, points: 0, taxRate: 10 },
   ]);
 
-  // 伝票一覧取得（取得したordersを返す）
+  // 伝票一覧取得
   const fetchOrders = useCallback(async (): Promise<MemberOrder[]> => {
     setLoading(true);
     try {
@@ -311,50 +335,37 @@ export default function PurchasePanel({
     }
   }, [memberCode]);
 
-  // MLM購入履歴取得（ordersを引数で受け取りorderId→orderNumber解決）
+  // MLM購入履歴取得
   const fetchMlmPurchasesWithOrders = useCallback(async (currentOrders: MemberOrder[]) => {
     setMlmLoading(true);
     try {
       const res = await fetch(`/api/admin/product-purchases?memberCode=${memberCode}`);
       if (res.ok) {
         const data = await res.json();
-
-        // orderId → orderNumber マップを構築（主キーによる照合）
         const orderIdMap = new Map<string, string>();
-        // purchaseMonth → [orderNumber] マップ（fallback用：orderId=nullのレコード向け）
         const monthOrderMap = new Map<string, string[]>();
         for (const order of currentOrders) {
           orderIdMap.set(order.id, order.orderNumber);
-          const month = order.orderedAt.slice(0, 7); // "YYYY-MM"
+          const month = order.orderedAt.slice(0, 7);
           if (!monthOrderMap.has(month)) monthOrderMap.set(month, []);
           monthOrderMap.get(month)!.push(order.orderNumber);
         }
-
-        // 商品コード1000・2000のみ表示
         const filtered = (data.purchases || [])
-          .filter((p: MlmPurchaseRecord) =>
-            p.productCode === "1000" || p.productCode === "2000"
-          )
+          .filter((p: MlmPurchaseRecord) => p.productCode === "1000" || p.productCode === "2000")
           .map((p: MlmPurchaseRecord) => {
             let resolvedOrderNumber: string | null = null;
             if (p.orderId) {
-              // orderId が存在する場合は正確にマッピング
               resolvedOrderNumber = orderIdMap.get(p.orderId) ?? null;
             } else {
-              // orderId=null（旧データ・バッチ登録）の場合は purchaseMonth で照合
               const monthOrders = monthOrderMap.get(p.purchaseMonth) || [];
               if (monthOrders.length === 1) {
-                // その月に伝票が1件のみなら確実に対応付け可能
                 resolvedOrderNumber = monthOrders[0];
               } else if (monthOrders.length > 1) {
-                // 複数伝票がある月は「複数伝票あり」と表示
                 resolvedOrderNumber = `(${monthOrders.length}件)`;
               }
             }
             return { ...p, orderNumber: resolvedOrderNumber };
           });
-
-        // 購入月の降順 → 同月内は purchasedAt の昇順でソート
         filtered.sort((a: MlmPurchaseRecord, b: MlmPurchaseRecord) => {
           const monthCmp = b.purchaseMonth.localeCompare(a.purchaseMonth);
           if (monthCmp !== 0) return monthCmp;
@@ -367,13 +378,11 @@ export default function PurchasePanel({
     }
   }, [memberCode]);
 
-  // 外部から呼び出し可能なラッパー（伝票一覧を再取得してからorderNumber照合）
   const fetchMlmPurchases = useCallback(async () => {
     const latestOrders = await fetchOrders();
     await fetchMlmPurchasesWithOrders(latestOrders);
   }, [fetchOrders, fetchMlmPurchasesWithOrders]);
 
-  // MLM購入履歴削除
   async function handleDeleteMlmPurchase(id: string, month: string, productName: string) {
     if (!confirm(`購入履歴を削除しますか？\n${productName} / ${month}\nこの操作は取り消せません。`)) return;
     setDeletingMlmId(id);
@@ -386,7 +395,6 @@ export default function PurchasePanel({
     }
   }
 
-  // 商品マスター取得
   const fetchProducts = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/products");
@@ -398,7 +406,6 @@ export default function PurchasePanel({
   }, []);
 
   useEffect(() => {
-    // 伝票一覧を先に取得してから購入履歴のorderNumber照合を行う
     const init = async () => {
       const [fetchedOrders] = await Promise.all([fetchOrders(), fetchProducts()]);
       await fetchMlmPurchasesWithOrders(fetchedOrders);
@@ -407,7 +414,6 @@ export default function PurchasePanel({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memberCode]);
 
-  // 商品選択時に価格・ポイントを自動反映
   function onProductSelect(idx: number, productId: string, setter: React.Dispatch<React.SetStateAction<SlipItem[]>>) {
     const product = products.find((p) => p.id === productId);
     setter((prev) =>
@@ -427,7 +433,6 @@ export default function PurchasePanel({
     );
   }
 
-  // 行追加・削除
   function addRow(setter: React.Dispatch<React.SetStateAction<SlipItem[]>>) {
     setter((prev) => [
       ...prev,
@@ -439,7 +444,6 @@ export default function PurchasePanel({
     setter((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  // 合計計算
   function calcTotals(items: SlipItem[]) {
     const tax8total = items.filter((i) => i.taxRate === 8).reduce((s, i) => s + i.unitPrice * i.quantity, 0);
     const tax10total = items.filter((i) => i.taxRate === 10).reduce((s, i) => s + i.unitPrice * i.quantity, 0);
@@ -452,7 +456,6 @@ export default function PurchasePanel({
     };
   }
 
-  // 伝票作成送信
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const validItems = slipItems.filter((i) => i.productId);
@@ -470,7 +473,6 @@ export default function PurchasePanel({
       setShowForm(false);
       setSlipItems([{ productId: "", productCode: "", productName: "", unitPrice: 0, quantity: 1, points: 0, taxRate: 10 }]);
       setForm(makeEmptyForm(memberCode, memberName || "", memberPostal || "", memberAddress || "", memberPhone || ""));
-      // 伝票作成後、伝票一覧を再取得してからorderNumber照合付きで購入履歴を更新
       const newOrders = await fetchOrders();
       await fetchMlmPurchasesWithOrders(newOrders);
     } finally {
@@ -478,13 +480,11 @@ export default function PurchasePanel({
     }
   }
 
-  // ─── 編集モーダルを開く ───────────────────────────────────
   function openEditModal(order: MemberOrder) {
     setEditOrder(order);
     const orderedDate = order.orderedAt.slice(0, 10);
     const paidDate = order.paidAt ? order.paidAt.slice(0, 10) : "";
     const sl = order.shippingLabel;
-    // 住所を都道府県・市区町村・建物に分割（簡易）
     const addr = sl?.recipientAddress || "";
     setEditForm({
       orderedAt: orderedDate,
@@ -535,7 +535,6 @@ export default function PurchasePanel({
     );
   }
 
-  // 編集保存
   async function handleEditSave(e: React.FormEvent) {
     e.preventDefault();
     if (!editOrder || !editForm) return;
@@ -553,7 +552,6 @@ export default function PurchasePanel({
       alert("伝票を更新しました");
       setEditOrder(null);
       setEditForm(null);
-      // 伝票更新後、伝票一覧を再取得してからorderNumber照合付きで購入履歴を更新
       const updatedOrders = await fetchOrders();
       await fetchMlmPurchasesWithOrders(updatedOrders);
     } finally {
@@ -561,7 +559,6 @@ export default function PurchasePanel({
     }
   }
 
-  // 伝票削除
   async function handleDelete(orderId: string, orderNumber: string) {
     if (!confirm(`伝票「${orderNumber}」を削除しますか？\nこの操作は取り消せません。`)) return;
     setDeletingId(orderId);
@@ -570,7 +567,6 @@ export default function PurchasePanel({
       if (!res.ok) { const d = await res.json(); alert(d.error || "削除に失敗しました"); return; }
       alert("伝票を削除しました");
       setEditOrder(null);
-      // 伝票削除後、伝票一覧を再取得してからorderNumber照合付きで購入履歴を更新
       const remainOrders = await fetchOrders();
       await fetchMlmPurchasesWithOrders(remainOrders);
     } finally {
@@ -578,9 +574,99 @@ export default function PurchasePanel({
     }
   }
 
-  // 納品書PDF印刷
   function handlePrintInvoice(orderId: string) {
     window.open(`/admin/orders-shipping/delivery-note?ids=${orderId}&type=delivery`, "_blank");
+  }
+
+  // ── チェックボックス制御 ───────────────────────────────────
+  const allChecked = orders.length > 0 && selectedIds.size === orders.length;
+  const someChecked = selectedIds.size > 0 && selectedIds.size < orders.length;
+
+  function toggleAll() {
+    if (allChecked) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(orders.map((o) => o.id)));
+    }
+  }
+
+  function toggleOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  // ── 一括編集実行 ───────────────────────────────────────────
+  async function handleBulkSave() {
+    const enabledFields = Object.entries(bulkFields).filter(([, v]) => v.enabled);
+    if (enabledFields.length === 0) {
+      alert("変更する項目を1つ以上チェックしてください");
+      return;
+    }
+    if (selectedIds.size === 0) return;
+
+    const confirmMsg = [
+      `選択中の伝票 ${selectedIds.size} 件を一括更新します。`,
+      "",
+      "【変更する項目】",
+      ...enabledFields.map(([key, v]) => {
+        const labels: Record<string, string> = {
+          orderedAt: "注文日",
+          slipType: "種別",
+          paymentMethod: "支払方法",
+          paymentStatus: "入金ステータス",
+          shippingStatus: "発送ステータス",
+          paidAt: "入金日",
+          shippedAt: "発送日",
+        };
+        return `・${labels[key] || key}：${v.value || "（クリア）"}`;
+      }),
+      "",
+      "よろしいですか？",
+    ].join("\n");
+
+    if (!confirm(confirmMsg)) return;
+
+    setBulkSubmitting(true);
+    try {
+      // 送信するフィールドを組み立て（enabledのみ）
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fields: Record<string, any> = {};
+      for (const [key, v] of enabledFields) {
+        fields[key] = v.value || null;
+      }
+
+      const res = await fetch("/api/admin/mlm-members/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderIds: Array.from(selectedIds), fields }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "一括更新に失敗しました");
+        return;
+      }
+
+      const msg = [`${data.updatedCount} 件の伝票を更新しました。`];
+      if (data.errors?.length) {
+        msg.push("", `エラー（${data.errors.length}件）:`, ...data.errors.slice(0, 5));
+      }
+      alert(msg.join("\n"));
+
+      setShowBulkEdit(false);
+      setSelectedIds(new Set());
+      setBulkFields(makeEmptyBulkFields());
+      const updated = await fetchOrders();
+      await fetchMlmPurchasesWithOrders(updated);
+    } finally {
+      setBulkSubmitting(false);
+    }
   }
 
   // input/select helper
@@ -589,7 +675,6 @@ export default function PurchasePanel({
   const EF = (key: keyof ReturnType<typeof makeEmptyForm>, value: string | number) =>
     setEditForm((f) => f ? { ...f, [key]: value } : f);
 
-  // ─── 入力欄スタイル
   const inp = "border border-gray-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 w-full";
   const sel = "border border-gray-300 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 w-full";
   const lbl = "text-[11px] text-gray-600 font-medium whitespace-nowrap";
@@ -598,7 +683,6 @@ export default function PurchasePanel({
   const totals = calcTotals(slipItems);
   const editTotals = calcTotals(editItems);
 
-  // ── 伝票フォーム内部（新規・編集共用）
   function SlipFormBody({
     f, setF, items, setItems, onProductSelectFn, onAddRow, onRemoveRow, totalsData,
   }: {
@@ -613,7 +697,6 @@ export default function PurchasePanel({
   }) {
     return (
       <div className="p-4 space-y-4">
-        {/* ── ヘッダー情報グリッド */}
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -673,7 +756,6 @@ export default function PurchasePanel({
           </div>
         </div>
 
-        {/* ── 注文者情報 ＋ 配送先 */}
         <div className="grid grid-cols-2 gap-4">
           <div className="border border-gray-200 rounded-lg overflow-hidden">
             <div className="bg-gray-100 px-3 py-1.5 text-xs font-bold text-gray-700">注文者情報</div>
@@ -733,7 +815,6 @@ export default function PurchasePanel({
           </div>
         </div>
 
-        {/* ── 商品テーブル */}
         <div className="border border-gray-200 rounded-lg overflow-hidden">
           <div className="bg-gray-800 text-white px-3 py-1.5 text-xs font-bold">{f.ordererMemberId || "ビジネス会員"}</div>
           <div className="overflow-x-auto">
@@ -819,7 +900,6 @@ export default function PurchasePanel({
           </div>
         </div>
 
-        {/* 作成後BOX */}
         <div className="flex items-center justify-center gap-4 pt-2">
           <label className="flex items-center gap-2 text-xs text-gray-600">
             <input type="checkbox" checked={f.afterCreateOutbox > 0}
@@ -835,6 +915,42 @@ export default function PurchasePanel({
             </select>
             に入れる
           </label>
+        </div>
+      </div>
+    );
+  }
+
+  // ── 一括編集フィールド行コンポーネント ─────────────────────
+  function BulkFieldRow({
+    fieldKey, label, children,
+  }: {
+    fieldKey: keyof BulkEditFields;
+    label: string;
+    children: React.ReactNode;
+  }) {
+    const enabled = bulkFields[fieldKey].enabled;
+    return (
+      <div className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border transition ${
+        enabled ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-100"
+      }`}>
+        <label className="flex items-center gap-2 cursor-pointer select-none min-w-[140px]">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) =>
+              setBulkFields((prev) => ({
+                ...prev,
+                [fieldKey]: { ...prev[fieldKey], enabled: e.target.checked },
+              }))
+            }
+            className="w-4 h-4 rounded accent-amber-500"
+          />
+          <span className={`text-xs font-semibold ${enabled ? "text-amber-800" : "text-gray-400"}`}>
+            {label}
+          </span>
+        </label>
+        <div className={`flex-1 transition ${enabled ? "opacity-100" : "opacity-30 pointer-events-none"}`}>
+          {children}
         </div>
       </div>
     );
@@ -877,6 +993,29 @@ export default function PurchasePanel({
         </form>
       )}
 
+      {/* ── 一括操作バー ────────────────────────────────────── */}
+      {selectedIds.size > 0 && (
+        <div className="mb-3 flex items-center gap-3 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl">
+          <i className="fas fa-check-square text-amber-500" />
+          <span className="text-xs font-bold text-amber-800">
+            {selectedIds.size} 件 選択中
+          </span>
+          <button
+            onClick={() => setShowBulkEdit(true)}
+            className="flex items-center gap-1.5 px-4 py-1.5 bg-amber-500 text-white text-xs font-bold rounded-lg hover:bg-amber-600 transition shadow-sm"
+          >
+            <i className="fas fa-edit text-[10px]" />
+            一括編集
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="px-3 py-1.5 bg-white text-gray-500 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+          >
+            選択解除
+          </button>
+        </div>
+      )}
+
       {/* 伝票一覧 */}
       {loading ? (
         <p className="text-gray-400 text-sm">読み込み中...</p>
@@ -884,9 +1023,20 @@ export default function PurchasePanel({
         <p className="text-gray-500 text-sm">伝票データなし</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse min-w-[700px]">
+          <table className="w-full text-xs border-collapse min-w-[750px]">
             <thead className="bg-slate-800 text-white">
               <tr>
+                {/* 全選択チェックボックス */}
+                <th className="px-3 py-2 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={allChecked}
+                    ref={(el) => { if (el) el.indeterminate = someChecked; }}
+                    onChange={toggleAll}
+                    className="w-4 h-4 rounded cursor-pointer accent-amber-400"
+                    title="全選択"
+                  />
+                </th>
                 <th className="px-3 py-2 text-left">注文日</th>
                 <th className="px-3 py-2 text-left">注文番号</th>
                 <th className="px-3 py-2 text-left">種別</th>
@@ -899,102 +1049,115 @@ export default function PurchasePanel({
               </tr>
             </thead>
             <tbody>
-              {orders.map((order) => (
-                <>
-                  <tr key={order.id}
-                    className="border-b hover:bg-violet-50 cursor-pointer transition"
-                    onClick={() => setExpandedId(expandedId === order.id ? null : order.id)}>
-                    <td className="px-3 py-2">{order.orderedAt.slice(0, 10)}</td>
-                    {/* 注文番号クリックで編集モーダル */}
-                    <td className="px-3 py-2" onClick={(e) => { e.stopPropagation(); openEditModal(order); }}>
-                      <span className="font-mono text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-semibold">
-                        {order.orderNumber}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2">
-                      <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded">{order.slipTypeLabel}</span>
-                    </td>
-                    <td className="px-3 py-2">
-                      <span className={`px-1.5 py-0.5 rounded ${
-                        order.paymentMethod === "card" ? "bg-blue-50 text-blue-700"
-                        : order.paymentMethod === "bank_transfer" || order.paymentMethod === "postal_transfer" ? "bg-yellow-50 text-yellow-700"
-                        : "bg-gray-100 text-gray-600"
-                      }`}>{order.paymentMethodLabel || "—"}</span>
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <span className={`px-1.5 py-0.5 rounded ${order.paymentStatus === "paid" ? "bg-green-100 text-green-700" : "bg-red-50 text-red-600"}`}>
-                        {order.paymentStatus === "paid" ? "入金済" : "未入金"}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <span className={`px-1.5 py-0.5 rounded ${order.shippingStatus === "shipped" ? "bg-green-100 text-green-700" : "bg-orange-50 text-orange-600"}`}>
-                        {order.shippingStatus === "shipped" ? "発送済" : "未発送"}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-right font-medium">¥{order.totalAmount.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-blue-700">
-                      {order.items.reduce((s, i) => s + i.points * i.quantity, 0).toLocaleString()} pt
-                    </td>
-                    {/* 操作ボタン */}
-                    <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-1 justify-center">
-                        <button
-                          onClick={() => handlePrintInvoice(order.id)}
-                          className="px-2 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded text-[10px] hover:bg-indigo-100 whitespace-nowrap"
-                          title="納品書PDF"
-                        >
-                          <i className="fas fa-file-pdf mr-0.5" />納品書
-                        </button>
-                        <button
-                          onClick={() => handleDelete(order.id, order.orderNumber)}
-                          disabled={deletingId === order.id}
-                          className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded text-[10px] hover:bg-red-100 whitespace-nowrap disabled:opacity-50"
-                          title="削除"
-                        >
-                          {deletingId === order.id ? "..." : <><i className="fas fa-trash mr-0.5" />削除</>}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  {/* 展開詳細 */}
-                  {expandedId === order.id && (
-                    <tr key={`${order.id}-detail`}>
-                      <td colSpan={9} className="bg-violet-50/40 px-4 py-3 border-b border-violet-100">
-                        <div className="space-y-2">
-                          <p className="text-xs text-gray-500">入金日：{order.paidAt?.slice(0, 10) || "—"}</p>
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="text-gray-400 border-b">
-                                <td className="pb-1">商品</td>
-                                <td className="pb-1 text-right">単価</td>
-                                <td className="pb-1 text-center">数</td>
-                                <td className="pb-1 text-right">小計</td>
-                                <td className="pb-1 text-right">pt</td>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {order.items.map((item) => (
-                                <tr key={item.id} className="border-b border-gray-100">
-                                  <td className="py-0.5 text-gray-700">{item.productName}</td>
-                                  <td className="py-0.5 text-right text-gray-500">¥{item.unitPrice.toLocaleString()}</td>
-                                  <td className="py-0.5 text-center">{item.quantity}</td>
-                                  <td className="py-0.5 text-right font-medium">¥{item.lineAmount.toLocaleString()}</td>
-                                  <td className="py-0.5 text-right text-blue-600">{(item.points * item.quantity).toLocaleString()}pt</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                          {order.shippingLabel && (
-                            <p className="text-xs text-gray-500">
-                              配送先：{order.shippingLabel.recipientName} 〒{order.shippingLabel.recipientPostal} {order.shippingLabel.recipientAddress}
-                            </p>
-                          )}
+              {orders.map((order) => {
+                const isSelected = selectedIds.has(order.id);
+                return (
+                  <>
+                    <tr key={order.id}
+                      className={`border-b cursor-pointer transition ${
+                        isSelected
+                          ? "bg-amber-50 hover:bg-amber-100"
+                          : "hover:bg-violet-50"
+                      }`}
+                      onClick={() => setExpandedId(expandedId === order.id ? null : order.id)}>
+                      {/* チェックボックスセル */}
+                      <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleOne(order.id)}
+                          className="w-4 h-4 rounded cursor-pointer accent-amber-500"
+                        />
+                      </td>
+                      <td className="px-3 py-2">{order.orderedAt.slice(0, 10)}</td>
+                      <td className="px-3 py-2" onClick={(e) => { e.stopPropagation(); openEditModal(order); }}>
+                        <span className="font-mono text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-semibold">
+                          {order.orderNumber}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded">{order.slipTypeLabel}</span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className={`px-1.5 py-0.5 rounded ${
+                          order.paymentMethod === "card" ? "bg-blue-50 text-blue-700"
+                          : order.paymentMethod === "bank_transfer" || order.paymentMethod === "postal_transfer" ? "bg-yellow-50 text-yellow-700"
+                          : "bg-gray-100 text-gray-600"
+                        }`}>{order.paymentMethodLabel || "—"}</span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`px-1.5 py-0.5 rounded ${order.paymentStatus === "paid" ? "bg-green-100 text-green-700" : "bg-red-50 text-red-600"}`}>
+                          {order.paymentStatus === "paid" ? "入金済" : "未入金"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <span className={`px-1.5 py-0.5 rounded ${order.shippingStatus === "shipped" ? "bg-green-100 text-green-700" : "bg-orange-50 text-orange-600"}`}>
+                          {order.shippingStatus === "shipped" ? "発送済" : "未発送"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right font-medium">¥{order.totalAmount.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right font-semibold text-blue-700">
+                        {order.items.reduce((s, i) => s + i.points * i.quantity, 0).toLocaleString()} pt
+                      </td>
+                      <td className="px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1 justify-center">
+                          <button
+                            onClick={() => handlePrintInvoice(order.id)}
+                            className="px-2 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded text-[10px] hover:bg-indigo-100 whitespace-nowrap"
+                            title="納品書PDF"
+                          >
+                            <i className="fas fa-file-pdf mr-0.5" />納品書
+                          </button>
+                          <button
+                            onClick={() => handleDelete(order.id, order.orderNumber)}
+                            disabled={deletingId === order.id}
+                            className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded text-[10px] hover:bg-red-100 whitespace-nowrap disabled:opacity-50"
+                            title="削除"
+                          >
+                            {deletingId === order.id ? "..." : <><i className="fas fa-trash mr-0.5" />削除</>}
+                          </button>
                         </div>
                       </td>
                     </tr>
-                  )}
-                </>
-              ))}
+                    {expandedId === order.id && (
+                      <tr key={`${order.id}-detail`}>
+                        <td colSpan={10} className="bg-violet-50/40 px-4 py-3 border-b border-violet-100">
+                          <div className="space-y-2">
+                            <p className="text-xs text-gray-500">入金日：{order.paidAt?.slice(0, 10) || "—"}</p>
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="text-gray-400 border-b">
+                                  <td className="pb-1">商品</td>
+                                  <td className="pb-1 text-right">単価</td>
+                                  <td className="pb-1 text-center">数</td>
+                                  <td className="pb-1 text-right">小計</td>
+                                  <td className="pb-1 text-right">pt</td>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {order.items.map((item) => (
+                                  <tr key={item.id} className="border-b border-gray-100">
+                                    <td className="py-0.5 text-gray-700">{item.productName}</td>
+                                    <td className="py-0.5 text-right text-gray-500">¥{item.unitPrice.toLocaleString()}</td>
+                                    <td className="py-0.5 text-center">{item.quantity}</td>
+                                    <td className="py-0.5 text-right font-medium">¥{item.lineAmount.toLocaleString()}</td>
+                                    <td className="py-0.5 text-right text-blue-600">{(item.points * item.quantity).toLocaleString()}pt</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            {order.shippingLabel && (
+                              <p className="text-xs text-gray-500">
+                                配送先：{order.shippingLabel.recipientName} 〒{order.shippingLabel.recipientPostal} {order.shippingLabel.recipientAddress}
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1098,12 +1261,11 @@ export default function PurchasePanel({
       </div>
 
       {/* ═══════════════════════════════════════════
-          伝票編集モーダル
+          伝票編集モーダル（個別編集）
       ═══════════════════════════════════════════ */}
       {editOrder && editForm && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 overflow-y-auto py-8">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl mx-4 overflow-hidden">
-            {/* モーダルヘッダ */}
             <div className="bg-orange-600 text-white px-5 py-3 flex items-center justify-between">
               <div>
                 <span className="font-bold text-sm">伝票修正</span>
@@ -1112,7 +1274,6 @@ export default function PurchasePanel({
               <button onClick={() => { setEditOrder(null); setEditForm(null); }}
                 className="text-white hover:text-orange-200 text-lg font-bold">✕</button>
             </div>
-
             <form onSubmit={handleEditSave}>
               <SlipFormBody
                 f={editForm}
@@ -1124,10 +1285,7 @@ export default function PurchasePanel({
                 onRemoveRow={(idx) => removeRow(idx, setEditItems, editItems)}
                 totalsData={editTotals}
               />
-
-              {/* モーダルフッタ */}
               <div className="px-5 py-4 bg-gray-50 border-t flex items-center justify-between gap-3">
-                {/* 削除ボタン（左） */}
                 <button
                   type="button"
                   onClick={() => handleDelete(editOrder.id, editOrder.orderNumber)}
@@ -1150,6 +1308,171 @@ export default function PurchasePanel({
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════
+          一括編集モーダル
+      ═══════════════════════════════════════════ */}
+      {showBulkEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl mx-4 overflow-hidden">
+            {/* モーダルヘッダ */}
+            <div className="bg-amber-500 text-white px-5 py-3.5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <i className="fas fa-edit" />
+                <span className="font-bold text-sm">一括編集</span>
+                <span className="ml-1 bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                  {selectedIds.size} 件選択中
+                </span>
+              </div>
+              <button
+                onClick={() => { setShowBulkEdit(false); setBulkFields(makeEmptyBulkFields()); }}
+                className="text-white hover:text-amber-200 text-lg font-bold"
+              >✕</button>
+            </div>
+
+            {/* 説明文 */}
+            <div className="px-5 pt-4 pb-2">
+              <p className="text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                <i className="fas fa-info-circle text-blue-400 mr-1.5" />
+                チェックを入れた項目だけが更新されます。チェックなしの項目は変更されません。
+              </p>
+            </div>
+
+            {/* フィールド一覧 */}
+            <div className="px-5 py-3 space-y-2 max-h-[60vh] overflow-y-auto">
+
+              {/* 注文日 */}
+              <BulkFieldRow fieldKey="orderedAt" label="注文日">
+                <SlipDatePicker
+                  value={bulkFields.orderedAt.value}
+                  onChange={(v) => setBulkFields((p) => ({ ...p, orderedAt: { ...p.orderedAt, value: v } }))}
+                  highlightBg="bg-amber-50"
+                />
+              </BulkFieldRow>
+
+              {/* 種別 */}
+              <BulkFieldRow fieldKey="slipType" label="種別">
+                <select
+                  value={bulkFields.slipType.value}
+                  onChange={(e) => setBulkFields((p) => ({ ...p, slipType: { ...p.slipType, value: e.target.value } }))}
+                  className="border border-gray-300 rounded px-2 py-1 text-xs bg-white w-full focus:ring-1 focus:ring-amber-400"
+                >
+                  {SLIP_TYPES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+              </BulkFieldRow>
+
+              {/* 支払方法 */}
+              <BulkFieldRow fieldKey="paymentMethod" label="支払方法">
+                <select
+                  value={bulkFields.paymentMethod.value}
+                  onChange={(e) => setBulkFields((p) => ({ ...p, paymentMethod: { ...p.paymentMethod, value: e.target.value } }))}
+                  className="border border-gray-300 rounded px-2 py-1 text-xs bg-white w-full focus:ring-1 focus:ring-amber-400"
+                >
+                  {PAYMENT_METHODS.map((pm) => <option key={pm.value} value={pm.value}>{pm.label}</option>)}
+                </select>
+              </BulkFieldRow>
+
+              {/* 入金ステータス */}
+              <BulkFieldRow fieldKey="paymentStatus" label="入金ステータス">
+                <div className="flex gap-3">
+                  {[
+                    { value: "paid",   label: "入金済", color: "text-green-700 bg-green-50 border-green-200" },
+                    { value: "unpaid", label: "未入金", color: "text-red-600 bg-red-50 border-red-200" },
+                  ].map((opt) => (
+                    <label key={opt.value} className={`flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
+                      bulkFields.paymentStatus.value === opt.value ? opt.color : "text-gray-400 bg-white border-gray-200"
+                    }`}>
+                      <input
+                        type="radio"
+                        name="bulk_paymentStatus"
+                        value={opt.value}
+                        checked={bulkFields.paymentStatus.value === opt.value}
+                        onChange={(e) => setBulkFields((p) => ({ ...p, paymentStatus: { ...p.paymentStatus, value: e.target.value } }))}
+                        className="accent-amber-500"
+                      />
+                      {opt.label}
+                    </label>
+                  ))}
+                </div>
+              </BulkFieldRow>
+
+              {/* 入金日 */}
+              <BulkFieldRow fieldKey="paidAt" label="入金日">
+                <SlipDatePicker
+                  value={bulkFields.paidAt.value}
+                  onChange={(v) => setBulkFields((p) => ({ ...p, paidAt: { ...p.paidAt, value: v } }))}
+                  allowEmpty
+                  highlightBg="bg-amber-50"
+                />
+              </BulkFieldRow>
+
+              {/* 発送ステータス */}
+              <BulkFieldRow fieldKey="shippingStatus" label="発送ステータス">
+                <div className="flex gap-3">
+                  {[
+                    { value: "shipped",   label: "発送済", color: "text-green-700 bg-green-50 border-green-200" },
+                    { value: "unshipped", label: "未発送", color: "text-orange-600 bg-orange-50 border-orange-200" },
+                  ].map((opt) => (
+                    <label key={opt.value} className={`flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
+                      bulkFields.shippingStatus.value === opt.value ? opt.color : "text-gray-400 bg-white border-gray-200"
+                    }`}>
+                      <input
+                        type="radio"
+                        name="bulk_shippingStatus"
+                        value={opt.value}
+                        checked={bulkFields.shippingStatus.value === opt.value}
+                        onChange={(e) => setBulkFields((p) => ({ ...p, shippingStatus: { ...p.shippingStatus, value: e.target.value } }))}
+                        className="accent-amber-500"
+                      />
+                      {opt.label}
+                    </label>
+                  ))}
+                </div>
+              </BulkFieldRow>
+
+              {/* 発送日 */}
+              <BulkFieldRow fieldKey="shippedAt" label="発送日">
+                <SlipDatePicker
+                  value={bulkFields.shippedAt.value}
+                  onChange={(v) => setBulkFields((p) => ({ ...p, shippedAt: { ...p.shippedAt, value: v } }))}
+                  allowEmpty
+                  highlightBg="bg-amber-50"
+                />
+              </BulkFieldRow>
+
+            </div>
+
+            {/* フッタ */}
+            <div className="px-5 py-4 bg-gray-50 border-t flex items-center justify-between gap-3">
+              <button
+                onClick={() => setBulkFields(makeEmptyBulkFields())}
+                className="px-4 py-2 text-xs text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-100 transition"
+              >
+                <i className="fas fa-undo mr-1 text-[10px]" />リセット
+              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setShowBulkEdit(false); setBulkFields(makeEmptyBulkFields()); }}
+                  className="px-5 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-100 transition"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleBulkSave}
+                  disabled={bulkSubmitting || Object.values(bulkFields).every((v) => !v.enabled)}
+                  className="px-8 py-2 bg-amber-500 text-white text-sm font-bold rounded-lg hover:bg-amber-600 disabled:opacity-40 transition flex items-center gap-2"
+                >
+                  {bulkSubmitting ? (
+                    <><i className="fas fa-spinner animate-spin text-xs" />更新中...</>
+                  ) : (
+                    <><i className="fas fa-check text-xs" />{selectedIds.size} 件を一括更新</>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
