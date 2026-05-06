@@ -558,13 +558,23 @@ export async function PATCH(request: NextRequest) {
     const { orderIds, fields } = body as {
       orderIds: string[];
       fields: {
-        orderedAt?: string;       // "YYYY-MM-DD" | null（変更しない場合はキー自体なし）
+        orderedAt?: string | null;
         slipType?: string;
         paymentMethod?: string;
-        paymentStatus?: string;   // "paid" | "unpaid"
-        shippingStatus?: string;  // "shipped" | "unshipped"
-        paidAt?: string | null;   // "YYYY-MM-DD" | null
+        paymentStatus?: string;
+        shippingStatus?: string;
+        paidAt?: string | null;
         shippedAt?: string | null;
+        // 商品一括差し替え
+        items?: {
+          productId?: string;
+          productCode: string;
+          productName: string;
+          unitPrice: number;
+          quantity: number;
+          points: number;
+          taxRate: number;
+        }[];
       };
     };
 
@@ -575,15 +585,15 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "更新するフィールドがありません" }, { status: 400 });
     }
 
-    // 更新データを構築（undefined のキーはスキップ）
+    // Order 基本フィールドの更新データを構築（undefined のキーはスキップ）
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const orderData: Record<string, any> = {};
     if (fields.orderedAt !== undefined) {
       orderData.orderedAt = fields.orderedAt ? new Date(fields.orderedAt) : undefined;
     }
-    if (fields.slipType !== undefined)      orderData.slipType = fields.slipType;
-    if (fields.paymentMethod !== undefined) orderData.paymentMethod = fields.paymentMethod;
-    if (fields.paymentStatus !== undefined) orderData.paymentStatus = fields.paymentStatus;
+    if (fields.slipType !== undefined)       orderData.slipType = fields.slipType;
+    if (fields.paymentMethod !== undefined)  orderData.paymentMethod = fields.paymentMethod;
+    if (fields.paymentStatus !== undefined)  orderData.paymentStatus = fields.paymentStatus;
     if (fields.shippingStatus !== undefined) orderData.shippingStatus = fields.shippingStatus;
     if (fields.paidAt !== undefined) {
       orderData.paidAt = fields.paidAt ? new Date(fields.paidAt) : null;
@@ -593,7 +603,6 @@ export async function PATCH(request: NextRequest) {
     let shippedAtDate: Date | null | undefined = undefined;
     if (fields.shippedAt !== undefined) {
       shippedAtDate = fields.shippedAt ? new Date(fields.shippedAt) : null;
-      // shippingStatus も連動
       if (!("shippingStatus" in fields)) {
         orderData.shippingStatus = fields.shippedAt ? "shipped" : "unshipped";
       }
@@ -604,18 +613,41 @@ export async function PATCH(request: NextRequest) {
       orderData.paymentStatus = fields.paidAt ? "paid" : "unpaid";
     }
 
+    // 商品差し替え用データを事前計算
+    const newItems = fields.items && fields.items.length > 0 ? fields.items : null;
+    let newSubtotalAmount = 0;
+    let newTotalAmount = 0;
+    if (newItems) {
+      let sub8 = 0, sub10 = 0;
+      for (const item of newItems) {
+        const line = (item.unitPrice || 0) * (item.quantity || 1);
+        if (item.taxRate === 8) sub8 += line; else sub10 += line;
+      }
+      const tax8 = Math.floor(sub8 * 0.08);
+      const tax10 = Math.floor(sub10 * 0.10);
+      newSubtotalAmount = sub8 + sub10;
+      newTotalAmount = newSubtotalAmount + tax8 + tax10;
+      // 金額も Order に反映
+      orderData.subtotalAmount = newSubtotalAmount;
+      orderData.totalAmount = newTotalAmount;
+    }
+
     let updatedCount = 0;
     const errors: string[] = [];
 
     for (const orderId of orderIds) {
       try {
         const orderIdBig = BigInt(orderId);
-        await prisma.order.update({
-          where: { id: orderIdBig },
-          data: orderData,
-        });
 
-        // ShippingLabel の発送日を同期
+        // ── Order 基本フィールド更新
+        if (Object.keys(orderData).length > 0) {
+          await prisma.order.update({
+            where: { id: orderIdBig },
+            data: orderData,
+          });
+        }
+
+        // ── ShippingLabel の発送日同期
         if (shippedAtDate !== undefined) {
           const label = await prisma.shippingLabel.findUnique({ where: { orderId: orderIdBig } });
           if (label) {
@@ -625,6 +657,73 @@ export async function PATCH(request: NextRequest) {
             });
           }
         }
+
+        // ── 商品差し替え（OrderItem 削除→再作成 + MlmPurchase 同期）
+        if (newItems) {
+          // 1. OrderItem 削除
+          await prisma.orderItem.deleteMany({ where: { orderId: orderIdBig } });
+
+          // 2. OrderItem 再作成
+          for (const item of newItems) {
+            const lineAmount = (item.unitPrice || 0) * (item.quantity || 1);
+            await prisma.orderItem.create({
+              data: {
+                orderId: orderIdBig,
+                ...(item.productId ? { productId: BigInt(item.productId) } : {}),
+                productCode: item.productCode || null,
+                productName: item.productName || "",
+                unitPrice: item.unitPrice || 0,
+                quantity: item.quantity || 1,
+                lineAmount,
+                points: item.points || 0,
+              },
+            });
+          }
+
+          // 3. MlmPurchase 同期（この伝票に紐付くものを削除→再作成）
+          const orderForSync = await prisma.order.findUnique({
+            where: { id: orderIdBig },
+            select: {
+              orderedAt: true,
+              slipType: true,
+              user: { select: { mlmMember: { select: { id: true } } } },
+            },
+          });
+          if (orderForSync?.user?.mlmMember) {
+            const mlmMemberId = orderForSync.user.mlmMember.id;
+            await prisma.mlmPurchase.deleteMany({
+              where: { mlmMemberId, orderId: orderIdBig },
+            });
+            const slipType = fields.slipType || orderForSync.slipType || "";
+            const purchaseStatus = SLIP_TO_PURCHASE_STATUS[slipType] || "one_time";
+            const purchasedAt = orderForSync.orderedAt ?? new Date();
+            const purchaseMonth = purchasedAt.toISOString().slice(0, 7);
+
+            for (const item of newItems) {
+              if (!item.points || item.points <= 0) continue;
+              const codeNum = parseInt((item.productCode || "").replace(/[^0-9]/g, ""));
+              if (codeNum >= 1000 && codeNum <= 2999) {
+                await prisma.mlmPurchase.create({
+                  data: {
+                    mlmMemberId,
+                    orderId: orderIdBig,
+                    productCode: item.productCode || "",
+                    productName: item.productName || "",
+                    quantity: item.quantity || 1,
+                    unitPrice: item.unitPrice || 0,
+                    points: item.points || 0,
+                    totalPoints: (item.points || 0) * (item.quantity || 1),
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    purchaseStatus: purchaseStatus as any,
+                    purchaseMonth,
+                    purchasedAt,
+                  },
+                });
+              }
+            }
+          }
+        }
+
         updatedCount++;
       } catch (err) {
         errors.push(`ID:${orderId} - ${err instanceof Error ? err.message : String(err)}`);

@@ -141,14 +141,25 @@ type MemberOrder = {
 };
 
 // ── 一括編集フィールド型 ────────────────────────────────────────
+type BulkSlipItem = {
+  productId: string;
+  productCode: string;
+  productName: string;
+  unitPrice: number;
+  quantity: number;
+  points: number;
+  taxRate: number;
+};
+
 type BulkEditFields = {
-  orderedAt: { enabled: boolean; value: string };
-  slipType: { enabled: boolean; value: string };
+  orderedAt:     { enabled: boolean; value: string };
+  slipType:      { enabled: boolean; value: string };
   paymentMethod: { enabled: boolean; value: string };
   paymentStatus: { enabled: boolean; value: string };
-  shippingStatus: { enabled: boolean; value: string };
-  paidAt: { enabled: boolean; value: string };
-  shippedAt: { enabled: boolean; value: string };
+  shippingStatus:{ enabled: boolean; value: string };
+  paidAt:        { enabled: boolean; value: string };
+  shippedAt:     { enabled: boolean; value: string };
+  items:         { enabled: boolean; value: BulkSlipItem[] };
 };
 
 // ── 選択肢定数 ────────────────────────────────────────────────
@@ -260,6 +271,10 @@ type SlipItem = {
   taxRate: number;
 };
 
+function makeEmptyBulkItem(): BulkSlipItem {
+  return { productId: "", productCode: "", productName: "", unitPrice: 0, quantity: 1, points: 0, taxRate: 10 };
+}
+
 // 一括編集フィールドの初期値
 function makeEmptyBulkFields(): BulkEditFields {
   return {
@@ -270,6 +285,7 @@ function makeEmptyBulkFields(): BulkEditFields {
     shippingStatus:{ enabled: false, value: "shipped" },
     paidAt:        { enabled: false, value: "" },
     shippedAt:     { enabled: false, value: "" },
+    items:         { enabled: false, value: [makeEmptyBulkItem()] },
   };
 }
 
@@ -611,21 +627,36 @@ export default function PurchasePanel({
     }
     if (selectedIds.size === 0) return;
 
+    const FIELD_LABELS: Record<string, string> = {
+      orderedAt: "注文日",
+      slipType: "種別",
+      paymentMethod: "支払方法",
+      paymentStatus: "入金ステータス",
+      shippingStatus: "発送ステータス",
+      paidAt: "入金日",
+      shippedAt: "発送日",
+      items: "商品明細",
+    };
+
+    // 商品が有効な場合、空行を除いてバリデーション
+    if (bulkFields.items.enabled) {
+      const validItems = bulkFields.items.value.filter((i) => i.productId || i.productName);
+      if (validItems.length === 0) {
+        alert("商品を1つ以上選択してください");
+        return;
+      }
+    }
+
     const confirmMsg = [
       `選択中の伝票 ${selectedIds.size} 件を一括更新します。`,
       "",
       "【変更する項目】",
       ...enabledFields.map(([key, v]) => {
-        const labels: Record<string, string> = {
-          orderedAt: "注文日",
-          slipType: "種別",
-          paymentMethod: "支払方法",
-          paymentStatus: "入金ステータス",
-          shippingStatus: "発送ステータス",
-          paidAt: "入金日",
-          shippedAt: "発送日",
-        };
-        return `・${labels[key] || key}：${v.value || "（クリア）"}`;
+        if (key === "items") {
+          const validItems = (v.value as BulkSlipItem[]).filter((i) => i.productId || i.productName);
+          return `・商品明細：${validItems.length}商品に差し替え`;
+        }
+        return `・${FIELD_LABELS[key] || key}：${(v as { value: string }).value || "（クリア）"}`;
       }),
       "",
       "よろしいですか？",
@@ -639,7 +670,12 @@ export default function PurchasePanel({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const fields: Record<string, any> = {};
       for (const [key, v] of enabledFields) {
-        fields[key] = v.value || null;
+        if (key === "items") {
+          // 空行を除いた商品リストだけ送信
+          fields[key] = (v.value as BulkSlipItem[]).filter((i) => i.productId || i.productName);
+        } else {
+          fields[key] = (v as { value: string }).value || null;
+        }
       }
 
       const res = await fetch("/api/admin/mlm-members/orders", {
@@ -1433,7 +1469,7 @@ export default function PurchasePanel({
                 </div>
               </BulkFieldRow>
 
-              {/* 発送日 */}
+  {/* 発送日 */}
               <BulkFieldRow fieldKey="shippedAt" label="発送日">
                 <SlipDatePicker
                   value={bulkFields.shippedAt.value}
@@ -1442,6 +1478,229 @@ export default function PurchasePanel({
                   highlightBg="bg-amber-50"
                 />
               </BulkFieldRow>
+
+              {/* ── 商品明細（差し替え） ── */}
+              <div className={`rounded-lg border transition ${
+                bulkFields.items.enabled ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-100"
+              }`}>
+                {/* ヘッダ行（チェックボックス＋ラベル） */}
+                <div className="flex items-center gap-3 px-4 py-2.5">
+                  <label className="flex items-center gap-2 cursor-pointer select-none min-w-[140px]">
+                    <input
+                      type="checkbox"
+                      checked={bulkFields.items.enabled}
+                      onChange={(e) =>
+                        setBulkFields((p) => ({
+                          ...p,
+                          items: { ...p.items, enabled: e.target.checked },
+                        }))
+                      }
+                      className="w-4 h-4 rounded accent-amber-500"
+                    />
+                    <span className={`text-xs font-semibold ${
+                      bulkFields.items.enabled ? "text-amber-800" : "text-gray-400"
+                    }`}>
+                      商品明細
+                    </span>
+                  </label>
+                  <span className={`text-[10px] ${
+                    bulkFields.items.enabled ? "text-amber-600" : "text-gray-400"
+                  }`}>
+                    選択した全伝票の商品を下記に差し替えます
+                  </span>
+                </div>
+
+                {/* 商品テーブル */}
+                <div className={`transition ${
+                  bulkFields.items.enabled ? "opacity-100" : "opacity-30 pointer-events-none"
+                }`}>
+                  <div className="overflow-x-auto px-4 pb-2">
+                    <table className="w-full text-xs border-collapse min-w-[560px]">
+                      <thead>
+                        <tr className="border-b border-amber-200 text-amber-700">
+                          <th className="pb-1 text-left pl-1 w-6"></th>
+                          <th className="pb-1 text-left">商品</th>
+                          <th className="pb-1 text-right w-20">単価</th>
+                          <th className="pb-1 text-center w-14">数量</th>
+                          <th className="pb-1 text-right w-16">PV</th>
+                          <th className="pb-1 text-center w-16">税率</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {bulkFields.items.value.map((item, idx) => (
+                          <tr key={idx} className="border-b border-amber-100">
+                            {/* 削除ボタン */}
+                            <td className="py-1.5 text-center pl-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setBulkFields((p) => ({
+                                    ...p,
+                                    items: {
+                                      ...p.items,
+                                      value: p.items.value.length <= 1
+                                        ? p.items.value
+                                        : p.items.value.filter((_, i) => i !== idx),
+                                    },
+                                  }))
+                                }
+                                className="text-gray-300 hover:text-red-500 transition"
+                              >
+                                <i className="fas fa-times" />
+                              </button>
+                            </td>
+                            {/* 商品選択 */}
+                            <td className="py-1.5 pr-1">
+                              <select
+                                value={item.productId}
+                                onChange={(e) => {
+                                  const product = products.find((p) => p.id === e.target.value);
+                                  setBulkFields((p) => ({
+                                    ...p,
+                                    items: {
+                                      ...p.items,
+                                      value: p.items.value.map((it, i) =>
+                                        i === idx
+                                          ? {
+                                              ...it,
+                                              productId: product?.id || "",
+                                              productCode: product?.product_code || "",
+                                              productName: product?.name || "",
+                                              unitPrice: product?.price || 0,
+                                              points: product?.pv || 0,
+                                            }
+                                          : it
+                                      ),
+                                    },
+                                  }));
+                                }}
+                                className="border border-gray-300 rounded px-2 py-1 text-xs bg-white w-full focus:ring-1 focus:ring-amber-400"
+                              >
+                                <option value="">— 商品を選択 —</option>
+                                {products.map((p) => (
+                                  <option key={p.id} value={p.id}>
+                                    {p.product_code} - {p.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            {/* 単価 */}
+                            <td className="py-1.5 pr-1">
+                              <input
+                                type="number" min={0}
+                                value={item.unitPrice}
+                                onChange={(e) =>
+                                  setBulkFields((p) => ({
+                                    ...p,
+                                    items: {
+                                      ...p.items,
+                                      value: p.items.value.map((it, i) =>
+                                        i === idx ? { ...it, unitPrice: Number(e.target.value) } : it
+                                      ),
+                                    },
+                                  }))
+                                }
+                                className="border border-gray-300 rounded px-2 py-1 text-xs text-right w-full bg-white"
+                              />
+                            </td>
+                            {/* 数量 */}
+                            <td className="py-1.5 pr-1">
+                              <input
+                                type="number" min={1}
+                                value={item.quantity}
+                                onChange={(e) =>
+                                  setBulkFields((p) => ({
+                                    ...p,
+                                    items: {
+                                      ...p.items,
+                                      value: p.items.value.map((it, i) =>
+                                        i === idx ? { ...it, quantity: Number(e.target.value) || 1 } : it
+                                      ),
+                                    },
+                                  }))
+                                }
+                                className="border border-gray-300 rounded px-2 py-1 text-xs text-center w-full bg-white"
+                              />
+                            </td>
+                            {/* PV */}
+                            <td className="py-1.5 pr-1">
+                              <input
+                                type="number" min={0}
+                                value={item.points}
+                                onChange={(e) =>
+                                  setBulkFields((p) => ({
+                                    ...p,
+                                    items: {
+                                      ...p.items,
+                                      value: p.items.value.map((it, i) =>
+                                        i === idx ? { ...it, points: Number(e.target.value) } : it
+                                      ),
+                                    },
+                                  }))
+                                }
+                                className="border border-gray-300 rounded px-2 py-1 text-xs text-right w-full bg-white"
+                              />
+                            </td>
+                            {/* 税率 */}
+                            <td className="py-1.5">
+                              <select
+                                value={item.taxRate}
+                                onChange={(e) =>
+                                  setBulkFields((p) => ({
+                                    ...p,
+                                    items: {
+                                      ...p.items,
+                                      value: p.items.value.map((it, i) =>
+                                        i === idx ? { ...it, taxRate: Number(e.target.value) } : it
+                                      ),
+                                    },
+                                  }))
+                                }
+                                className="border border-gray-300 rounded px-2 py-1 text-xs bg-white w-full"
+                              >
+                                <option value={10}>10%</option>
+                                <option value={8}>8%</option>
+                                <option value={0}>非課税</option>
+                              </select>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* 行追加ボタン */}
+                  <div className="px-4 pb-3 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setBulkFields((p) => ({
+                          ...p,
+                          items: { ...p.items, value: [...p.items.value, makeEmptyBulkItem()] },
+                        }))
+                      }
+                      className="w-7 h-7 bg-green-500 text-white rounded font-bold text-sm hover:bg-green-600 flex items-center justify-center transition"
+                    >+</button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setBulkFields((p) => ({
+                          ...p,
+                          items: {
+                            ...p.items,
+                            value: p.items.value.length <= 1
+                              ? p.items.value
+                              : p.items.value.slice(0, -1),
+                          },
+                        }))
+                      }
+                      className="w-7 h-7 bg-gray-400 text-white rounded font-bold text-sm hover:bg-gray-500 flex items-center justify-center transition"
+                    >−</button>
+                    <span className="text-[10px] text-amber-600">
+                      {bulkFields.items.value.filter((i) => i.productId).length} 商品選択中
+                    </span>
+                  </div>
+                </div>
+              </div>
 
             </div>
 
