@@ -329,16 +329,22 @@ function RegisterForm() {
           </div>
         )}
         {!refLoading && referrer && (
-          <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 text-sm">
-            <div className="font-semibold text-emerald-800">🎁 紹介からの登録</div>
-            <div className="mt-1 text-emerald-700">
-              <span className="font-bold">{referrer.name}</span> さんに紹介されました。
+          <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 text-sm space-y-2">
+            <div className="font-semibold text-emerald-800">🤝 紹介者情報</div>
+            <div className="rounded-xl bg-emerald-100 border border-emerald-200 px-4 py-3 text-emerald-900 font-bold text-base">
+              {referrer.name}
+            </div>
+            <div className="text-emerald-700 text-xs">
+              登録後、上記の方があなたの紹介者として紐づけられます。
             </div>
           </div>
         )}
         {!refLoading && refCode && !referrer && (
-          <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-700">
-            🎁 紹介URLから登録します。登録後に紹介者として自動で紐づけされます。
+          <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 text-sm space-y-2">
+            <div className="font-semibold text-emerald-800">🤝 紹介者情報</div>
+            <div className="text-emerald-700 text-xs">
+              登録後、紹介者として紐づけられます。
+            </div>
           </div>
         )}
 
