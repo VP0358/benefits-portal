@@ -183,25 +183,24 @@ export default function MenuCard({
     } catch { /* ignore */ }
   }
 
-  if (menuType === "contact") {
-  return (
-    <a
-      href="/contact"
-      className="rounded-2xl bg-white p-4 shadow-sm text-center hover:shadow-md transition-shadow cursor-pointer block"
-    >
-      <div className="text-2xl mb-1">{icon}</div>
-      <div className="text-xs font-semibold text-slate-800">{title}</div>
-      {subtitle && (
-        <div className="text-xs text-slate-400 mt-0.5">{subtitle}</div>
-      )}
-    </a>
-  );
-}
+  // ── ページ遷移系（href で直接飛ぶ） ──────────────────────
+  const pageHref: string | null =
+    menuType === "contact"           ? "/contact"
+    : menuType === "vp_phone"        ? "/vp-phone"
+    : menuType === "used_car"        ? "/used-cars"
+    : menuType === "life_insurance"  ? "/insurance?tab=life"
+    : menuType === "non_life_insurance" ? "/insurance?tab=non_life"
+    : menuType === "url"             ? (linkUrl || "#")
+    : null;
 
-  if (menuType === "url") {
+  if (pageHref !== null) {
+    const isExternal = menuType === "url";
     return (
-      <a href={linkUrl || "#"} target="_blank" rel="noopener noreferrer"
-        className="rounded-2xl bg-white p-4 shadow-sm text-center hover:shadow-md transition-shadow active:scale-95 cursor-pointer">
+      <a
+        href={pageHref}
+        {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+        className="rounded-2xl bg-white p-4 shadow-sm text-center hover:shadow-md transition-shadow active:scale-95 cursor-pointer block"
+      >
         <div className="text-2xl mb-2">{icon}</div>
         <div className="text-xs font-semibold text-slate-800">{title}</div>
         {subtitle && <div className="text-xs text-slate-400 mt-0.5">{subtitle}</div>}

@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useState, useEffect } from "react";
+import { FormEvent, useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 
 // ── カラーテーマ ────────────────────────────────────────
 const GOLD       = "#c9a84c";
@@ -57,8 +58,17 @@ const DEFAULT_NON_LIFE_PRODUCTS = ["ずっとスマイル", "安全運TEN", "わ
 
 type InsuranceTab = "life" | "non_life";
 
-export default function InsurancePage() {
-  const [tab, setTab] = useState<InsuranceTab>("life");
+function InsurancePageInner() {
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<InsuranceTab>(
+    searchParams.get("tab") === "non_life" ? "non_life" : "life"
+  );
+
+  // URLパラメータ変化を追随
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (t === "non_life" || t === "life") setTab(t);
+  }, [searchParams]);
 
   // 生命保険
   const [lifeForm, setLifeForm]           = useState<LifeForm>(emptyLife());
@@ -381,6 +391,14 @@ export default function InsurancePage() {
 
       </div>
     </div>
+  );
+}
+
+export default function InsurancePage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", background: "#eee8e0" }} />}>
+      <InsurancePageInner />
+    </Suspense>
   );
 }
 
