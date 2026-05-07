@@ -24,7 +24,7 @@ import {
   ACTIVE_REQUIRED_PRODUCTS,
   DIRECT_BONUS_AMOUNT,
   POINT_RATE,
-  LEVEL_ITEM_RANGES,
+  LEVEL_GP_RANGES,
   UNILEVEL_RATES,
 } from "../lib/mlm-bonus";
 
@@ -117,32 +117,32 @@ console.log("  条件: アクティブ かつ 直紹介アクティブ2人以上
 
 assert(
   "アクティブ・直紹介アクティブ2人 → 資格あり",
-  isEligibleForBonus({ isActive: true, directActiveCount: 2 }),
+  isEligibleForBonus({ isActive: true, directActiveCount: 2, conditionAchieved: true }),
   true
 );
 assert(
   "アクティブ・直紹介アクティブ3人 → 資格あり",
-  isEligibleForBonus({ isActive: true, directActiveCount: 3 }),
+  isEligibleForBonus({ isActive: true, directActiveCount: 3, conditionAchieved: true }),
   true
 );
 assert(
   "アクティブ・直紹介アクティブ1人 → 資格なし",
-  isEligibleForBonus({ isActive: true, directActiveCount: 1 }),
+  isEligibleForBonus({ isActive: true, directActiveCount: 1, conditionAchieved: true }),
   false
 );
 assert(
   "アクティブ・直紹介アクティブ0人 → 資格なし",
-  isEligibleForBonus({ isActive: true, directActiveCount: 0 }),
+  isEligibleForBonus({ isActive: true, directActiveCount: 0, conditionAchieved: true }),
   false
 );
 assert(
   "非アクティブ・直紹介アクティブ2人 → 資格なし",
-  isEligibleForBonus({ isActive: false, directActiveCount: 2 }),
+  isEligibleForBonus({ isActive: false, directActiveCount: 2, conditionAchieved: true }),
   false
 );
 assert(
   "非アクティブ・直紹介アクティブ0人 → 資格なし",
-  isEligibleForBonus({ isActive: false, directActiveCount: 0 }),
+  isEligibleForBonus({ isActive: false, directActiveCount: 0, conditionAchieved: false }),
   false
 );
 
@@ -420,7 +420,7 @@ assert("E: 非アクティブ", eActive, false);
 const aDirectActiveCount = [bActive, cActive].filter(Boolean).length; // B, Cが直紹介
 assert("A: 直紹介アクティブ数 = 2", aDirectActiveCount, 2);
 
-const aEligible = isEligibleForBonus({ isActive: aActive, directActiveCount: aDirectActiveCount });
+const aEligible = isEligibleForBonus({ isActive: aActive, directActiveCount: aDirectActiveCount, conditionAchieved: true });
 assert("A: 報酬受取資格あり", aEligible, true);
 
 // A → B → D, E   A → C の流通個数（7段内）
