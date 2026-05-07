@@ -443,8 +443,9 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
       </div>
 
       {/* テーブル */}
-      <div className="bg-white rounded-2xl border border-stone-100 overflow-x-auto">
-        <table className="w-full text-xs whitespace-nowrap">
+      <div className="bg-white rounded-2xl border border-stone-100">
+        <div className="overflow-x-auto w-full">
+        <table className="text-xs whitespace-nowrap">
           <thead className="bg-slate-800 text-white text-[11px]">
             <tr>
               {/* ① 会員コード */}
@@ -686,6 +687,7 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* 詳細モーダル */}

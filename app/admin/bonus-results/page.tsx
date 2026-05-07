@@ -548,14 +548,15 @@ export default function BonusResultsPage() {
           </div>
 
           {/* テーブル */}
-          <div className="p-4 overflow-x-auto">
+          <div className="p-4">
             {filteredResults.length === 0 ? (
               <div className="text-center py-12 text-gray-400">
                 <i className="fas fa-search text-4xl text-gray-200 mb-3 block"></i>
                 <p className="font-semibold">該当データがありません</p>
               </div>
             ) : (
-              <table className="w-full text-xs whitespace-nowrap">
+              <div className="overflow-x-auto w-full">
+              <table className="text-xs whitespace-nowrap">
                 <thead className="bg-slate-800 text-white text-[11px]">
                   <tr>
                     {/* ① 会員コード */}
@@ -794,6 +795,7 @@ export default function BonusResultsPage() {
                   })}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
 
