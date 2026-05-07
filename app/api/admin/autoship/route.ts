@@ -120,6 +120,7 @@ export async function POST(request: Request) {
         targetMonth,
         paymentMethod: paymentMethod as "credit_card" | "bank_transfer",
         memberCode: m.memberCode,
+        creditCardId: m.creditCardId ?? null,  // クレディックス顧客ID（CSV照合キー）
         memberName: getMlmDisplayName(m.user.name, m.companyName),
         memberNameKana: m.user.nameKana ?? null,
         memberPhone: m.user.phone ?? null,
