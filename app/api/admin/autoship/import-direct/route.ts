@@ -105,6 +105,7 @@ export async function POST(request: Request) {
   let codeIdx: number;
   let resultIdx: number;
   let reasonIdx: number;
+  let dateIdx: number;  // 決済日時列
 
   if (isCredixFormat) {
     // クレディックスCSV: "ID(sendid)"列が会員コード
@@ -112,8 +113,14 @@ export async function POST(request: Request) {
       h.includes("sendid") || h === "id(sendid)" || h.includes("id(send")
     );
     resultIdx = header.findIndex(h => h.includes("結果") || h.includes("result"));
+    // 決済日時列: "決済日時" "処理日時" "date" 等
+    dateIdx = header.findIndex(h =>
+      h.includes("決済日時") || h.includes("処理日時") || h.includes("日時") ||
+      h.includes("date") || h.includes("datetime")
+    );
     if (codeIdx   === -1) codeIdx   = 10; // フォールバック: 11列目（0-indexed: 10）
     if (resultIdx === -1) resultIdx = 4;  // フォールバック
+    if (dateIdx   === -1) dateIdx   = 3;  // フォールバック: 4列目（0-indexed: 3）
     reasonIdx = -1;
   } else {
     // 汎用フォーマット: 会員コード列を広く探す（より多くのパターンに対応）
@@ -126,6 +133,10 @@ export async function POST(request: Request) {
     );
     resultIdx = header.findIndex(h =>
       h.includes("結果") || h.includes("result") || h.includes("status") || h.includes("決済")
+    );
+    dateIdx = header.findIndex(h =>
+      h.includes("決済日時") || h.includes("処理日時") || h.includes("日時") ||
+      h.includes("date") || h.includes("datetime")
     );
     reasonIdx = header.findIndex(h =>
       h.includes("理由") || h.includes("reason") || h.includes("error") || h.includes("失敗")
@@ -176,8 +187,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "CSVにデータ行がありません（ヘッダー行のみ）" }, { status: 400 });
   }
 
-  // memberCode → { ok, reason }
-  const resultMap = new Map<string, { ok: boolean; reason?: string }>();
+  // CSV日時文字列 → Date 変換ヘルパー
+  // 対応形式: "2026/5/5 15:29" "2026-05-05 15:29:00" "2026/05/05" 等
+  function parseCsvDate(str: string): Date | null {
+    if (!str || str === "-" || str === "") return null;
+    // "YYYY/M/D HH:MM" または "YYYY/M/D HH:MM:SS" 形式
+    const m1 = str.match(/^(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+    if (m1) {
+      const [, y, mo, d, h = "0", mi = "0", s = "0"] = m1;
+      // JST → UTC（-9h）で保存
+      const jst = new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s));
+      return new Date(jst.getTime() - 9 * 60 * 60 * 1000);
+    }
+    return null;
+  }
+
+  // memberCode → { ok, reason, paidDate }
+  const resultMap = new Map<string, { ok: boolean; reason?: string; paidDate?: Date }>();
   for (const line of effectiveDataLines) {
     if (!line.trim()) continue;
     const cols       = parseCsvLine(line).map(c => c.replace(/^"|"$/g, "").trim());
@@ -186,6 +212,9 @@ export async function POST(request: Request) {
 
     let ok     = true;
     let reason: string | undefined = undefined;
+    // 決済日時をCSVから取得
+    const rawDate = dateIdx >= 0 ? (cols[dateIdx] ?? "") : "";
+    const paidDate = parseCsvDate(rawDate) ?? undefined;
 
     if (isCredixFormat) {
       // クレディックスCSVはファイルに含まれる行が全て決済成功
@@ -193,11 +222,13 @@ export async function POST(request: Request) {
       ok = true;
     } else {
       const result = cols[resultIdx] ?? "";
-      ok = result === "OK" || result === "0" || result.toLowerCase() === "success" || result === "1";
+      // 「決済完了」「OK」「0」「success」「1」を成功と判定
+      ok = result === "OK" || result === "0" || result.toLowerCase() === "success" ||
+           result === "1" || result.includes("完了") || result.includes("成功");
       reason = reasonIdx >= 0 ? (cols[reasonIdx] ?? undefined) : undefined;
     }
 
-    resultMap.set(memberCode, { ok, reason });
+    resultMap.set(memberCode, { ok, reason, paidDate });
   }
 
   // ── 対象会員取得 ──
@@ -296,10 +327,10 @@ export async function POST(request: Request) {
       if (!res) continue;
 
       if (res.ok) {
-        // 決済成功
+        // 決済成功: paidAtはCSVの決済日時を優先、なければ現在時刻
         await tx.autoShipOrder.update({
           where: { id: order.id },
-          data: { status: "paid", paidAt: now },
+          data: { status: "paid", paidAt: res.paidDate ?? now },
         });
 
         // MlmPurchase 記録（重複チェック）
@@ -322,7 +353,7 @@ export async function POST(request: Request) {
               totalPoints:  order.points * order.quantity,
               purchaseStatus: 'autoship',
               purchaseMonth: targetMonth,
-              purchasedAt:  now,
+              purchasedAt:  res.paidDate ?? now,
             },
           });
         }
