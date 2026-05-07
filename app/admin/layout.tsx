@@ -32,10 +32,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       style={{ background: "#eee8e0", fontFamily: "var(--font-noto), 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', sans-serif" }}
     >
       <AdminNav />
-      <div className="flex-1 min-w-0 overflow-auto">
+      {/* overflow-y-auto のみ（縦スクロール）、横は子に委ねる */}
+      <div className="flex-1 min-w-0 flex flex-col overflow-y-auto">
         {/* トップバー */}
         <div
-          className="sticky top-0 z-10 h-14 flex items-center px-6 backdrop-blur-md"
+          className="sticky top-0 z-10 h-14 flex items-center px-6 backdrop-blur-md flex-shrink-0"
           style={{
             background: "rgba(10,22,40,0.92)",
             borderBottom: "1px solid rgba(201,168,76,0.20)",
@@ -55,8 +56,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             Admin Portal
           </div>
         </div>
-        {/* メインコンテンツ */}
-        <div className="p-6 md:p-8 max-w-screen-2xl mx-auto">
+        {/* メインコンテンツ: overflow-x-auto で横スクロールを子テーブルに届ける */}
+        <div className="p-6 md:p-8 flex-1 overflow-x-auto">
           {children}
         </div>
       </div>
