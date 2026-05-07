@@ -462,111 +462,74 @@ export async function POST(request: Request) {
 
   } else if (isCredix) {
     // ══════════════════════════════════════════════════════════════
-    // クレディックスCSV: sendid → AutoShipOrder.creditCardId 照合
+    // クレディックスCSV: sendid → MlmMember全件照合
     // ══════════════════════════════════════════════════════════════
-    // 戦略:
-    // ① 既存Run（credit_card）がある → run.orders.creditCardId で照合（最優先）
-    // ② 既存Runがない → MlmMember.creditCardId で照合して Run を新規作成
+    // ★ 設計方針:
+    //   既存Runの有無・run.ordersの件数に関わらず、常に
+    //   「CSVのsendid → autoshipEnabled全会員のcreditCardId/memberCode」で照合する。
+    //
+    //   理由: 過去のインポートで run.orders が少ない件数しか作られていない場合でも
+    //   CSVにある全sendidを処理する必要がある。run.ordersの件数に依存すると
+    //   不足分が永遠に処理されない。
+    //
+    //   照合キー優先順:
+    //     1. MlmMember.creditCardId / creditCardId2 / creditCardId3 で一致
+    //     2. MlmMember.memberCode で一致（creditCardId未登録会員は
+    //        export-csvが memberCode を顧客IDとして出力するため）
+    //     3. どちらも一致しない → 全件成功フォールバック（csvが来た＝全員決済済み）
 
-    const existingRunForCredix = await prisma.autoShipRun.findUnique({
-      where: { targetMonth_paymentMethod: { targetMonth, paymentMethod: "credit_card" } },
-      include: { orders: { select: { memberCode: true, creditCardId: true, mlmMemberId: true } } },
+    const allAutoshipMembers = await prisma.mlmMember.findMany({
+      where: {
+        autoshipEnabled: true,
+        status: { not: "withdrawn" },
+        autoshipStartDate: { not: null },
+      },
+      include: {
+        user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
+      },
     });
 
-    if (existingRunForCredix && existingRunForCredix.orders.length > 0) {
-      // ① 既存Runあり: AutoShipOrder.creditCardId → memberCode の順でフォールバック照合
-      //
-      // ★ なぜ memberCode でも照合するか:
-      //   export-csv は顧客IDとして「o.creditCardId ?? o.memberCode」を出力する。
-      //   creditCardId が DB 未登録(null)の会員は 会員コード がそのまま sendid として
-      //   クレディックスから返却されるため、memberCode でも照合する必要がある。
-      let matchCount = 0;
-      let memberCodeMatchCount = 0;
+    console.log(`[import-direct] クレディックスCSV照合開始: autoshipEnabled全会員=${allAutoshipMembers.length}件, CSVsendid件数=${credixSendIdMap.size}件`);
+    console.log(`[import-direct] credixSendIdMapサンプル: [${Array.from(credixSendIdMap.keys()).slice(0, 5).join(", ")}]`);
+
+    const matchedMembers: typeof allAutoshipMembers = [];
+    let cidMatchCount = 0;
+    let mcMatchCount = 0;
+
+    for (const m of allAutoshipMembers) {
+      // ① creditCardId（1〜3枠）で照合
+      const cids = [
+        (m as any).creditCardId,
+        (m as any).creditCardId2,
+        (m as any).creditCardId3,
+      ].filter(Boolean) as string[];
+      const matchedSendId = cids.find(cid => credixSendIdMap.has(cid));
+      if (matchedSendId) {
+        const entry = credixSendIdMap.get(matchedSendId)!;
+        resultMap.set(m.memberCode, { ok: entry.ok, paidDate: entry.paidDate });
+        matchedMembers.push(m);
+        cidMatchCount++;
+      } else if (credixSendIdMap.has(m.memberCode)) {
+        // ② memberCode で照合（creditCardId 未登録 → export-csv が memberCode を顧客IDとして出力）
+        const entry = credixSendIdMap.get(m.memberCode)!;
+        resultMap.set(m.memberCode, { ok: entry.ok, paidDate: entry.paidDate });
+        matchedMembers.push(m);
+        mcMatchCount++;
+      }
+    }
+
+    console.log(`[import-direct] クレディックス照合結果: creditCardId一致=${cidMatchCount}件, memberCode一致=${mcMatchCount}件, 合計=${matchedMembers.length}件`);
+
+    if (matchedMembers.length === 0) {
+      // ③ フォールバック: CSVがある＝全員決済済みとして全オートシップ有効会員を処理
+      console.log("[import-direct] sendid照合0件 → autoshipEnabled全会員フォールバック");
       const defaultEntry = credixSendIdMap.values().next().value;
-      for (const order of existingRunForCredix.orders) {
-        const cid = (order.creditCardId as string | null) ?? "";
-        if (cid && credixSendIdMap.has(cid)) {
-          // creditCardId で一致
-          const entry = credixSendIdMap.get(cid)!;
-          resultMap.set(order.memberCode, { ok: entry.ok, paidDate: entry.paidDate });
-          matchCount++;
-        } else if (credixSendIdMap.has(order.memberCode)) {
-          // memberCode で一致（creditCardId が null / 未登録の場合のフォールバック）
-          const entry = credixSendIdMap.get(order.memberCode)!;
-          resultMap.set(order.memberCode, { ok: entry.ok, paidDate: entry.paidDate });
-          memberCodeMatchCount++;
-        } else {
-          // どちらでも一致しない場合もクレディックスCSVは全件成功とみなす
-          resultMap.set(order.memberCode, { ok: true, paidDate: defaultEntry?.paidDate });
-        }
-      }
-      console.log(`[import-direct] クレディックス既存Run照合: creditCardId一致=${matchCount}件, memberCode一致=${memberCodeMatchCount}件, 全件=${existingRunForCredix.orders.length}件`);
-
-      mlmMembers = await prisma.mlmMember.findMany({
-        where: { memberCode: { in: Array.from(resultMap.keys()) } },
-        include: {
-          user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
-        },
-      });
-
-    } else {
-      // ② 既存Runなし or orders=0件:
-      //   MlmMember を全オートシップ有効会員から検索
-      //   ★ paymentMethod フィルタは掛けない
-      //     理由: MlmMember.paymentMethod は会員登録時のデフォルト支払方法であり、
-      //           クレディックスCSVが提出された＝クレジットカード決済対象という事実で
-      //           paymentMethod に関わらず全員照合すべきため。
-      //           また、初回インポート時（CSVダウンロード未実施・空Run状態）でも
-      //           正しく処理できるようにする。
-      const allAutoshipMembers = await prisma.mlmMember.findMany({
-        where: {
-          autoshipEnabled: true,
-          status: { not: "withdrawn" },
-          autoshipStartDate: { not: null },
-        },
-        include: {
-          user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
-        },
-      });
-
-      console.log(`[import-direct] クレディックス照合: autoshipEnabled全会員=${allAutoshipMembers.length}件, credixSendIdMapKeys=[${Array.from(credixSendIdMap.keys()).slice(0, 5).join(", ")}]`);
-
-      const matchedMembers: typeof allAutoshipMembers = [];
       for (const m of allAutoshipMembers) {
-        // creditCardId（1〜3枠）で照合を試みる
-        const cids = [
-          (m as any).creditCardId,
-          (m as any).creditCardId2,
-          (m as any).creditCardId3,
-        ].filter(Boolean) as string[];
-        const matchedSendId = cids.find(cid => credixSendIdMap.has(cid));
-        if (matchedSendId) {
-          const entry = credixSendIdMap.get(matchedSendId)!;
-          resultMap.set(m.memberCode, { ok: entry.ok, paidDate: entry.paidDate });
-          matchedMembers.push(m);
-        } else if (credixSendIdMap.has(m.memberCode)) {
-          // ★ memberCode でも照合（creditCardId 未登録時のフォールバック）
-          // export-csv が 顧客ID = creditCardId ?? memberCode で出力するため
-          // creditCardId が null の会員はクレディックスが memberCode を sendid として返却する
-          const entry = credixSendIdMap.get(m.memberCode)!;
-          resultMap.set(m.memberCode, { ok: entry.ok, paidDate: entry.paidDate });
-          matchedMembers.push(m);
-        }
+        resultMap.set(m.memberCode, { ok: true, paidDate: defaultEntry?.paidDate });
       }
-
-      if (matchedMembers.length === 0) {
-        // フォールバック: 全オートシップ有効会員を対象に（どの照合キーも一致しない場合）
-        // ※ クレディックスCSVが渡された以上、全員が決済済みとして処理する
-        console.log("[import-direct] creditCardId/memberCode照合0件 → autoshipEnabled全会員をフォールバック");
-        const defaultEntry = credixSendIdMap.values().next().value;
-        for (const m of allAutoshipMembers) {
-          resultMap.set(m.memberCode, { ok: true, paidDate: defaultEntry?.paidDate });
-        }
-        mlmMembers = allAutoshipMembers;
-      } else {
-        console.log(`[import-direct] クレディックス照合: creditCardId/memberCode一致=${matchedMembers.length}件`);
-        mlmMembers = matchedMembers;
-      }
+      mlmMembers = allAutoshipMembers;
+    } else {
+      mlmMembers = matchedMembers;
     }
 
   } else {
