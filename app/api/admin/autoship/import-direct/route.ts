@@ -690,7 +690,7 @@ export async function POST(request: Request) {
         paidCount,
         failedCount,
         importedAt: now,
-        status: paidCount + failedCount > 0 ? "imported" : run!.status,
+        status: paidCount + failedCount > 0 ? "completed" : run!.status,
       },
     });
   } catch (updateErr) {
@@ -940,7 +940,7 @@ async function processFromDatabase(
         paidCount,
         failedCount,
         importedAt: now,
-        status:     paidCount > 0 ? "imported" : run!.status,
+        status:     paidCount > 0 ? "completed" : run!.status,
       },
     });
   } catch (updateErr) {
