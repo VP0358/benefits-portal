@@ -79,19 +79,20 @@ export async function POST(request: Request) {
     },
   });
 
-  // 支払い方法フィルタ（MlmRegistrationの口座情報有無で判定）
+  // 支払い方法フィルタ（会員の paymentMethod フィールドで判定）
+  const targetMonthStart = new Date(`${targetMonth}-01`);
   const filtered = allMembers.filter(m => {
-    // stopDate チェック
-    if (m.autoshipStopDate && m.autoshipStopDate <= new Date(`${targetMonth}-01`)) return false;
+    // stopDate チェック（stopDateが対象月以前なら除外）
+    if (m.autoshipStopDate && m.autoshipStopDate <= targetMonthStart) return false;
+    // startDate チェック（startDateが入力されていて、対象月より未来なら除外）
+    if (m.autoshipStartDate && m.autoshipStartDate > targetMonthStart) return false;
     // suspend月チェック
     if (m.autoshipSuspendMonths) {
       const months = m.autoshipSuspendMonths.split(",").map(s => s.trim());
       if (months.includes(targetMonth)) return false;
     }
-    // 支払い方法判定: 口座情報があれば bank_transfer、なければ credit_card
-    const hasBank = !!(m.mlmRegistration?.bankAccountNumber);
-    if (paymentMethod === "bank_transfer") return hasBank;
-    return !hasBank; // credit_card
+    // 支払い方法判定: 会員に設定された paymentMethod で一致を確認
+    return m.paymentMethod === paymentMethod;
   });
 
   if (filtered.length === 0) {

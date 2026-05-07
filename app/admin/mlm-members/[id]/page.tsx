@@ -2106,8 +2106,10 @@ export default function MlmMemberDetailPage() {
           {/* 有効条件の説明 */}
           <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 text-xs text-blue-800 space-y-1 mb-1">
             <p className="font-bold text-blue-700">📌 継続購入の有効条件</p>
-            <p>• <strong>継続購入を有効にするチェックあり</strong> ＋ <strong>開始日あり</strong> ＋ <strong>停止日なし（空欄）</strong> → 毎月継続購入が有効</p>
-            <p>• <strong>停止日を入力した場合</strong>: 翌月以降その日付以降は停止されます</p>
+            <p>• <strong>継続購入を有効にするチェックあり</strong> ＋ <strong>停止日なし（空欄）</strong> → 毎月継続購入が有効（開始日は任意）</p>
+            <p>• <strong>開始日を入力した場合</strong>: その日付以降から継続購入が開始されます</p>
+            <p>• <strong>停止日を入力した場合</strong>: その日付以降は停止されます</p>
+            <p>• いずれの場合も、支払い方法欄に設定した支払方法が適用されます</p>
             <p>• 停止日は手動で入力した場合のみ反映されます。空欄のまま保存すると停止日はクリアされます</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -2116,7 +2118,7 @@ export default function MlmMemberDetailPage() {
                 <input type="checkbox" checked={Boolean(editData.autoshipEnabled)} onChange={e => set("autoshipEnabled", e.target.checked)} className="w-4 h-4 accent-blue-600" />
                 <div>
                   <span className="text-sm font-semibold">継続購入を有効にする</span>
-                  <p className="text-xs text-slate-500">開始日あり・停止日なしの場合、毎月自動的に継続購入が有効になります</p>
+                  <p className="text-xs text-slate-500">チェックを入れるだけで有効になります（開始日は任意）。支払い方法欄に設定した方法が適用されます</p>
                 </div>
               </label>
             </div>
@@ -2161,20 +2163,20 @@ export default function MlmMemberDetailPage() {
           </div>
           {/* 有効状態プレビュー */}
           <div className={`mt-2 rounded-lg px-3 py-2 text-xs ${
-            editData.autoshipEnabled && editData.autoshipStartDate && !editData.autoshipStopDate
+            editData.autoshipEnabled && !editData.autoshipStopDate
               ? "bg-green-50 border border-green-200 text-green-800"
               : editData.autoshipEnabled && editData.autoshipStopDate
               ? "bg-amber-50 border border-amber-200 text-amber-800"
               : "bg-gray-50 border border-gray-200 text-gray-600"
           }`}>
             <strong>設定プレビュー: </strong>
-            {editData.autoshipEnabled && editData.autoshipStartDate && !editData.autoshipStopDate
-              ? `✅ 毎月継続購入が有効（${String(editData.autoshipStartDate)} 開始・停止日なし）`
+            {editData.autoshipEnabled && !editData.autoshipStopDate
+              ? editData.autoshipStartDate
+                ? `✅ 毎月継続購入が有効（${String(editData.autoshipStartDate)} 開始・停止日なし）`
+                : `✅ 毎月継続購入が有効（開始日なし・即時有効・停止日なし）`
               : editData.autoshipEnabled && editData.autoshipStopDate
               ? `⏹️ ${String(editData.autoshipStopDate)} 以降停止予定`
-              : !editData.autoshipEnabled
-              ? "❌ 継続購入無効"
-              : "⚠️ 開始日を入力してください"}
+              : "❌ 継続購入無効"}
           </div>
         </EditModal>
       )}
