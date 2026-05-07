@@ -23,6 +23,25 @@ function yen(n: number) {
   return `¥${n.toLocaleString()}`;
 }
 
+// ステータス表示ラベル
+const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  active:    { label: "活動中",       color: "bg-green-100 text-green-700" },
+  autoship:  { label: "オートシップ", color: "bg-blue-100 text-blue-700" },
+  suspended: { label: "休止中",       color: "bg-yellow-100 text-yellow-700" },
+  inactive:  { label: "非活動",       color: "bg-gray-100 text-gray-500" },
+  withdrawn: { label: "退会",         color: "bg-red-100 text-red-500" },
+};
+
+// レベルバッジ色
+const LEVEL_COLORS: Record<number, string> = {
+  0: "bg-gray-100 text-gray-400",
+  1: "bg-blue-100 text-blue-700",
+  2: "bg-green-100 text-green-700",
+  3: "bg-yellow-100 text-yellow-700",
+  4: "bg-purple-100 text-purple-700",
+  5: "bg-red-100 text-red-700",
+};
+
 /** 1ポジション分の詳細 */
 type PositionRow = {
   id: string;
@@ -62,31 +81,26 @@ type BonusResultDetail = {
   memberName: string;
   companyName: string | null;
   status: string;
-  // 複数ポジション対応
   baseCode: string;
   positionCount: number;
   positions: PositionRow[];
 
-  // ボーナス項目
   directBonus: number;
   unilevelBonus: number;
   rankUpBonus: number;
   shareBonus: number;
   structureBonus: number;
 
-  // 合計・調整
   bonusTotal: number;
   carryoverAmount: number;
   adjustmentAmount: number;
   otherPositionAmount: number;
   amountBeforeAdjustment: number;
 
-  // 支払調整
   paymentAdjustmentRate: number | null;
   paymentAdjustmentAmount: number;
   finalAmount: number;
 
-  // 税金・手数料
   consumptionTax: number;
   withholdingTax: number;
   shortageAmount: number;
@@ -94,7 +108,6 @@ type BonusResultDetail = {
   serviceFee: number;
   paymentAmount: number;
 
-  // グループ情報
   groupActiveCount: number;
   groupPoints: number;
   minLinePoints: number;
@@ -103,22 +116,19 @@ type BonusResultDetail = {
   level2Lines: number;
   level3Lines: number;
 
-  // 個人情報
   selfPurchasePoints: number;
   directActiveCount: number;
 
-  // レベル情報
   previousTitleLevel: number;
   newTitleLevel: number;
   achievedLevel: number;
   forcedLevel: number;
 
-  // 条件・フラグ
   conditions: string | null;
   savingsPoints: number;
+  savingsPointsAdded: number;
   isActive: boolean;
 
-  // ユニレベル段数別
   unilevelDetail: Record<string, number> | null;
 };
 
@@ -200,8 +210,9 @@ function BonusDetailModal({ row, onClose }: { row: BonusResultDetail; onClose: (
   const [activeTab, setActiveTab] = useState<"merged" | number>("merged");
 
   const name = row.companyName || row.memberName;
+  const isCompany = !!row.companyName;
+  const THRESHOLD = 120000;
 
-  // 表示するデータ（合算 or ポジション個別）
   const displayData: PositionRow | BonusResultDetail =
     activeTab === "merged" || !isMulti
       ? row
@@ -225,13 +236,19 @@ function BonusDetailModal({ row, onClose }: { row: BonusResultDetail; onClose: (
           </div>
           <div className="flex flex-col items-end gap-2">
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">✕</button>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
               {isMulti && (
                 <span className="text-xs px-2 py-1 rounded-full font-bold bg-purple-100 text-purple-700">
                   {row.positionCount}POS
                 </span>
               )}
-              <span className={`text-xs px-2 py-1 rounded-full font-semibold ${row.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+              {isCompany && (
+                <span className="text-xs px-2 py-1 rounded-full font-bold bg-orange-100 text-orange-700">法人</span>
+              )}
+              <span className={`text-xs px-2 py-1 rounded-full font-semibold ${STATUS_LABELS[row.status]?.color ?? "bg-gray-100 text-gray-500"}`}>
+                {STATUS_LABELS[row.status]?.label ?? row.status}
+              </span>
+              <span className={`text-xs px-2 py-1 rounded-full font-semibold ${row.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
                 {row.isActive ? "アクティブ" : "非アクティブ"}
               </span>
             </div>
@@ -299,37 +316,53 @@ function BonusDetailModal({ row, onClose }: { row: BonusResultDetail; onClose: (
                 <p className="text-xl font-bold text-slate-800">{displayData.groupPoints}<span className="text-xs font-normal text-slate-400 ml-1">pt</span></p>
               </div>
               <div className="bg-slate-50 rounded-xl p-3 text-center">
-                <p className="text-xs text-slate-500 mb-1">直下アクティブ</p>
+                <p className="text-xs text-slate-500 mb-1">直接紹介アクティブ</p>
                 <p className="text-xl font-bold text-slate-800">{displayData.directActiveCount}<span className="text-xs font-normal text-slate-400 ml-1">名</span></p>
               </div>
             </div>
           </section>
 
-          {/* ── レベル情報 ── */}
+          {/* ── レベル・称号変動 ── */}
           <section>
-            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">レベル情報</h4>
+            <h4 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">レベル・称号変動</h4>
             <div className="flex items-center gap-4 bg-indigo-50 rounded-xl px-5 py-4 flex-wrap">
               <div className="text-center">
                 <p className="text-xs text-indigo-400 mb-1">前回称号</p>
-                <p className="text-base font-bold text-indigo-700">{LEVEL_LABELS[displayData.previousTitleLevel]}</p>
+                <span className={`text-sm font-bold px-3 py-1 rounded-full ${LEVEL_COLORS[displayData.previousTitleLevel]}`}>
+                  {LEVEL_LABELS[displayData.previousTitleLevel]}
+                </span>
               </div>
-              {displayData.previousTitleLevel !== displayData.newTitleLevel ? (
-                <>
-                  <div className="text-2xl text-indigo-300">→</div>
-                  <div className="text-center">
-                    <p className="text-xs text-indigo-400 mb-1">新称号</p>
-                    <p className="text-base font-bold text-indigo-700">{LEVEL_LABELS[displayData.newTitleLevel]}</p>
-                  </div>
-                  <span className={`ml-auto text-xs px-3 py-1 rounded-full font-semibold ${displayData.newTitleLevel > displayData.previousTitleLevel ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                    {displayData.newTitleLevel > displayData.previousTitleLevel ? "▲ 昇格" : "▼ 降格"}
+              <div className="text-2xl text-indigo-200 font-bold">→</div>
+              <div className="text-center">
+                <p className="text-xs text-indigo-400 mb-1">新称号（現レベル）</p>
+                <span className={`text-sm font-bold px-3 py-1 rounded-full ${LEVEL_COLORS[displayData.newTitleLevel]}`}>
+                  {LEVEL_LABELS[displayData.newTitleLevel]}
+                </span>
+              </div>
+              <div className="ml-auto">
+                {displayData.newTitleLevel > displayData.previousTitleLevel ? (
+                  <span className="text-xs px-3 py-1.5 rounded-full font-bold bg-green-100 text-green-700">▲ 昇格</span>
+                ) : displayData.newTitleLevel < displayData.previousTitleLevel ? (
+                  <span className="text-xs px-3 py-1.5 rounded-full font-bold bg-red-100 text-red-600">▼ 降格</span>
+                ) : (
+                  <span className="text-xs px-3 py-1.5 rounded-full font-semibold bg-gray-100 text-gray-500">変動なし</span>
+                )}
+              </div>
+              <div className="w-full border-t border-indigo-200 pt-2 flex items-center gap-6">
+                <div className="text-center">
+                  <p className="text-xs text-indigo-400 mb-1">当月達成LV</p>
+                  <span className={`text-sm font-bold px-3 py-1 rounded-full ${LEVEL_COLORS[displayData.achievedLevel]}`}>
+                    {LEVEL_LABELS[displayData.achievedLevel]}
                   </span>
-                </>
-              ) : (
-                <span className="ml-auto text-xs px-3 py-1 rounded-full font-semibold bg-gray-100 text-gray-500">変動なし</span>
-              )}
-              <div className="text-center ml-4 pl-4 border-l border-indigo-200">
-                <p className="text-xs text-indigo-400 mb-1">当月達成LV</p>
-                <p className="text-base font-bold text-indigo-700">{LEVEL_LABELS[displayData.achievedLevel]}</p>
+                </div>
+                {("forcedLevel" in displayData) && (displayData as BonusResultDetail).forcedLevel > 0 && (
+                  <div className="text-center">
+                    <p className="text-xs text-indigo-400 mb-1">強制LV</p>
+                    <span className="text-sm font-bold px-3 py-1 rounded-full bg-orange-100 text-orange-700">
+                      LV.{(displayData as BonusResultDetail).forcedLevel}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </section>
@@ -348,7 +381,7 @@ function BonusDetailModal({ row, onClose }: { row: BonusResultDetail; onClose: (
                 <table className="w-full text-sm">
                   <tbody className="divide-y divide-gray-50">
                     <tr className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-600">調整前取得額</td>
+                      <td className="px-4 py-3 text-gray-600">支払調整前取得額</td>
                       <td className="px-4 py-3 text-right font-semibold text-gray-800">{yen(row.amountBeforeAdjustment)}</td>
                     </tr>
                     {(row.paymentAdjustmentRate ?? 0) > 0 && (
@@ -368,8 +401,21 @@ function BonusDetailModal({ row, onClose }: { row: BonusResultDetail; onClose: (
                       <td className="px-4 py-3 text-right font-semibold text-gray-800">{yen(row.finalAmount)}</td>
                     </tr>
                     <tr className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-600">源泉徴収税（10.21%）</td>
-                      <td className="px-4 py-3 text-right text-red-500">－{yen(row.withholdingTax)}</td>
+                      <td className="px-4 py-3 text-gray-600">
+                        源泉徴収税（10.21%）
+                        {isCompany ? (
+                          <span className="ml-2 text-xs text-orange-500 font-normal">※法人非課税</span>
+                        ) : row.amountBeforeAdjustment <= THRESHOLD ? (
+                          <span className="ml-2 text-xs text-gray-400 font-normal">※12万円以下非課税</span>
+                        ) : (
+                          <span className="ml-2 text-xs text-gray-400 font-normal">
+                            ※{yen(row.amountBeforeAdjustment - THRESHOLD)}（12万超分）× 10.21%
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right text-red-500">
+                        {row.withholdingTax > 0 ? `－${yen(row.withholdingTax)}` : "¥0"}
+                      </td>
                     </tr>
                     {row.serviceFee > 0 && (
                       <tr className="hover:bg-gray-50">
@@ -390,6 +436,26 @@ function BonusDetailModal({ row, onClose }: { row: BonusResultDetail; onClose: (
                   </tbody>
                 </table>
               </div>
+
+              {/* 貯金ポイント表示（01ポジションのみ） */}
+              {(("savingsPoints" in row) && ((row as BonusResultDetail).savingsPoints ?? 0) > 0) && (
+                <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-4">
+                  <div>
+                    <p className="text-xs text-amber-600 font-semibold">貯金ポイント累計</p>
+                    <p className="text-lg font-bold text-amber-800">
+                      {((row as BonusResultDetail).savingsPoints / 10).toFixed(1)} pt
+                    </p>
+                  </div>
+                  {(row as BonusResultDetail).savingsPointsAdded > 0 && (
+                    <div className="border-l border-amber-300 pl-4">
+                      <p className="text-xs text-amber-600 font-semibold">今月追加分</p>
+                      <p className="text-base font-bold text-amber-700">
+                        +{((row as BonusResultDetail).savingsPointsAdded / 10).toFixed(1)} pt
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
           )}
 
@@ -414,15 +480,11 @@ export default function BonusResultsPage() {
   const [loading, setLoading] = useState(false);
   const [detailRow, setDetailRow] = useState<BonusResultDetail | null>(null);
 
-  // 検索・フィルター
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "payment">("all");
 
-  // データ取得
   useEffect(() => {
-    if (selectedMonth) {
-      fetchData();
-    }
+    if (selectedMonth) fetchData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMonth]);
 
@@ -441,7 +503,6 @@ export default function BonusResultsPage() {
     setLoading(false);
   };
 
-  // フィルタリング（baseCode または memberCode で検索）
   const filteredResults = results.filter((r) => {
     const code = r.baseCode || r.memberCode;
     const matchesSearch =
@@ -458,27 +519,40 @@ export default function BonusResultsPage() {
   const totalPaymentAmount = paymentResults.reduce((s, r) => s + r.paymentAmount, 0);
   const totalBonusShown = filteredResults.reduce((s, r) => s + r.bonusTotal, 0);
 
-  // CSVエクスポート（全項目）
   const handleExportCSV = () => {
     const headers = [
-      "会員コード", "会員名", "法人名", "ステータス", "ACT", "ポジション数",
-      "自己購入PT", "グループPT", "直下ACT",
-      "ダイレクトB", "ユニレベルB", "ランクアップB", "シェアB", "組織構築B",
-      "繰越金", "調整金", "支払調整前取得額",
-      "調整率", "調整額", "取得額合計",
-      "源泉所得税", "過不足金", "事務手数料", "支払額",
-      "前回レベル", "タイトルレベル", "当月レベル",
+      "会員コード", "氏名/法人名", "ステータス", "ACT",
+      "自己PT", "グループPT", "直接",
+      "前称号", "称号変動", "現レベル",
+      "ダイレクト", "ユニレベル", "組織構築", "調整金",
+      "ボーナス合計", "源泉税", "事務費", "支払額",
     ];
 
-    const rows = filteredResults.map((r) => [
-      r.baseCode || r.memberCode, r.memberName, r.companyName || "", r.status, r.isActive ? "○" : "", r.positionCount ?? 1,
-      r.selfPurchasePoints, r.groupPoints, r.directActiveCount,
-      r.directBonus, r.unilevelBonus, r.rankUpBonus, r.shareBonus, r.structureBonus,
-      r.carryoverAmount, r.adjustmentAmount, r.amountBeforeAdjustment,
-      r.paymentAdjustmentRate || "", r.paymentAdjustmentAmount, r.finalAmount,
-      r.withholdingTax, r.shortageAmount, r.serviceFee, r.paymentAmount,
-      r.previousTitleLevel, r.newTitleLevel, r.achievedLevel,
-    ]);
+    const rows = filteredResults.map((r) => {
+      const titleChange =
+        r.newTitleLevel > r.previousTitleLevel ? "昇格" :
+        r.newTitleLevel < r.previousTitleLevel ? "降格" : "変動なし";
+      return [
+        r.baseCode || r.memberCode,
+        r.companyName || r.memberName,
+        STATUS_LABELS[r.status]?.label ?? r.status,
+        r.isActive ? "○" : "",
+        r.selfPurchasePoints,
+        r.groupPoints,
+        r.directActiveCount,
+        LEVEL_LABELS[r.previousTitleLevel],
+        titleChange,
+        LEVEL_LABELS[r.newTitleLevel],
+        r.directBonus,
+        r.unilevelBonus,
+        r.structureBonus,
+        r.adjustmentAmount,
+        r.bonusTotal,
+        r.withholdingTax,
+        r.serviceFee,
+        r.paymentAmount,
+      ];
+    });
 
     const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const bom = "\uFEFF";
@@ -623,7 +697,7 @@ export default function BonusResultsPage() {
           </div>
 
           {/* テーブル */}
-          <div className="p-6">
+          <div className="p-4">
             {filteredResults.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
                 <i className="fas fa-search text-4xl text-gray-200 mb-3 block"></i>
@@ -632,20 +706,28 @@ export default function BonusResultsPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs whitespace-nowrap">
-                  <thead className="bg-slate-800 text-white">
-                    <tr>
-                      <th className="px-3 py-3 text-left font-semibold sticky left-0 bg-slate-800 z-10 min-w-[120px]">会員コード</th>
+                  <thead>
+                    <tr className="bg-slate-800 text-white">
+                      {/* ── 会員情報 ── */}
+                      <th className="px-3 py-3 text-left font-semibold sticky left-0 bg-slate-800 z-10 min-w-[110px]">会員コード</th>
                       <th className="px-3 py-3 text-left font-semibold min-w-[140px]">氏名 / 法人名</th>
-                      <th className="px-3 py-3 text-center font-semibold">ACT</th>
-                      <th className="px-3 py-3 text-center font-semibold">レベル</th>
-                      <th className="px-3 py-3 text-right font-semibold">自己PT</th>
-                      <th className="px-3 py-3 text-right font-semibold">GrpPT</th>
-                      <th className="px-3 py-3 text-right font-semibold">直下</th>
+                      <th className="px-3 py-3 text-center font-semibold min-w-[90px]">ステータス</th>
+                      {/* ── 活動データ ── */}
+                      <th className="px-3 py-3 text-right font-semibold bg-slate-700">自己PT</th>
+                      <th className="px-3 py-3 text-right font-semibold bg-slate-700">グループPT</th>
+                      <th className="px-3 py-3 text-right font-semibold bg-slate-700">直接</th>
+                      {/* ── 称号変動 ── */}
+                      <th className="px-3 py-3 text-center font-semibold bg-indigo-800 min-w-[120px]">称号変動</th>
+                      <th className="px-3 py-3 text-center font-semibold bg-indigo-800">現レベル</th>
+                      {/* ── ボーナス ── */}
                       <th className="px-3 py-3 text-right font-semibold bg-blue-900">ダイレクト</th>
                       <th className="px-3 py-3 text-right font-semibold bg-blue-900">ユニレベル</th>
                       <th className="px-3 py-3 text-right font-semibold bg-blue-900">組織</th>
+                      <th className="px-3 py-3 text-right font-semibold bg-blue-900">調整金</th>
                       <th className="px-3 py-3 text-right font-semibold bg-indigo-900">B合計</th>
+                      {/* ── 支払い ── */}
                       <th className="px-3 py-3 text-right font-semibold">源泉税</th>
+                      <th className="px-3 py-3 text-right font-semibold">事務費</th>
                       <th className="px-3 py-3 text-right font-semibold bg-emerald-900">支払額</th>
                       <th className="px-3 py-3 text-center font-semibold">詳細</th>
                     </tr>
@@ -654,20 +736,32 @@ export default function BonusResultsPage() {
                     {filteredResults.map((r) => {
                       const isMulti = (r.positionCount ?? 1) >= 2;
                       const displayCode = isMulti ? r.baseCode : r.memberCode;
+                      const isCompany = !!r.companyName;
+
+                      // 称号変動
+                      const titleChanged = r.newTitleLevel !== r.previousTitleLevel;
+                      const titleUp = r.newTitleLevel > r.previousTitleLevel;
+
                       return (
                         <tr
                           key={r.id}
                           className={`hover:bg-violet-50/30 transition ${r.paymentAmount > 0 ? "" : "opacity-60"}`}
                         >
+                          {/* 会員コード */}
                           <td className="px-3 py-2.5 font-mono text-xs text-slate-600 sticky left-0 bg-white">
                             {isMulti
-                              ? <span>{displayCode}<span className="text-purple-400">**</span></span>
+                              ? <><span>{displayCode}</span><span className="text-purple-400">**</span></>
                               : displayCode
                             }
                           </td>
+
+                          {/* 氏名 / 法人名 */}
                           <td className="px-3 py-2.5">
                             <div className="flex items-center gap-1.5">
                               <span className="font-semibold text-gray-800">{r.companyName || r.memberName}</span>
+                              {isCompany && (
+                                <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-orange-100 text-orange-600">法人</span>
+                              )}
                               {isMulti && (
                                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
                                   {r.positionCount}POS
@@ -676,27 +770,119 @@ export default function BonusResultsPage() {
                             </div>
                             {r.companyName && <div className="text-gray-400 text-[10px]">{r.memberName}</div>}
                           </td>
+
+                          {/* ステータス */}
                           <td className="px-3 py-2.5 text-center">
-                            {r.isActive
-                              ? <span className="text-green-600 font-bold">●</span>
-                              : <span className="text-gray-300">○</span>}
-                          </td>
-                          <td className="px-3 py-2.5 text-center">
-                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${r.achievedLevel > 0 ? "bg-indigo-100 text-indigo-700" : "bg-gray-100 text-gray-400"}`}>
-                              {LEVEL_LABELS[r.achievedLevel]}
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_LABELS[r.status]?.color ?? "bg-gray-100 text-gray-500"}`}>
+                              {STATUS_LABELS[r.status]?.label ?? r.status}
                             </span>
                           </td>
-                          <td className="px-3 py-2.5 text-right text-gray-600">{r.selfPurchasePoints}</td>
-                          <td className="px-3 py-2.5 text-right text-gray-600">{r.groupPoints}</td>
-                          <td className="px-3 py-2.5 text-right text-gray-600">{r.directActiveCount}</td>
-                          <td className="px-3 py-2.5 text-right bg-blue-50/50 font-medium">{yen(r.directBonus)}</td>
-                          <td className="px-3 py-2.5 text-right bg-blue-50/50 font-medium">{yen(r.unilevelBonus)}</td>
-                          <td className="px-3 py-2.5 text-right bg-blue-50/50 font-medium">{yen(r.structureBonus)}</td>
-                          <td className="px-3 py-2.5 text-right bg-indigo-50/50 font-bold text-indigo-800">{yen(r.bonusTotal)}</td>
-                          <td className="px-3 py-2.5 text-right text-red-500">{yen(r.withholdingTax)}</td>
+
+                          {/* 自己PT */}
+                          <td className="px-3 py-2.5 text-right text-gray-600 bg-slate-50/50">
+                            {r.selfPurchasePoints > 0
+                              ? <span className="font-medium">{r.selfPurchasePoints}</span>
+                              : <span className="text-gray-300">-</span>
+                            }
+                          </td>
+
+                          {/* グループPT */}
+                          <td className="px-3 py-2.5 text-right text-gray-600 bg-slate-50/50">
+                            {r.groupPoints > 0
+                              ? <span className="font-medium">{r.groupPoints}</span>
+                              : <span className="text-gray-300">-</span>
+                            }
+                          </td>
+
+                          {/* 直接 */}
+                          <td className="px-3 py-2.5 text-right bg-slate-50/50">
+                            {r.directActiveCount > 0
+                              ? <span className="font-medium text-gray-700">{r.directActiveCount}</span>
+                              : <span className="text-gray-300">-</span>
+                            }
+                          </td>
+
+                          {/* 称号変動 */}
+                          <td className="px-3 py-2.5 text-center bg-indigo-50/30">
+                            {titleChanged ? (
+                              <div className="flex items-center justify-center gap-1">
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${LEVEL_COLORS[r.previousTitleLevel]}`}>
+                                  {LEVEL_LABELS[r.previousTitleLevel]}
+                                </span>
+                                <span className={`text-[10px] font-bold ${titleUp ? "text-green-600" : "text-red-500"}`}>
+                                  {titleUp ? "▲" : "▼"}
+                                </span>
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${LEVEL_COLORS[r.newTitleLevel]}`}>
+                                  {LEVEL_LABELS[r.newTitleLevel]}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-gray-400">-</span>
+                            )}
+                          </td>
+
+                          {/* 現レベル */}
+                          <td className="px-3 py-2.5 text-center bg-indigo-50/30">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${LEVEL_COLORS[r.newTitleLevel]}`}>
+                              {LEVEL_LABELS[r.newTitleLevel]}
+                            </span>
+                          </td>
+
+                          {/* ダイレクト */}
+                          <td className="px-3 py-2.5 text-right bg-blue-50/40 font-medium">
+                            {r.directBonus > 0 ? yen(r.directBonus) : <span className="text-gray-300">-</span>}
+                          </td>
+
+                          {/* ユニレベル */}
+                          <td className="px-3 py-2.5 text-right bg-blue-50/40 font-medium">
+                            {r.unilevelBonus > 0 ? yen(r.unilevelBonus) : <span className="text-gray-300">-</span>}
+                          </td>
+
+                          {/* 組織 */}
+                          <td className="px-3 py-2.5 text-right bg-blue-50/40 font-medium">
+                            {r.structureBonus > 0 ? yen(r.structureBonus) : <span className="text-gray-300">-</span>}
+                          </td>
+
+                          {/* 調整金 */}
+                          <td className="px-3 py-2.5 text-right bg-blue-50/40">
+                            {r.adjustmentAmount !== 0 ? (
+                              <span className={r.adjustmentAmount > 0 ? "text-blue-600 font-medium" : "text-red-500 font-medium"}>
+                                {r.adjustmentAmount > 0 ? "+" : ""}{yen(r.adjustmentAmount)}
+                              </span>
+                            ) : (
+                              <span className="text-gray-300">-</span>
+                            )}
+                          </td>
+
+                          {/* B合計 */}
+                          <td className="px-3 py-2.5 text-right bg-indigo-50/50 font-bold text-indigo-800">
+                            {yen(r.bonusTotal)}
+                          </td>
+
+                          {/* 源泉税 */}
+                          <td className="px-3 py-2.5 text-right">
+                            {r.withholdingTax > 0
+                              ? <span className="text-red-500">－{yen(r.withholdingTax)}</span>
+                              : isCompany
+                                ? <span className="text-[9px] text-orange-400">法人</span>
+                                : <span className="text-gray-300">-</span>
+                            }
+                          </td>
+
+                          {/* 事務費 */}
+                          <td className="px-3 py-2.5 text-right">
+                            {r.serviceFee > 0
+                              ? <span className="text-red-400">－{yen(r.serviceFee)}</span>
+                              : <span className="text-gray-300">-</span>
+                            }
+                          </td>
+
+                          {/* 支払額 */}
                           <td className={`px-3 py-2.5 text-right font-bold bg-emerald-50/50 ${r.paymentAmount > 0 ? "text-emerald-700" : "text-gray-400"}`}>
                             {yen(r.paymentAmount)}
                           </td>
+
+                          {/* 詳細ボタン */}
                           <td className="px-3 py-2.5 text-center">
                             <button
                               onClick={() => setDetailRow(r)}
@@ -713,6 +899,37 @@ export default function BonusResultsPage() {
                       );
                     })}
                   </tbody>
+                  {/* フッター合計行 */}
+                  <tfoot>
+                    <tr className="bg-slate-100 font-bold text-xs border-t-2 border-slate-300">
+                      <td colSpan={8} className="px-3 py-2.5 text-right text-slate-600 sticky left-0 bg-slate-100">合計</td>
+                      <td className="px-3 py-2.5 text-right text-blue-800">
+                        {yen(filteredResults.reduce((s, r) => s + r.directBonus, 0))}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-blue-800">
+                        {yen(filteredResults.reduce((s, r) => s + r.unilevelBonus, 0))}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-blue-800">
+                        {yen(filteredResults.reduce((s, r) => s + r.structureBonus, 0))}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-blue-800">
+                        {yen(filteredResults.reduce((s, r) => s + r.adjustmentAmount, 0))}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-indigo-800">
+                        {yen(filteredResults.reduce((s, r) => s + r.bonusTotal, 0))}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-red-600">
+                        -{yen(filteredResults.reduce((s, r) => s + r.withholdingTax, 0))}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-red-400">
+                        -{yen(filteredResults.reduce((s, r) => s + r.serviceFee, 0))}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-emerald-700">
+                        {yen(filteredResults.reduce((s, r) => s + r.paymentAmount, 0))}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             )}

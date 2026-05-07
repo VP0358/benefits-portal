@@ -129,6 +129,10 @@ export async function executeBonusCalculation(
     },
   });
 
+  // 源泉徴収税の閾値
+  const WITHHOLDING_THRESHOLD = 120000; // 12万円
+  const WITHHOLDING_RATE = 0.1021;      // 10.21%
+
   console.log(`📊 対象会員数: ${members.length}名`);
 
   // 3. 対象月の購入データを取得（Orderリレーション含む：オートシップ伝票判定用）
@@ -451,8 +455,14 @@ export async function executeBonusCalculation(
 
     const finalAmount = amountBeforeAdjustment - paymentAdjustmentAmount;
 
-    // 源泉徴収税（10.21%）
-    const withholdingTax = Math.floor(finalAmount * 0.1021);
+    // 源泉徴収税
+    // 仕様: 支払調整前取得額が12万円を超えた場合、超えた金額に対して10.21%を差引く
+    //       法人会員（companyNameあり）は対象外
+    const isCompany = !!(member as any).companyName;
+    let withholdingTax = 0;
+    if (!isCompany && amountBeforeAdjustment > WITHHOLDING_THRESHOLD) {
+      withholdingTax = Math.floor((amountBeforeAdjustment - WITHHOLDING_THRESHOLD) * WITHHOLDING_RATE);
+    }
 
     // 事務手数料
     const serviceFee =
