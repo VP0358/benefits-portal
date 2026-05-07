@@ -18,6 +18,7 @@ type Params = { params: Promise<{ id: string }> };
  * 結果コード: "OK" or "0" = 成功, それ以外 = 失敗
  */
 export async function POST(request: Request, { params }: Params) {
+  try {
   const guard = await requireAdmin();
   if (guard.error) return guard.error;
   const { id } = await params;
@@ -284,4 +285,12 @@ export async function POST(request: Request, { params }: Params) {
     failedCount,
     totalProcessed: paidCount + failedCount,
   });
+
+  } catch (unexpectedErr) {
+    console.error("[import-result] 予期しないエラー:", unexpectedErr);
+    return NextResponse.json(
+      { error: `取り込み処理中にエラーが発生しました: ${unexpectedErr instanceof Error ? unexpectedErr.message : String(unexpectedErr)}` },
+      { status: 500 }
+    );
+  }
 }

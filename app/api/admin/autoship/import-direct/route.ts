@@ -18,6 +18,7 @@ import { requireAdmin } from "@/app/api/admin/route-guard";
  *   noFile:        "true" の場合、ファイルなしでDBのオートシップ有効会員を全員取込
  */
 export async function POST(request: Request) {
+  try {
   const guard = await requireAdmin();
   if (guard.error) return guard.error;
 
@@ -424,6 +425,14 @@ export async function POST(request: Request) {
     failedCount,
     runCreated,
   }, { status: 200 });
+
+  } catch (unexpectedErr) {
+    console.error("[import-direct] 予期しないエラー:", unexpectedErr);
+    return NextResponse.json(
+      { error: `インポート処理中にエラーが発生しました: ${unexpectedErr instanceof Error ? unexpectedErr.message : String(unexpectedErr)}` },
+      { status: 500 }
+    );
+  }
 }
 
 /**

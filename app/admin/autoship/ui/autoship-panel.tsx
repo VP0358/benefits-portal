@@ -460,8 +460,11 @@ export default function AutoShipPanel() {
         method: "POST",
         body: fd,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "インポート失敗");
+      // 空ボディ・HTML エラーページでも JSON.parse がクラッシュしないよう安全に解析
+      const rawText = await res.text();
+      let data: Record<string, unknown> = {};
+      try { data = rawText ? JSON.parse(rawText) : {}; } catch { /* ignore */ }
+      if (!res.ok) throw new Error((data.error as string) ?? `サーバーエラー (${res.status})`);
       setCsvImportResult({ paidCount: data.paidCount, failedCount: data.failedCount, newRunId: data.runId });
       setMsg({
         type: "success",
@@ -489,12 +492,14 @@ export default function AutoShipPanel() {
         method: "POST",
         body: fd,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "取込失敗");
-      setCsvImportResult({ paidCount: data.paidCount, failedCount: data.failedCount, newRunId: data.runId });
+      const rawText2 = await res.text();
+      let data2: Record<string, unknown> = {};
+      try { data2 = rawText2 ? JSON.parse(rawText2) : {}; } catch { /* ignore */ }
+      if (!res.ok) throw new Error((data2.error as string) ?? `サーバーエラー (${res.status})`);
+      setCsvImportResult({ paidCount: data2.paidCount as number, failedCount: data2.failedCount as number, newRunId: data2.runId as string | undefined });
       setMsg({
         type: "success",
-        text: `DB自動取込完了: 対象月 ${csvImportMonth} のオートシップ有効会員 ${data.paidCount} 件を当月アクティブに反映しました。`,
+        text: `DB自動取込完了: 対象月 ${csvImportMonth} のオートシップ有効会員 ${data2.paidCount} 件を当月アクティブに反映しました。`,
       });
       loadRuns();
     } catch (e: unknown) {
