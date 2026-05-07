@@ -444,7 +444,7 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
 
       {/* テーブル */}
       {/* overflowX をビューポート基準で確保。サイドバー256px＋両側padding(48px×2)を引いた幅が最大幅 */}
-      <div className="bg-white rounded-2xl border border-stone-100" style={{maxWidth:'calc(100vw - 256px - 6rem)',overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+      <div className="table-scroll bg-white rounded-2xl border border-stone-100" style={{maxWidth:'calc(100vw - 256px - 6rem)'}}>
         <table className="text-xs" style={{whiteSpace:'nowrap',borderCollapse:'collapse',minWidth:'max-content'}}>
           <thead className="bg-slate-800 text-white text-[11px]">
             <tr>

@@ -555,7 +555,7 @@ export default function BonusResultsPage() {
                 <p className="font-semibold">該当データがありません</p>
               </div>
             ) : (
-              <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch',maxWidth:'calc(100vw - 256px - 6rem)'}}>
+              <div className="table-scroll" style={{maxWidth:'calc(100vw - 256px - 6rem)'}}>
               <table className="text-xs" style={{whiteSpace:'nowrap',borderCollapse:'collapse',minWidth:'max-content'}}>
                 <thead className="bg-slate-800 text-white text-[11px]">
                   <tr>

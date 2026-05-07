@@ -304,7 +304,8 @@ html {
   scroll-behavior: smooth;
 }
 
-::-webkit-scrollbar {
+/* テーブル以外はスクロールバー非表示 */
+:not(.table-scroll)::-webkit-scrollbar {
   display: none;
 }
 
@@ -312,6 +313,35 @@ html {
   -ms-overflow-style: none;
   scrollbar-width: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* ボーナステーブル用：上下両方にスクロールバーを表示 */
+.table-scroll {
+  -ms-overflow-style: scrollbar;
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f5f9;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll::-webkit-scrollbar {
+  display: block;
+  height: 10px;
+}
+
+.table-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 999px;
+}
+
+.table-scroll::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 999px;
+  border: 2px solid #f1f5f9;
+}
+
+.table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
 }
 
 ::selection {
