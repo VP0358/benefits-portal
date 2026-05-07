@@ -36,135 +36,217 @@ export async function POST(request: Request, { params }: Params) {
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "CSVファイルが必要です" }, { status: 400 });
 
-  // ── CSV 読み込み（Shift-JIS / UTF-8 両対応） ──
+  // ── ファイル読み込み ──
   const arrayBuffer = await file.arrayBuffer();
   const uint8 = new Uint8Array(arrayBuffer);
 
-  function looksLikeShiftJis(buf: Uint8Array): boolean {
-    for (let i = 0; i < Math.min(buf.length, 4096); i++) {
-      const b = buf[i];
-      if ((b >= 0x81 && b <= 0x9F) || (b >= 0xE0 && b <= 0xEF)) return true;
+  // ── 三菱UFJファクター固定長TXT判定 ──
+  // 先頭5バイトが全て数字 かつ カンマが3未満 = 固定長フォーマット
+  function isMufgFixedFormat(buf: Uint8Array): boolean {
+    for (let i = 0; i < Math.min(5, buf.length); i++) {
+      if (buf[i] < 0x30 || buf[i] > 0x39) return false;
     }
-    return false;
-  }
-
-  const hasUtf8Bom = uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF;
-  let rawText: string;
-  if (!hasUtf8Bom && looksLikeShiftJis(uint8)) {
-    rawText = new TextDecoder("shift-jis").decode(arrayBuffer);
-  } else {
-    rawText = new TextDecoder("utf-8").decode(arrayBuffer);
-  }
-
-  const text = rawText.replace(/^\uFEFF/, "");
-  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter(l => l.trim());
-
-  if (lines.length < 2) {
-    return NextResponse.json({ error: "CSVにデータがありません（ヘッダー行のみ）" }, { status: 400 });
-  }
-
-  // CSVの列を解析するヘルパー（引用符対応）
-  function parseCsvLine(line: string): string[] {
-    const result: string[] = [];
-    let current = "";
-    let inQuotes = false;
-    for (const ch of line) {
-      if (ch === '"') { inQuotes = !inQuotes; }
-      else if (ch === "," && !inQuotes) { result.push(current.trim()); current = ""; }
-      else { current += ch; }
+    let commaCount = 0;
+    for (let i = 0; i < Math.min(200, buf.length); i++) {
+      if (buf[i] === 0x2C) commaCount++;
     }
-    result.push(current.trim());
-    return result;
+    return commaCount < 3;
   }
 
-  // ヘッダー行を解析して列インデックスを特定
-  const headerRaw = parseCsvLine(lines[0]);
-  const header = headerRaw.map(h => h.replace(/^"|"$/g, "").replace(/^\uFEFF/, "").trim().toLowerCase());
+  // 結果マップ: memberCode → { ok, reason?, paidDate? }
+  const resultMap = new Map<string, { ok: boolean; reason?: string; paidDate?: Date }>();
 
-  // クレディックスCSV自動判定（ID(sendid) 列を含む形式）
-  const isCredixFormat = header.some(h =>
-    h.includes("sendid") || h.includes("sendpoint") || h.includes("id(sendid)")
-  );
-
-  let codeIdx: number;
-  let resultIdx: number;
-  let reasonIdx: number;
-  let dateIdx: number; // 決済日時列
-
-  if (isCredixFormat) {
-    // クレディックスCSV: col[10]=ID(sendid)=会員コード、全行が決済成功
-    codeIdx   = header.findIndex(h => h.includes("sendid") || h === "id(sendid)" || h.includes("id(send"));
-    resultIdx = header.findIndex(h => h.includes("結果") || h.includes("result"));
-    dateIdx   = header.findIndex(h =>
-      h.includes("決済日時") || h.includes("処理日時") || h.includes("日時") ||
-      h.includes("date") || h.includes("datetime")
-    );
-    if (codeIdx   === -1) codeIdx   = 10;
-    if (resultIdx === -1) resultIdx = 4;
-    if (dateIdx   === -1) dateIdx   = 3;  // フォールバック: 4列目（0-indexed: 3）
-    reasonIdx = -1;
-  } else {
-    // 汎用フォーマット
-    codeIdx   = header.findIndex(h => h.includes("会員") || h.includes("code") || h.includes("コード"));
-    resultIdx = header.findIndex(h => h.includes("結果") || h.includes("result") || h.includes("status"));
-    dateIdx   = header.findIndex(h =>
-      h.includes("決済日時") || h.includes("処理日時") || h.includes("日時") ||
-      h.includes("date") || h.includes("datetime")
-    );
-    reasonIdx = header.findIndex(h => h.includes("理由") || h.includes("reason") || h.includes("error"));
-  }
-
-  if (codeIdx === -1) {
-    return NextResponse.json({
-      error: `CSVの形式が正しくありません（会員コード列が見つかりません）。検出されたヘッダー: [${headerRaw.join(", ")}]`,
-      detectedHeaders: headerRaw,
-      isCredixFormat,
-    }, { status: 400 });
-  }
-
-  const dataLines = lines.slice(1);
-
-  // CSV日時文字列 → Date 変換ヘルパー
-  // 対応形式: "2026/5/5 15:29" "2026-05-05 15:29:00" 等
+  // CSV日時文字列 → Date 変換ヘルパー（JST→UTC）
   function parseCsvDate(str: string): Date | null {
     if (!str || str === "-" || str === "") return null;
     const m = str.match(/^(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
     if (m) {
       const [, y, mo, d, h = "0", mi = "0", s = "0"] = m;
-      // JST → UTC（-9h）で保存
       const jst = new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s));
       return new Date(jst.getTime() - 9 * 60 * 60 * 1000);
     }
     return null;
   }
 
-  // 結果マップ: memberCode → { ok: boolean, reason?: string, paidDate?: Date }
-  const resultMap = new Map<string, { ok: boolean; reason?: string; paidDate?: Date }>();
-  for (const line of dataLines) {
-    if (!line.trim()) continue;
-    const cols = parseCsvLine(line).map(c => c.replace(/^"|"$/g, "").trim());
-    const memberCode = cols[codeIdx] ?? "";
-    if (!memberCode || memberCode === "-") continue;
+  if (isMufgFixedFormat(uint8)) {
+    // ══════════════════════════════════════════════════════════════
+    // 三菱UFJファクター 固定長TXTフォーマット（全銀協準拠）
+    // ══════════════════════════════════════════════════════════════
+    // 正規化後フィールド:
+    //   [0:5]   レコード種別（19xxx=ヘッダ, 80xxx=フッタ, 9=エンド, 他=データ）
+    //   [42:43] 口座種別（1=普通, 2=当座）
+    //   [43:50] 口座番号（7桁）← DB の accountNumber と照合
+    //   [80:90] 引落金額（10桁）
+    // ファイルに含まれる行は全て引き落とし成功
 
-    let ok: boolean;
-    let reason: string | undefined;
-    // 決済日時をCSVから取得
-    const rawDate = dateIdx >= 0 ? (cols[dateIdx] ?? "") : "";
-    const paidDate = parseCsvDate(rawDate) ?? undefined;
+    const [ty, tm] = run.targetMonth.split("-").map(Number);
+    const lastDayOfMonth = new Date(ty, tm, 0);
+    const paidDateForAll = new Date(lastDayOfMonth.getTime() - 9 * 60 * 60 * 1000);
 
-    if (isCredixFormat) {
-      // クレディックスCSVはファイル内の全行が決済成功
-      ok = true;
-    } else {
-      const result = cols[resultIdx] ?? "";
-      // 「決済完了」「OK」「0」「success」「1」「完了」「成功」を成功と判定
-      ok = result === "OK" || result === "0" || result.toLowerCase() === "success" ||
-           result === "1" || result.includes("完了") || result.includes("成功");
-      reason = reasonIdx >= 0 ? (cols[reasonIdx] ?? undefined) : undefined;
+    // accountNumber → { ok, paidDate } のマップを一時構築
+    const mufgAccountMap = new Map<string, { ok: boolean; paidDate: Date }>();
+
+    // CRLF/LF で行分割
+    const byteLines: Uint8Array[] = [];
+    let bStart = 0;
+    for (let i = 0; i < uint8.length; i++) {
+      if (uint8[i] === 0x0A) {
+        const end = (i > 0 && uint8[i-1] === 0x0D) ? i - 1 : i;
+        byteLines.push(uint8.slice(bStart, end));
+        bStart = i + 1;
+      }
+    }
+    if (bStart < uint8.length) byteLines.push(uint8.slice(bStart));
+
+    for (const byteLine of byteLines) {
+      if (byteLine.length < 50) continue;
+      // U+FFFD (ef bf bd) → '?' に正規化
+      const norm: number[] = [];
+      let bi = 0;
+      while (bi < byteLine.length) {
+        if (bi + 2 < byteLine.length &&
+            byteLine[bi] === 0xEF && byteLine[bi+1] === 0xBF && byteLine[bi+2] === 0xBD) {
+          norm.push(0x3F);
+          bi += 3;
+        } else {
+          norm.push(byteLine[bi]);
+          bi++;
+        }
+      }
+      if (norm.length < 50) continue;
+
+      const recType = norm.slice(0, 5).map(b => String.fromCharCode(b)).join("").trim();
+      if (recType.startsWith("19") || recType.startsWith("80") || recType === "9" ||
+          recType === "" || !/^\d{5}$/.test(recType)) continue;
+
+      // 口座番号 [43:50]（先頭ゼロ除去して照合）
+      const acNumRaw = norm.slice(43, 50).map(b => String.fromCharCode(b)).join("").trim();
+      if (!acNumRaw || !/^\d+$/.test(acNumRaw)) continue;
+      const acNum = acNumRaw.replace(/^0+/, "") || "0";
+
+      if (!mufgAccountMap.has(acNum)) {
+        mufgAccountMap.set(acNum, { ok: true, paidDate: paidDateForAll });
+      }
     }
 
-    resultMap.set(memberCode, { ok, reason, paidDate });
-  }
+    // run に紐づく注文の accountNumber と突き合わせ
+    // orders には accountNumber が保存されているのでそちらを使う
+    for (const order of run.orders) {
+      const acNorm = (order.accountNumber ?? "").replace(/^0+/, "") || "0";
+      const entry = mufgAccountMap.get(acNorm);
+      if (entry) {
+        resultMap.set(order.memberCode, { ok: entry.ok, paidDate: entry.paidDate });
+      }
+    }
+
+  } else {
+    // ══════════════════════════════════════════════════════════════
+    // CSV フォーマット（クレディックス / 汎用）
+    // ══════════════════════════════════════════════════════════════
+
+    function looksLikeShiftJis(buf: Uint8Array): boolean {
+      for (let i = 0; i < Math.min(buf.length, 4096); i++) {
+        const b = buf[i];
+        if ((b >= 0x81 && b <= 0x9F) || (b >= 0xE0 && b <= 0xEF)) return true;
+      }
+      return false;
+    }
+
+    const hasUtf8Bom = uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF;
+    let rawText: string;
+    if (!hasUtf8Bom && looksLikeShiftJis(uint8)) {
+      rawText = new TextDecoder("shift-jis").decode(arrayBuffer);
+    } else {
+      rawText = new TextDecoder("utf-8").decode(arrayBuffer);
+    }
+
+    const text = rawText.replace(/^\uFEFF/, "");
+    const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter(l => l.trim());
+
+    if (lines.length < 2) {
+      return NextResponse.json({ error: "CSVにデータがありません（ヘッダー行のみ）" }, { status: 400 });
+    }
+
+    function parseCsvLine(line: string): string[] {
+      const result: string[] = [];
+      let current = "";
+      let inQuotes = false;
+      for (const ch of line) {
+        if (ch === '"') { inQuotes = !inQuotes; }
+        else if (ch === "," && !inQuotes) { result.push(current.trim()); current = ""; }
+        else { current += ch; }
+      }
+      result.push(current.trim());
+      return result;
+    }
+
+    const headerRaw = parseCsvLine(lines[0]);
+    const header = headerRaw.map(h => h.replace(/^"|"$/g, "").replace(/^\uFEFF/, "").trim().toLowerCase());
+
+    // クレディックスCSV自動判定
+    const isCredixFormat = header.some(h =>
+      h.includes("sendid") || h.includes("sendpoint") || h.includes("id(sendid)")
+    );
+
+    let codeIdx: number;
+    let resultIdx: number;
+    let reasonIdx: number;
+    let dateIdx: number;
+
+    if (isCredixFormat) {
+      codeIdx   = header.findIndex(h => h.includes("sendid") || h === "id(sendid)" || h.includes("id(send"));
+      resultIdx = header.findIndex(h => h.includes("結果") || h.includes("result"));
+      dateIdx   = header.findIndex(h =>
+        h.includes("決済日時") || h.includes("処理日時") || h.includes("日時") ||
+        h.includes("date") || h.includes("datetime")
+      );
+      if (codeIdx   === -1) codeIdx   = 10;
+      if (resultIdx === -1) resultIdx = 4;
+      if (dateIdx   === -1) dateIdx   = 3;
+      reasonIdx = -1;
+    } else {
+      codeIdx   = header.findIndex(h => h.includes("会員") || h.includes("code") || h.includes("コード"));
+      resultIdx = header.findIndex(h => h.includes("結果") || h.includes("result") || h.includes("status"));
+      dateIdx   = header.findIndex(h =>
+        h.includes("決済日時") || h.includes("処理日時") || h.includes("日時") ||
+        h.includes("date") || h.includes("datetime")
+      );
+      reasonIdx = header.findIndex(h => h.includes("理由") || h.includes("reason") || h.includes("error"));
+    }
+
+    if (codeIdx === -1) {
+      return NextResponse.json({
+        error: `CSVの形式が正しくありません（会員コード列が見つかりません）。検出されたヘッダー: [${headerRaw.join(", ")}]`,
+        detectedHeaders: headerRaw,
+        isCredixFormat,
+      }, { status: 400 });
+    }
+
+    const dataLines = lines.slice(1);
+
+    for (const line of dataLines) {
+      if (!line.trim()) continue;
+      const cols = parseCsvLine(line).map(c => c.replace(/^"|"$/g, "").trim());
+      const memberCode = cols[codeIdx] ?? "";
+      if (!memberCode || memberCode === "-") continue;
+
+      let ok: boolean;
+      let reason: string | undefined;
+      const rawDate = dateIdx >= 0 ? (cols[dateIdx] ?? "") : "";
+      const paidDate = parseCsvDate(rawDate) ?? undefined;
+
+      if (isCredixFormat) {
+        ok = true;
+      } else {
+        const result = cols[resultIdx] ?? "";
+        ok = result === "OK" || result === "0" || result.toLowerCase() === "success" ||
+             result === "1" || result.includes("完了") || result.includes("成功");
+        reason = reasonIdx >= 0 ? (cols[reasonIdx] ?? undefined) : undefined;
+      }
+
+      resultMap.set(memberCode, { ok, reason, paidDate });
+    }
+  } // end CSV format
 
   const now = new Date();
   const targetMonth = run.targetMonth;
