@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   const where: any = {
     autoshipEnabled: true,
     status: { not: "withdrawn" },
-    autoshipStartDate: { not: null }, // 開始日が設定されていること
+    // 開始日なし（即時有効）でもチェックのみで有効なので条件から除外
   };
 
   // 支払い方法が指定されている場合のみ絞り込む

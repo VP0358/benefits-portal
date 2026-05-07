@@ -662,7 +662,8 @@ export default function AutoShipPanel() {
 
       {/* ──── ② 有効会員一覧 ──── */}
       <div className="bg-white border border-blue-100 rounded-xl p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-gray-800 mb-3">📋 オートシップ有効会員一覧（対象月・支払方法で絞り込み）</h2>
+        <h2 className="text-base font-semibold text-gray-800 mb-1">📋 オートシップ有効会員一覧</h2>
+        <p className="text-xs text-gray-500 mb-3">対象月を選択すると、支払方法ごとにグループ分けして継続購入が有効な会員を表示します。</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-3">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">対象月</label>
@@ -674,13 +675,13 @@ export default function AutoShipPanel() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">支払い方法</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">支払い方法で絞り込み（任意）</label>
             <select
               value={memberListPm}
               onChange={e => setMemberListPm(e.target.value)}
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
-              <option value="">すべて</option>
+              <option value="">すべて（支払方法別グループ表示）</option>
               <option value="credit_card">💳 クレジットカード</option>
               <option value="bank_transfer">🏦 口座引き落とし</option>
               <option value="bank_payment">🏧 銀行振込</option>
@@ -698,13 +699,20 @@ export default function AutoShipPanel() {
             </button>
           </div>
         </div>
+
         {showMemberList && (
-          <div className="mt-3">
-            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <div className="mt-3 space-y-4">
+            {/* ヘッダー行 */}
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <p className="text-sm text-gray-600">
-                対象: <strong>{memberListMonth}</strong> / {memberListPm ? PM_LABELS[memberListPm] ?? memberListPm : "すべての支払い方法"} — <strong>{memberListData.length}件</strong>
+                対象月: <strong>{memberListMonth}</strong>
+                {memberListPm
+                  ? <> ／ {PM_LABELS[memberListPm] ?? memberListPm}</>
+                  : <span className="text-gray-400"> ／ すべての支払い方法</span>
+                }
+                　<strong className="text-blue-700">{memberListData.length}件</strong>
                 {selectedMemberIds.size > 0 && (
-                  <span className="ml-2 text-blue-700 font-semibold">{selectedMemberIds.size}件選択中</span>
+                  <span className="ml-2 text-violet-700 font-semibold">（{selectedMemberIds.size}件選択中）</span>
                 )}
               </p>
               <div className="flex gap-2">
@@ -716,73 +724,95 @@ export default function AutoShipPanel() {
                     📋 選択した{selectedMemberIds.size}件の伝票を一括作成
                   </button>
                 )}
-                <button onClick={() => setShowMemberList(false)} className="text-xs text-gray-400 hover:text-gray-600">✕ 閉じる</button>
+                <button onClick={() => { setShowMemberList(false); setSelectedMemberIds(new Set()); }} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 border border-gray-200 rounded-lg">✕ 閉じる</button>
               </div>
             </div>
-            {memberListData.length > 0 ? (
-              <div className="overflow-x-auto rounded-lg border">
-                <table className="min-w-full text-xs">
-                  <thead>
-                    <tr className="bg-gray-50 text-gray-500 uppercase">
-                      <th className="px-3 py-2 text-center w-10">
-                        <input
-                          type="checkbox"
-                          checked={selectedMemberIds.size === memberListData.length && memberListData.length > 0}
-                          onChange={toggleAllMembers}
-                          className="w-3.5 h-3.5 cursor-pointer"
-                          title="全て選択/解除"
-                        />
-                      </th>
-                      <th className="px-3 py-2 text-left">会員コード</th>
-                      <th className="px-3 py-2 text-left">氏名</th>
-                      <th className="px-3 py-2 text-left">電話</th>
-                      <th className="px-3 py-2 text-left">メール</th>
-                      <th className="px-3 py-2 text-left">支払い方法</th>
-                      <th className="px-3 py-2 text-left">開始日</th>
-                      <th className="px-3 py-2 text-left">停止日</th>
-                      <th className="px-3 py-2 text-center">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {memberListData.map(m => (
-                      <tr key={m.id} className={`hover:bg-blue-50 ${selectedMemberIds.has(m.id) ? "bg-blue-50" : ""}`}>
-                        <td className="px-3 py-2 text-center">
-                          <input
-                            type="checkbox"
-                            checked={selectedMemberIds.has(m.id)}
-                            onChange={() => toggleMember(m.id)}
-                            className="w-3.5 h-3.5 cursor-pointer"
-                          />
-                        </td>
-                        <td className="px-3 py-2 font-mono">{m.memberCode}</td>
-                        <td className="px-3 py-2">
-                          <button
-                            onClick={() => openSlipModal(m)}
-                            className="text-blue-600 hover:text-blue-800 hover:underline font-semibold text-left"
-                          >
-                            {m.memberName}
-                          </button>
-                        </td>
-                        <td className="px-3 py-2 text-gray-500">{m.memberPhone ?? "—"}</td>
-                        <td className="px-3 py-2 text-gray-500">{m.memberEmail ?? "—"}</td>
-                        <td className="px-3 py-2">{PM_LABELS[m.paymentMethod] ?? m.paymentMethod}</td>
-                        <td className="px-3 py-2 text-gray-500">{m.autoshipStartDate ? (() => { const d = new Date(m.autoshipStartDate); return `${d.getUTCFullYear()}/${d.getUTCMonth()+1}/${d.getUTCDate()}`; })() : "—"}</td>
-                        <td className="px-3 py-2 text-gray-500">{m.autoshipStopDate ? (() => { const d = new Date(m.autoshipStopDate); return `${d.getUTCFullYear()}/${d.getUTCMonth()+1}/${d.getUTCDate()}`; })() : "—"}</td>
-                        <td className="px-3 py-2 text-center">
-                          <button
-                            onClick={() => openSlipModal(m)}
-                            className="px-2 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded text-xs font-medium"
-                          >
-                            📋 伝票作成
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+
+            {memberListData.length === 0 ? (
+              <p className="text-sm text-gray-400 py-6 text-center bg-gray-50 rounded-lg border">対象会員がいません</p>
+            ) : memberListPm ? (
+              /* ── 支払方法指定：1テーブル表示 ── */
+              <MemberTable
+                members={memberListData}
+                selectedIds={selectedMemberIds}
+                onToggle={toggleMember}
+                onToggleAll={toggleAllMembers}
+                onSlip={openSlipModal}
+                pmLabels={PM_LABELS}
+                showPmCol={false}
+              />
             ) : (
-              <p className="text-sm text-gray-400 py-4 text-center">対象会員がいません</p>
+              /* ── 支払方法「すべて」：グループ別表示 ── */
+              (() => {
+                const PM_ORDER = ["credit_card", "bank_transfer", "bank_payment", "cod", "other"];
+                const groups: Record<string, typeof memberListData> = {};
+                memberListData.forEach(m => {
+                  if (!groups[m.paymentMethod]) groups[m.paymentMethod] = [];
+                  groups[m.paymentMethod].push(m);
+                });
+                const groupKeys = PM_ORDER.filter(k => groups[k]?.length > 0);
+                return (
+                  <div className="space-y-4">
+                    {groupKeys.map(pm => {
+                      const groupMembers = groups[pm];
+                      const allSelected = groupMembers.every(m => selectedMemberIds.has(m.id));
+                      const someSelected = groupMembers.some(m => selectedMemberIds.has(m.id));
+                      function toggleGroup() {
+                        setSelectedMemberIds(prev => {
+                          const next = new Set(prev);
+                          if (allSelected) groupMembers.forEach(m => next.delete(m.id));
+                          else groupMembers.forEach(m => next.add(m.id));
+                          return next;
+                        });
+                      }
+                      return (
+                        <div key={pm} className="border border-gray-200 rounded-xl overflow-hidden">
+                          {/* グループヘッダー */}
+                          <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                checked={allSelected}
+                                ref={el => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                                onChange={toggleGroup}
+                                className="w-3.5 h-3.5 cursor-pointer accent-blue-600"
+                                title="グループ全選択/解除"
+                              />
+                              <span className="text-sm font-semibold text-gray-700">{PM_LABELS[pm] ?? pm}</span>
+                              <span className="text-xs text-gray-500 bg-white border border-gray-200 rounded-full px-2 py-0.5">{groupMembers.length}件</span>
+                              {someSelected && (
+                                <span className="text-xs text-violet-600 font-semibold">
+                                  {groupMembers.filter(m => selectedMemberIds.has(m.id)).length}件選択中
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => {
+                                // このグループの支払方法を検索条件にセットして伝票一括作成
+                                setMemberListPm(pm);
+                                setSelectedMemberIds(new Set(groupMembers.map(m => m.id)));
+                              }}
+                              className="text-xs text-violet-600 hover:text-violet-800 hover:underline"
+                            >
+                              このグループを全選択して一括伝票作成 →
+                            </button>
+                          </div>
+                          {/* テーブル */}
+                          <MemberTable
+                            members={groupMembers}
+                            selectedIds={selectedMemberIds}
+                            onToggle={toggleMember}
+                            onToggleAll={toggleGroup}
+                            onSlip={openSlipModal}
+                            pmLabels={PM_LABELS}
+                            showPmCol={false}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()
             )}
           </div>
         )}
@@ -1413,6 +1443,113 @@ export default function AutoShipPanel() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─── 有効会員テーブルコンポーネント ─── */
+type MemberRow = {
+  id: string; memberCode: string; memberName: string; memberPhone: string | null;
+  memberEmail: string | null; memberPostal: string | null; memberAddress: string | null;
+  companyName: string | null; paymentMethod: string;
+  autoshipStartDate: string | null; autoshipStopDate: string | null;
+};
+
+function MemberTable({
+  members, selectedIds, onToggle, onToggleAll, onSlip, pmLabels, showPmCol,
+}: {
+  members: MemberRow[];
+  selectedIds: Set<string>;
+  onToggle: (id: string) => void;
+  onToggleAll: () => void;
+  onSlip: (m: MemberRow) => void;
+  pmLabels: Record<string, string>;
+  showPmCol: boolean;
+}) {
+  const allSelected = members.length > 0 && members.every(m => selectedIds.has(m.id));
+
+  function fmtD(iso: string | null) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return `${d.getUTCFullYear()}/${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-xs">
+        <thead>
+          <tr className="bg-gray-50 text-gray-500 text-[11px] uppercase tracking-wide">
+            <th className="px-3 py-2 text-center w-10">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={onToggleAll}
+                className="w-3.5 h-3.5 cursor-pointer accent-blue-600"
+                title="全て選択/解除"
+              />
+            </th>
+            <th className="px-3 py-2 text-left whitespace-nowrap">会員コード</th>
+            <th className="px-3 py-2 text-left whitespace-nowrap">氏名／法人名</th>
+            <th className="px-3 py-2 text-left whitespace-nowrap">電話</th>
+            <th className="px-3 py-2 text-left whitespace-nowrap">メール</th>
+            {showPmCol && <th className="px-3 py-2 text-left whitespace-nowrap">支払い方法</th>}
+            <th className="px-3 py-2 text-left whitespace-nowrap">開始日</th>
+            <th className="px-3 py-2 text-left whitespace-nowrap">停止日</th>
+            <th className="px-3 py-2 text-center whitespace-nowrap">操作</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {members.map(m => (
+            <tr key={m.id} className={`hover:bg-blue-50 transition-colors ${selectedIds.has(m.id) ? "bg-blue-50" : "bg-white"}`}>
+              <td className="px-3 py-2 text-center">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(m.id)}
+                  onChange={() => onToggle(m.id)}
+                  className="w-3.5 h-3.5 cursor-pointer accent-blue-600"
+                />
+              </td>
+              <td className="px-3 py-2 font-mono text-gray-700 whitespace-nowrap">{m.memberCode}</td>
+              <td className="px-3 py-2 whitespace-nowrap">
+                <button
+                  onClick={() => onSlip(m)}
+                  className="text-blue-600 hover:text-blue-800 hover:underline font-semibold text-left"
+                >
+                  {m.memberName}
+                </button>
+                {m.companyName && m.companyName !== m.memberName && (
+                  <div className="text-gray-400 text-[10px]">{m.companyName}</div>
+                )}
+              </td>
+              <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{m.memberPhone ?? "—"}</td>
+              <td className="px-3 py-2 text-gray-500 whitespace-nowrap max-w-[160px] truncate">{m.memberEmail ?? "—"}</td>
+              {showPmCol && (
+                <td className="px-3 py-2 whitespace-nowrap">{pmLabels[m.paymentMethod] ?? m.paymentMethod}</td>
+              )}
+              <td className="px-3 py-2 text-gray-500 whitespace-nowrap">
+                {m.autoshipStartDate
+                  ? <span className="text-green-700 font-medium">{fmtD(m.autoshipStartDate)}</span>
+                  : <span className="text-amber-600 text-[11px]">即時有効</span>
+                }
+              </td>
+              <td className="px-3 py-2 text-gray-500 whitespace-nowrap">
+                {m.autoshipStopDate
+                  ? <span className="text-red-500">{fmtD(m.autoshipStopDate)}</span>
+                  : <span className="text-gray-300">—</span>
+                }
+              </td>
+              <td className="px-3 py-2 text-center">
+                <button
+                  onClick={() => onSlip(m)}
+                  className="px-2 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200 rounded text-xs font-medium whitespace-nowrap"
+                >
+                  📋 伝票作成
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
