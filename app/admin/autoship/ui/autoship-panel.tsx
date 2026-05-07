@@ -1067,12 +1067,31 @@ export default function AutoShipPanel() {
                   <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(r.exportedAt)}</td>
                   <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(r.importedAt)}</td>
                   <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => openDetail(r.id)}
-                      className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-medium rounded-lg transition"
-                    >
-                      詳細・操作
-                    </button>
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => openDetail(r.id)}
+                        className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-medium rounded-lg transition"
+                      >
+                        詳細・操作
+                      </button>
+                      {r.status === "draft" && r.totalCount === 0 && (
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`「${r.targetMonth} / ${PM_LABELS[r.paymentMethod] ?? r.paymentMethod}」の空伝票を削除しますか？`)) return;
+                            try {
+                              const res = await fetch(`/api/admin/autoship/${r.id}`, { method: "DELETE" });
+                              if (!res.ok) { const d = await res.json(); alert(d.error ?? "削除失敗"); return; }
+                              setMsg({ type: "success", text: "空伝票を削除しました" });
+                              loadRuns();
+                            } catch { alert("削除に失敗しました"); }
+                          }}
+                          className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg transition"
+                          title="空の下書き伝票を削除"
+                        >
+                          🗑️ 削除
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
