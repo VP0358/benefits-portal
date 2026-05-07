@@ -456,12 +456,12 @@ export async function executeBonusCalculation(
     const finalAmount = amountBeforeAdjustment - paymentAdjustmentAmount;
 
     // 源泉徴収税
-    // 仕様: 支払調整前取得額が12万円を超えた場合、超えた金額に対して10.21%を差引く
-    //       法人会員（companyNameあり）は対象外
+    // 仕様: 支払調整後の月間報酬支払額（finalAmount）が12万円を超えた場合、
+    //       超えた金額に対して10.21%を差引く。法人会員（companyNameあり）は対象外。
     const isCompany = !!(member as any).companyName;
     let withholdingTax = 0;
-    if (!isCompany && amountBeforeAdjustment > WITHHOLDING_THRESHOLD) {
-      withholdingTax = Math.floor((amountBeforeAdjustment - WITHHOLDING_THRESHOLD) * WITHHOLDING_RATE);
+    if (!isCompany && finalAmount > WITHHOLDING_THRESHOLD) {
+      withholdingTax = Math.floor((finalAmount - WITHHOLDING_THRESHOLD) * WITHHOLDING_RATE);
     }
 
     // 事務手数料
