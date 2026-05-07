@@ -713,6 +713,8 @@ model MlmMember {
   accountType       String?         @db.VarChar(10)   // 普通/当座
   accountNumber     String?         @db.VarChar(20)
   accountHolder     String?         @db.VarChar(100)
+  // インボイス登録番号
+  invoiceNumber     String?         @db.VarChar(50)   // 登録番号（Tから始まる13桁等）
   // 法人情報
   companyName       String?         @db.VarChar(255)
   companyNameKana   String?         @db.VarChar(255)
