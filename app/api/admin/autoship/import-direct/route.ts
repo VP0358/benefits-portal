@@ -640,43 +640,63 @@ export async function POST(request: Request) {
   const orderUpdateErrors: string[] = [];
   const postProcessErrors: string[] = [];
 
-  // ─ 第1段階: AutoShipOrder の status 更新 ─
+  // ─ 第1段階: AutoShipOrder の status 一括更新（updateMany でタイムアウト回避）─
+  // ★ 個別 update ループはPrismaトランザクションのデフォルト5秒タイムアウトを超えるため
+  //    paid/failed の ID リストを事前に集計し updateMany で一括処理する
   try {
-    await prisma.$transaction(async (tx) => {
-      for (const order of run!.orders) {
-        const res = resultMap.get(order.memberCode);
-        if (!res) continue;
+    const paidOrderIds: bigint[]   = [];
+    const failedOrders: { id: bigint; reason: string }[] = [];
+    // 三菱UFJファクターはファイルに含まれる全行が引き落とし成功
+    // paidDate は全件同一（月末日）の場合が多いが、複数paidDateがある場合は
+    // 個別対応が必要なため paidDate ごとにグループ化する
+    const paidByDate = new Map<string, bigint[]>(); // ISO文字列 → order ids
 
-        if (res.ok) {
-          await tx.autoShipOrder.update({
-            where: { id: order.id },
-            data: { status: "paid", paidAt: res.paidDate ?? now },
-          });
-          paidCount++;
-        } else {
-          await tx.autoShipOrder.update({
-            where: { id: order.id },
-            data: { status: "failed", failReason: res.reason ?? "決済失敗" },
-          });
-          failedCount++;
-        }
+    for (const order of run!.orders) {
+      const res = resultMap.get(order.memberCode);
+      if (!res) continue;
+      if (res.ok) {
+        const dateKey = (res.paidDate ?? now).toISOString();
+        if (!paidByDate.has(dateKey)) paidByDate.set(dateKey, []);
+        paidByDate.get(dateKey)!.push(order.id);
+        paidOrderIds.push(order.id);
+        paidCount++;
+      } else {
+        failedOrders.push({ id: order.id, reason: res.reason ?? "決済失敗" });
+        failedCount++;
       }
+    }
 
-      // Run ステータス更新
-      await tx.autoShipRun.update({
-        where: { id: run!.id },
-        data: {
-          paidCount,
-          failedCount,
-          importedAt: now,
-          status: paidCount + failedCount > 0 ? "imported" : run!.status,
-        },
+    // paid: paidDate ごとに updateMany（DB への往復回数を最小化）
+    for (const [dateKey, ids] of paidByDate) {
+      await prisma.autoShipOrder.updateMany({
+        where: { id: { in: ids } },
+        data:  { status: "paid", paidAt: new Date(dateKey) },
       });
+    }
+
+    // failed: failReason は個別に異なる場合があるため個別 update
+    // （件数は少ないのでタイムアウトしない）
+    for (const fo of failedOrders) {
+      await prisma.autoShipOrder.update({
+        where: { id: fo.id },
+        data:  { status: "failed", failReason: fo.reason },
+      });
+    }
+
+    // Run ステータス更新（単一クエリ）
+    await prisma.autoShipRun.update({
+      where: { id: run!.id },
+      data: {
+        paidCount,
+        failedCount,
+        importedAt: now,
+        status: paidCount + failedCount > 0 ? "imported" : run!.status,
+      },
     });
-  } catch (txErr) {
-    console.error("[import-direct] 第1段階トランザクションエラー:", txErr);
+  } catch (updateErr) {
+    console.error("[import-direct] 第1段階 updateMany エラー:", updateErr);
     return NextResponse.json({
-      error: `決済ステータス更新に失敗しました: ${txErr instanceof Error ? txErr.message : String(txErr)}`,
+      error: `決済ステータス更新に失敗しました: ${updateErr instanceof Error ? updateErr.message : String(updateErr)}`,
       _debug: debugInfo,
     }, { status: 500 });
   }
@@ -900,33 +920,32 @@ async function processFromDatabase(
   let paidCount   = 0;
   let failedCount = 0;
 
-  // 第1段階: AutoShipOrder / AutoShipRun 更新
+  // 第1段階: AutoShipOrder を updateMany で一括更新（トランザクションタイムアウト回避）
   try {
-    await prisma.$transaction(async (tx) => {
-      for (const order of run!.orders) {
-        const memberRecord = memberMap.get(order.memberCode);
-        if (!memberRecord) continue;
+    const targetOrderIds = run!.orders
+      .filter(o => memberMap.has(o.memberCode))
+      .map(o => o.id);
+    paidCount = targetOrderIds.length;
 
-        await tx.autoShipOrder.update({
-          where: { id: order.id },
-          data:  { status: "paid", paidAt: now },
-        });
-        paidCount++;
-      }
-
-      await tx.autoShipRun.update({
-        where: { id: run!.id },
-        data: {
-          paidCount,
-          failedCount,
-          importedAt: now,
-          status:     paidCount > 0 ? "imported" : run!.status,
-        },
+    if (paidCount > 0) {
+      await prisma.autoShipOrder.updateMany({
+        where: { id: { in: targetOrderIds } },
+        data:  { status: "paid", paidAt: now },
       });
+    }
+
+    await prisma.autoShipRun.update({
+      where: { id: run!.id },
+      data: {
+        paidCount,
+        failedCount,
+        importedAt: now,
+        status:     paidCount > 0 ? "imported" : run!.status,
+      },
     });
-  } catch (txErr) {
-    console.error("[import-direct/db] 第1段階トランザクションエラー:", txErr);
-    return NextResponse.json({ error: `決済ステータス更新に失敗しました: ${txErr instanceof Error ? txErr.message : String(txErr)}` }, { status: 500 });
+  } catch (updateErr) {
+    console.error("[import-direct/db] 第1段階 updateMany エラー:", updateErr);
+    return NextResponse.json({ error: `決済ステータス更新に失敗しました: ${updateErr instanceof Error ? updateErr.message : String(updateErr)}` }, { status: 500 });
   }
 
   // 第2段階: MlmPurchase / MlmMember / PointWallet 更新
