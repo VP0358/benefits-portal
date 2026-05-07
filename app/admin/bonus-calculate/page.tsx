@@ -22,6 +22,8 @@ type PositionRow = {
   memberCode: string;
   memberName: string;
   companyName: string | null;
+  isCompany: boolean;
+  invoiceNumber: string | null;
   status: string;
   isActive: boolean;
   selfPurchasePoints: number;
@@ -442,85 +444,232 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
 
       {/* テーブル */}
       <div className="bg-white rounded-2xl border border-stone-100 overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead className="bg-slate-800 text-white">
+        <table className="w-full text-xs whitespace-nowrap">
+          <thead className="bg-slate-800 text-white text-[11px]">
             <tr>
-              <th className="text-left p-2 font-semibold">会員コード</th>
-              <th className="text-left p-2 font-semibold">氏名/法人名</th>
-              <th className="text-left p-2 font-semibold">ステータス</th>
-              <th className="text-right p-2 font-semibold">自己pt</th>
-              <th className="text-right p-2 font-semibold">グループpt</th>
-              <th className="text-right p-2 font-semibold">直接</th>
-              <th className="text-left p-2 font-semibold">称号変動</th>
-              <th className="text-left p-2 font-semibold">現レベル</th>
-              <th className="text-right p-2 font-semibold">ダイレクト</th>
-              <th className="text-right p-2 font-semibold">ユニレベル</th>
-              <th className="text-right p-2 font-semibold">組織</th>
-              <th className="text-right p-2 font-semibold">調整金</th>
-              <th className="text-right p-2 font-semibold">ボーナス合計</th>
-              <th className="text-right p-2 font-semibold">源泉税</th>
-              <th className="text-right p-2 font-semibold">事務費</th>
-              <th className="text-right p-2 font-semibold">支払額</th>
-              <th className="text-center p-2 font-semibold">詳細</th>
+              {/* ① 会員コード */}
+              <th className="text-left px-2 py-2.5 font-semibold sticky left-0 bg-slate-800 z-10 min-w-[110px]">会員コード</th>
+              {/* ② 氏名／法人名 */}
+              <th className="text-left px-2 py-2.5 font-semibold min-w-[130px]">氏名／法人名</th>
+              {/* ③ ステータス */}
+              <th className="text-center px-2 py-2.5 font-semibold min-w-[70px]">ステータス</th>
+              {/* ④ 自己PT */}
+              <th className="text-right px-2 py-2.5 font-semibold min-w-[55px]">自己PT</th>
+              {/* ⑤ グループPT */}
+              <th className="text-right px-2 py-2.5 font-semibold min-w-[65px]">グループPT</th>
+              {/* ⑥ 直接 */}
+              <th className="text-right px-2 py-2.5 font-semibold min-w-[40px]">直接</th>
+              {/* ⑦ 称号変動 */}
+              <th className="text-center px-2 py-2.5 font-semibold bg-indigo-900 min-w-[72px]">称号変動</th>
+              {/* ⑧ 現レベル */}
+              <th className="text-center px-2 py-2.5 font-semibold bg-indigo-900 min-w-[65px]">現レベル</th>
+              {/* ⑨ ダイレクトB */}
+              <th className="text-right px-2 py-2.5 font-semibold bg-blue-900 min-w-[80px]">ダイレクトB</th>
+              {/* ⑩ ユニレベルB */}
+              <th className="text-right px-2 py-2.5 font-semibold bg-blue-900 min-w-[80px]">ユニレベルB</th>
+              {/* ⑪ 組織構築B */}
+              <th className="text-right px-2 py-2.5 font-semibold bg-blue-900 min-w-[75px]">組織構築B</th>
+              {/* ⑫ 貯金PT */}
+              <th className="text-right px-2 py-2.5 font-semibold bg-emerald-900 min-w-[65px]">貯金PT</th>
+              {/* ⑬ 繰越金 */}
+              <th className="text-right px-2 py-2.5 font-semibold min-w-[65px]">繰越金</th>
+              {/* ⑭ 調整金 */}
+              <th className="text-right px-2 py-2.5 font-semibold min-w-[65px]">調整金</th>
+              {/* ⑮ ボーナス合計 */}
+              <th className="text-right px-2 py-2.5 font-semibold bg-slate-700 min-w-[90px]">ボーナス合計</th>
+              {/* ⑯ 支払調整率 */}
+              <th className="text-right px-2 py-2.5 font-semibold bg-orange-900 min-w-[72px]">支払調整率</th>
+              {/* ⑰ 支払調整額 */}
+              <th className="text-right px-2 py-2.5 font-semibold bg-orange-900 min-w-[72px]">支払調整額</th>
+              {/* ⑱ 取得額 */}
+              <th className="text-right px-2 py-2.5 font-semibold bg-orange-800 min-w-[80px]">取得額</th>
+              {/* ⑲ 消費税(内) */}
+              <th className="text-right px-2 py-2.5 font-semibold min-w-[72px]">消費税(内)</th>
+              {/* ⑳ 源泉税 */}
+              <th className="text-right px-2 py-2.5 font-semibold text-red-300 min-w-[72px]">源泉税</th>
+              {/* ㉑ 過不足金 */}
+              <th className="text-right px-2 py-2.5 font-semibold min-w-[65px]">過不足金</th>
+              {/* ㉒ 事務手数料 */}
+              <th className="text-right px-2 py-2.5 font-semibold min-w-[72px]">事務手数料</th>
+              {/* ㉓ 支払額 */}
+              <th className="text-right px-2 py-2.5 font-semibold bg-emerald-800 min-w-[90px]">支払額</th>
+              {/* ㉔ インボイス番号 */}
+              <th className="text-left px-2 py-2.5 font-semibold min-w-[120px]">インボイス番号</th>
+              {/* ㉕ 詳細 */}
+              <th className="text-center px-2 py-2.5 font-semibold min-w-[50px]">詳細</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-gray-100">
             {filtered.length === 0 ? (
-              <tr><td colSpan={17} className="text-center py-8 text-gray-400">データがありません</td></tr>
-            ) : filtered.map((r) => (
-              <tr key={r.id} className={`border-b hover:bg-blue-50/30 transition ${r.paymentAmount > 0 ? "" : "opacity-60"}`}>
-                {/* 会員コード：複数ポジションは baseCode-** 表示 */}
-                <td className="p-2 font-mono text-xs text-slate-600">
+              <tr><td colSpan={25} className="text-center py-8 text-gray-400">データがありません</td></tr>
+            ) : filtered.map((r) => {
+              const titleChange = r.newTitleLevel > r.previousTitleLevel ? "▲昇格"
+                : r.newTitleLevel < r.previousTitleLevel ? "▼降格" : "－";
+              const titleChangeColor = r.newTitleLevel > r.previousTitleLevel
+                ? "text-green-600 font-bold"
+                : r.newTitleLevel < r.previousTitleLevel
+                  ? "text-red-500 font-bold"
+                  : "text-gray-400";
+              // ボーナス合計 = ダイレクトB + ユニレベルB + 組織構築B + 繰越金 + 調整金
+              const bonusTotal = r.directBonus + r.unilevelBonus + r.structureBonus
+                + r.carryoverAmount + r.adjustmentAmount;
+              return (
+              <tr key={r.id} className={`hover:bg-violet-50/30 transition ${r.paymentAmount > 0 ? "" : "opacity-60"}`}>
+
+                {/* ① 会員コード */}
+                <td className="px-2 py-2 font-mono text-[11px] text-slate-600 sticky left-0 bg-white">
                   {r.positionCount >= 2
                     ? <span>{r.baseCode}<span className="text-purple-400">**</span></span>
                     : r.memberCode}
                 </td>
-                <td className="p-2">
-                  <div className="font-medium text-gray-800 flex items-center gap-1">
-                    {r.companyName || r.memberName}
-                    {/* 複数ポジションバッジ */}
+
+                {/* ② 氏名／法人名 */}
+                <td className="px-2 py-2">
+                  <div className="flex items-center gap-1">
+                    {r.isCompany && (
+                      <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-orange-100 text-orange-600">法人</span>
+                    )}
+                    <span className="font-semibold text-gray-800">{r.companyName || r.memberName}</span>
                     {r.positionCount >= 2 && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-700 leading-none">
-                        {r.positionCount}POS
-                      </span>
+                      <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-purple-100 text-purple-700">{r.positionCount}POS</span>
                     )}
                   </div>
-                  {r.companyName && <div className="text-gray-500 text-[10px]">{r.memberName}</div>}
+                  {r.companyName && <div className="text-gray-400 text-[10px]">{r.memberName}</div>}
                 </td>
-                <td className="p-2">
-                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold ${
+
+                {/* ③ ステータス */}
+                <td className="px-2 py-2 text-center">
+                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
                     r.isActive ? "bg-green-100 text-green-700"
                     : r.status === "autoship" ? "bg-blue-100 text-blue-600"
                     : "bg-gray-100 text-gray-500"}`}>
-                    {r.isActive ? "アクティブ" : r.status === "autoship" ? "AS" : "非"}
+                    {r.isActive ? "アクティブ" : r.status === "autoship" ? "AS" : "非アクティブ"}
                   </span>
                 </td>
-                <td className="p-2 text-right text-gray-700">{r.selfPurchasePoints}</td>
-                <td className="p-2 text-right text-gray-700">{r.groupPoints}</td>
-                <td className="p-2 text-right text-gray-700">{r.directActiveCount}</td>
-                <td className="p-2">
-                  {r.previousTitleLevel !== r.newTitleLevel ? (
-                    <span className={`text-[10px] font-semibold ${r.newTitleLevel > r.previousTitleLevel ? "text-green-600" : "text-red-500"}`}>
-                      {LEVEL_LABELS[r.previousTitleLevel]} → {LEVEL_LABELS[r.newTitleLevel]}
-                    </span>
-                  ) : (
-                    <span className="text-gray-400 text-[10px]">変動なし</span>
-                  )}
+
+                {/* ④ 自己PT */}
+                <td className="px-2 py-2 text-right text-gray-600">{r.selfPurchasePoints}</td>
+
+                {/* ⑤ グループPT */}
+                <td className="px-2 py-2 text-right text-gray-600">{r.groupPoints}</td>
+
+                {/* ⑥ 直接アクティブ */}
+                <td className="px-2 py-2 text-right text-gray-600">{r.directActiveCount}</td>
+
+                {/* ⑦ 称号変動 */}
+                <td className={`px-2 py-2 text-center bg-indigo-50/30 text-[11px] ${titleChangeColor}`}>{titleChange}</td>
+
+                {/* ⑧ 現レベル */}
+                <td className="px-2 py-2 text-center bg-indigo-50/30">
+                  <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
+                    r.achievedLevel === 0 ? "bg-gray-100 text-gray-500"
+                    : r.achievedLevel === 1 ? "bg-blue-100 text-blue-700"
+                    : r.achievedLevel === 2 ? "bg-green-100 text-green-700"
+                    : r.achievedLevel === 3 ? "bg-yellow-100 text-yellow-700"
+                    : r.achievedLevel === 4 ? "bg-purple-100 text-purple-700"
+                    : "bg-red-100 text-red-700"}`}>
+                    {LEVEL_LABELS[r.achievedLevel]}
+                  </span>
                 </td>
-                <td className="p-2 text-gray-700 text-[11px]">{LEVEL_LABELS[r.achievedLevel]}</td>
-                <td className="p-2 text-right text-gray-800">{yen(r.directBonus)}</td>
-                <td className="p-2 text-right text-gray-800">{yen(r.unilevelBonus)}</td>
-                <td className="p-2 text-right text-gray-800">{yen(r.structureBonus)}</td>
-                <td className={`p-2 text-right font-semibold ${r.adjustmentAmount !== 0 ? (r.adjustmentAmount > 0 ? "text-emerald-700" : "text-red-600") : "text-gray-400"}`}>
-                  {r.adjustmentAmount !== 0 ? yen(r.adjustmentAmount) : "—"}
+
+                {/* ⑨ ダイレクトB */}
+                <td className="px-2 py-2 text-right bg-blue-50/30 font-medium">
+                  {r.directBonus > 0 ? yen(r.directBonus) : <span className="text-gray-300">－</span>}
                 </td>
-                <td className="p-2 text-right font-bold text-slate-700">{yen(r.bonusTotal)}</td>
-                <td className="p-2 text-right text-red-600">{yen(r.withholdingTax)}</td>
-                <td className="p-2 text-right text-red-500">{r.serviceFee > 0 ? yen(r.serviceFee) : "—"}</td>
-                <td className={`p-2 text-right font-bold ${r.paymentAmount > 0 ? "text-blue-600" : "text-gray-400"}`}>
+
+                {/* ⑩ ユニレベルB */}
+                <td className="px-2 py-2 text-right bg-blue-50/30 font-medium">
+                  {r.unilevelBonus > 0 ? yen(r.unilevelBonus) : <span className="text-gray-300">－</span>}
+                </td>
+
+                {/* ⑪ 組織構築B */}
+                <td className="px-2 py-2 text-right bg-blue-50/30 font-medium">
+                  {r.structureBonus > 0 ? yen(r.structureBonus) : <span className="text-gray-300">－</span>}
+                </td>
+
+                {/* ⑫ 貯金PT（01ポジション以外は「－」） */}
+                <td className="px-2 py-2 text-right bg-emerald-50/40 font-medium text-emerald-700">
+                  {r.savingsPointsAdded > 0
+                    ? `+${(r.savingsPointsAdded / 10).toFixed(1)}pt`
+                    : <span className="text-gray-300">－</span>}
+                </td>
+
+                {/* ⑬ 繰越金 */}
+                <td className="px-2 py-2 text-right text-gray-500">
+                  {r.carryoverAmount !== 0 ? yen(r.carryoverAmount) : <span className="text-gray-300">－</span>}
+                </td>
+
+                {/* ⑭ 調整金 */}
+                <td className="px-2 py-2 text-right text-gray-500">
+                  {r.adjustmentAmount !== 0
+                    ? <span className={r.adjustmentAmount > 0 ? "text-emerald-700 font-semibold" : "text-red-600 font-semibold"}>{yen(r.adjustmentAmount)}</span>
+                    : <span className="text-gray-300">－</span>}
+                </td>
+
+                {/* ⑮ ボーナス合計 */}
+                <td className="px-2 py-2 text-right bg-slate-50 font-bold text-slate-700">
+                  {yen(bonusTotal)}
+                </td>
+
+                {/* ⑯ 支払調整率 */}
+                <td className="px-2 py-2 text-right bg-orange-50/40 text-orange-700">
+                  {(r.paymentAdjustmentRate ?? 0) > 0
+                    ? `${r.paymentAdjustmentRate}%`
+                    : <span className="text-gray-300">－</span>}
+                </td>
+
+                {/* ⑰ 支払調整額 */}
+                <td className="px-2 py-2 text-right bg-orange-50/40 text-orange-700">
+                  {r.paymentAdjustmentAmount > 0
+                    ? `－${yen(r.paymentAdjustmentAmount)}`
+                    : <span className="text-gray-300">－</span>}
+                </td>
+
+                {/* ⑱ 取得額（finalAmount） */}
+                <td className="px-2 py-2 text-right bg-orange-50/20 font-semibold text-gray-700">
+                  {yen(r.finalAmount)}
+                </td>
+
+                {/* ⑲ 10%消費税(内税) */}
+                <td className="px-2 py-2 text-right text-gray-400 text-[10px]">
+                  {r.consumptionTax > 0 ? yen(r.consumptionTax) : <span className="text-gray-300">－</span>}
+                </td>
+
+                {/* ⑳ 源泉税 */}
+                <td className="px-2 py-2 text-right text-red-500">
+                  {r.isCompany
+                    ? <span className="text-[9px] text-gray-400">法人除外</span>
+                    : r.withholdingTax > 0
+                      ? `－${yen(r.withholdingTax)}`
+                      : <span className="text-gray-300">－</span>}
+                </td>
+
+                {/* ㉑ 過不足金 */}
+                <td className="px-2 py-2 text-right">
+                  {r.shortageAmount !== 0
+                    ? <span className={r.shortageAmount >= 0 ? "text-blue-600" : "text-red-500"}>{yen(r.shortageAmount)}</span>
+                    : <span className="text-gray-300">－</span>}
+                </td>
+
+                {/* ㉒ 事務手数料 */}
+                <td className="px-2 py-2 text-right text-gray-500">
+                  {r.serviceFee > 0 ? `－${yen(r.serviceFee)}` : <span className="text-gray-300">－</span>}
+                </td>
+
+                {/* ㉓ 支払額 */}
+                <td className={`px-2 py-2 text-right font-bold bg-emerald-50/50 ${r.paymentAmount > 0 ? "text-emerald-700" : "text-gray-400"}`}>
                   {yen(r.paymentAmount)}
                 </td>
-                <td className="p-2 text-center">
+
+                {/* ㉔ インボイス登録番号 */}
+                <td className="px-2 py-2 text-left font-mono text-xs text-gray-500">
+                  {r.invoiceNumber
+                    ? <span className="text-indigo-600">{r.invoiceNumber}</span>
+                    : <span className="text-gray-300">－</span>}
+                </td>
+
+                {/* ㉕ 詳細ボタン */}
+                <td className="px-2 py-2 text-center">
                   <button
                     onClick={() => setDetailRow(r)}
                     className={`px-2 py-1 border text-[10px] rounded transition font-semibold ${
@@ -529,11 +678,12 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
                         : "bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100"
                     }`}
                   >
-                    {r.positionCount >= 2 ? `詳細(${r.positionCount}POS)` : "詳細"}
+                    {r.positionCount >= 2 ? `${r.positionCount}POS` : "詳細"}
                   </button>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
