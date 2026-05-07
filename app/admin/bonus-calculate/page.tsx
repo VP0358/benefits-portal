@@ -451,7 +451,7 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
               {/* ① 会員コード */}
               <th className="text-left px-2 py-2.5 font-semibold sticky left-0 bg-slate-800 z-10 min-w-[110px]">会員コード</th>
               {/* ② 氏名／法人名 */}
-              <th className="text-left px-2 py-2.5 font-semibold min-w-[130px]">氏名／法人名</th>
+              <th className="text-left px-2 py-2.5 font-semibold sticky left-[110px] bg-slate-800 z-10 min-w-[130px]">氏名／法人名</th>
               {/* ③ ステータス */}
               <th className="text-center px-2 py-2.5 font-semibold min-w-[70px]">ステータス</th>
               {/* ④ 自己PT */}
@@ -518,14 +518,14 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
               <tr key={r.id} className={`hover:bg-violet-50/30 transition ${r.paymentAmount > 0 ? "" : "opacity-60"}`}>
 
                 {/* ① 会員コード */}
-                <td className="px-2 py-2 font-mono text-[11px] text-slate-600 sticky left-0 bg-white">
+                <td className="px-2 py-2 font-mono text-[11px] text-slate-600 sticky left-0 bg-white z-10">
                   {r.positionCount >= 2
                     ? <span>{r.baseCode}<span className="text-purple-400">**</span></span>
                     : r.memberCode}
                 </td>
 
                 {/* ② 氏名／法人名 */}
-                <td className="px-2 py-2">
+                <td className="px-2 py-2 sticky left-[110px] bg-white z-10" style={{boxShadow:'2px 0 4px rgba(0,0,0,0.06)'}}>
                   <div className="flex items-center gap-1">
                     {r.isCompany && (
                       <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-orange-100 text-orange-600">法人</span>

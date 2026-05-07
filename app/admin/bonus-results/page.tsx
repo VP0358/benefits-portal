@@ -563,7 +563,7 @@ export default function BonusResultsPage() {
                     {/* ① 会員コード */}
                     <th className="px-2 py-2.5 text-left font-semibold sticky left-0 bg-slate-800 z-10 min-w-[110px]">会員コード</th>
                     {/* ② 氏名／法人名 */}
-                    <th className="px-2 py-2.5 text-left font-semibold min-w-[130px]">氏名／法人名</th>
+                    <th className="px-2 py-2.5 text-left font-semibold sticky left-[110px] bg-slate-800 z-10 min-w-[130px]">氏名／法人名</th>
                     {/* ③ ステータス */}
                     <th className="px-2 py-2.5 text-center font-semibold min-w-[70px]">ステータス</th>
                     {/* ④ 自己PT */}
@@ -633,12 +633,12 @@ export default function BonusResultsPage() {
                         className={`hover:bg-violet-50/30 transition ${dr.paymentAmount > 0 ? "" : "opacity-60"}`}>
 
                         {/* ① 会員コード */}
-                        <td className="px-2 py-2 font-mono text-slate-600 sticky left-0 bg-white text-[11px]">
+                        <td className="px-2 py-2 font-mono text-slate-600 sticky left-0 bg-white text-[11px] z-10">
                           {isMulti ? <span>{displayCode}<span className="text-purple-400">**</span></span> : displayCode}
                         </td>
 
                         {/* ② 氏名/法人名 */}
-                        <td className="px-2 py-2">
+                        <td className="px-2 py-2 sticky left-[110px] bg-white z-10" style={{boxShadow:'2px 0 4px rgba(0,0,0,0.06)'}}>
                           <div className="flex items-center gap-1">
                             {r.isCompany && (
                               <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-orange-100 text-orange-600">法人</span>
