@@ -656,11 +656,14 @@ export async function POST(request: Request) {
       where: { targetMonth_paymentMethod: { targetMonth, paymentMethod: effectivePaymentMethod } },
       include: { orders: true },
     });
-  } else if (run.orders.length === 0 && mlmMembers.length > 0) {
-    // ── 既存Run(orders=0件)の場合: mlmMembers から注文を補完作成 ──
-    // 例: 「CSVダウンロード前」に空の下書きRunが作られた場合や、
-    //     インポートを先行させる運用での対応
-    console.log(`[import-direct] 既存Run(id=${run.id})のorders=0件 → mlmMembers(${mlmMembers.length}件)から注文を作成`);
+  } else if (run.orders.length < mlmMembers.length && mlmMembers.length > 0) {
+    // ── 既存Runのorders件数がmlmMembers件数より少ない場合: 不足分を補完作成 ──
+    // ケース1: orders=0件（空の下書きRunが事前作成された）
+    // ケース2: orders=2件など中途半端（前回のインポートで一部しか作成されなかった）
+    // → skipDuplicates:true により既存ordersはそのまま、不足分のみ追加される
+    const existingMemberCodes = new Set(run.orders.map(o => o.memberCode));
+    const missingMembers = mlmMembers.filter(m => !existingMemberCodes.has(m.memberCode));
+    console.log(`[import-direct] 既存Run(id=${run.id}) orders=${run.orders.length}件 < mlmMembers=${mlmMembers.length}件 → 不足${missingMembers.length}件を補完作成`);
     try {
       await prisma.autoShipOrder.createMany({
         data: buildOrderData(run.id),
