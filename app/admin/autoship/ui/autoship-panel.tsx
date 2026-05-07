@@ -299,7 +299,7 @@ export default function AutoShipPanel() {
   const [csvImportPm, setCsvImportPm] = useState<string>("credit_card");
   const [csvImportPmAutoDetected, setCsvImportPmAutoDetected] = useState(false);
   const [csvImportLoading, setCsvImportLoading] = useState(false);
-  const [csvImportResult, setCsvImportResult] = useState<{ paidCount: number; failedCount: number; newRunId?: string; effectivePaymentMethod?: string } | null>(null);
+  const [csvImportResult, setCsvImportResult] = useState<{ paidCount: number; failedCount: number; newRunId?: string; effectivePaymentMethod?: string; debug?: Record<string, unknown> } | null>(null);
 
   /* ─── 一覧取得 ─── */
   const loadRuns = useCallback(async () => {
@@ -468,7 +468,7 @@ export default function AutoShipPanel() {
       let data: Record<string, unknown> = {};
       try { data = rawText ? JSON.parse(rawText) : {}; } catch { /* ignore */ }
       if (!res.ok) throw new Error((data.error as string) ?? `サーバーエラー (${res.status})`);
-      setCsvImportResult({ paidCount: data.paidCount as number, failedCount: data.failedCount as number, newRunId: data.runId as string | undefined, effectivePaymentMethod: data.effectivePaymentMethod as string | undefined });
+      setCsvImportResult({ paidCount: data.paidCount as number, failedCount: data.failedCount as number, newRunId: data.runId as string | undefined, effectivePaymentMethod: data.effectivePaymentMethod as string | undefined, debug: data._debug as Record<string, unknown> | undefined });
       const pmLabel = data.effectivePaymentMethod === "bank_transfer" ? "口座引き落とし" :
                       data.effectivePaymentMethod === "credit_card"   ? "クレジットカード" :
                       (data.effectivePaymentMethod as string | undefined) ?? csvImportPm;
@@ -871,8 +871,9 @@ export default function AutoShipPanel() {
                 // ファイル名から支払い方法を自動判定
                 if (f) {
                   const name = f.name.toUpperCase();
-                  // 三菱UFJファクター固定長TXT: SIRRRDRFDL*.txt 等
-                  if (name.match(/^SIRR+DRFDL/i) || name.match(/SIRR+DRFDL/i)) {
+                  // 三菱UFJファクター固定長TXT: SIRRRDRFDL*.txt / SIRRDRDFDL*.txt 等
+                  // 実ファイル例: SIRRRDRFDL03_20260507223824.txt, SIRRDRDFDL03_20260507232824.txt
+                  if (name.match(/SIR[RD]+[RF]+DL/i)) {
                     setCsvImportPm("bank_transfer");
                     setCsvImportPmAutoDetected(true);
                   } else {
@@ -920,6 +921,11 @@ export default function AutoShipPanel() {
           <div className="mt-3 p-3 bg-green-50 rounded-lg text-sm border border-green-200">
             <p className="font-semibold text-green-800">✅ インポート完了</p>
             <p className="text-green-700">決済成功: <strong>{csvImportResult.paidCount}件</strong> / 失敗: <strong>{csvImportResult.failedCount}件</strong></p>
+            {csvImportResult.effectivePaymentMethod && (
+              <p className="text-xs text-gray-500 mt-1">
+                支払い方法: {csvImportResult.effectivePaymentMethod === "bank_transfer" ? "🏦 口座引き落とし" : csvImportResult.effectivePaymentMethod === "credit_card" ? "💳 クレジットカード" : csvImportResult.effectivePaymentMethod}
+              </p>
+            )}
             {csvImportResult.newRunId && (
               <button
                 onClick={() => openDetail(csvImportResult.newRunId!)}
@@ -927,6 +933,28 @@ export default function AutoShipPanel() {
               >
                 → 作成された伝票を確認
               </button>
+            )}
+            {csvImportResult.debug && (
+              <details className="mt-2">
+                <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">🔍 デバッグ情報（クリックで展開）</summary>
+                <div className="mt-1 p-2 bg-gray-50 rounded text-xs font-mono text-gray-600 overflow-auto max-h-48">
+                  <div>isMufg: <strong>{String(csvImportResult.debug.isMufg)}</strong></div>
+                  <div>effectivePaymentMethod: <strong>{String(csvImportResult.debug.effectivePaymentMethod)}</strong> (sent: {String(csvImportResult.debug.originalPaymentMethod)})</div>
+                  <div>resultMapSize: <strong>{String(csvImportResult.debug.resultMapSize)}</strong></div>
+                  <div>runOrdersCount: <strong>{String(csvImportResult.debug.runOrdersCount)}</strong></div>
+                  <div>matchedCount: <strong>{String(csvImportResult.debug.matchedCount)}</strong></div>
+                  <div>mufgAccountMapSize: <strong>{String(csvImportResult.debug.mufgAccountMapSize ?? "-")}</strong></div>
+                  {Array.isArray(csvImportResult.debug.mufgAccountSample) && (
+                    <div>mufgAccountSample: [{(csvImportResult.debug.mufgAccountSample as string[]).join(", ")}]</div>
+                  )}
+                  {Array.isArray(csvImportResult.debug.runOrdersSampleAccountNumbers) && (
+                    <div>runOrders accountNumbers sample: [{(csvImportResult.debug.runOrdersSampleAccountNumbers as (string|null)[]).map(v => v ?? "null").join(", ")}]</div>
+                  )}
+                  {Array.isArray(csvImportResult.debug.unmatchedOrders) && (csvImportResult.debug.unmatchedOrders as unknown[]).length > 0 && (
+                    <div className="text-orange-600">未照合orders({(csvImportResult.debug.unmatchedOrders as unknown[]).length}件): {JSON.stringify(csvImportResult.debug.unmatchedOrders).slice(0, 200)}</div>
+                  )}
+                </div>
+              </details>
             )}
           </div>
         )}

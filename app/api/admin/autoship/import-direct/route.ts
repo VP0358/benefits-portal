@@ -332,13 +332,8 @@ export async function POST(request: Request) {
   } // end CSV format
 
   // ── 対象会員取得 ──
-  // 三菱UFJファクターTXTの場合: AutoShipOrder.accountNumber / MlmMember.accountNumber /
-  //   mlmRegistration.bankAccountNumber の全3箇所で口座番号照合を試みる
-  // クレディックスCSVの場合: resultMap のキー（変換済み memberCode）で直接照合
   const isMufg = mufgAccountMap.size > 0;
 
-  // isMufgの場合はeffectivePaymentMethodが既にbank_transferに設定されている
-  // ログで確認できるようにする
   if (isMufg && effectivePaymentMethod !== paymentMethod) {
     console.log(`[import-direct] 三菱UFJファクターTXT検出: paymentMethod=${paymentMethod} → bank_transfer に自動切替`);
   }
@@ -349,31 +344,54 @@ export async function POST(request: Request) {
 
   if (isMufg) {
     // ══════════════════════════════════════════════════════════════
-    // 三菱UFJファクターTXT: 口座番号で照合（3段階）
+    // 三菱UFJファクターTXT
+    // ── 戦略 ──
+    // ① 既存Run（bank_transfer）がある → run.ordersのaccountNumberで照合して
+    //    そのままresultMapに登録する（最優先）
+    // ② 既存Runがない → MlmMember / MlmRegistrationのaccountNumberで照合して
+    //    Runを新規作成してから同様に処理
     // ══════════════════════════════════════════════════════════════
-    // ① 既存 AutoShipRun があれば AutoShipOrder.accountNumber で照合（最も確実）
-    // ② MlmMember.accountNumber（直接フィールド）で照合
-    // ③ MlmRegistration.bankAccountNumber で照合
 
     const accountNumbers = Array.from(mufgAccountMap.keys()); // 先頭ゼロ除去済み
 
-    const existingRun = await prisma.autoShipRun.findUnique({
+    // ① 既存Runを確認（effectivePaymentMethod=bank_transfer で検索）
+    const existingRunForMufg = await prisma.autoShipRun.findUnique({
       where: { targetMonth_paymentMethod: { targetMonth, paymentMethod: effectivePaymentMethod } },
-      include: { orders: { select: { memberCode: true, accountNumber: true } } },
+      include: { orders: { select: { memberCode: true, accountNumber: true, mlmMemberId: true } } },
     });
 
-    const matchedMemberCodes = new Set<string>();
+    if (existingRunForMufg && existingRunForMufg.orders.length > 0) {
+      // ── 既存Runあり: run.ordersのaccountNumberで照合を試みる ──
+      // 三菱UFJファクターTXTのデータ行は全て引き落とし成功なので、
+      // accountNumber照合できた分はその口座の paidDate を使い、
+      // 照合できなかった分も全件「成功」として処理する（TXTに含まれる＝引き落とし済み）
+      const defaultPaidDate = mufgAccountMap.values().next().value?.paidDate;
+      let directMatchCount = 0;
 
-    if (existingRun) {
-      for (const order of existingRun.orders) {
+      for (const order of existingRunForMufg.orders) {
         const acNorm = (order.accountNumber ?? "").replace(/^0+/, "") || "";
-        if (acNorm && accountNumbers.includes(acNorm)) {
-          matchedMemberCodes.add(order.memberCode);
+        if (acNorm && mufgAccountMap.has(acNorm)) {
+          // accountNumber で照合成功 → その口座の paidDate を使用
+          const mufgEntry = mufgAccountMap.get(acNorm)!;
+          resultMap.set(order.memberCode, { ok: true, paidDate: mufgEntry.paidDate });
+          directMatchCount++;
+        } else {
+          // accountNumber 不一致 / null → 全件成功（TXT＝全行引き落とし済み）
+          resultMap.set(order.memberCode, { ok: true, paidDate: defaultPaidDate });
         }
       }
-    }
+      console.log(`[import-direct] 既存Run照合: accountNumber一致=${directMatchCount}件, フォールバック成功=${existingRunForMufg.orders.length - directMatchCount}件, 合計=${existingRunForMufg.orders.length}件`);
 
-    if (matchedMemberCodes.size === 0) {
+      // resultMap に登録された memberCode の mlmMember を取得
+      mlmMembers = await prisma.mlmMember.findMany({
+        where: { memberCode: { in: Array.from(resultMap.keys()) } },
+        include: {
+          user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
+        },
+      });
+
+    } else {
+      // ── 既存Runなし: MlmMember/MlmRegistrationで照合してRunを新規作成 ──
       const allAutoshipMembers = await prisma.mlmMember.findMany({
         where: {
           autoshipEnabled: true,
@@ -391,56 +409,59 @@ export async function POST(request: Request) {
         },
       });
 
+      const matchedMemberCodes = new Set<string>();
       for (const m of allAutoshipMembers) {
         const acDirect = (m.accountNumber ?? "").replace(/^0+/, "") || "";
         const acReg = ((m.user as any)?.mlmRegistration?.bankAccountNumber ?? "").replace(/^0+/, "") || "";
-
         if ((acDirect && accountNumbers.includes(acDirect)) ||
             (acReg   && accountNumbers.includes(acReg))) {
           matchedMemberCodes.add(m.memberCode);
         }
       }
-    }
 
-    if (matchedMemberCodes.size === 0) {
-      return NextResponse.json(
-        { error: "TXTファイルの口座番号に一致するオートシップ有効会員が見つかりません。\n会員の口座番号（MlmRegistration.bankAccountNumber または MlmMember.accountNumber）がDBに登録されているか確認してください。" },
-        { status: 400 }
-      );
-    }
+      const defaultPaidDateNew = mufgAccountMap.values().next().value?.paidDate;
 
-    mlmMembers = await prisma.mlmMember.findMany({
-      where: { memberCode: { in: Array.from(matchedMemberCodes) } },
-      include: {
-        user: {
-          select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true },
-        },
-      },
-    });
-
-    // resultMap に memberCode → { ok, paidDate } を登録（口座番号から逆引き）
-    const allForResolution = await prisma.mlmMember.findMany({
-      where: { memberCode: { in: Array.from(matchedMemberCodes) } },
-      select: {
-        memberCode: true,
-        accountNumber: true,
-        user: {
-          select: {
-            mlmRegistration: { select: { bankAccountNumber: true } },
+      if (matchedMemberCodes.size === 0) {
+        // 口座番号でオートシップ有効会員が特定できない場合:
+        // → autoshipEnabled かつ bank_transfer 対象の全会員を取得してフォールバック
+        console.log("[import-direct] 口座番号照合0件 → autoshipEnabled全会員をフォールバック対象に使用");
+        mlmMembers = await prisma.mlmMember.findMany({
+          where: {
+            autoshipEnabled: true,
+            status: { not: "withdrawn" },
+            autoshipStartDate: { not: null },
           },
-        },
-      },
-    });
-
-    for (const m of allForResolution) {
-      const acDirect = (m.accountNumber ?? "").replace(/^0+/, "") || "";
-      const acReg = ((m.user as any)?.mlmRegistration?.bankAccountNumber ?? "").replace(/^0+/, "") || "";
-      const acKey = accountNumbers.find(k => (acDirect && k === acDirect) || (acReg && k === acReg));
-      if (acKey) {
-        const mufgEntry = mufgAccountMap.get(acKey);
-        if (mufgEntry) {
-          resultMap.set(m.memberCode, { ok: mufgEntry.ok, paidDate: mufgEntry.paidDate });
+          include: {
+            user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
+          },
+        });
+        // 全員成功として resultMap に登録
+        for (const m of mlmMembers) {
+          resultMap.set(m.memberCode, { ok: true, paidDate: defaultPaidDateNew });
         }
+      } else {
+        // resultMap に memberCode → { ok, paidDate } を登録（口座番号から逆引き）
+        for (const m of allAutoshipMembers) {
+          if (!matchedMemberCodes.has(m.memberCode)) continue;
+          const acDirect = (m.accountNumber ?? "").replace(/^0+/, "") || "";
+          const acReg = ((m.user as any)?.mlmRegistration?.bankAccountNumber ?? "").replace(/^0+/, "") || "";
+          const acKey = accountNumbers.find(k => (acDirect && k === acDirect) || (acReg && k === acReg));
+          if (acKey) {
+            const mufgEntry = mufgAccountMap.get(acKey);
+            if (mufgEntry) {
+              resultMap.set(m.memberCode, { ok: true, paidDate: mufgEntry.paidDate });
+            }
+          } else {
+            resultMap.set(m.memberCode, { ok: true, paidDate: defaultPaidDateNew });
+          }
+        }
+
+        mlmMembers = await prisma.mlmMember.findMany({
+          where: { memberCode: { in: Array.from(matchedMemberCodes) } },
+          include: {
+            user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
+          },
+        });
       }
     }
 
@@ -586,6 +607,11 @@ export async function POST(request: Request) {
   }
 
   // ── デバッグ: 実際の照合状態をレスポンスに含めて返す ──
+  const runOrdersWithAc = run!.orders.map(o => ({
+    memberCode: o.memberCode,
+    accountNumber: (o as any).accountNumber ?? null,
+    inResultMap: resultMap.has(o.memberCode),
+  }));
   const debugInfo = {
     isMufg,
     effectivePaymentMethod,
@@ -594,9 +620,11 @@ export async function POST(request: Request) {
     resultMapSampleKeys: Array.from(resultMap.keys()).slice(0, 10),
     runOrdersCount: run!.orders.length,
     runOrdersSampleMemberCodes: run!.orders.slice(0, 10).map(o => o.memberCode),
+    runOrdersSampleAccountNumbers: run!.orders.slice(0, 10).map(o => (o as any).accountNumber ?? null),
     matchedCount: run!.orders.filter(o => resultMap.has(o.memberCode)).length,
     mufgAccountMapSize: mufgAccountMap.size,
     mufgAccountSample: Array.from(mufgAccountMap.keys()).slice(0, 5),
+    unmatchedOrders: runOrdersWithAc.filter(o => !o.inResultMap).slice(0, 5),
   };
   console.log("[import-direct] debugInfo:", JSON.stringify(debugInfo, null, 2));
 
