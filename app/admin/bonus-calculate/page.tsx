@@ -443,9 +443,9 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
       </div>
 
       {/* テーブル */}
-      <div className="bg-white rounded-2xl border border-stone-100">
-        <div className="overflow-x-auto w-full">
-        <table className="text-xs whitespace-nowrap">
+      {/* overflowX をビューポート基準で確保。サイドバー256px＋両側padding(48px×2)を引いた幅が最大幅 */}
+      <div className="bg-white rounded-2xl border border-stone-100" style={{maxWidth:'calc(100vw - 256px - 6rem)',overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+        <table className="text-xs" style={{whiteSpace:'nowrap',borderCollapse:'collapse',minWidth:'max-content'}}>
           <thead className="bg-slate-800 text-white text-[11px]">
             <tr>
               {/* ① 会員コード */}
@@ -687,7 +687,6 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
             })}
           </tbody>
         </table>
-        </div>
       </div>
 
       {/* 詳細モーダル */}
@@ -1434,7 +1433,7 @@ export default function BonusCalculatePage() {
           })}
         </div>
 
-        <div className="p-6">
+        <div className="p-6" style={{overflowX:'visible'}}>
           {/* ── 計算結果 ── */}
           {activeTab === "calculation" && (
             loading

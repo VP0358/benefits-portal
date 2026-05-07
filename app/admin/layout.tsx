@@ -32,8 +32,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       style={{ background: "#eee8e0", fontFamily: "var(--font-noto), 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', sans-serif" }}
     >
       <AdminNav />
-      {/* overflow-y-auto のみ（縦スクロール）、横は子に委ねる */}
-      <div className="flex-1 min-w-0 flex flex-col overflow-y-auto">
+      {/*
+        ★ overflow-y-auto をここに置くと CSS 仕様上 overflow-x も auto/hidden になり
+          子テーブルの overflow-x:auto が機能しなくなる。
+          → 縦スクロールは html/body に任せ、この div は overflow:visible のまま。
+      */}
+      <div className="flex-1 flex flex-col" style={{ minWidth: 0 }}>
         {/* トップバー */}
         <div
           className="sticky top-0 z-10 h-14 flex items-center px-6 backdrop-blur-md flex-shrink-0"
@@ -56,8 +60,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             Admin Portal
           </div>
         </div>
-        {/* メインコンテンツ: overflow-x-auto で横スクロールを子テーブルに届ける */}
-        <div className="p-6 md:p-8 flex-1 overflow-x-auto">
+        {/* メインコンテンツ — overflow は指定しない（子の overflow-x:auto を妨げない） */}
+        <div className="p-6 md:p-8 flex-1">
           {children}
         </div>
       </div>
