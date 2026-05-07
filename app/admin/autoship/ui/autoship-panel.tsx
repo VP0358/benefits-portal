@@ -15,7 +15,7 @@ function currentMonthJST() {
 
 /* ───────────── 型定義 ───────────── */
 type PaymentMethod = "credit_card" | "bank_transfer" | "bank_payment" | "cod" | "other";
-type RunStatus = "draft" | "exported" | "imported" | "completed" | "canceled";
+type RunStatus = "draft" | "exported" | "importing" | "completed" | "canceled";
 type OrderStatus = "pending" | "paid" | "failed" | "canceled";
 
 interface AutoShipRun {
@@ -69,14 +69,14 @@ interface RunDetail extends AutoShipRun {
 const RUN_STATUS_LABELS: Record<RunStatus, string> = {
   draft: "下書き",
   exported: "CSV出力済",
-  imported: "結果取込済",
+  importing: "結果取込済",
   completed: "完了",
   canceled: "キャンセル",
 };
 const RUN_STATUS_COLORS: Record<RunStatus, string> = {
   draft: "bg-gray-100 text-gray-700",
   exported: "bg-blue-100 text-blue-700",
-  imported: "bg-yellow-100 text-yellow-700",
+  importing: "bg-yellow-100 text-yellow-700",
   completed: "bg-green-100 text-green-700",
   canceled: "bg-red-100 text-red-700",
 };
@@ -1181,7 +1181,7 @@ export default function AutoShipPanel() {
                     <div className="self-center text-gray-400 text-lg">→</div>
 
                     {/* STEP3: 納品書生成 */}
-                    <div className={`flex-1 min-w-[140px] p-3 rounded-lg border ${detail.status === "imported" ? "bg-white border-indigo-300 shadow" : "bg-gray-50 border-gray-200"}`}>
+                    <div className={`flex-1 min-w-[140px] p-3 rounded-lg border ${detail.status === "importing" ? "bg-white border-indigo-300 shadow" : "bg-gray-50 border-gray-200"}`}>
                       <div className="font-semibold mb-1">③ 納品書生成</div>
                       <div className="text-gray-500 mb-2">決済成功会員の納品書を自動作成</div>
                       <div className="flex flex-col gap-1">
