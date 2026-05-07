@@ -328,7 +328,7 @@ export default function BonusResultsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "payment">("all");
 
-  // 再計算用: 行ごとの上書き値 { resultId: { serviceFee?, shortageAmount?, paymentAdjustmentRate? } }
+  // 再計算用: 行ごとの上書き値
   const [overrides, setOverrides] = useState<Record<string, {
     serviceFee?: number;
     shortageAmount?: number;
@@ -381,19 +381,24 @@ export default function BonusResultsPage() {
   const paymentResults = results.filter(r => getDisplayRow(r).paymentAmount > 0);
   const totalPayment = paymentResults.reduce((s, r) => s + getDisplayRow(r).paymentAmount, 0);
 
-  // CSV出力
+  // CSV出力（25列 + 詳細参照用後半列）
   const handleExportCSV = () => {
     const headers = [
+      // 1〜12: 基本情報・活動
       "会員コード", "氏名/法人名", "法人", "ステータス",
-      "自己PT", "グループPT", "直接",
+      "自己PT", "グループPT", "直接アクティブ数",
       "称号変動", "現レベル",
-      "ダイレクトB", "ユニレベルB", "組織構築B", "貯金PT(今月追加)",
-      "繰越金", "調整金", "ボーナス合計",
-      "源泉税", "事務手数料", "支払額",
+      "ダイレクトB(¥)", "ユニレベルB(¥)", "組織構築B(¥)",
+      // 13〜18: 貯金・調整・合計
+      "貯金PT(今月追加)", "繰越金(¥)", "調整金(¥)", "ボーナス合計(¥)",
+      // 19〜21: 支払調整
+      "支払調整率(%)", "支払調整額(¥)", "取得額(¥)",
+      // 22〜25: 税・費用・支払
+      "10%消費税内税(¥)", "源泉税(¥)", "過不足金(¥)", "事務手数料(¥)", "支払額(¥)",
+      // 26: 登録番号
       "インボイス登録番号",
-      // 詳細参照用
-      "前称号", "支払調整前取得額", "支払調整率(%)", "支払調整額", "取得額",
-      "10%消費税(内税)", "過不足金",
+      // 後半（参照用）
+      "前称号",
     ];
     const rows = filteredResults.map(r => {
       const dr = getDisplayRow(r);
@@ -418,18 +423,16 @@ export default function BonusResultsPage() {
         dr.carryoverAmount,
         dr.adjustmentAmount,
         bonusTotal,
-        dr.withholdingTax,
-        dr.serviceFee,
-        dr.paymentAmount,
-        r.invoiceNumber || "",
-        // 詳細参照用
-        LEVEL_LABELS[dr.previousTitleLevel],
-        dr.amountBeforeAdjustment,
         dr.paymentAdjustmentRate || "",
         dr.paymentAdjustmentAmount,
         dr.finalAmount,
         dr.consumptionTax,
+        dr.withholdingTax,
         dr.shortageAmount,
+        dr.serviceFee,
+        dr.paymentAmount,
+        r.invoiceNumber || "",
+        LEVEL_LABELS[dr.previousTitleLevel],
       ];
     });
     const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(",")).join("\n");
@@ -540,7 +543,7 @@ export default function BonusResultsPage() {
             />
             <span className="text-sm text-gray-500">{filteredResults.length}件</span>
             <div className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 font-medium">
-              <i className="fas fa-edit mr-1"></i>詳細ボタンから支払計算の内訳（調整率・過不足金・消費税など）を確認できます
+              <i className="fas fa-edit mr-1"></i>詳細ボタンから支払計算の内訳を確認できます
             </div>
           </div>
 
@@ -555,30 +558,55 @@ export default function BonusResultsPage() {
               <table className="w-full text-xs whitespace-nowrap">
                 <thead className="bg-slate-800 text-white text-[11px]">
                   <tr>
-                    {/* 基本情報 */}
+                    {/* ① 会員コード */}
                     <th className="px-2 py-2.5 text-left font-semibold sticky left-0 bg-slate-800 z-10 min-w-[110px]">会員コード</th>
+                    {/* ② 氏名／法人名 */}
                     <th className="px-2 py-2.5 text-left font-semibold min-w-[130px]">氏名／法人名</th>
+                    {/* ③ ステータス */}
                     <th className="px-2 py-2.5 text-center font-semibold min-w-[70px]">ステータス</th>
+                    {/* ④ 自己PT */}
                     <th className="px-2 py-2.5 text-right font-semibold min-w-[55px]">自己PT</th>
+                    {/* ⑤ グループPT */}
                     <th className="px-2 py-2.5 text-right font-semibold min-w-[65px]">グループPT</th>
+                    {/* ⑥ 直接 */}
                     <th className="px-2 py-2.5 text-right font-semibold min-w-[40px]">直接</th>
-                    {/* 称号 */}
+                    {/* ⑦ 称号変動 */}
                     <th className="px-2 py-2.5 text-center font-semibold bg-indigo-900 min-w-[72px]">称号変動</th>
+                    {/* ⑧ 現レベル */}
                     <th className="px-2 py-2.5 text-center font-semibold bg-indigo-900 min-w-[65px]">現レベル</th>
-                    {/* ボーナス */}
+                    {/* ⑨ ダイレクトB */}
                     <th className="px-2 py-2.5 text-right font-semibold bg-blue-900 min-w-[80px]">ダイレクトB</th>
+                    {/* ⑩ ユニレベルB */}
                     <th className="px-2 py-2.5 text-right font-semibold bg-blue-900 min-w-[80px]">ユニレベルB</th>
+                    {/* ⑪ 組織構築B */}
                     <th className="px-2 py-2.5 text-right font-semibold bg-blue-900 min-w-[75px]">組織構築B</th>
+                    {/* ⑫ 貯金PT */}
                     <th className="px-2 py-2.5 text-right font-semibold bg-emerald-900 min-w-[65px]">貯金PT</th>
-                    {/* 調整・合計 */}
+                    {/* ⑬ 繰越金 */}
                     <th className="px-2 py-2.5 text-right font-semibold min-w-[65px]">繰越金</th>
+                    {/* ⑭ 調整金 */}
                     <th className="px-2 py-2.5 text-right font-semibold min-w-[65px]">調整金</th>
+                    {/* ⑮ ボーナス合計 */}
                     <th className="px-2 py-2.5 text-right font-semibold bg-slate-700 min-w-[90px]">ボーナス合計</th>
-                    {/* 控除・支払 */}
+                    {/* ⑯ 支払調整率 */}
+                    <th className="px-2 py-2.5 text-right font-semibold bg-orange-900 min-w-[72px]">支払調整率</th>
+                    {/* ⑰ 支払調整額 */}
+                    <th className="px-2 py-2.5 text-right font-semibold bg-orange-900 min-w-[72px]">支払調整額</th>
+                    {/* ⑱ 取得額 */}
+                    <th className="px-2 py-2.5 text-right font-semibold bg-orange-800 min-w-[80px]">取得額</th>
+                    {/* ⑲ 消費税(内) */}
+                    <th className="px-2 py-2.5 text-right font-semibold min-w-[72px]">消費税(内)</th>
+                    {/* ⑳ 源泉税 */}
                     <th className="px-2 py-2.5 text-right font-semibold text-red-300 min-w-[72px]">源泉税</th>
-                    <th className="px-2 py-2.5 text-right font-semibold min-w-[65px]">事務手数料</th>
+                    {/* ㉑ 過不足金 */}
+                    <th className="px-2 py-2.5 text-right font-semibold min-w-[65px]">過不足金</th>
+                    {/* ㉒ 事務手数料 */}
+                    <th className="px-2 py-2.5 text-right font-semibold min-w-[72px]">事務手数料</th>
+                    {/* ㉓ 支払額 */}
                     <th className="px-2 py-2.5 text-right font-semibold bg-emerald-800 min-w-[90px]">支払額</th>
-                    <th className="px-2 py-2.5 text-left font-semibold min-w-[120px]">インボイス登録番号</th>
+                    {/* ㉔ インボイス登録番号 */}
+                    <th className="px-2 py-2.5 text-left font-semibold min-w-[120px]">インボイス番号</th>
+                    {/* ㉕ 詳細 */}
                     <th className="px-2 py-2.5 text-center font-semibold min-w-[50px]">詳細</th>
                   </tr>
                 </thead>
@@ -594,18 +622,20 @@ export default function BonusResultsPage() {
                       : dr.newTitleLevel < dr.previousTitleLevel
                         ? "text-red-500 font-bold"
                         : "text-gray-400";
-                    // ボーナス合計 = ダイレクトB + ユニレベルB + 組織構築B + 調整金（繰越含む）
+                    // ボーナス合計 = ダイレクトB + ユニレベルB + 組織構築B + 繰越金 + 調整金
                     const bonusTotal = dr.directBonus + dr.unilevelBonus + dr.structureBonus
                       + dr.carryoverAmount + dr.adjustmentAmount;
 
                     return (
                       <tr key={r.id}
                         className={`hover:bg-violet-50/30 transition ${dr.paymentAmount > 0 ? "" : "opacity-60"}`}>
-                        {/* 会員コード */}
+
+                        {/* ① 会員コード */}
                         <td className="px-2 py-2 font-mono text-slate-600 sticky left-0 bg-white text-[11px]">
                           {isMulti ? <span>{displayCode}<span className="text-purple-400">**</span></span> : displayCode}
                         </td>
-                        {/* 氏名/法人名 */}
+
+                        {/* ② 氏名/法人名 */}
                         <td className="px-2 py-2">
                           <div className="flex items-center gap-1">
                             {r.isCompany && (
@@ -618,61 +648,101 @@ export default function BonusResultsPage() {
                           </div>
                           {r.companyName && <div className="text-gray-400 text-[10px]">{r.memberName}</div>}
                         </td>
-                        {/* ステータス */}
+
+                        {/* ③ ステータス */}
                         <td className="px-2 py-2 text-center">
                           <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${STATUS_COLOR[r.status] ?? "bg-gray-100 text-gray-500"}`}>
                             {STATUS_LABELS[r.status] || r.status}
                           </span>
                         </td>
-                        {/* 自己PT */}
+
+                        {/* ④ 自己PT */}
                         <td className="px-2 py-2 text-right text-gray-600">{dr.selfPurchasePoints}</td>
-                        {/* グループPT */}
+
+                        {/* ⑤ グループPT */}
                         <td className="px-2 py-2 text-right text-gray-600">{dr.groupPoints}</td>
-                        {/* 直接アクティブ */}
+
+                        {/* ⑥ 直接アクティブ */}
                         <td className="px-2 py-2 text-right text-gray-600">{dr.directActiveCount}</td>
-                        {/* 称号変動 */}
+
+                        {/* ⑦ 称号変動 */}
                         <td className={`px-2 py-2 text-center bg-indigo-50/30 text-[11px] ${titleChangeColor}`}>{titleChange}</td>
-                        {/* 現レベル */}
+
+                        {/* ⑧ 現レベル */}
                         <td className="px-2 py-2 text-center bg-indigo-50/30">
                           <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${LEVEL_COLOR[dr.achievedLevel] ?? "bg-gray-100 text-gray-500"}`}>
                             {LEVEL_LABELS[dr.achievedLevel]}
                           </span>
                         </td>
-                        {/* ダイレクトB */}
+
+                        {/* ⑨ ダイレクトB */}
                         <td className="px-2 py-2 text-right bg-blue-50/30 font-medium">
                           {dr.directBonus > 0 ? yen(dr.directBonus) : <span className="text-gray-300">－</span>}
                         </td>
-                        {/* ユニレベルB */}
+
+                        {/* ⑩ ユニレベルB */}
                         <td className="px-2 py-2 text-right bg-blue-50/30 font-medium">
                           {dr.unilevelBonus > 0 ? yen(dr.unilevelBonus) : <span className="text-gray-300">－</span>}
                         </td>
-                        {/* 組織構築B */}
+
+                        {/* ⑪ 組織構築B */}
                         <td className="px-2 py-2 text-right bg-blue-50/30 font-medium">
                           {dr.structureBonus > 0 ? yen(dr.structureBonus) : <span className="text-gray-300">－</span>}
                         </td>
-                        {/* 貯金PT（01ポジション以外は「－」） */}
+
+                        {/* ⑫ 貯金PT（01ポジション以外は「－」） */}
                         <td className="px-2 py-2 text-right bg-emerald-50/40 font-medium text-emerald-700">
                           {dr.savingsPointsAdded > 0
                             ? `+${(dr.savingsPointsAdded / 10).toFixed(1)}pt`
                             : <span className="text-gray-300">－</span>}
                         </td>
-                        {/* 繰越金 */}
+
+                        {/* ⑬ 繰越金 */}
                         <td className="px-2 py-2 text-right text-gray-500">
                           {dr.carryoverAmount !== 0
                             ? yen(dr.carryoverAmount)
                             : <span className="text-gray-300">－</span>}
                         </td>
-                        {/* 調整金 */}
+
+                        {/* ⑭ 調整金 */}
                         <td className="px-2 py-2 text-right text-gray-500">
                           {dr.adjustmentAmount !== 0
                             ? yen(dr.adjustmentAmount)
                             : <span className="text-gray-300">－</span>}
                         </td>
-                        {/* ボーナス合計 */}
+
+                        {/* ⑮ ボーナス合計 */}
                         <td className="px-2 py-2 text-right bg-slate-50 font-bold text-slate-700">
                           {yen(bonusTotal)}
                         </td>
-                        {/* 源泉税 */}
+
+                        {/* ⑯ 支払調整率 */}
+                        <td className="px-2 py-2 text-right bg-orange-50/40 text-orange-700">
+                          {(dr.paymentAdjustmentRate ?? 0) > 0
+                            ? `${dr.paymentAdjustmentRate}%`
+                            : <span className="text-gray-300">－</span>}
+                        </td>
+
+                        {/* ⑰ 支払調整額 */}
+                        <td className="px-2 py-2 text-right bg-orange-50/40 text-orange-700">
+                          {dr.paymentAdjustmentAmount > 0
+                            ? `－${yen(dr.paymentAdjustmentAmount)}`
+                            : <span className="text-gray-300">－</span>}
+                        </td>
+
+                        {/* ⑱ 取得額（finalAmount = ボーナス合計 - 支払調整額） */}
+                        <td className="px-2 py-2 text-right bg-orange-50/20 font-semibold text-gray-700">
+                          {yen(dr.finalAmount)}
+                        </td>
+
+                        {/* ⑲ 10%消費税(内税) */}
+                        <td className="px-2 py-2 text-right text-gray-400 text-[10px]">
+                          {dr.consumptionTax > 0
+                            ? yen(dr.consumptionTax)
+                            : <span className="text-gray-300">－</span>}
+                        </td>
+
+                        {/* ⑳ 源泉税 */}
                         <td className="px-2 py-2 text-right text-red-500">
                           {r.isCompany
                             ? <span className="text-[9px] text-gray-400">法人除外</span>
@@ -680,23 +750,34 @@ export default function BonusResultsPage() {
                               ? `－${yen(dr.withholdingTax)}`
                               : <span className="text-gray-300">－</span>}
                         </td>
-                        {/* 事務手数料 */}
+
+                        {/* ㉑ 過不足金 */}
+                        <td className="px-2 py-2 text-right">
+                          {dr.shortageAmount !== 0
+                            ? <span className={dr.shortageAmount >= 0 ? "text-blue-600" : "text-red-500"}>{yen(dr.shortageAmount)}</span>
+                            : <span className="text-gray-300">－</span>}
+                        </td>
+
+                        {/* ㉒ 事務手数料 */}
                         <td className="px-2 py-2 text-right text-gray-500">
                           {dr.serviceFee > 0
                             ? `－${yen(dr.serviceFee)}`
                             : <span className="text-gray-300">－</span>}
                         </td>
-                        {/* 支払額 */}
+
+                        {/* ㉓ 支払額 */}
                         <td className={`px-2 py-2 text-right font-bold bg-emerald-50/50 ${dr.paymentAmount > 0 ? "text-emerald-700" : "text-gray-400"}`}>
                           {yen(dr.paymentAmount)}
                         </td>
-                        {/* インボイス登録番号 */}
+
+                        {/* ㉔ インボイス登録番号 */}
                         <td className="px-2 py-2 text-left font-mono text-xs text-gray-500">
                           {r.invoiceNumber
                             ? <span className="text-indigo-600">{r.invoiceNumber}</span>
                             : <span className="text-gray-300">－</span>}
                         </td>
-                        {/* 詳細ボタン */}
+
+                        {/* ㉕ 詳細ボタン */}
                         <td className="px-2 py-2 text-center">
                           <button
                             onClick={() => setDetailRow(getDisplayRow(r))}
@@ -723,10 +804,11 @@ export default function BonusResultsPage() {
               <span>ダイレクトB: <b className="text-blue-700">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).directBonus, 0))}</b></span>
               <span>ユニレベルB: <b className="text-blue-700">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).unilevelBonus, 0))}</b></span>
               <span>組織構築B: <b className="text-blue-700">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).structureBonus, 0))}</b></span>
-              <span>貯金PT(追加計): <b className="text-emerald-600">{filteredResults.reduce((s, r) => s + getDisplayRow(r).savingsPointsAdded, 0) > 0 ? `+${(filteredResults.reduce((s, r) => s + getDisplayRow(r).savingsPointsAdded, 0) / 10).toFixed(1)}pt` : "0pt"}</b></span>
-              <span>繰越金計: <b className="text-gray-600">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).carryoverAmount, 0))}</b></span>
-              <span>調整金計: <b className="text-gray-600">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).adjustmentAmount, 0))}</b></span>
+              <span>貯金PT: <b className="text-emerald-600">{filteredResults.reduce((s, r) => s + getDisplayRow(r).savingsPointsAdded, 0) > 0 ? `+${(filteredResults.reduce((s, r) => s + getDisplayRow(r).savingsPointsAdded, 0) / 10).toFixed(1)}pt` : "0pt"}</b></span>
+              <span>繰越金: <b className="text-gray-600">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).carryoverAmount, 0))}</b></span>
+              <span>調整金: <b className="text-gray-600">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).adjustmentAmount, 0))}</b></span>
               <span>ボーナス合計: <b className="text-slate-700">{yen(filteredResults.reduce((s, r) => { const dr = getDisplayRow(r); return s + dr.directBonus + dr.unilevelBonus + dr.structureBonus + dr.carryoverAmount + dr.adjustmentAmount; }, 0))}</b></span>
+              <span>取得額計: <b className="text-orange-700">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).finalAmount, 0))}</b></span>
               <span>源泉税計: <b className="text-red-600">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).withholdingTax, 0))}</b></span>
               <span>事務手数料計: <b className="text-gray-600">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).serviceFee, 0))}</b></span>
               <span className="font-bold">支払額合計: <b className="text-emerald-700 text-sm">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).paymentAmount, 0))}</b></span>
