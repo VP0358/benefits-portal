@@ -304,44 +304,48 @@ html {
   scroll-behavior: smooth;
 }
 
-/* テーブル以外はスクロールバー非表示 */
-:not(.table-scroll)::-webkit-scrollbar {
+/* スクロールバー非表示（テーブルスクロール要素は除く） */
+::-webkit-scrollbar {
   display: none;
 }
 
-* {
+*:not(.table-scroll) {
   -ms-overflow-style: none;
   scrollbar-width: none;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ボーナステーブル用：上下両方にスクロールバーを表示 */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ボーナステーブル用スクロールバー — * の scrollbar-width:none より後に書いて上書き */
 .table-scroll {
-  -ms-overflow-style: scrollbar;
-  scrollbar-width: thin;
-  scrollbar-color: #94a3b8 #f1f5f9;
-  overflow-x: auto;
+  overflow-x: auto !important;
   -webkit-overflow-scrolling: touch;
+  -ms-overflow-style: scrollbar !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #94a3b8 #e2e8f0;
 }
 
 .table-scroll::-webkit-scrollbar {
-  display: block;
+  display: block !important;
   height: 10px;
+  width: 10px;
 }
 
 .table-scroll::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 999px;
+  background: #e2e8f0;
 }
 
 .table-scroll::-webkit-scrollbar-thumb {
   background: #94a3b8;
-  border-radius: 999px;
-  border: 2px solid #f1f5f9;
+  border-radius: 4px;
+  border: 2px solid #e2e8f0;
 }
 
 .table-scroll::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: #475569;
 }
 
 ::selection {

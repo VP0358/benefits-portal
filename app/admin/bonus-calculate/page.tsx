@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { LEVEL_LABELS } from "@/lib/mlm-bonus";
+import DualScrollTable from "@/app/admin/ui/dual-scroll-table";
 
 /* ─── 型定義 ─── */
 type BonusRunSummary = {
@@ -442,9 +443,8 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
         </div>
       </div>
 
-      {/* テーブル */}
-      {/* overflowX をビューポート基準で確保。サイドバー256px＋両側padding(48px×2)を引いた幅が最大幅 */}
-      <div className="table-scroll bg-white rounded-2xl border border-stone-100" style={{maxWidth:'calc(100vw - 256px - 6rem)'}}>
+      {/* テーブル — 上下ミラースクロールバー付き */}
+      <DualScrollTable className="bg-white rounded-2xl border border-stone-100">
         <table className="text-xs" style={{whiteSpace:'nowrap',borderCollapse:'collapse',minWidth:'max-content'}}>
           <thead className="bg-slate-800 text-white text-[11px]">
             <tr>
@@ -687,7 +687,7 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
             })}
           </tbody>
         </table>
-      </div>
+      </DualScrollTable>
 
       {/* 詳細モーダル */}
       {detailRow && <BonusDetailModal row={detailRow} onClose={() => setDetailRow(null)} />}

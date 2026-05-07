@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { LEVEL_LABELS } from "@/lib/mlm-bonus";
+import DualScrollTable from "@/app/admin/ui/dual-scroll-table";
 
 // ━━━ 定数 ━━━
 const WITHHOLDING_THRESHOLD = 120000; // 源泉税12万円閾値
@@ -555,7 +556,7 @@ export default function BonusResultsPage() {
                 <p className="font-semibold">該当データがありません</p>
               </div>
             ) : (
-              <div className="table-scroll" style={{maxWidth:'calc(100vw - 256px - 6rem)'}}>
+              <DualScrollTable>
               <table className="text-xs" style={{whiteSpace:'nowrap',borderCollapse:'collapse',minWidth:'max-content'}}>
                 <thead className="bg-slate-800 text-white text-[11px]">
                   <tr>
@@ -795,7 +796,7 @@ export default function BonusResultsPage() {
                   })}
                 </tbody>
               </table>
-              </div>
+              </DualScrollTable>
             )}
           </div>
 
