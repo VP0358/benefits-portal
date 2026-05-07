@@ -78,9 +78,11 @@ export async function POST(request: Request) {
   // 三菱UFJファクター固定長TXTの場合は accountNumber ベースで照合するため別マップを用意
   const mufgAccountMap = new Map<string, { ok: boolean; paidDate?: Date }>();
 
-  // クレディックスCSVの場合は creditCardId ベースで照合するため別マップを用意
-  // sendid → { ok, paidDate }  ※ sendid = クレディックスが採番した顧客ID = MlmMember.creditCardId
+  // クレディックスCSV用マップ
+  // sendid → { ok, paidDate }  （後方互換のため残すが、照合には使わない）
   const credixSendIdMap = new Map<string, { ok: boolean; paidDate?: Date }>();
+  // phone → { ok, paidDate }  ★ クレディックスCSVの主照合キー（電話番号）
+  const credixPhoneMap  = new Map<string, { ok: boolean; paidDate?: Date }>();
 
   // ── 三菱UFJファクター固定長TXTの場合はpaymentMethodをbank_transferに強制 ──
   // 三菱UFJファクターは口座振替専用のため、フロントで誤ってcredit_cardが
@@ -237,17 +239,25 @@ export async function POST(request: Request) {
     let reasonIdx: number;
     let dateIdx: number;
 
+    // クレディックスCSV: 電話番号列インデックス（主照合キー）
+    let credixPhoneIdx = -1;
+
     if (isCredixFormat) {
-      // クレディックスCSV: "ID(sendid)"列が会員コード
+      // クレディックスCSV列インデックス
       codeIdx   = header.findIndex(h => h.includes("sendid") || h === "id(sendid)" || h.includes("id(send"));
       resultIdx = header.findIndex(h => h.includes("結果") || h.includes("result"));
       dateIdx   = header.findIndex(h =>
         h.includes("決済日時") || h.includes("処理日時") || h.includes("日時") ||
         h.includes("date") || h.includes("datetime")
       );
-      if (codeIdx   === -1) codeIdx   = 10;
-      if (resultIdx === -1) resultIdx = 4;
-      if (dateIdx   === -1) dateIdx   = 3;
+      // ★ 電話番号列（主照合キー）
+      credixPhoneIdx = header.findIndex(h =>
+        h.includes("電話番号") || h.includes("phone") || h.includes("tel")
+      );
+      if (codeIdx        === -1) codeIdx        = 10;
+      if (resultIdx      === -1) resultIdx      = 4;
+      if (dateIdx        === -1) dateIdx        = 3;
+      if (credixPhoneIdx === -1) credixPhoneIdx = 2; // クレディックスCSVは固定列2
       reasonIdx = -1;
     } else {
       // 汎用フォーマット
@@ -307,10 +317,21 @@ export async function POST(request: Request) {
 
       if (isCredixFormat) {
         // ── クレディックスCSV ──
-        // ID(sendid) 列の値 = クレディックスが採番した顧客ID = MlmMember.creditCardId
-        // memberCode への変換は行わず credixSendIdMap に登録し
-        // 後段で AutoShipOrder.creditCardId と照合する
+        // ★ 照合キーは電話番号（credixPhoneMap）
+        //   sendid はクレディックス独自採番IDのためDBに存在しない
+        //   電話番号 → MlmMember.user.phone で照合する
+        const rawPhone = cols[credixPhoneIdx] ?? "";
+        // 電話番号を正規化（ハイフン除去・先頭の+81を0に変換）
+        const normalizedPhone = rawPhone
+          .replace(/-/g, "")
+          .replace(/^\+81/, "0")
+          .trim();
+        // sendidも後方互換のため残す
         credixSendIdMap.set(rawCode, { ok: true, paidDate });
+        // 電話番号マップ（主照合キー）: 同じ電話番号が複数行あっても上書きでOK（全行「決済完了」のため）
+        if (normalizedPhone && normalizedPhone !== "-" && normalizedPhone !== "non") {
+          credixPhoneMap.set(normalizedPhone, { ok: true, paidDate });
+        }
       } else {
         // ── 汎用CSVフォーマット ──
         const result = cols[resultIdx] ?? "";
@@ -324,13 +345,14 @@ export async function POST(request: Request) {
 
   // ── 対象会員取得 ──
   const isMufg   = mufgAccountMap.size > 0;
-  const isCredix = credixSendIdMap.size > 0;
+  // credixPhoneMap が主照合マップ。credixSendIdMap はフォールバック互換用
+  const isCredix = credixPhoneMap.size > 0 || credixSendIdMap.size > 0;
 
   if (isMufg && effectivePaymentMethod !== paymentMethod) {
     console.log(`[import-direct] 三菱UFJファクターTXT検出: paymentMethod=${paymentMethod} → bank_transfer に自動切替`);
   }
   if (isCredix) {
-    console.log(`[import-direct] クレディックスCSV検出: sendid ${credixSendIdMap.size}件 → creditCardId 照合で処理`);
+    console.log(`[import-direct] クレディックスCSV検出: phone ${credixPhoneMap.size}件, sendid ${credixSendIdMap.size}件 → 電話番号照合で処理`);
   }
 
   let mlmMembers: Awaited<ReturnType<typeof prisma.mlmMember.findMany<{
@@ -462,21 +484,17 @@ export async function POST(request: Request) {
 
   } else if (isCredix) {
     // ══════════════════════════════════════════════════════════════
-    // クレディックスCSV: sendid → MlmMember全件照合
+    // クレディックスCSV: 電話番号 → MlmMember全件照合
     // ══════════════════════════════════════════════════════════════
     // ★ 設計方針:
-    //   既存Runの有無・run.ordersの件数に関わらず、常に
-    //   「CSVのsendid → autoshipEnabled全会員のcreditCardId/memberCode」で照合する。
-    //
-    //   理由: 過去のインポートで run.orders が少ない件数しか作られていない場合でも
-    //   CSVにある全sendidを処理する必要がある。run.ordersの件数に依存すると
-    //   不足分が永遠に処理されない。
+    //   sendid はクレディックス独自採番ID（DBに存在しない）のため照合には使用しない。
+    //   CSV の「電話番号」列 → MlmMember.user.phone で照合する。
     //
     //   照合キー優先順:
-    //     1. MlmMember.creditCardId / creditCardId2 / creditCardId3 で一致
-    //     2. MlmMember.memberCode で一致（creditCardId未登録会員は
-    //        export-csvが memberCode を顧客IDとして出力するため）
-    //     3. どちらも一致しない → 全件成功フォールバック（csvが来た＝全員決済済み）
+    //     1. MlmMember.user.phone（正規化後）が credixPhoneMap に一致
+    //     2. 一致しない → 全件成功フォールバック（CSVが届いた＝全員決済済み）
+    //
+    //   1会員が複数枠（複数行）持つ場合も、同一電話番号を1会員として処理する。
 
     const allAutoshipMembers = await prisma.mlmMember.findMany({
       where: {
@@ -489,41 +507,34 @@ export async function POST(request: Request) {
       },
     });
 
-    console.log(`[import-direct] クレディックスCSV照合開始: autoshipEnabled全会員=${allAutoshipMembers.length}件, CSVsendid件数=${credixSendIdMap.size}件`);
-    console.log(`[import-direct] credixSendIdMapサンプル: [${Array.from(credixSendIdMap.keys()).slice(0, 5).join(", ")}]`);
+    console.log(`[import-direct] クレディックスCSV照合開始: autoshipEnabled全会員=${allAutoshipMembers.length}件, CSV電話番号件数=${credixPhoneMap.size}件（ユニーク）, CSVsendid件数=${credixSendIdMap.size}件`);
+    console.log(`[import-direct] credixPhoneMapサンプル: [${Array.from(credixPhoneMap.keys()).slice(0, 5).join(", ")}]`);
 
     const matchedMembers: typeof allAutoshipMembers = [];
-    let cidMatchCount = 0;
-    let mcMatchCount = 0;
+    let phoneMatchCount = 0;
 
     for (const m of allAutoshipMembers) {
-      // ① creditCardId（1〜3枠）で照合
-      const cids = [
-        (m as any).creditCardId,
-        (m as any).creditCardId2,
-        (m as any).creditCardId3,
-      ].filter(Boolean) as string[];
-      const matchedSendId = cids.find(cid => credixSendIdMap.has(cid));
-      if (matchedSendId) {
-        const entry = credixSendIdMap.get(matchedSendId)!;
+      // ① user.phone（正規化）で照合
+      const rawMemberPhone = m.user?.phone ?? "";
+      const normalizedMemberPhone = rawMemberPhone
+        .replace(/-/g, "")
+        .replace(/^\+81/, "0")
+        .trim();
+
+      if (normalizedMemberPhone && credixPhoneMap.has(normalizedMemberPhone)) {
+        const entry = credixPhoneMap.get(normalizedMemberPhone)!;
         resultMap.set(m.memberCode, { ok: entry.ok, paidDate: entry.paidDate });
         matchedMembers.push(m);
-        cidMatchCount++;
-      } else if (credixSendIdMap.has(m.memberCode)) {
-        // ② memberCode で照合（creditCardId 未登録 → export-csv が memberCode を顧客IDとして出力）
-        const entry = credixSendIdMap.get(m.memberCode)!;
-        resultMap.set(m.memberCode, { ok: entry.ok, paidDate: entry.paidDate });
-        matchedMembers.push(m);
-        mcMatchCount++;
+        phoneMatchCount++;
       }
     }
 
-    console.log(`[import-direct] クレディックス照合結果: creditCardId一致=${cidMatchCount}件, memberCode一致=${mcMatchCount}件, 合計=${matchedMembers.length}件`);
+    console.log(`[import-direct] クレディックス照合結果: 電話番号一致=${phoneMatchCount}件`);
 
     if (matchedMembers.length === 0) {
-      // ③ フォールバック: CSVがある＝全員決済済みとして全オートシップ有効会員を処理
-      console.log("[import-direct] sendid照合0件 → autoshipEnabled全会員フォールバック");
-      const defaultEntry = credixSendIdMap.values().next().value;
+      // ② フォールバック: CSVがある＝全員決済済みとして全オートシップ有効会員を処理
+      console.log("[import-direct] 電話番号照合0件 → autoshipEnabled全会員フォールバック");
+      const defaultEntry = credixPhoneMap.values().next().value ?? credixSendIdMap.values().next().value;
       for (const m of allAutoshipMembers) {
         resultMap.set(m.memberCode, { ok: true, paidDate: defaultEntry?.paidDate });
       }
@@ -555,7 +566,7 @@ export async function POST(request: Request) {
       { error: isMufg
           ? "TXTファイルの口座番号に一致する会員が見つかりません。"
           : isCredix
-          ? `クレディックスCSVのsendid（${Array.from(credixSendIdMap.keys()).slice(0, 3).join(", ")}…）に一致する会員が見つかりません。会員のcreditCardIdまたは会員コードとCSVのsendidが一致するか確認してください。`
+          ? `クレディックスCSVの電話番号に一致するオートシップ有効会員が見つかりません。CSV電話番号サンプル: [${Array.from(credixPhoneMap.keys()).slice(0, 3).join(", ")}…]`
           : "CSVの会員コードに一致する会員が見つかりません。" },
       { status: 400 }
     );
