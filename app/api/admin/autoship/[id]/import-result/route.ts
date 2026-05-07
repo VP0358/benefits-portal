@@ -35,17 +35,80 @@ export async function POST(request: Request, { params }: Params) {
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "CSVファイルが必要です" }, { status: 400 });
 
-  const text = await file.text();
+  // ── CSV 読み込み（Shift-JIS / UTF-8 両対応） ──
+  const arrayBuffer = await file.arrayBuffer();
+  const uint8 = new Uint8Array(arrayBuffer);
+
+  function looksLikeShiftJis(buf: Uint8Array): boolean {
+    for (let i = 0; i < Math.min(buf.length, 4096); i++) {
+      const b = buf[i];
+      if ((b >= 0x81 && b <= 0x9F) || (b >= 0xE0 && b <= 0xEF)) return true;
+    }
+    return false;
+  }
+
+  const hasUtf8Bom = uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF;
+  let rawText: string;
+  if (!hasUtf8Bom && looksLikeShiftJis(uint8)) {
+    rawText = new TextDecoder("shift-jis").decode(arrayBuffer);
+  } else {
+    rawText = new TextDecoder("utf-8").decode(arrayBuffer);
+  }
+
+  const text = rawText.replace(/^\uFEFF/, "");
   const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter(l => l.trim());
 
-  // ヘッダー行を解析して列インデックスを特定
-  const header = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, "").toLowerCase());
-  const codeIdx   = header.findIndex(h => h.includes("会員") || h.includes("code") || h.includes("コード"));
-  const resultIdx = header.findIndex(h => h.includes("結果") || h.includes("result") || h.includes("status"));
-  const reasonIdx = header.findIndex(h => h.includes("理由") || h.includes("reason") || h.includes("error"));
+  if (lines.length < 2) {
+    return NextResponse.json({ error: "CSVにデータがありません（ヘッダー行のみ）" }, { status: 400 });
+  }
 
-  if (codeIdx === -1 || resultIdx === -1) {
-    return NextResponse.json({ error: "CSVの形式が正しくありません（会員コード・決済結果列が必要）" }, { status: 400 });
+  // CSVの列を解析するヘルパー（引用符対応）
+  function parseCsvLine(line: string): string[] {
+    const result: string[] = [];
+    let current = "";
+    let inQuotes = false;
+    for (const ch of line) {
+      if (ch === '"') { inQuotes = !inQuotes; }
+      else if (ch === "," && !inQuotes) { result.push(current.trim()); current = ""; }
+      else { current += ch; }
+    }
+    result.push(current.trim());
+    return result;
+  }
+
+  // ヘッダー行を解析して列インデックスを特定
+  const headerRaw = parseCsvLine(lines[0]);
+  const header = headerRaw.map(h => h.replace(/^"|"$/g, "").replace(/^\uFEFF/, "").trim().toLowerCase());
+
+  // クレディックスCSV自動判定（ID(sendid) 列を含む形式）
+  const isCredixFormat = header.some(h =>
+    h.includes("sendid") || h.includes("sendpoint") || h.includes("id(sendid)")
+  );
+
+  let codeIdx: number;
+  let resultIdx: number;
+  let reasonIdx: number;
+
+  if (isCredixFormat) {
+    // クレディックスCSV: col[10]=ID(sendid)=会員コード、全行が決済成功
+    codeIdx   = header.findIndex(h => h.includes("sendid") || h === "id(sendid)" || h.includes("id(send"));
+    resultIdx = header.findIndex(h => h.includes("結果") || h.includes("result"));
+    if (codeIdx   === -1) codeIdx   = 10;
+    if (resultIdx === -1) resultIdx = 4;
+    reasonIdx = -1;
+  } else {
+    // 汎用フォーマット
+    codeIdx   = header.findIndex(h => h.includes("会員") || h.includes("code") || h.includes("コード"));
+    resultIdx = header.findIndex(h => h.includes("結果") || h.includes("result") || h.includes("status"));
+    reasonIdx = header.findIndex(h => h.includes("理由") || h.includes("reason") || h.includes("error"));
+  }
+
+  if (codeIdx === -1) {
+    return NextResponse.json({
+      error: `CSVの形式が正しくありません（会員コード列が見つかりません）。検出されたヘッダー: [${headerRaw.join(", ")}]`,
+      detectedHeaders: headerRaw,
+      isCredixFormat,
+    }, { status: 400 });
   }
 
   const dataLines = lines.slice(1);
@@ -54,11 +117,22 @@ export async function POST(request: Request, { params }: Params) {
   const resultMap = new Map<string, { ok: boolean; reason?: string }>();
   for (const line of dataLines) {
     if (!line.trim()) continue;
-    const cols = line.split(",").map(c => c.trim().replace(/^"|"$/g, ""));
+    const cols = parseCsvLine(line).map(c => c.replace(/^"|"$/g, "").trim());
     const memberCode = cols[codeIdx] ?? "";
-    const result     = cols[resultIdx] ?? "";
-    const reason     = reasonIdx >= 0 ? cols[reasonIdx] : undefined;
-    const ok = result === "OK" || result === "0" || result.toLowerCase() === "success" || result === "1";
+    if (!memberCode || memberCode === "-") continue;
+
+    let ok: boolean;
+    let reason: string | undefined;
+
+    if (isCredixFormat) {
+      // クレディックスCSVはファイル内の全行が決済成功
+      ok = true;
+    } else {
+      const result = cols[resultIdx] ?? "";
+      ok = result === "OK" || result === "0" || result.toLowerCase() === "success" || result === "1";
+      reason = reasonIdx >= 0 ? (cols[reasonIdx] ?? undefined) : undefined;
+    }
+
     resultMap.set(memberCode, { ok, reason });
   }
 

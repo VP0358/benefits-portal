@@ -36,8 +36,34 @@ export async function POST(request: Request) {
     return await processFromDatabase(targetMonth, paymentMethod);
   }
 
-  // ── CSV 解析 ──
-  const rawText = await file.text();
+  // ── CSV 解析（Shift-JIS / UTF-8 両対応） ──
+  // file.text() はUTF-8前提のため、バイナリで読み込んでエンコードを自動判定する
+  const arrayBuffer = await file.arrayBuffer();
+  const uint8 = new Uint8Array(arrayBuffer);
+
+  // Shift-JIS 判定: 0x81-0x9F または 0xE0-0xEF で始まるマルチバイト列を検出
+  function looksLikeShiftJis(buf: Uint8Array): boolean {
+    for (let i = 0; i < Math.min(buf.length, 4096); i++) {
+      const b = buf[i];
+      if ((b >= 0x81 && b <= 0x9F) || (b >= 0xE0 && b <= 0xEF)) return true;
+    }
+    return false;
+  }
+
+  // UTF-8 BOM 判定: EF BB BF
+  const hasUtf8Bom = uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF;
+
+  let rawText: string;
+  if (!hasUtf8Bom && looksLikeShiftJis(uint8)) {
+    // Shift-JIS → UTF-16 変換
+    const decoder = new TextDecoder("shift-jis");
+    rawText = decoder.decode(arrayBuffer);
+  } else {
+    // UTF-8（BOM付き含む）
+    const decoder = new TextDecoder("utf-8");
+    rawText = decoder.decode(arrayBuffer);
+  }
+
   // BOM除去（UTF-8 BOM: \ufeff）
   const text  = rawText.replace(/^\uFEFF/, "");
   const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter(l => l.trim());
