@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import DualScrollTable from "@/app/admin/ui/dual-scroll-table";
 import Link from "next/link";
 
 /* ─── 月リスト生成（JST基準） ─── */
@@ -323,7 +324,7 @@ export default function BonusReportCenterPage() {
       r.memberCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.memberName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.companyName?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesTab = resultsSubTab === "all" || (resultsSubTab === "payment" && r.paymentAmount > 4000);
+    const matchesTab = resultsSubTab === "all" || (resultsSubTab === "payment" && r.paymentAmount > 3000);
     return matchesSearch && matchesTab;
   });
 
@@ -599,8 +600,8 @@ export default function BonusReportCenterPage() {
                       }`}
                     >
                       <i className="fas fa-money-bill-wave mr-1 text-xs"></i>
-                      支払対象者（{results.filter((r) => r.paymentAmount > 4000).length}件）
-                      <span className="ml-1 text-[10px] text-orange-500">※4,000円超</span>
+                      支払対象者（{results.filter((r) => r.paymentAmount > 3000).length}件）
+                      <span className="ml-1 text-[10px] text-orange-500">※3,000円超</span>
                     </button>
                   </nav>
                 </div>
@@ -608,7 +609,7 @@ export default function BonusReportCenterPage() {
                 {resultsSubTab === "payment" && (
                   <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 text-xs text-orange-700">
                     <i className="fas fa-info-circle mr-1"></i>
-                    支払額が4,000円以下の会員は繰越となり、累計が4,000円を超えた月に支払対象となります。
+                    支払額が3,000円以下の会員は繰越となり、累計が3,000円を超えた月に支払対象となります。
                   </div>
                 )}
 
@@ -625,8 +626,8 @@ export default function BonusReportCenterPage() {
                 {filteredResults.length === 0 ? (
                   <p className="text-gray-500 text-center py-8">データがありません</p>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs min-w-[3500px]">
+                  <DualScrollTable>
+                    <table className="text-xs" style={{whiteSpace:'nowrap',borderCollapse:'collapse',minWidth:'max-content'}}>
                       <thead className="bg-gray-800 text-white">
                         <tr>
                           <th className="px-3 py-3 text-left font-semibold sticky left-0 bg-gray-800 z-10">操作</th>
@@ -728,7 +729,7 @@ export default function BonusReportCenterPage() {
                         ))}
                       </tbody>
                     </table>
-                  </div>
+                  </DualScrollTable>
                 )}
               </div>
             )}
@@ -885,18 +886,18 @@ export default function BonusReportCenterPage() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <p className="text-sm text-gray-600">
-                        支払対象者（4,000円超）: <span className="font-bold text-indigo-700">{results.filter((r) => r.paymentAmount > 4000).length}件</span>
+                        支払対象者（3,000円超）: <span className="font-bold text-indigo-700">{results.filter((r) => r.paymentAmount > 3000).length}件</span>
                       </p>
                       <button
                         onClick={handleDownloadPaymentSlip}
-                        disabled={results.filter((r) => r.paymentAmount > 4000).length === 0}
+                        disabled={results.filter((r) => r.paymentAmount > 3000).length === 0}
                         className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 text-sm font-semibold"
                       >
                         <i className="fas fa-download mr-2"></i>
                         支払調書 CSV出力
                       </button>
                     </div>
-                    {results.filter((r) => r.paymentAmount > 4000).length === 0 ? (
+                    {results.filter((r) => r.paymentAmount > 3000).length === 0 ? (
                       <p className="text-gray-500 text-center py-8">支払調書データがありません</p>
                     ) : (
                       <div className="overflow-x-auto">
@@ -913,7 +914,7 @@ export default function BonusReportCenterPage() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-200">
-                            {results.filter((r) => r.paymentAmount > 4000).map((r) => (
+                            {results.filter((r) => r.paymentAmount > 3000).map((r) => (
                               <tr key={r.id} className="hover:bg-indigo-50">
                                 <td className="p-3 font-mono text-xs">{r.memberCode}</td>
                                 <td className="p-3">{r.memberName}</td>
