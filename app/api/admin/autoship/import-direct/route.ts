@@ -240,13 +240,6 @@ export async function POST(request: Request) {
       user: {
         select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true },
       },
-      mlmRegistration: {
-        select: {
-          bankName: true, bankBranch: true, bankAccountType: true,
-          bankAccountNumber: true, bankAccountHolder: true,
-          deliveryPostalCode: true, deliveryAddress: true,
-        },
-      },
     },
   });
 
@@ -288,13 +281,13 @@ export async function POST(request: Request) {
           memberNameKana: m.user.nameKana ?? null,
           memberPhone:   m.user.phone ?? null,
           memberEmail:   m.user.email ?? null,
-          memberPostal:  m.mlmRegistration?.deliveryPostalCode ?? m.user.postalCode ?? null,
-          memberAddress: m.mlmRegistration?.deliveryAddress ?? m.user.address ?? null,
-          bankName:      m.mlmRegistration?.bankName ?? null,
-          branchName:    m.mlmRegistration?.bankBranch ?? null,
-          accountType:   m.mlmRegistration?.bankAccountType ?? null,
-          accountNumber: m.mlmRegistration?.bankAccountNumber ?? null,
-          accountHolder: m.mlmRegistration?.bankAccountHolder ?? null,
+          memberPostal:  m.user.postalCode ?? null,
+          memberAddress: m.user.address ?? null,
+          bankName:      m.bankName ?? null,
+          branchName:    m.branchName ?? null,
+          accountType:   m.accountType ?? null,
+          accountNumber: m.accountNumber ?? null,
+          accountHolder: m.accountHolder ?? null,
           unitPrice:     UNIT_PRICE,
           totalAmount:   UNIT_PRICE,
           points:        POINTS,
@@ -461,13 +454,6 @@ async function processFromDatabase(
       user: {
         select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true },
       },
-      mlmRegistration: {
-        select: {
-          bankName: true, bankBranch: true, bankAccountType: true,
-          bankAccountNumber: true, bankAccountHolder: true,
-          deliveryPostalCode: true, deliveryAddress: true,
-        },
-      },
     },
   });
 
@@ -479,7 +465,8 @@ async function processFromDatabase(
       const months = m.autoshipSuspendMonths.split(",").map((s: string) => s.trim());
       if (months.includes(targetMonth)) return false;
     }
-    const hasBank = !!(m.mlmRegistration?.bankAccountNumber);
+    // MlmMember直接フィールドの口座番号で支払方法を判定
+    const hasBank = !!(m.accountNumber);
     if (paymentMethod === "bank_transfer") return hasBank;
     return !hasBank;
   });
@@ -521,13 +508,13 @@ async function processFromDatabase(
           memberNameKana: m.user.nameKana ?? null,
           memberPhone:    m.user.phone ?? null,
           memberEmail:    m.user.email ?? null,
-          memberPostal:   m.mlmRegistration?.deliveryPostalCode ?? m.user.postalCode ?? null,
-          memberAddress:  m.mlmRegistration?.deliveryAddress ?? m.user.address ?? null,
-          bankName:       m.mlmRegistration?.bankName ?? null,
-          branchName:     m.mlmRegistration?.bankBranch ?? null,
-          accountType:    m.mlmRegistration?.bankAccountType ?? null,
-          accountNumber:  m.mlmRegistration?.bankAccountNumber ?? null,
-          accountHolder:  m.mlmRegistration?.bankAccountHolder ?? null,
+          memberPostal:   m.user.postalCode ?? null,
+          memberAddress:  m.user.address ?? null,
+          bankName:       m.bankName ?? null,
+          branchName:     m.branchName ?? null,
+          accountType:    m.accountType ?? null,
+          accountNumber:  m.accountNumber ?? null,
+          accountHolder:  m.accountHolder ?? null,
           unitPrice:      UNIT_PRICE,
           totalAmount:    UNIT_PRICE,
           points:         POINTS,
