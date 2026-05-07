@@ -684,13 +684,20 @@ export async function POST(request: Request) {
     }
 
     // Run ステータス更新（単一クエリ）
+    // ★ run!.status を直接フォールバックに使うと DB に残った不正値（例: "imported"）が
+    //   Prisma enum バリデーションでエラーになるため、安全な enum 値のみを使用する
+    const VALID_RUN_STATUSES = ["draft", "exported", "importing", "completed", "canceled"] as const;
+    type ValidRunStatus = typeof VALID_RUN_STATUSES[number];
+    const currentStatus = VALID_RUN_STATUSES.includes(run!.status as ValidRunStatus)
+      ? run!.status as ValidRunStatus
+      : "exported"; // 不正値のフォールバック（exported = CSV出力済み状態）
     await prisma.autoShipRun.update({
       where: { id: run!.id },
       data: {
         paidCount,
         failedCount,
         importedAt: now,
-        status: paidCount + failedCount > 0 ? "completed" : run!.status,
+        status: paidCount + failedCount > 0 ? "completed" : currentStatus,
       },
     });
   } catch (updateErr) {
@@ -934,13 +941,19 @@ async function processFromDatabase(
       });
     }
 
+    // ★ run!.status を直接フォールバックに使うと DB に残った不正値でエラーになるため安全な値を使用
+    const VALID_DB_RUN_STATUSES = ["draft", "exported", "importing", "completed", "canceled"] as const;
+    type ValidDbRunStatus = typeof VALID_DB_RUN_STATUSES[number];
+    const currentDbStatus = VALID_DB_RUN_STATUSES.includes(run!.status as ValidDbRunStatus)
+      ? run!.status as ValidDbRunStatus
+      : "exported";
     await prisma.autoShipRun.update({
       where: { id: run!.id },
       data: {
         paidCount,
         failedCount,
         importedAt: now,
-        status:     paidCount > 0 ? "completed" : run!.status,
+        status:     paidCount > 0 ? "completed" : currentDbStatus,
       },
     });
   } catch (updateErr) {
