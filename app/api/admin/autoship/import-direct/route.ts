@@ -78,6 +78,10 @@ export async function POST(request: Request) {
   // 三菱UFJファクター固定長TXTの場合は accountNumber ベースで照合するため別マップを用意
   const mufgAccountMap = new Map<string, { ok: boolean; paidDate?: Date }>();
 
+  // クレディックスCSVの場合は creditCardId ベースで照合するため別マップを用意
+  // sendid → { ok, paidDate }  ※ sendid = クレディックスが採番した顧客ID = MlmMember.creditCardId
+  const credixSendIdMap = new Map<string, { ok: boolean; paidDate?: Date }>();
+
   // ── 三菱UFJファクター固定長TXTの場合はpaymentMethodをbank_transferに強制 ──
   // 三菱UFJファクターは口座振替専用のため、フロントで誤ってcredit_cardが
   // 選択されていても bank_transfer として処理する
@@ -294,48 +298,39 @@ export async function POST(request: Request) {
 
     for (const line of effectiveDataLines) {
       if (!line.trim()) continue;
-      const cols   = parseCsvLine(line).map(c => c.replace(/^"|"$/g, "").trim());
-      // クレディックスCSVの「ID(sendid)」列の値（例: WC14857601, 69823944）を取得
-      const sendId = cols[codeIdx] ?? "";
-      if (!sendId || sendId === "-") continue;
+      const cols    = parseCsvLine(line).map(c => c.replace(/^"|"$/g, "").trim());
+      const rawCode = cols[codeIdx] ?? "";
+      if (!rawCode || rawCode === "-") continue;
 
-      // ── sendId → memberCode 変換 ──
-      // sendId フォーマット:
-      //   WC14857601 → WC + 8桁数字 → 数字部分を XXXXXX-YY 形式に変換
-      //   69823944   →      8桁数字 → そのまま XXXXXX-YY 形式に変換
-      const digits = sendId.startsWith("WC") ? sendId.slice(2) : sendId;
-      let memberCode: string;
-      if (/^\d{8}$/.test(digits)) {
-        memberCode = `${digits.slice(0, 6)}-${digits.slice(6)}`;
-      } else {
-        // 8桁でない場合はそのまま使用（汎用フォーマットの memberCode）
-        memberCode = sendId;
-      }
-
-      let ok     = true;
-      let reason: string | undefined = undefined;
       const rawDate  = dateIdx >= 0 ? (cols[dateIdx] ?? "") : "";
       const paidDate = parseCsvDate(rawDate) ?? undefined;
 
       if (isCredixFormat) {
-        ok = true; // クレディックスCSVは全行が決済成功（結果列は「決済完了」固定）
+        // ── クレディックスCSV ──
+        // ID(sendid) 列の値 = クレディックスが採番した顧客ID = MlmMember.creditCardId
+        // memberCode への変換は行わず credixSendIdMap に登録し
+        // 後段で AutoShipOrder.creditCardId と照合する
+        credixSendIdMap.set(rawCode, { ok: true, paidDate });
       } else {
+        // ── 汎用CSVフォーマット ──
         const result = cols[resultIdx] ?? "";
-        ok = result === "OK" || result === "0" || result.toLowerCase() === "success" ||
-             result === "1" || result.includes("完了") || result.includes("成功");
-        reason = reasonIdx >= 0 ? (cols[reasonIdx] ?? undefined) : undefined;
+        const ok = result === "OK" || result === "0" || result.toLowerCase() === "success" ||
+                   result === "1" || result.includes("完了") || result.includes("成功");
+        const reason = reasonIdx >= 0 ? (cols[reasonIdx] ?? undefined) : undefined;
+        resultMap.set(rawCode, { ok, reason, paidDate });
       }
-
-      // resultMap のキーは変換済み memberCode
-      resultMap.set(memberCode, { ok, reason, paidDate });
     }
   } // end CSV format
 
   // ── 対象会員取得 ──
-  const isMufg = mufgAccountMap.size > 0;
+  const isMufg   = mufgAccountMap.size > 0;
+  const isCredix = credixSendIdMap.size > 0;
 
   if (isMufg && effectivePaymentMethod !== paymentMethod) {
     console.log(`[import-direct] 三菱UFJファクターTXT検出: paymentMethod=${paymentMethod} → bank_transfer に自動切替`);
+  }
+  if (isCredix) {
+    console.log(`[import-direct] クレディックスCSV検出: sendid ${credixSendIdMap.size}件 → creditCardId 照合で処理`);
   }
 
   let mlmMembers: Awaited<ReturnType<typeof prisma.mlmMember.findMany<{
@@ -465,13 +460,110 @@ export async function POST(request: Request) {
       }
     }
 
+  } else if (isCredix) {
+    // ══════════════════════════════════════════════════════════════
+    // クレディックスCSV: sendid → AutoShipOrder.creditCardId 照合
+    // ══════════════════════════════════════════════════════════════
+    // 戦略:
+    // ① 既存Run（credit_card）がある → run.orders.creditCardId で照合（最優先）
+    // ② 既存Runがない → MlmMember.creditCardId で照合して Run を新規作成
+
+    const existingRunForCredix = await prisma.autoShipRun.findUnique({
+      where: { targetMonth_paymentMethod: { targetMonth, paymentMethod: "credit_card" } },
+      include: { orders: { select: { memberCode: true, creditCardId: true, mlmMemberId: true } } },
+    });
+
+    if (existingRunForCredix && existingRunForCredix.orders.length > 0) {
+      // ① 既存Runあり: AutoShipOrder.creditCardId → memberCode の順でフォールバック照合
+      //
+      // ★ なぜ memberCode でも照合するか:
+      //   export-csv は顧客IDとして「o.creditCardId ?? o.memberCode」を出力する。
+      //   creditCardId が DB 未登録(null)の会員は 会員コード がそのまま sendid として
+      //   クレディックスから返却されるため、memberCode でも照合する必要がある。
+      let matchCount = 0;
+      let memberCodeMatchCount = 0;
+      const defaultEntry = credixSendIdMap.values().next().value;
+      for (const order of existingRunForCredix.orders) {
+        const cid = (order.creditCardId as string | null) ?? "";
+        if (cid && credixSendIdMap.has(cid)) {
+          // creditCardId で一致
+          const entry = credixSendIdMap.get(cid)!;
+          resultMap.set(order.memberCode, { ok: entry.ok, paidDate: entry.paidDate });
+          matchCount++;
+        } else if (credixSendIdMap.has(order.memberCode)) {
+          // memberCode で一致（creditCardId が null / 未登録の場合のフォールバック）
+          const entry = credixSendIdMap.get(order.memberCode)!;
+          resultMap.set(order.memberCode, { ok: entry.ok, paidDate: entry.paidDate });
+          memberCodeMatchCount++;
+        } else {
+          // どちらでも一致しない場合もクレディックスCSVは全件成功とみなす
+          resultMap.set(order.memberCode, { ok: true, paidDate: defaultEntry?.paidDate });
+        }
+      }
+      console.log(`[import-direct] クレディックス既存Run照合: creditCardId一致=${matchCount}件, memberCode一致=${memberCodeMatchCount}件, 全件=${existingRunForCredix.orders.length}件`);
+
+      mlmMembers = await prisma.mlmMember.findMany({
+        where: { memberCode: { in: Array.from(resultMap.keys()) } },
+        include: {
+          user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
+        },
+      });
+
+    } else {
+      // ② 既存Runなし: MlmMember.creditCardId（1〜3枠）で照合
+      const allAutoshipMembers = await prisma.mlmMember.findMany({
+        where: {
+          autoshipEnabled: true,
+          status: { not: "withdrawn" },
+          paymentMethod: "credit_card",
+        },
+        include: {
+          user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
+        },
+      });
+
+      const matchedMembers: typeof allAutoshipMembers = [];
+      for (const m of allAutoshipMembers) {
+        // creditCardId（1〜3枠）で照合を試みる
+        const cids = [
+          (m as any).creditCardId,
+          (m as any).creditCardId2,
+          (m as any).creditCardId3,
+        ].filter(Boolean) as string[];
+        const matchedSendId = cids.find(cid => credixSendIdMap.has(cid));
+        if (matchedSendId) {
+          const entry = credixSendIdMap.get(matchedSendId)!;
+          resultMap.set(m.memberCode, { ok: entry.ok, paidDate: entry.paidDate });
+          matchedMembers.push(m);
+        } else if (credixSendIdMap.has(m.memberCode)) {
+          // ★ memberCode でも照合（creditCardId 未登録時のフォールバック）
+          // export-csv が 顧客ID = creditCardId ?? memberCode で出力するため
+          // creditCardId が null の会員はクレディックスが memberCode を sendid として返却する
+          const entry = credixSendIdMap.get(m.memberCode)!;
+          resultMap.set(m.memberCode, { ok: entry.ok, paidDate: entry.paidDate });
+          matchedMembers.push(m);
+        }
+      }
+
+      if (matchedMembers.length === 0) {
+        // フォールバック: credit_card 全会員を対象に（どの照合キーも一致しない場合）
+        console.log("[import-direct] creditCardId/memberCode照合0件 → credit_card有効会員全員をフォールバック");
+        const defaultEntry = credixSendIdMap.values().next().value;
+        for (const m of allAutoshipMembers) {
+          resultMap.set(m.memberCode, { ok: true, paidDate: defaultEntry?.paidDate });
+        }
+        mlmMembers = allAutoshipMembers;
+      } else {
+        console.log(`[import-direct] クレディックス照合: creditCardId/memberCode一致=${matchedMembers.length}件`);
+        mlmMembers = matchedMembers;
+      }
+    }
+
   } else {
     // ══════════════════════════════════════════════════════════════
-    // クレディックスCSV: resultMap のキー（変換済み memberCode）で直接照合
+    // 汎用CSV: resultMap のキー（memberCode）で直接照合
     // ══════════════════════════════════════════════════════════════
-    // sendId → memberCode 変換済みのため、そのまま memberCode で検索可能
     const memberCodes = Array.from(resultMap.keys());
-
     mlmMembers = await prisma.mlmMember.findMany({
       where: { memberCode: { in: memberCodes } },
       include: {
@@ -480,10 +572,8 @@ export async function POST(request: Request) {
         },
       },
     });
-
     if (mlmMembers.length === 0) {
-      // memberCode で見つからない場合、変換前の sendId (WC+数字) で creditCardId 照合を試みる
-      console.log("[import-direct] memberCode照合失敗、サンプルkeys:", memberCodes.slice(0, 3));
+      console.log("[import-direct] 汎用CSV memberCode照合失敗、サンプルkeys:", memberCodes.slice(0, 3));
     }
   }
 
@@ -491,7 +581,9 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: isMufg
           ? "TXTファイルの口座番号に一致する会員が見つかりません。"
-          : "CSVのID(sendid)に一致する会員が見つかりません。" },
+          : isCredix
+          ? `クレディックスCSVのsendid（${Array.from(credixSendIdMap.keys()).slice(0, 3).join(", ")}…）に一致する会員が見つかりません。会員のcreditCardIdまたは会員コードとCSVのsendidが一致するか確認してください。`
+          : "CSVの会員コードに一致する会員が見つかりません。" },
       { status: 400 }
     );
   }
