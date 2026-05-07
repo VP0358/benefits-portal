@@ -297,8 +297,9 @@ export default function AutoShipPanel() {
   const [csvImportFile, setCsvImportFile] = useState<File | null>(null);
   const [csvImportMonth, setCsvImportMonth] = useState(() => currentMonthJST());
   const [csvImportPm, setCsvImportPm] = useState<string>("credit_card");
+  const [csvImportPmAutoDetected, setCsvImportPmAutoDetected] = useState(false);
   const [csvImportLoading, setCsvImportLoading] = useState(false);
-  const [csvImportResult, setCsvImportResult] = useState<{ paidCount: number; failedCount: number; newRunId?: string } | null>(null);
+  const [csvImportResult, setCsvImportResult] = useState<{ paidCount: number; failedCount: number; newRunId?: string; effectivePaymentMethod?: string } | null>(null);
 
   /* ─── 一覧取得 ─── */
   const loadRuns = useCallback(async () => {
@@ -455,6 +456,8 @@ export default function AutoShipPanel() {
       const fd = new FormData();
       fd.append("file", csvImportFile);
       fd.append("targetMonth", csvImportMonth);
+      // 三菱UFJファクターTXTの場合はAPIサーバー側でbank_transferに自動修正されるが
+      // フロントでも送信値を合わせる（ファイル名自動判定済みのcsvImportPmを使用）
       fd.append("paymentMethod", csvImportPm);
       const res = await fetch("/api/admin/autoship/import-direct", {
         method: "POST",
@@ -465,10 +468,13 @@ export default function AutoShipPanel() {
       let data: Record<string, unknown> = {};
       try { data = rawText ? JSON.parse(rawText) : {}; } catch { /* ignore */ }
       if (!res.ok) throw new Error((data.error as string) ?? `サーバーエラー (${res.status})`);
-      setCsvImportResult({ paidCount: data.paidCount, failedCount: data.failedCount, newRunId: data.runId });
+      setCsvImportResult({ paidCount: data.paidCount as number, failedCount: data.failedCount as number, newRunId: data.runId as string | undefined, effectivePaymentMethod: data.effectivePaymentMethod as string | undefined });
+      const pmLabel = data.effectivePaymentMethod === "bank_transfer" ? "口座引き落とし" :
+                      data.effectivePaymentMethod === "credit_card"   ? "クレジットカード" :
+                      (data.effectivePaymentMethod as string | undefined) ?? csvImportPm;
       setMsg({
         type: "success",
-        text: `CSVインポート完了: 決済成功 ${data.paidCount} 件 / 失敗 ${data.failedCount} 件。当月アクティブ反映済み。`,
+        text: `CSVインポート完了: 決済成功 ${data.paidCount} 件 / 失敗 ${data.failedCount} 件。支払い方法: ${pmLabel}。当月アクティブ反映済み。`,
       });
       loadRuns();
     } catch (e: unknown) {
@@ -859,16 +865,38 @@ export default function AutoShipPanel() {
             <input
               type="file"
               accept=".csv,.txt,text/plain,text/csv"
-              onChange={e => setCsvImportFile(e.target.files?.[0] ?? null)}
+              onChange={e => {
+                const f = e.target.files?.[0] ?? null;
+                setCsvImportFile(f);
+                // ファイル名から支払い方法を自動判定
+                if (f) {
+                  const name = f.name.toUpperCase();
+                  // 三菱UFJファクター固定長TXT: SIRRRDRFDL*.txt 等
+                  if (name.match(/^SIRR+DRFDL/i) || name.match(/SIRR+DRFDL/i)) {
+                    setCsvImportPm("bank_transfer");
+                    setCsvImportPmAutoDetected(true);
+                  } else {
+                    setCsvImportPmAutoDetected(false);
+                  }
+                } else {
+                  setCsvImportPmAutoDetected(false);
+                }
+              }}
               className="w-full text-xs file:mr-2 file:py-1.5 file:px-3 file:border-0 file:bg-green-50 file:text-green-700 file:rounded file:text-xs file:cursor-pointer"
             />
-            <p className="text-xs text-gray-400 mt-0.5">CSV・TXTファイルに対応。クレディックスCSV（ID(sendid)列を含む）自動判定。</p>
+            {csvImportPmAutoDetected && (
+              <p className="text-xs text-blue-600 mt-0.5 font-medium">
+                🏦 三菱UFJファクターTXTを検出 → 支払い方法を「口座引き落とし」に自動切り替えました
+              </p>
+            )}
+            <p className="text-xs text-gray-400 mt-0.5">CSV・TXTファイルに対応。三菱UFJファクターTXT（SIRRRDRFDL*.txt）・クレディックスCSV自動判定。</p>
           </div>
         </div>
         <div className="mt-3 p-3 bg-yellow-50 rounded-lg text-xs text-yellow-800 border border-yellow-200 mb-3">
           ⚠️ <strong>対応フォーマット</strong>:<br />
-          <span className="font-semibold">① クレディックスCSV（自動判定）</span>: ヘッダーに「ID(sendid)」列を含む形式。ファイル内全行を決済成功として処理します。<br />
-          <span className="font-semibold">② 汎用フォーマット</span>: ヘッダーに「会員コード（code）」「決済結果（result/status）」列が必要。
+          <span className="font-semibold">① 三菱UFJファクター固定長TXT（自動判定）</span>: ファイル名が <code className="bg-yellow-100 px-1 rounded">SIRRRDRFDL*.txt</code> の形式。支払い方法は「口座引き落とし」に自動切り替えされます。ファイル内全行を引き落とし成功として処理します。<br />
+          <span className="font-semibold">② クレディックスCSV（自動判定）</span>: ヘッダーに「ID(sendid)」列を含む形式。ファイル内全行を決済成功として処理します。<br />
+          <span className="font-semibold">③ 汎用フォーマット</span>: ヘッダーに「会員コード（code）」「決済結果（result/status）」列が必要。
           結果コード: <code className="bg-yellow-100 px-1 rounded">OK</code>/<code className="bg-yellow-100 px-1 rounded">1</code> = 成功。
         </div>
         <div className="flex flex-wrap gap-3">

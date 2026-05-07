@@ -78,34 +78,38 @@ export async function POST(request: Request) {
   // 三菱UFJファクター固定長TXTの場合は accountNumber ベースで照合するため別マップを用意
   const mufgAccountMap = new Map<string, { ok: boolean; paidDate?: Date }>();
 
+  // ── 三菱UFJファクター固定長TXTの場合はpaymentMethodをbank_transferに強制 ──
+  // 三菱UFJファクターは口座振替専用のため、フロントで誤ってcredit_cardが
+  // 選択されていても bank_transfer として処理する
+  let effectivePaymentMethod = paymentMethod;
+
   if (isMufgFixedFormat(uint8)) {
     // ══════════════════════════════════════════════════════════════
     // 三菱UFJファクター 固定長TXTフォーマット（全銀協準拠）
     // ══════════════════════════════════════════════════════════════
-    // 正規化後のフィールド定義:
-    //   [0:5]   レコード種別コード
-    //             19xxx = ヘッダレコード（スキップ）
-    //             80000 = フッタレコード（スキップ）
-    //             9     = エンドレコード（スキップ）
-    //             それ以外 = データレコード（全行引き落とし成功）
-    //   [1:5]   銀行コード（4桁）     ※全銀協データレコード [1:5]
-    //   [5:20]  銀行名（15桁）
+    // 実ファイル検証済みフィールド定義（正規化後 120バイト/行）:
+    //   [0]     データ区分（1桁）
+    //             '1' で始まり先頭5桁が "19xxx" = ヘッダレコード（スキップ）
+    //             '8' で始まり先頭5桁が "80xxx" = フッタレコード（スキップ）
+    //             '9' で始まる                 = エンドレコード（スキップ）
+    //             それ以外の先頭5桁が数字5桁   = データレコード（全行引き落とし成功）
+    //   [1:5]   銀行コード（4桁）
+    //   [5:20]  銀行名（15バイト、マルチバイト文字化け→'?'正規化済み）
     //   [20:23] 支店コード（3桁）
-    //   [23:38] 支店名（15桁）
-    //   [38:42] ダミー（4桁）
-    //   [42:43] 口座種別（1桁: 1=普通, 2=当座）
-    //   [43:50] 口座番号（7桁）       ← DB の accountNumber と照合
-    //   [50:80] 口座名義（30桁）
+    //   [23:38] 支店名（15バイト、マルチバイト文字化け→'?'正規化済み）
+    //   [38:42] ダミー（4バイト）
+    //   [42:50] 口座番号（8桁）       ← ★DB の accountNumber と照合（先頭ゼロ除去後）
+    //   [50:80] 口座名義（30バイト、マルチバイト文字化け→'?'正規化済み）
     //   [80:90] 引落金額（10桁 例: 0000017380 = 17,380円）
-    //   [90:91] 新規コード（1桁）
-    //   [91:95] 連番（4桁）
-    //   [95:103] 顧客番号（8桁）      ← 今回は空欄で送信しているため使用しない
+    //   [90:98] 委託者管理番号（8桁）
+    //   [98:106] 管理番号続き（8桁）
+    //   [106:112] 顧客管理番号（6桁）
     //
     // ※ このファイルはUTF-8で保存されているが、日本語部分がU+FFFD(ef bf bd=3bytes)に
     //   化けているため、U+FFDFを1バイトの'?'に変換して正規化してから処理する。
     //
     // ※ 照合キー: DB の mlmMember.accountNumber（先頭ゼロ除去後）と
-    //   TXTの口座番号（[43:50]の先頭ゼロ除去後）を突き合わせる。
+    //   TXTの口座番号（[42:50]の先頭ゼロ除去後、8桁）を突き合わせる。
 
     // 対象月末日を入金日として使用（JST→UTC変換）
     const [ty, tm] = targetMonth.split("-").map(Number);
@@ -144,16 +148,19 @@ export async function POST(request: Request) {
 
       if (norm.length < 50) continue;
 
-      // レコード種別コード（先頭5バイト）
-      const recType = norm.slice(0, 5).map(b => String.fromCharCode(b)).join("").trim();
+      // 先頭5バイトでレコード種別を判定
+      const first5 = norm.slice(0, 5).map(b => String.fromCharCode(b)).join("");
 
       // ヘッダ・フッタ・エンドレコードをスキップ
-      if (recType.startsWith("19") || recType.startsWith("80") || recType === "9" ||
-          recType === "" || !/^\d{5}$/.test(recType)) continue;
+      // 実ファイル確認: ヘッダ="19100...", フッタ="80000...", エンド="9   "
+      if (first5.startsWith("19") || first5.startsWith("80") ||
+          first5.trimStart().startsWith("9") || first5.trim() === "" ||
+          !/^\d/.test(first5)) continue;
 
-      // 口座番号: [43:50]（7桁、先頭ゼロを除去して照合）
-      if (norm.length < 50) continue;
-      const acNumRaw = norm.slice(43, 50).map(b => String.fromCharCode(b)).join("").trim();
+      // 口座番号: [42:50]（8桁、先頭ゼロを除去して照合）
+      // ★修正: 旧コードは[43:50]（7桁）だったが実ファイル検証で[42:50]（8桁）が正しい
+      if (norm.length < 90) continue;
+      const acNumRaw = norm.slice(42, 50).map(b => String.fromCharCode(b)).join("").trim();
       if (!acNumRaw || !/^\d+$/.test(acNumRaw)) continue;
       // 先頭ゼロを除去（DBのaccountNumberと合わせる）
       const acNum = acNumRaw.replace(/^0+/, "") || "0";
@@ -164,6 +171,9 @@ export async function POST(request: Request) {
         mufgAccountMap.set(acNum, { ok: true, paidDate: paidDateForAll });
       }
     }
+
+    // 三菱UFJファクターTXTは必ず bank_transfer として処理
+    effectivePaymentMethod = "bank_transfer";
 
   } else {
     // ══════════════════════════════════════════════════════════════
@@ -284,9 +294,23 @@ export async function POST(request: Request) {
 
     for (const line of effectiveDataLines) {
       if (!line.trim()) continue;
-      const cols       = parseCsvLine(line).map(c => c.replace(/^"|"$/g, "").trim());
-      const memberCode = cols[codeIdx] ?? "";
-      if (!memberCode || memberCode === "-") continue;
+      const cols   = parseCsvLine(line).map(c => c.replace(/^"|"$/g, "").trim());
+      // クレディックスCSVの「ID(sendid)」列の値（例: WC14857601, 69823944）を取得
+      const sendId = cols[codeIdx] ?? "";
+      if (!sendId || sendId === "-") continue;
+
+      // ── sendId → memberCode 変換 ──
+      // sendId フォーマット:
+      //   WC14857601 → WC + 8桁数字 → 数字部分を XXXXXX-YY 形式に変換
+      //   69823944   →      8桁数字 → そのまま XXXXXX-YY 形式に変換
+      const digits = sendId.startsWith("WC") ? sendId.slice(2) : sendId;
+      let memberCode: string;
+      if (/^\d{8}$/.test(digits)) {
+        memberCode = `${digits.slice(0, 6)}-${digits.slice(6)}`;
+      } else {
+        // 8桁でない場合はそのまま使用（汎用フォーマットの memberCode）
+        memberCode = sendId;
+      }
 
       let ok     = true;
       let reason: string | undefined = undefined;
@@ -294,7 +318,7 @@ export async function POST(request: Request) {
       const paidDate = parseCsvDate(rawDate) ?? undefined;
 
       if (isCredixFormat) {
-        ok = true; // クレディックスCSVは全行が決済成功
+        ok = true; // クレディックスCSVは全行が決済成功（結果列は「決済完了」固定）
       } else {
         const result = cols[resultIdx] ?? "";
         ok = result === "OK" || result === "0" || result.toLowerCase() === "success" ||
@@ -302,47 +326,131 @@ export async function POST(request: Request) {
         reason = reasonIdx >= 0 ? (cols[reasonIdx] ?? undefined) : undefined;
       }
 
+      // resultMap のキーは変換済み memberCode
       resultMap.set(memberCode, { ok, reason, paidDate });
     }
   } // end CSV format
 
   // ── 対象会員取得 ──
-  // 三菱UFJファクターTXTの場合: accountNumber で照合
-  // CSV（クレディックス等）の場合: memberCode で照合
+  // 三菱UFJファクターTXTの場合: AutoShipOrder.accountNumber / MlmMember.accountNumber /
+  //   mlmRegistration.bankAccountNumber の全3箇所で口座番号照合を試みる
+  // クレディックスCSVの場合: resultMap のキー（変換済み memberCode）で直接照合
   const isMufg = mufgAccountMap.size > 0;
 
-  let mlmMembers: Awaited<ReturnType<typeof prisma.mlmMember.findMany>>;
+  // isMufgの場合はeffectivePaymentMethodが既にbank_transferに設定されている
+  // ログで確認できるようにする
+  if (isMufg && effectivePaymentMethod !== paymentMethod) {
+    console.log(`[import-direct] 三菱UFJファクターTXT検出: paymentMethod=${paymentMethod} → bank_transfer に自動切替`);
+  }
+
+  let mlmMembers: Awaited<ReturnType<typeof prisma.mlmMember.findMany<{
+    include: { user: { select: { name: boolean; nameKana: boolean; phone: boolean; email: boolean; postalCode: boolean; address: boolean } } }
+  }>>>;
+
   if (isMufg) {
-    // mufgAccountMap のキーは先頭ゼロ除去済み口座番号
-    const accountNumbers = Array.from(mufgAccountMap.keys());
-    // DB の accountNumber は先頭ゼロあり/なしが混在しうるため両方で検索
-    const allMembers = await prisma.mlmMember.findMany({
-      where: {
-        accountNumber: { not: null },
-        autoshipEnabled: true,
-        status: { not: "withdrawn" },
-      },
+    // ══════════════════════════════════════════════════════════════
+    // 三菱UFJファクターTXT: 口座番号で照合（3段階）
+    // ══════════════════════════════════════════════════════════════
+    // ① 既存 AutoShipRun があれば AutoShipOrder.accountNumber で照合（最も確実）
+    // ② MlmMember.accountNumber（直接フィールド）で照合
+    // ③ MlmRegistration.bankAccountNumber で照合
+
+    const accountNumbers = Array.from(mufgAccountMap.keys()); // 先頭ゼロ除去済み
+
+    const existingRun = await prisma.autoShipRun.findUnique({
+      where: { targetMonth_paymentMethod: { targetMonth, paymentMethod: effectivePaymentMethod } },
+      include: { orders: { select: { memberCode: true, accountNumber: true } } },
+    });
+
+    const matchedMemberCodes = new Set<string>();
+
+    if (existingRun) {
+      for (const order of existingRun.orders) {
+        const acNorm = (order.accountNumber ?? "").replace(/^0+/, "") || "";
+        if (acNorm && accountNumbers.includes(acNorm)) {
+          matchedMemberCodes.add(order.memberCode);
+        }
+      }
+    }
+
+    if (matchedMemberCodes.size === 0) {
+      const allAutoshipMembers = await prisma.mlmMember.findMany({
+        where: {
+          autoshipEnabled: true,
+          status: { not: "withdrawn" },
+          autoshipStartDate: { not: null },
+        },
+        select: {
+          memberCode: true,
+          accountNumber: true,
+          user: {
+            select: {
+              mlmRegistration: { select: { bankAccountNumber: true } },
+            },
+          },
+        },
+      });
+
+      for (const m of allAutoshipMembers) {
+        const acDirect = (m.accountNumber ?? "").replace(/^0+/, "") || "";
+        const acReg = ((m.user as any)?.mlmRegistration?.bankAccountNumber ?? "").replace(/^0+/, "") || "";
+
+        if ((acDirect && accountNumbers.includes(acDirect)) ||
+            (acReg   && accountNumbers.includes(acReg))) {
+          matchedMemberCodes.add(m.memberCode);
+        }
+      }
+    }
+
+    if (matchedMemberCodes.size === 0) {
+      return NextResponse.json(
+        { error: "TXTファイルの口座番号に一致するオートシップ有効会員が見つかりません。\n会員の口座番号（MlmRegistration.bankAccountNumber または MlmMember.accountNumber）がDBに登録されているか確認してください。" },
+        { status: 400 }
+      );
+    }
+
+    mlmMembers = await prisma.mlmMember.findMany({
+      where: { memberCode: { in: Array.from(matchedMemberCodes) } },
       include: {
         user: {
           select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true },
         },
       },
     });
-    // 口座番号の先頭ゼロを除去して突き合わせ
-    mlmMembers = allMembers.filter(m => {
-      const acNorm = (m.accountNumber ?? "").replace(/^0+/, "") || "0";
-      return accountNumbers.includes(acNorm);
+
+    // resultMap に memberCode → { ok, paidDate } を登録（口座番号から逆引き）
+    const allForResolution = await prisma.mlmMember.findMany({
+      where: { memberCode: { in: Array.from(matchedMemberCodes) } },
+      select: {
+        memberCode: true,
+        accountNumber: true,
+        user: {
+          select: {
+            mlmRegistration: { select: { bankAccountNumber: true } },
+          },
+        },
+      },
     });
-    // resultMap に accountNumber → { ok, paidDate } を変換して登録
-    for (const m of mlmMembers) {
-      const acNorm = (m.accountNumber ?? "").replace(/^0+/, "") || "0";
-      const mufgEntry = mufgAccountMap.get(acNorm);
-      if (mufgEntry) {
-        resultMap.set(m.memberCode, { ok: mufgEntry.ok, paidDate: mufgEntry.paidDate });
+
+    for (const m of allForResolution) {
+      const acDirect = (m.accountNumber ?? "").replace(/^0+/, "") || "";
+      const acReg = ((m.user as any)?.mlmRegistration?.bankAccountNumber ?? "").replace(/^0+/, "") || "";
+      const acKey = accountNumbers.find(k => (acDirect && k === acDirect) || (acReg && k === acReg));
+      if (acKey) {
+        const mufgEntry = mufgAccountMap.get(acKey);
+        if (mufgEntry) {
+          resultMap.set(m.memberCode, { ok: mufgEntry.ok, paidDate: mufgEntry.paidDate });
+        }
       }
     }
+
   } else {
+    // ══════════════════════════════════════════════════════════════
+    // クレディックスCSV: resultMap のキー（変換済み memberCode）で直接照合
+    // ══════════════════════════════════════════════════════════════
+    // sendId → memberCode 変換済みのため、そのまま memberCode で検索可能
     const memberCodes = Array.from(resultMap.keys());
+
     mlmMembers = await prisma.mlmMember.findMany({
       where: { memberCode: { in: memberCodes } },
       include: {
@@ -351,13 +459,18 @@ export async function POST(request: Request) {
         },
       },
     });
+
+    if (mlmMembers.length === 0) {
+      // memberCode で見つからない場合、変換前の sendId (WC+数字) で creditCardId 照合を試みる
+      console.log("[import-direct] memberCode照合失敗、サンプルkeys:", memberCodes.slice(0, 3));
+    }
   }
 
   if (mlmMembers.length === 0) {
     return NextResponse.json(
       { error: isMufg
-          ? "TXTファイルの口座番号に一致するオートシップ有効会員が見つかりません。口座番号がDBに登録されているか確認してください。"
-          : "CSVの会員コードに一致する会員が見つかりません。" },
+          ? "TXTファイルの口座番号に一致する会員が見つかりません。"
+          : "CSVのID(sendid)に一致する会員が見つかりません。" },
       { status: 400 }
     );
   }
@@ -370,9 +483,29 @@ export async function POST(request: Request) {
 
   // ── 伝票（AutoShipRun）を取得 or 作成 ──
   let run = await prisma.autoShipRun.findUnique({
-    where: { targetMonth_paymentMethod: { targetMonth, paymentMethod } },
+    where: { targetMonth_paymentMethod: { targetMonth, paymentMethod: effectivePaymentMethod } },
     include: { orders: true },
   });
+
+  // 既存Runがある場合: run.orders にある memberCode が memberMap に含まれていない可能性があるため
+  // run.orders の全 memberCode を mlmMember から補完取得する
+  if (run && run.orders.length > 0) {
+    const existingOrderMemberCodes = run.orders.map(o => o.memberCode);
+    const missingCodes = existingOrderMemberCodes.filter(code => !memberMap.has(code));
+    if (missingCodes.length > 0) {
+      const additionalMembers = await prisma.mlmMember.findMany({
+        where: { memberCode: { in: missingCodes } },
+        include: {
+          user: {
+            select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true },
+          },
+        },
+      });
+      for (const m of additionalMembers) {
+        memberMap.set(m.memberCode, m);
+      }
+    }
+  }
 
   let runCreated = false;
   if (!run) {
@@ -383,7 +516,7 @@ export async function POST(request: Request) {
       const newRun = await tx.autoShipRun.create({
         data: {
           targetMonth,
-          paymentMethod,
+          paymentMethod: effectivePaymentMethod,
           totalCount: mlmMembers.length,
           totalAmount: mlmMembers.length * UNIT_PRICE,
         },
@@ -394,19 +527,20 @@ export async function POST(request: Request) {
           autoShipRunId: newRun.id,
           mlmMemberId:   m.id,
           targetMonth,
-          paymentMethod,
+          paymentMethod: effectivePaymentMethod,
           memberCode:    m.memberCode,
+          creditCardId:  (m as any).creditCardId ?? null,  // クレディックス顧客ID（CSV照合キー）
           memberName:    m.user.name,
           memberNameKana: m.user.nameKana ?? null,
           memberPhone:   m.user.phone ?? null,
           memberEmail:   m.user.email ?? null,
           memberPostal:  m.user.postalCode ?? null,
           memberAddress: m.user.address ?? null,
-          bankName:      m.bankName ?? null,
-          branchName:    m.branchName ?? null,
-          accountType:   m.accountType ?? null,
-          accountNumber: m.accountNumber ?? null,
-          accountHolder: m.accountHolder ?? null,
+          bankName:      (m as any).bankName ?? null,
+          branchName:    (m as any).branchName ?? null,
+          accountType:   (m as any).accountType ?? null,
+          accountNumber: (m as any).accountNumber ?? null,
+          accountHolder: (m as any).accountHolder ?? null,
           unitPrice:     UNIT_PRICE,
           totalAmount:   UNIT_PRICE,
           points:        POINTS,
@@ -420,7 +554,7 @@ export async function POST(request: Request) {
     }
 
     run = await prisma.autoShipRun.findUnique({
-      where: { targetMonth_paymentMethod: { targetMonth, paymentMethod } },
+      where: { targetMonth_paymentMethod: { targetMonth, paymentMethod: effectivePaymentMethod } },
       include: { orders: true },
     });
   }
@@ -432,6 +566,39 @@ export async function POST(request: Request) {
   // ── 結果を取り込んでアクティブ反映 ──
   let paidCount   = 0;
   let failedCount = 0;
+
+  // ── 三菱UFJファクターTXTの場合: run.orders の accountNumber → mufgAccountMap 直接補完 ──
+  // resultMap は memberCode をキーとするが、run.orders の accountNumber が
+  // mufgAccountMap に含まれているにも関わらず resultMap に未登録の場合を補完
+  if (isMufg) {
+    const accountNumbers = Array.from(mufgAccountMap.keys());
+    for (const order of run!.orders) {
+      if (resultMap.has(order.memberCode)) continue; // 既にresultMapにある場合はスキップ
+      const acNorm = ((order as any).accountNumber ?? "").replace(/^0+/, "") || "";
+      if (acNorm && accountNumbers.includes(acNorm)) {
+        const mufgEntry = mufgAccountMap.get(acNorm);
+        if (mufgEntry) {
+          resultMap.set(order.memberCode, { ok: mufgEntry.ok, paidDate: mufgEntry.paidDate });
+          console.log(`[import-direct] accountNumber補完: ${order.memberCode} ← accountNumber=${acNorm}`);
+        }
+      }
+    }
+  }
+
+  // ── デバッグ: 実際の照合状態をレスポンスに含めて返す ──
+  const debugInfo = {
+    isMufg,
+    effectivePaymentMethod,
+    originalPaymentMethod: paymentMethod,
+    resultMapSize: resultMap.size,
+    resultMapSampleKeys: Array.from(resultMap.keys()).slice(0, 10),
+    runOrdersCount: run!.orders.length,
+    runOrdersSampleMemberCodes: run!.orders.slice(0, 10).map(o => o.memberCode),
+    matchedCount: run!.orders.filter(o => resultMap.has(o.memberCode)).length,
+    mufgAccountMapSize: mufgAccountMap.size,
+    mufgAccountSample: Array.from(mufgAccountMap.keys()).slice(0, 5),
+  };
+  console.log("[import-direct] debugInfo:", JSON.stringify(debugInfo, null, 2));
 
   try {
   await prisma.$transaction(async (tx) => {
@@ -532,10 +699,12 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    runId:       run.id.toString(),
+    runId:              run.id.toString(),
     paidCount,
     failedCount,
     runCreated,
+    effectivePaymentMethod,
+    _debug: debugInfo,
   }, { status: 200 });
 
   } catch (unexpectedErr) {
