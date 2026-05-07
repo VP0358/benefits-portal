@@ -510,17 +510,26 @@ export async function POST(request: Request) {
       });
 
     } else {
-      // ② 既存Runなし: MlmMember.creditCardId（1〜3枠）で照合
+      // ② 既存Runなし or orders=0件:
+      //   MlmMember を全オートシップ有効会員から検索
+      //   ★ paymentMethod フィルタは掛けない
+      //     理由: MlmMember.paymentMethod は会員登録時のデフォルト支払方法であり、
+      //           クレディックスCSVが提出された＝クレジットカード決済対象という事実で
+      //           paymentMethod に関わらず全員照合すべきため。
+      //           また、初回インポート時（CSVダウンロード未実施・空Run状態）でも
+      //           正しく処理できるようにする。
       const allAutoshipMembers = await prisma.mlmMember.findMany({
         where: {
           autoshipEnabled: true,
           status: { not: "withdrawn" },
-          paymentMethod: "credit_card",
+          autoshipStartDate: { not: null },
         },
         include: {
           user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
         },
       });
+
+      console.log(`[import-direct] クレディックス照合: autoshipEnabled全会員=${allAutoshipMembers.length}件, credixSendIdMapKeys=[${Array.from(credixSendIdMap.keys()).slice(0, 5).join(", ")}]`);
 
       const matchedMembers: typeof allAutoshipMembers = [];
       for (const m of allAutoshipMembers) {
@@ -546,8 +555,9 @@ export async function POST(request: Request) {
       }
 
       if (matchedMembers.length === 0) {
-        // フォールバック: credit_card 全会員を対象に（どの照合キーも一致しない場合）
-        console.log("[import-direct] creditCardId/memberCode照合0件 → credit_card有効会員全員をフォールバック");
+        // フォールバック: 全オートシップ有効会員を対象に（どの照合キーも一致しない場合）
+        // ※ クレディックスCSVが渡された以上、全員が決済済みとして処理する
+        console.log("[import-direct] creditCardId/memberCode照合0件 → autoshipEnabled全会員をフォールバック");
         const defaultEntry = credixSendIdMap.values().next().value;
         for (const m of allAutoshipMembers) {
           resultMap.set(m.memberCode, { ok: true, paidDate: defaultEntry?.paidDate });
@@ -620,6 +630,30 @@ export async function POST(request: Request) {
     }
   }
 
+  // オーダー明細を作成するヘルパー（新規Run作成時 / 既存Run orders=0件の補完時に使用）
+  const buildOrderData = (runId: bigint) => mlmMembers.map(m => ({
+    autoShipRunId: runId,
+    mlmMemberId:   m.id,
+    targetMonth,
+    paymentMethod: effectivePaymentMethod,
+    memberCode:    m.memberCode,
+    creditCardId:  (m as any).creditCardId ?? null,  // クレディックス顧客ID（CSV照合キー）
+    memberName:    m.user.name,
+    memberNameKana: m.user.nameKana ?? null,
+    memberPhone:   m.user.phone ?? null,
+    memberEmail:   m.user.email ?? null,
+    memberPostal:  m.user.postalCode ?? null,
+    memberAddress: m.user.address ?? null,
+    bankName:      (m as any).bankName ?? null,
+    branchName:    (m as any).branchName ?? null,
+    accountType:   (m as any).accountType ?? null,
+    accountNumber: (m as any).accountNumber ?? null,
+    accountHolder: (m as any).accountHolder ?? null,
+    unitPrice:     UNIT_PRICE,
+    totalAmount:   UNIT_PRICE,
+    points:        POINTS,
+  }));
+
   let runCreated = false;
   if (!run) {
     // 伝票がまだないので新規作成
@@ -634,30 +668,8 @@ export async function POST(request: Request) {
           totalAmount: mlmMembers.length * UNIT_PRICE,
         },
       });
-
       await tx.autoShipOrder.createMany({
-        data: mlmMembers.map(m => ({
-          autoShipRunId: newRun.id,
-          mlmMemberId:   m.id,
-          targetMonth,
-          paymentMethod: effectivePaymentMethod,
-          memberCode:    m.memberCode,
-          creditCardId:  (m as any).creditCardId ?? null,  // クレディックス顧客ID（CSV照合キー）
-          memberName:    m.user.name,
-          memberNameKana: m.user.nameKana ?? null,
-          memberPhone:   m.user.phone ?? null,
-          memberEmail:   m.user.email ?? null,
-          memberPostal:  m.user.postalCode ?? null,
-          memberAddress: m.user.address ?? null,
-          bankName:      (m as any).bankName ?? null,
-          branchName:    (m as any).branchName ?? null,
-          accountType:   (m as any).accountType ?? null,
-          accountNumber: (m as any).accountNumber ?? null,
-          accountHolder: (m as any).accountHolder ?? null,
-          unitPrice:     UNIT_PRICE,
-          totalAmount:   UNIT_PRICE,
-          points:        POINTS,
-        })),
+        data: buildOrderData(newRun.id),
         skipDuplicates: true,
       });
     });
@@ -666,6 +678,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `伝票作成に失敗しました: ${txErr instanceof Error ? txErr.message : String(txErr)}` }, { status: 500 });
     }
 
+    run = await prisma.autoShipRun.findUnique({
+      where: { targetMonth_paymentMethod: { targetMonth, paymentMethod: effectivePaymentMethod } },
+      include: { orders: true },
+    });
+  } else if (run.orders.length === 0 && mlmMembers.length > 0) {
+    // ── 既存Run(orders=0件)の場合: mlmMembers から注文を補完作成 ──
+    // 例: 「CSVダウンロード前」に空の下書きRunが作られた場合や、
+    //     インポートを先行させる運用での対応
+    console.log(`[import-direct] 既存Run(id=${run.id})のorders=0件 → mlmMembers(${mlmMembers.length}件)から注文を作成`);
+    try {
+      await prisma.autoShipOrder.createMany({
+        data: buildOrderData(run.id),
+        skipDuplicates: true,
+      });
+      // totalCount/totalAmount も更新
+      await prisma.autoShipRun.update({
+        where: { id: run.id },
+        data: {
+          totalCount:  mlmMembers.length,
+          totalAmount: mlmMembers.length * UNIT_PRICE,
+        },
+      });
+    } catch (txErr) {
+      console.error("[import-direct] 既存Run注文補完エラー:", txErr);
+      return NextResponse.json({ error: `注文の補完作成に失敗しました: ${txErr instanceof Error ? txErr.message : String(txErr)}` }, { status: 500 });
+    }
+    // 作成後に再取得
     run = await prisma.autoShipRun.findUnique({
       where: { targetMonth_paymentMethod: { targetMonth, paymentMethod: effectivePaymentMethod } },
       include: { orders: true },
