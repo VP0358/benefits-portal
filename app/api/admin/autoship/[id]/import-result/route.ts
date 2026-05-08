@@ -1,6 +1,7 @@
 // 動的レンダリングを強制（ビルド時にこのルートを実行しない）
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+export const maxDuration = 300 // Vercel最大300秒
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -459,10 +460,27 @@ export async function POST(request: Request, { params }: Params) {
     // ──────────────────────────────────────────────────────────────
     // 第2段階: MlmPurchase / MlmMember / PointWallet 更新
     // ★ トランザクション外で処理 → エラーが出ても paidCount は保持される
+    // ★ 並列処理で高速化（会員ごとに Promise.allSettled）
     // ──────────────────────────────────────────────────────────────
-    for (const order of run.orders) {
-      const res = resultMap.get(order.memberCode);
-      if (!res || !res.ok) continue;
+    const AUTOSHIP_BASE  = 15000;
+    const AUTOSHIP_RATE  = 0.05;
+    const savingsPoints  = Math.floor(AUTOSHIP_BASE * AUTOSHIP_RATE); // 750pt
+
+    // userId が必要なため、run.orders の mlmMemberId → userId を一括取得
+    const paidOrders = run.orders.filter(o => {
+      const res = resultMap.get(o.memberCode);
+      return res && res.ok;
+    });
+
+    const memberUserIds = await prisma.mlmMember.findMany({
+      where: { id: { in: paidOrders.map(o => o.mlmMemberId) } },
+      select: { id: true, userId: true },
+    });
+    const memberUserIdMap = new Map(memberUserIds.map(m => [m.id.toString(), m.userId]));
+
+    await Promise.allSettled(paidOrders.map(async (order) => {
+      const res = resultMap.get(order.memberCode)!;
+      const userId = memberUserIdMap.get(order.mlmMemberId.toString());
 
       // MlmPurchase 記録
       try {
@@ -495,54 +513,48 @@ export async function POST(request: Request, { params }: Params) {
         postProcessErrors.push(msg);
       }
 
-      // MlmMember をアクティブに
-      try {
-        await prisma.mlmMember.update({
+      // MlmMember / PointWallet / savingsPoints を並列更新
+      await Promise.allSettled([
+        prisma.mlmMember.update({
           where: { id: order.mlmMemberId },
           data:  { status: "active" },
-        });
-      } catch (e) {
-        const msg = `MlmMember更新エラー(${order.memberCode}): ${e instanceof Error ? e.message : String(e)}`;
-        console.error("[import-result]", msg);
-        postProcessErrors.push(msg);
-      }
+        }).catch((e: unknown) => {
+          const msg = `MlmMember更新エラー(${order.memberCode}): ${e instanceof Error ? e.message : String(e)}`;
+          console.error("[import-result]", msg);
+          postProcessErrors.push(msg);
+        }),
 
-      // SAVボーナス付与（オートシップ: 15,000円の5% = 750pt）
-      try {
-        const AUTOSHIP_BASE = 15000;
-        const AUTOSHIP_RATE = 0.05;
-        const savingsPoints = Math.floor(AUTOSHIP_BASE * AUTOSHIP_RATE); // 750pt
-
-        if (savingsPoints > 0) {
-          const member = await prisma.mlmMember.findUnique({
-            where:  { id: order.mlmMemberId },
-            select: { userId: true },
-          });
-          if (member) {
-            await prisma.pointWallet.upsert({
-              where:  { userId: member.userId },
+        (savingsPoints > 0 && userId)
+          ? prisma.pointWallet.upsert({
+              where:  { userId },
               update: {
                 externalPointsBalance:  { increment: savingsPoints },
                 availablePointsBalance: { increment: savingsPoints },
               },
               create: {
-                userId:                 member.userId,
+                userId,
                 externalPointsBalance:  savingsPoints,
                 availablePointsBalance: savingsPoints,
               },
-            });
-            await prisma.mlmMember.update({
+            }).catch((e: unknown) => {
+              const msg = `PointWallet更新エラー(${order.memberCode}): ${e instanceof Error ? e.message : String(e)}`;
+              console.error("[import-result]", msg);
+              postProcessErrors.push(msg);
+            })
+          : Promise.resolve(),
+
+        (savingsPoints > 0)
+          ? prisma.mlmMember.update({
               where: { id: order.mlmMemberId },
               data:  { savingsPoints: { increment: savingsPoints } },
-            });
-          }
-        }
-      } catch (e) {
-        const msg = `PointWallet更新エラー(${order.memberCode}): ${e instanceof Error ? e.message : String(e)}`;
-        console.error("[import-result]", msg);
-        postProcessErrors.push(msg);
-      }
-    }
+            }).catch((e: unknown) => {
+              const msg = `savingsPoints更新エラー(${order.memberCode}): ${e instanceof Error ? e.message : String(e)}`;
+              console.error("[import-result]", msg);
+              postProcessErrors.push(msg);
+            })
+          : Promise.resolve(),
+      ]);
+    }));
 
     if (postProcessErrors.length > 0) {
       console.warn("[import-result] 後処理エラー一覧:", postProcessErrors);

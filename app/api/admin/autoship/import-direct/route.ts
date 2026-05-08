@@ -1,6 +1,7 @@
 // 動的レンダリングを強制
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+export const maxDuration = 300 // Vercel最大300秒
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -712,17 +713,25 @@ async function updateMemberAfterPayment(
   const AUTOSHIP_RATE = 0.05;
   const savingsPoints = Math.floor(AUTOSHIP_BASE * AUTOSHIP_RATE); // 750pt
 
+  // MlmMember を1回だけ取得して使い回す
+  let mlmMemberId: bigint | null = null;
   try {
     const mlmMember = await prisma.mlmMember.findUnique({
       where: { userId },
-      select: { id: true, savingsPoints: true },
+      select: { id: true },
     });
     if (!mlmMember) return;
+    mlmMemberId = mlmMember.id;
+  } catch (e) {
+    console.error(`[import-direct] MlmMember取得エラー(userId=${userId}):`, e);
+    return;
+  }
 
-    // MlmPurchase 重複チェック → 未作成なら作成
+  // MlmPurchase 重複チェック → 未作成なら作成
+  try {
     const existing = await prisma.mlmPurchase.findFirst({
       where: {
-        mlmMemberId:    mlmMember.id,
+        mlmMemberId,
         purchaseMonth:  targetMonth,
         purchaseStatus: "autoship",
       },
@@ -730,7 +739,7 @@ async function updateMemberAfterPayment(
     if (!existing) {
       await prisma.mlmPurchase.create({
         data: {
-          mlmMemberId:    mlmMember.id,
+          mlmMemberId,
           productCode:    "2000",
           productName:    "VIOLA Pure 翠彩-SUMISAI-",
           quantity:       1,
@@ -747,49 +756,35 @@ async function updateMemberAfterPayment(
     console.error(`[import-direct] MlmPurchase作成エラー(userId=${userId}):`, e);
   }
 
-  try {
-    const mlmMember = await prisma.mlmMember.findUnique({
-      where: { userId },
-      select: { id: true },
-    });
-    if (mlmMember) {
-      await prisma.mlmMember.update({
-        where: { id: mlmMember.id },
-        data:  { status: "active" },
-      });
-    }
-  } catch (e) {
-    console.error(`[import-direct] MlmMember更新エラー(userId=${userId}):`, e);
-  }
+  // MlmMember.status → active & PointWallet を並列更新
+  await Promise.allSettled([
+    prisma.mlmMember.update({
+      where: { id: mlmMemberId },
+      data:  { status: "active" },
+    }).catch((e: unknown) => console.error(`[import-direct] MlmMember更新エラー(userId=${userId}):`, e)),
 
-  try {
-    if (savingsPoints > 0) {
-      await prisma.pointWallet.upsert({
-        where:  { userId },
-        update: {
-          externalPointsBalance:  { increment: savingsPoints },
-          availablePointsBalance: { increment: savingsPoints },
-        },
-        create: {
-          userId,
-          externalPointsBalance:  savingsPoints,
-          availablePointsBalance: savingsPoints,
-        },
-      });
-      const mlmMember = await prisma.mlmMember.findUnique({
-        where: { userId },
-        select: { id: true },
-      });
-      if (mlmMember) {
-        await prisma.mlmMember.update({
-          where: { id: mlmMember.id },
+    savingsPoints > 0
+      ? prisma.pointWallet.upsert({
+          where:  { userId },
+          update: {
+            externalPointsBalance:  { increment: savingsPoints },
+            availablePointsBalance: { increment: savingsPoints },
+          },
+          create: {
+            userId,
+            externalPointsBalance:  savingsPoints,
+            availablePointsBalance: savingsPoints,
+          },
+        }).catch((e: unknown) => console.error(`[import-direct] PointWalletエラー(userId=${userId}):`, e))
+      : Promise.resolve(),
+
+    savingsPoints > 0
+      ? prisma.mlmMember.update({
+          where: { id: mlmMemberId },
           data:  { savingsPoints: { increment: savingsPoints } },
-        });
-      }
-    }
-  } catch (e) {
-    console.error(`[import-direct] PointWalletエラー(userId=${userId}):`, e);
-  }
+        }).catch((e: unknown) => console.error(`[import-direct] savingsPoints更新エラー(userId=${userId}):`, e))
+      : Promise.resolve(),
+  ]);
 }
 
 /**
