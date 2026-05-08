@@ -96,11 +96,11 @@ export default async function DashboardPage() {
       menus={menus.map((m) => ({
         id: String(m.id),
         title: m.title,
-        subtitle: m.subtitle ?? undefined,
-        iconType: m.iconType ?? undefined,
-        menuType: m.menuType ?? undefined,
-        linkUrl: m.linkUrl ?? undefined,
-        contentData: m.contentData ?? undefined,
+        subtitle: m.subtitle ?? null,
+        iconType: m.iconType ?? null,
+        menuType: m.menuType ?? null,
+        linkUrl: m.linkUrl ?? "",
+        contentData: m.contentData ?? null,
       }))}
     />
   );

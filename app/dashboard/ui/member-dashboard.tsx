@@ -11,7 +11,7 @@ interface DashboardPoints {
   mobileReferralPoints: number;
 }
 interface Announcement { id:string; title:string; content:string; tag:string; isPublished:boolean; publishedAt:string|null; }
-interface Menu { id:string; title:string; subtitle?:string; iconType?:string; menuType?:string; linkUrl?:string; contentData?:string; }
+interface Menu { id:string; title:string; subtitle?:string|null; iconType?:string|null; menuType?:string|null; linkUrl?:string; contentData?:string|null; }
 type SkinShop = { name:string; area:string; address:string; phone:string; url?:string; photos?:string[]; };
 
 // ── デザイントークン（参考画像：ライトベージュ×深紺ゴールドサロンUI） ──
@@ -1012,7 +1012,7 @@ export default function MemberDashboard({
                   <button key={m.id} type="button"
                     onClick={()=>{
                       let shops:SkinShop[]=[];
-                      try{ if(m.contentData) shops=JSON.parse(m.contentData); }catch{}
+                      try{ if(m.contentData) shops=JSON.parse(m.contentData); }catch(_e){}
                       setSkinModal({menuId:m.id,title:m.title,shops});
                     }}
                     className="w-full rounded-2xl overflow-hidden transition-all hover:scale-[1.03] active:scale-95 text-left"
