@@ -27,9 +27,8 @@ export async function POST(request: Request, { params }: Params) {
       include: { orders: true },
     });
     if (!run) return NextResponse.json({ error: "見つかりません" }, { status: 404 });
-    if (run.status === "completed") {
-      return NextResponse.json({ error: "すでに完了済みです" }, { status: 400 });
-    }
+    // completed 状態でも再インポートを許可（クレディックスCSVを毎回インポートできるように）
+    // if (run.status === "completed") { ... } → 削除
 
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
@@ -221,36 +220,91 @@ export async function POST(request: Request, { params }: Params) {
 
       const dataLines = lines.slice(1);
 
+      // 電話番号正規化ヘルパー
+      function normalizePhone(raw: string): string {
+        return raw.replace(/-/g, "").replace(/^\+81/, "0").trim();
+      }
+
+      // クレディックスCSVの場合: 電話番号 → { ok, paidDate } マップを構築
+      // sendid はクレディックス独自IDでDBの会員コードとは無関係のため照合に使用しない
+      const credixPhoneMap = new Map<string, { ok: boolean; paidDate?: Date }>();
+      // 電話番号列インデックス（クレディックスCSV固定列2、またはヘッダーから検出）
+      const credixPhoneIdx = isCredixFormat
+        ? (() => {
+            const idx = (() => {
+              const headerLocal = lines[0] ? parseCsvLine(lines[0]).map(h => h.replace(/^"|"$/g, "").replace(/^\uFEFF/, "").trim().toLowerCase()) : [];
+              return headerLocal.findIndex(h => h.includes("電話番号") || h.includes("phone") || h.includes("tel"));
+            })();
+            return idx >= 0 ? idx : 2; // デフォルト列2
+          })()
+        : -1;
+
       for (const line of dataLines) {
         if (!line.trim()) continue;
         const cols = parseCsvLine(line).map(c => c.replace(/^"|"$/g, "").trim());
         const rawCode = cols[codeIdx] ?? "";
         if (!rawCode || rawCode === "-") continue;
 
-        // sendId → memberCode 変換（クレディックスCSV対応）
-        const digits = rawCode.startsWith("WC") ? rawCode.slice(2) : rawCode;
-        let memberCode: string;
-        if (/^\d{8}$/.test(digits)) {
-          memberCode = `${digits.slice(0, 6)}-${digits.slice(6)}`;
-        } else {
-          memberCode = rawCode;
-        }
-
-        let ok: boolean;
-        let reason: string | undefined;
         const rawDate = dateIdx >= 0 ? (cols[dateIdx] ?? "") : "";
         const paidDate = parseCsvDate(rawDate) ?? undefined;
 
         if (isCredixFormat) {
-          ok = true;
+          // クレディックスCSV: sendidは使わず電話番号マップを構築
+          const rawPhone = cols[credixPhoneIdx] ?? "";
+          const phone = normalizePhone(rawPhone);
+          if (phone && phone !== "-" && phone !== "non") {
+            credixPhoneMap.set(phone, { ok: true, paidDate });
+          }
         } else {
+          // 汎用CSV: 会員コードで直接照合
           const result = cols[resultIdx] ?? "";
-          ok = result === "OK" || result === "0" || result.toLowerCase() === "success" ||
+          const ok = result === "OK" || result === "0" || result.toLowerCase() === "success" ||
             result === "1" || result.includes("完了") || result.includes("成功");
-          reason = reasonIdx >= 0 ? (cols[reasonIdx] ?? undefined) : undefined;
+          const reason = reasonIdx >= 0 ? (cols[reasonIdx] ?? undefined) : undefined;
+          resultMap.set(rawCode, { ok, reason, paidDate });
         }
+      }
 
-        resultMap.set(memberCode, { ok, reason, paidDate });
+      // クレディックスCSV: run.orders の電話番号と credixPhoneMap を照合して resultMap を構築
+      if (isCredixFormat && credixPhoneMap.size > 0) {
+        // run.orders に紐づく MlmMember の電話番号を取得
+        const memberIds = run.orders.map(o => o.mlmMemberId);
+        const members = await prisma.mlmMember.findMany({
+          where: { id: { in: memberIds } },
+          select: {
+            id: true,
+            memberCode: true,
+            mobile: true,
+            user: { select: { phone: true } },
+          },
+        });
+        const memberPhoneMap = new Map(members.map(m => [m.memberCode, m]));
+
+        let matchCount = 0;
+        for (const order of run.orders) {
+          const member = memberPhoneMap.get(order.memberCode);
+          if (!member) continue;
+          const phoneUser   = normalizePhone(member.user?.phone ?? "");
+          const phoneMobile = normalizePhone(member.mobile ?? "");
+          const entry =
+            (phoneUser   && credixPhoneMap.has(phoneUser))   ? credixPhoneMap.get(phoneUser)! :
+            (phoneMobile && credixPhoneMap.has(phoneMobile)) ? credixPhoneMap.get(phoneMobile)! :
+            null;
+          if (entry) {
+            resultMap.set(order.memberCode, { ok: true, paidDate: entry.paidDate });
+            matchCount++;
+          }
+        }
+        console.log(`[import-result] クレディックスCSV 電話番号照合: ${matchCount}件マッチ / run.orders ${run.orders.length}件`);
+
+        // 照合0件フォールバック: 全件成功として処理
+        if (matchCount === 0) {
+          console.log("[import-result] 電話番号照合0件 → run.orders全件成功フォールバック");
+          const defaultEntry = credixPhoneMap.values().next().value;
+          for (const order of run.orders) {
+            resultMap.set(order.memberCode, { ok: true, paidDate: defaultEntry?.paidDate });
+          }
+        }
       }
     } // end CSV format
 

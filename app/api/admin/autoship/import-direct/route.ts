@@ -355,9 +355,8 @@ export async function POST(request: Request) {
     console.log(`[import-direct] クレディックスCSV検出: phone ${credixPhoneMap.size}件, sendid ${credixSendIdMap.size}件 → 電話番号照合で処理`);
   }
 
-  let mlmMembers: Awaited<ReturnType<typeof prisma.mlmMember.findMany<{
-    include: { user: { select: { name: boolean; nameKana: boolean; phone: boolean; email: boolean; postalCode: boolean; address: boolean } } }
-  }>>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mlmMembers: any[];
 
   if (isMufg) {
     // ══════════════════════════════════════════════════════════════
@@ -403,6 +402,13 @@ export async function POST(request: Request) {
       mlmMembers = await prisma.mlmMember.findMany({
         where: { memberCode: { in: Array.from(resultMap.keys()) } },
         include: {
+          mobile:        true,
+          bankName:      true,
+          branchName:    true,
+          accountType:   true,
+          accountNumber: true,
+          accountHolder: true,
+          creditCardId:  true,
           user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
         },
       });
@@ -449,6 +455,13 @@ export async function POST(request: Request) {
             autoshipStartDate: { not: null },
           },
           include: {
+            mobile:        true,
+            bankName:      true,
+            branchName:    true,
+            accountType:   true,
+            accountNumber: true,
+            accountHolder: true,
+            creditCardId:  true,
             user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
           },
         });
@@ -476,6 +489,13 @@ export async function POST(request: Request) {
         mlmMembers = await prisma.mlmMember.findMany({
           where: { memberCode: { in: Array.from(matchedMemberCodes) } },
           include: {
+            mobile:        true,
+            bankName:      true,
+            branchName:    true,
+            accountType:   true,
+            accountNumber: true,
+            accountHolder: true,
+            creditCardId:  true,
             user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
           },
         });
@@ -503,6 +523,13 @@ export async function POST(request: Request) {
         autoshipStartDate: { not: null },
       },
       include: {
+        mobile:        true,
+        bankName:      true,
+        branchName:    true,
+        accountType:   true,
+        accountNumber: true,
+        accountHolder: true,
+        creditCardId:  true,
         user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
       },
     });
@@ -510,29 +537,39 @@ export async function POST(request: Request) {
     console.log(`[import-direct] クレディックスCSV照合開始: autoshipEnabled全会員=${allAutoshipMembers.length}件, CSV電話番号件数=${credixPhoneMap.size}件（ユニーク）, CSVsendid件数=${credixSendIdMap.size}件`);
     console.log(`[import-direct] credixPhoneMapサンプル: [${Array.from(credixPhoneMap.keys()).slice(0, 5).join(", ")}]`);
 
+    // 電話番号正規化ヘルパー
+    function normalizePhone(raw: string | null | undefined): string {
+      return (raw ?? "")
+        .replace(/-/g, "")
+        .replace(/^\+81/, "0")
+        .trim();
+    }
+
     const matchedMembers: typeof allAutoshipMembers = [];
     let phoneMatchCount = 0;
 
     for (const m of allAutoshipMembers) {
       // ① user.phone（正規化）で照合
-      const rawMemberPhone = m.user?.phone ?? "";
-      const normalizedMemberPhone = rawMemberPhone
-        .replace(/-/g, "")
-        .replace(/^\+81/, "0")
-        .trim();
+      const phoneFromUser   = normalizePhone(m.user?.phone);
+      // ② mlmMember.mobile（正規化）でも照合（DBによっては mobile に電話番号が入っている）
+      const phoneFromMobile = normalizePhone(m.mobile);
 
-      if (normalizedMemberPhone && credixPhoneMap.has(normalizedMemberPhone)) {
-        const entry = credixPhoneMap.get(normalizedMemberPhone)!;
-        resultMap.set(m.memberCode, { ok: entry.ok, paidDate: entry.paidDate });
+      const matched =
+        (phoneFromUser   && credixPhoneMap.has(phoneFromUser))   ? credixPhoneMap.get(phoneFromUser)! :
+        (phoneFromMobile && credixPhoneMap.has(phoneFromMobile)) ? credixPhoneMap.get(phoneFromMobile)! :
+        null;
+
+      if (matched) {
+        resultMap.set(m.memberCode, { ok: matched.ok, paidDate: matched.paidDate });
         matchedMembers.push(m);
         phoneMatchCount++;
       }
     }
 
-    console.log(`[import-direct] クレディックス照合結果: 電話番号一致=${phoneMatchCount}件`);
+    console.log(`[import-direct] クレディックス照合結果: 電話番号一致=${phoneMatchCount}件 (user.phone + mobile 両方チェック)`);
 
     if (matchedMembers.length === 0) {
-      // ② フォールバック: CSVがある＝全員決済済みとして全オートシップ有効会員を処理
+      // フォールバック: CSVがある＝全員決済済みとして全オートシップ有効会員を処理
       console.log("[import-direct] 電話番号照合0件 → autoshipEnabled全会員フォールバック");
       const defaultEntry = credixPhoneMap.values().next().value ?? credixSendIdMap.values().next().value;
       for (const m of allAutoshipMembers) {
@@ -611,18 +648,18 @@ export async function POST(request: Request) {
     targetMonth,
     paymentMethod: effectivePaymentMethod,
     memberCode:    m.memberCode,
-    creditCardId:  (m as any).creditCardId ?? null,  // クレディックス顧客ID（CSV照合キー）
+    creditCardId:  m.creditCardId ?? null,  // クレディックス顧客ID（CSV照合キー）
     memberName:    m.user.name,
     memberNameKana: m.user.nameKana ?? null,
     memberPhone:   m.user.phone ?? null,
     memberEmail:   m.user.email ?? null,
     memberPostal:  m.user.postalCode ?? null,
     memberAddress: m.user.address ?? null,
-    bankName:      (m as any).bankName ?? null,
-    branchName:    (m as any).branchName ?? null,
-    accountType:   (m as any).accountType ?? null,
-    accountNumber: (m as any).accountNumber ?? null,
-    accountHolder: (m as any).accountHolder ?? null,
+    bankName:      m.bankName ?? null,
+    branchName:    m.branchName ?? null,
+    accountType:   m.accountType ?? null,
+    accountNumber: m.accountNumber ?? null,
+    accountHolder: m.accountHolder ?? null,
     unitPrice:     UNIT_PRICE,
     totalAmount:   UNIT_PRICE,
     points:        POINTS,
@@ -754,9 +791,7 @@ export async function POST(request: Request) {
   try {
     const paidOrderIds: bigint[]   = [];
     const failedOrders: { id: bigint; reason: string }[] = [];
-    // 三菱UFJファクターはファイルに含まれる全行が引き落とし成功
-    // paidDate は全件同一（月末日）の場合が多いが、複数paidDateがある場合は
-    // 個別対応が必要なため paidDate ごとにグループ化する
+    // paidDate ごとにグループ化
     const paidByDate = new Map<string, bigint[]>(); // ISO文字列 → order ids
 
     for (const order of run!.orders) {
@@ -769,10 +804,15 @@ export async function POST(request: Request) {
         paidOrderIds.push(order.id);
         paidCount++;
       } else {
+        // 既にpaid状態の注文はfailedに更新しない（再インポート時の保護）
+        if (order.status === "paid") continue;
         failedOrders.push({ id: order.id, reason: res.reason ?? "決済失敗" });
         failedCount++;
       }
     }
+    // 既存のpaid件数も合計に含める（再インポート時に既存paid分をカウント）
+    const alreadyPaidCount = run!.orders.filter(o => o.status === "paid" && !paidOrderIds.includes(o.id)).length;
+    paidCount += alreadyPaidCount;
 
     // paid: paidDate ごとに updateMany（DB への往復回数を最小化）
     for (const [dateKey, ids] of paidByDate) {
@@ -945,6 +985,13 @@ async function processFromDatabase(
       autoshipStartDate: { not: null },
     },
     include: {
+      mobile:        true,
+      bankName:      true,
+      branchName:    true,
+      accountType:   true,
+      accountNumber: true,
+      accountHolder: true,
+      creditCardId:  true,
       user: {
         select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true },
       },
