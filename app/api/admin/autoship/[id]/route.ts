@@ -85,7 +85,7 @@ export async function PATCH(_req: Request, { params }: Params) {
   return NextResponse.json({ id: updated.id.toString(), status: updated.status });
 }
 
-/** DELETE: 伝票削除（draft/0件のRunのみ削除可能） */
+/** DELETE: 伝票削除（全ステータス対応・関連Order含めて一括削除） */
 export async function DELETE(_req: Request, { params }: Params) {
   const guard = await requireAdmin();
   if (guard.error) return guard.error;
@@ -97,14 +97,9 @@ export async function DELETE(_req: Request, { params }: Params) {
   });
   if (!run) return NextResponse.json({ error: "見つかりません" }, { status: 404 });
 
-  // draft かつ 0件のRunのみ削除可能（安全ガード）
-  if (run.status !== "draft" || run._count.orders > 0) {
-    return NextResponse.json(
-      { error: `削除できません。status=${run.status}, orders=${run._count.orders}件。下書き(0件)のRunのみ削除可能です。` },
-      { status: 400 }
-    );
-  }
-
+  // 関連する AutoShipOrder を先に削除してから Run を削除
+  await prisma.autoShipOrder.deleteMany({ where: { autoShipRunId: BigInt(id) } });
   await prisma.autoShipRun.delete({ where: { id: BigInt(id) } });
-  return NextResponse.json({ ok: true });
+
+  return NextResponse.json({ ok: true, deletedOrders: run._count.orders });
 }
