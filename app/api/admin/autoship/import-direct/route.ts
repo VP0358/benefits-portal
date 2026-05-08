@@ -375,8 +375,8 @@ export async function POST(request: Request) {
     // CSV M列から合計金額を計算（実際の決済金額を使用）
     const totalPaidAmount = paidMembers.reduce((sum, m) => sum + (m.amount > 0 ? m.amount : 16500), 0);
 
+    // ── AutoShipRun を upsert（再インポート時は上書き・incrementしない） ──
     if (!autoShipRun) {
-      // AutoShipRun を自動作成
       autoShipRun = await prisma.autoShipRun.create({
         data: {
           targetMonth,
@@ -392,23 +392,41 @@ export async function POST(request: Request) {
       });
       console.log(`[import-direct] Credix: AutoShipRun 新規作成 id=${autoShipRun.id}`);
     } else {
-      // 既存 AutoShipRun を更新
+      // 再インポート時は increment せず最新の値で上書き
       await prisma.autoShipRun.update({
         where: { id: autoShipRun.id },
         data: {
           status:      "completed",
-          paidCount:   { increment: paidMembers.length },
-          failedCount: { increment: failedMembers.length },
-          totalCount:  { increment: matchedMembers.length },
-          totalAmount: { increment: totalPaidAmount },
+          paidCount:   paidMembers.length,
+          failedCount: failedMembers.length,
+          totalCount:  matchedMembers.length,
+          totalAmount: totalPaidAmount,
           importedAt:  now,
           completedAt: now,
         },
       });
-      console.log(`[import-direct] Credix: AutoShipRun 既存更新 id=${autoShipRun.id}`);
+      console.log(`[import-direct] Credix: AutoShipRun 既存を最新値で上書き id=${autoShipRun.id}`);
     }
 
     // ── AutoShipOrder を upsert（照合済み会員分） ──
+    // 再インポート時: 照合できなくなった会員（前回はいたが今回CSVにいない）をキャンセルに戻す
+    if (autoShipRun) {
+      const currentMemberIds = Array.from(matchedMap.values()).map(m => m.member.id);
+      // 今回のCSVに含まれない既存OrderはCSVから削除されたとみなしてpendingに戻す
+      await prisma.autoShipOrder.updateMany({
+        where: {
+          autoShipRunId: autoShipRun.id,
+          mlmMemberId:   { notIn: currentMemberIds },
+          status:        { in: ["paid", "failed"] },
+        },
+        data: {
+          status:     "pending",
+          paidAt:     null,
+          failReason: "再インポートにより取消",
+        },
+      });
+    }
+
     for (const { isOk, paidDate, amount, member } of matchedMap.values()) {
       // CSV M列の金額を使用（0の場合はデフォルト16500）
       const unitPrice   = amount > 0 ? amount : 16500;
@@ -460,6 +478,36 @@ export async function POST(request: Request) {
         console.error(`[import-direct] AutoShipOrder upsertエラー(${member.memberCode}):`, e);
         failedCount++;
       }
+    }
+
+    // ── AutoShipOrder upsert完了後、RunのカウントをDB実値で再計算して上書き ──
+    // （upsert中のエラーで件数がズレていても正確な値に修正される）
+    if (autoShipRun) {
+      const [agg] = await Promise.all([
+        prisma.autoShipOrder.aggregate({
+          where: { autoShipRunId: autoShipRun.id },
+          _count: { id: true },
+          _sum:   { totalAmount: true },
+        }),
+      ]);
+      const paidAgg = await prisma.autoShipOrder.aggregate({
+        where: { autoShipRunId: autoShipRun.id, status: "paid" },
+        _count: { id: true },
+      });
+      const failedAgg = await prisma.autoShipOrder.aggregate({
+        where: { autoShipRunId: autoShipRun.id, status: "failed" },
+        _count: { id: true },
+      });
+      await prisma.autoShipRun.update({
+        where: { id: autoShipRun.id },
+        data: {
+          totalCount:  agg._count.id,
+          paidCount:   paidAgg._count.id,
+          failedCount: failedAgg._count.id,
+          totalAmount: agg._sum.totalAmount ?? 0,
+        },
+      });
+      console.log(`[import-direct] Credix: AutoShipRun カウントをDB実値で再計算 total=${agg._count.id} paid=${paidAgg._count.id} failed=${failedAgg._count.id}`);
     }
 
     // CSV にあるが会員未照合のIDを詳細収集（原因究明）
