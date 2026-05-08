@@ -619,10 +619,23 @@ export async function POST(request: Request) {
     const memberCodes = Array.from(resultMap.keys());
     mlmMembers = await prisma.mlmMember.findMany({
       where: { memberCode: { in: memberCodes } },
-      include: {
-        user: {
-          select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true },
-        },
+      select: {
+        id: true,
+        memberCode: true,
+        userId: true,
+        mobile:        true,
+        bankName:      true,
+        branchName:    true,
+        accountType:   true,
+        accountNumber: true,
+        accountHolder: true,
+        creditCardId:  true,
+        autoshipEnabled:    true,
+        autoshipStartDate:  true,
+        autoshipStopDate:   true,
+        autoshipSuspendMonths: true,
+        savingsPoints:  true,
+        user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
       },
     });
     if (mlmMembers.length === 0) {
@@ -661,10 +674,23 @@ export async function POST(request: Request) {
     if (missingCodes.length > 0) {
       const additionalMembers = await prisma.mlmMember.findMany({
         where: { memberCode: { in: missingCodes } },
-        include: {
-          user: {
-            select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true },
-          },
+        select: {
+          id: true,
+          memberCode: true,
+          userId: true,
+          mobile:        true,
+          bankName:      true,
+          branchName:    true,
+          accountType:   true,
+          accountNumber: true,
+          accountHolder: true,
+          creditCardId:  true,
+          autoshipEnabled:    true,
+          autoshipStartDate:  true,
+          autoshipStopDate:   true,
+          autoshipSuspendMonths: true,
+          savingsPoints:  true,
+          user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
         },
       });
       for (const m of additionalMembers) {
