@@ -11,7 +11,8 @@ interface DashboardPoints {
   mobileReferralPoints: number;
 }
 interface Announcement { id:string; title:string; content:string; tag:string; isPublished:boolean; publishedAt:string|null; }
-interface Menu { id:string; title:string; subtitle?:string; iconType?:string; menuType?:string; linkUrl?:string; }
+interface Menu { id:string; title:string; subtitle?:string; iconType?:string; menuType?:string; linkUrl?:string; contentData?:string; }
+type SkinShop = { name:string; area:string; address:string; phone:string; url?:string; photos?:string[]; };
 
 // ── デザイントークン（参考画像：ライトベージュ×深紺ゴールドサロンUI） ──
 const GOLD       = "#c9a84c";
@@ -636,6 +637,9 @@ export default function MemberDashboard({
     mlmLastMonthPoints: 0, mlmCurrentMonthPoints: 0, savingsBonusPoints: 0, mobileReferralPoints: 0
   });
   const travelSubRef = useRef<{openModal:()=>void}>(null);
+  // 肌診断モーダル状態
+  const [skinModal, setSkinModal] = useState<{ menuId:string; title:string; shops:SkinShop[] } | null>(null);
+  const [skinPhotoViewer, setSkinPhotoViewer] = useState<{ photos:string[]; index:number } | null>(null);
 
   useEffect(()=>{
     fetch("/api/my/dashboard-points").then(r=>r.json()).then(d=>{if(!d.error)setDashboardPoints(d);}).catch(()=>{});
@@ -994,6 +998,27 @@ export default function MemberDashboard({
               const isTravel = m.menuType==="travel_sub"
                 || m.title.includes("旅行");
 
+              // 肌診断：linkUrlがあれば外部リンク、なければ代理店モーダル
+              if(m.menuType==="skin") {
+                if(m.linkUrl&&m.linkUrl.trim()!=="") {
+                  const skinHref=m.linkUrl.trim();
+                  const skinInternal=skinHref.startsWith("/");
+                  return (
+                    <a key={m.id} href={skinHref} target={skinInternal?undefined:"_blank"} rel={skinInternal?undefined:"noopener noreferrer"} className="rounded-2xl overflow-hidden transition-all hover:scale-[1.03] active:scale-95" style={cardStyle}>{cardContent}</a>
+                  );
+                }
+                // モーダルを開く（contentDataからshopsをパース）
+                return (
+                  <button key={m.id} type="button"
+                    onClick={()=>{
+                      let shops:SkinShop[]=[];
+                      try{ if(m.contentData) shops=JSON.parse(m.contentData); }catch{}
+                      setSkinModal({menuId:m.id,title:m.title,shops});
+                    }}
+                    className="w-full rounded-2xl overflow-hidden transition-all hover:scale-[1.03] active:scale-95 text-left"
+                    style={cardStyle}>{cardContent}</button>
+                );
+              }
               if(m.menuType==="contact") return (
                 <a key={m.id} href="/contact" className="rounded-2xl overflow-hidden transition-all hover:scale-[1.03] active:scale-95" style={cardStyle}>{cardContent}</a>
               );
@@ -1030,6 +1055,158 @@ export default function MemberDashboard({
             })}
           </div>
         </section>
+
+        {/* ── 肌診断モーダル ── */}
+        {skinModal&&(
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+            style={{background:"rgba(10,22,40,0.92)",backdropFilter:"blur(8px)"}}
+            onClick={()=>setSkinModal(null)}>
+            <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl flex flex-col overflow-hidden"
+              style={{
+                background:`linear-gradient(160deg,${NAVY} 0%,${NAVY_CARD} 30%,${NAVY_CARD2} 70%,${NAVY_CARD3} 100%)`,
+                border:`1px solid ${GOLD}40`,
+                boxShadow:`0 -12px 60px rgba(10,22,40,0.50),0 0 0 1px ${GOLD}15 inset`,
+                maxHeight:"92vh"
+              }}
+              onClick={e=>e.stopPropagation()}>
+
+              {/* トップゴールドライン */}
+              <div className="h-0.5 flex-shrink-0"
+                style={{background:`linear-gradient(90deg,transparent,${GOLD}90 20%,${GOLD_LIGHT} 50%,${GOLD}90 80%,transparent)`}}/>
+
+              {/* ヘッダー */}
+              <div className="flex items-center justify-between px-5 py-4 flex-shrink-0"
+                style={{borderBottom:`1px solid rgba(201,168,76,0.15)`}}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
+                    style={{background:"rgba(201,168,76,0.12)",border:`1px solid ${GOLD}30`}}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{color:GOLD_LIGHT}}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-[8px] font-label tracking-[0.26em] font-bold" style={{color:`${GOLD}60`}}>SKIN DIAGNOSIS</p>
+                    <h2 className="font-jp font-bold text-white text-sm leading-tight">{skinModal.title}</h2>
+                  </div>
+                </div>
+                <button onClick={()=>setSkinModal(null)}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold transition"
+                  style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.10)",color:"rgba(255,255,255,0.45)"}}>✕</button>
+              </div>
+
+              {/* 代理店リスト */}
+              <div className="overflow-y-auto flex-1 px-4 py-4 space-y-3 pb-8">
+                {skinModal.shops.length===0?(
+                  <div className="text-center py-10">
+                    <p className="text-sm font-jp" style={{color:"rgba(255,255,255,0.35)"}}>代理店情報がありません</p>
+                  </div>
+                ):skinModal.shops.map((shop,si)=>(
+                  <div key={si} className="rounded-2xl overflow-hidden"
+                    style={{background:NAVY_CARD2,border:`1px solid ${GOLD}20`}}>
+                    <div className="h-0.5" style={{background:`linear-gradient(90deg,transparent,${GOLD}55,transparent)`}}/>
+                    <div className="p-4">
+                      {/* 店名・エリア */}
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <p className="font-jp font-bold text-white text-sm leading-snug">{shop.name}</p>
+                        {shop.area&&(
+                          <span className="flex-shrink-0 text-[10px] font-label px-2 py-0.5 rounded-full"
+                            style={{background:`${GOLD}18`,color:GOLD_LIGHT,border:`1px solid ${GOLD}30`}}>
+                            {shop.area}
+                          </span>
+                        )}
+                      </div>
+                      {/* 住所 */}
+                      {shop.address&&(
+                        <a href={`https://maps.google.com/?q=${encodeURIComponent(shop.address)}`}
+                          target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 mb-1.5 group">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{color:`${GOLD}70`}}>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                          </svg>
+                          <span className="text-xs font-jp group-hover:underline" style={{color:"rgba(255,255,255,0.55)"}}>{shop.address}</span>
+                        </a>
+                      )}
+                      {/* 電話番号 */}
+                      {shop.phone&&(
+                        <a href={`tel:${shop.phone}`} className="flex items-center gap-1.5 mb-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{color:`${GOLD}70`}}>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                          </svg>
+                          <span className="text-xs font-jp" style={{color:"rgba(255,255,255,0.55)"}}>{shop.phone}</span>
+                        </a>
+                      )}
+                      {/* 写真ギャラリー */}
+                      {shop.photos&&shop.photos.length>0&&(
+                        <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1">
+                          {shop.photos.map((photo,pi)=>(
+                            <button key={pi} type="button"
+                              onClick={()=>setSkinPhotoViewer({photos:shop.photos!,index:pi})}
+                              className="flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden border transition hover:scale-105"
+                              style={{borderColor:`${GOLD}30`}}>
+                              <img src={photo} alt={`${shop.name} 写真${pi+1}`} className="w-full h-full object-cover"/>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {/* URLボタン */}
+                      {shop.url&&(
+                        <a href={shop.url} target="_blank" rel="noopener noreferrer"
+                          className="mt-3 flex items-center justify-center gap-1.5 w-full rounded-xl py-2 text-xs font-jp font-semibold transition hover:opacity-80"
+                          style={{background:`${GOLD}18`,color:GOLD_LIGHT,border:`1px solid ${GOLD}35`}}>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                          </svg>
+                          ウェブサイトを見る
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── 肌診断写真フルスクリーンビューア ── */}
+        {skinPhotoViewer&&(
+          <div className="fixed inset-0 z-[60] flex items-center justify-center"
+            style={{background:"rgba(0,0,0,0.95)"}}
+            onClick={()=>setSkinPhotoViewer(null)}>
+            <button type="button"
+              className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center text-white text-lg font-bold"
+              style={{background:"rgba(255,255,255,0.10)",border:"1px solid rgba(255,255,255,0.20)"}}
+              onClick={()=>setSkinPhotoViewer(null)}>✕</button>
+            {skinPhotoViewer.photos.length>1&&(
+              <>
+                <button type="button"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center text-white"
+                  style={{background:"rgba(255,255,255,0.10)",border:"1px solid rgba(255,255,255,0.20)"}}
+                  onClick={e=>{e.stopPropagation();setSkinPhotoViewer(v=>v?{...v,index:(v.index-1+v.photos.length)%v.photos.length}:null);}}>‹</button>
+                <button type="button"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center text-white"
+                  style={{background:"rgba(255,255,255,0.10)",border:"1px solid rgba(255,255,255,0.20)"}}
+                  onClick={e=>{e.stopPropagation();setSkinPhotoViewer(v=>v?{...v,index:(v.index+1)%v.photos.length}:null);}}>›</button>
+              </>
+            )}
+            <img
+              src={skinPhotoViewer.photos[skinPhotoViewer.index]}
+              alt={`写真 ${skinPhotoViewer.index+1}`}
+              className="max-w-full max-h-full object-contain rounded-xl"
+              style={{maxWidth:"90vw",maxHeight:"85vh"}}
+              onClick={e=>e.stopPropagation()}/>
+            {skinPhotoViewer.photos.length>1&&(
+              <div className="absolute bottom-6 flex gap-2">
+                {skinPhotoViewer.photos.map((_,i)=>(
+                  <button key={i} type="button"
+                    onClick={e=>{e.stopPropagation();setSkinPhotoViewer(v=>v?{...v,index:i}:null);}}
+                    className="w-2 h-2 rounded-full transition-all"
+                    style={i===skinPhotoViewer.index?{background:"white",width:"20px"}:{background:"rgba(255,255,255,0.35)"}}/>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── サービスメニュー（VP未来phone申込・格安旅行申込） ── */}
         <section>

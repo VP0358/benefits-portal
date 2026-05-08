@@ -26,6 +26,7 @@ export async function GET() {
       menuType: true,
       iconType: true,
       linkUrl: true,
+      contentData: true,
     },
   });
 
@@ -37,6 +38,7 @@ export async function GET() {
       menuType: m.menuType ?? "url",
       iconType: m.iconType ?? null,
       linkUrl: m.linkUrl ?? "",
+      contentData: m.contentData ?? null,
     }))
   );
 }

@@ -100,6 +100,7 @@ export default async function DashboardPage() {
         iconType: m.iconType ?? undefined,
         menuType: m.menuType ?? undefined,
         linkUrl: m.linkUrl ?? undefined,
+        contentData: m.contentData ?? undefined,
       }))}
     />
   );
