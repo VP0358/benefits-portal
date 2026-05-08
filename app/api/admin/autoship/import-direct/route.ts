@@ -401,7 +401,10 @@ export async function POST(request: Request) {
       // resultMap に登録された memberCode の mlmMember を取得
       mlmMembers = await prisma.mlmMember.findMany({
         where: { memberCode: { in: Array.from(resultMap.keys()) } },
-        include: {
+        select: {
+          id: true,
+          memberCode: true,
+          userId: true,
           mobile:        true,
           bankName:      true,
           branchName:    true,
@@ -409,6 +412,11 @@ export async function POST(request: Request) {
           accountNumber: true,
           accountHolder: true,
           creditCardId:  true,
+          autoshipEnabled:    true,
+          autoshipStartDate:  true,
+          autoshipStopDate:   true,
+          autoshipSuspendMonths: true,
+          savingsPoints:  true,
           user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
         },
       });
@@ -454,7 +462,10 @@ export async function POST(request: Request) {
             status: { not: "withdrawn" },
             autoshipStartDate: { not: null },
           },
-          include: {
+          select: {
+            id: true,
+            memberCode: true,
+            userId: true,
             mobile:        true,
             bankName:      true,
             branchName:    true,
@@ -462,6 +473,11 @@ export async function POST(request: Request) {
             accountNumber: true,
             accountHolder: true,
             creditCardId:  true,
+            autoshipEnabled:    true,
+            autoshipStartDate:  true,
+            autoshipStopDate:   true,
+            autoshipSuspendMonths: true,
+            savingsPoints:  true,
             user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
           },
         });
@@ -488,7 +504,10 @@ export async function POST(request: Request) {
 
         mlmMembers = await prisma.mlmMember.findMany({
           where: { memberCode: { in: Array.from(matchedMemberCodes) } },
-          include: {
+          select: {
+            id: true,
+            memberCode: true,
+            userId: true,
             mobile:        true,
             bankName:      true,
             branchName:    true,
@@ -496,6 +515,11 @@ export async function POST(request: Request) {
             accountNumber: true,
             accountHolder: true,
             creditCardId:  true,
+            autoshipEnabled:    true,
+            autoshipStartDate:  true,
+            autoshipStopDate:   true,
+            autoshipSuspendMonths: true,
+            savingsPoints:  true,
             user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
           },
         });
@@ -522,7 +546,10 @@ export async function POST(request: Request) {
         status: { not: "withdrawn" },
         autoshipStartDate: { not: null },
       },
-      include: {
+      select: {
+        id: true,
+        memberCode: true,
+        userId: true,
         mobile:        true,
         bankName:      true,
         branchName:    true,
@@ -530,6 +557,11 @@ export async function POST(request: Request) {
         accountNumber: true,
         accountHolder: true,
         creditCardId:  true,
+        autoshipEnabled:    true,
+        autoshipStartDate:  true,
+        autoshipStopDate:   true,
+        autoshipSuspendMonths: true,
+        savingsPoints:  true,
         user: { select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true } },
       },
     });
@@ -984,7 +1016,10 @@ async function processFromDatabase(
       status: { not: "withdrawn" },
       autoshipStartDate: { not: null },
     },
-    include: {
+    select: {
+      id: true,
+      memberCode: true,
+      userId: true,
       mobile:        true,
       bankName:      true,
       branchName:    true,
@@ -992,6 +1027,11 @@ async function processFromDatabase(
       accountNumber: true,
       accountHolder: true,
       creditCardId:  true,
+      autoshipEnabled:    true,
+      autoshipStartDate:  true,
+      autoshipStopDate:   true,
+      autoshipSuspendMonths: true,
+      savingsPoints:  true,
       user: {
         select: { name: true, nameKana: true, phone: true, email: true, postalCode: true, address: true },
       },
