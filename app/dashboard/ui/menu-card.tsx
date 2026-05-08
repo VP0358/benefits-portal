@@ -8,6 +8,7 @@ type SkinShop = {
   address: string;
   phone: string;
   url?: string;
+  photos?: string[]; // ② 写真最大5枚
 };
 
 type MenuCardProps = {
@@ -25,40 +26,127 @@ const iconMap: Record<string, string> = {
   message: "💬", jar: "🫙", star: "⭐", heart: "❤️",
 };
 
+// ─── ③ Googleマップ URL 生成 ─────────────────────────────
+function googleMapsUrl(address: string) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+}
+
 // ─── 肌診断モーダル ───────────────────────────────────────
 function SkinModal({ title, shops, onClose }: { title: string; shops: SkinShop[]; onClose: () => void }) {
+  const [photoIdx, setPhotoIdx] = useState<{ shopIdx: number; imgIdx: number } | null>(null);
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl max-h-[80vh] overflow-y-auto"
-        onClick={e => e.stopPropagation()}>
+      <div
+        className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl max-h-[85vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-slate-800">😊 {title} — 全国代理店</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">✕</button>
         </div>
+
         {shops.length === 0 ? (
           <p className="text-sm text-slate-400 text-center py-6">代理店情報は準備中です。</p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {shops.map((shop, i) => (
-              <div key={i} className="rounded-2xl border border-slate-100 p-4 bg-slate-50">
+              <div key={i} className="rounded-2xl border border-slate-100 p-4 bg-slate-50 space-y-2">
+                {/* 店舗名 */}
                 <div className="font-semibold text-slate-800 text-sm">{shop.name}</div>
-                {shop.area && <div className="text-xs text-slate-400 mt-0.5">📍 {shop.area}</div>}
-                {shop.address && <div className="text-xs text-slate-500 mt-1">{shop.address}</div>}
-                <div className="flex gap-3 mt-2">
+
+                {/* エリア */}
+                {shop.area && (
+                  <div className="text-xs text-slate-400">📍 {shop.area}</div>
+                )}
+
+                {/* ③ 住所 → Googleマップリンク */}
+                {shop.address && (
+                  <a
+                    href={googleMapsUrl(shop.address)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-start gap-1 text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    <span className="mt-0.5 shrink-0">🗺️</span>
+                    <span>{shop.address}</span>
+                  </a>
+                )}
+
+                {/* 電話・予約URL */}
+                <div className="flex flex-wrap gap-3 mt-1">
                   {shop.phone && (
-                    <a href={`tel:${shop.phone}`}
-                      className="text-xs text-emerald-700 underline">📞 {shop.phone}</a>
+                    <a href={`tel:${shop.phone}`} className="text-xs text-emerald-700 underline">
+                      📞 {shop.phone}
+                    </a>
                   )}
                   {shop.url && (
                     <a href={shop.url} target="_blank" rel="noopener noreferrer"
-                      className="text-xs text-blue-600 underline">🔗 予約サイト</a>
+                      className="text-xs text-blue-600 underline">
+                      🔗 予約サイト
+                    </a>
                   )}
                 </div>
+
+                {/* ② 写真ギャラリー */}
+                {shop.photos && shop.photos.length > 0 && (
+                  <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+                    {shop.photos.map((src, pi) => (
+                      <button
+                        key={pi}
+                        onClick={() => setPhotoIdx({ shopIdx: i, imgIdx: pi })}
+                        className="shrink-0 rounded-xl overflow-hidden border border-slate-200 w-20 h-20 bg-slate-100"
+                      >
+                        <img src={src} alt={`${shop.name} 写真${pi + 1}`}
+                          className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* ② 写真フルスクリーンビューア */}
+      {photoIdx !== null && (() => {
+        const shop = shops[photoIdx.shopIdx];
+        const photos = shop?.photos ?? [];
+        const cur = photoIdx.imgIdx;
+        return (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80"
+            onClick={() => setPhotoIdx(null)}
+          >
+            <div className="relative max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+              <img src={photos[cur]} alt={`${shop.name} 写真${cur + 1}`}
+                className="w-full rounded-2xl object-contain max-h-[70vh]" />
+              {/* 前後ボタン */}
+              {cur > 0 && (
+                <button
+                  onClick={() => setPhotoIdx({ shopIdx: photoIdx.shopIdx, imgIdx: cur - 1 })}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full w-9 h-9 flex items-center justify-center text-slate-700 text-lg shadow"
+                >‹</button>
+              )}
+              {cur < photos.length - 1 && (
+                <button
+                  onClick={() => setPhotoIdx({ shopIdx: photoIdx.shopIdx, imgIdx: cur + 1 })}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full w-9 h-9 flex items-center justify-center text-slate-700 text-lg shadow"
+                >›</button>
+              )}
+              {/* 枚数インジケーター */}
+              <div className="text-center mt-2 text-white text-xs">
+                {cur + 1} / {photos.length}
+              </div>
+              <button
+                onClick={() => setPhotoIdx(null)}
+                className="absolute top-2 right-2 bg-white/80 rounded-full w-8 h-8 flex items-center justify-center text-slate-600 text-base shadow"
+              >✕</button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -183,18 +271,20 @@ export default function MenuCard({
     } catch { /* ignore */ }
   }
 
+  // ① skin で linkUrl がある場合は外部リンクに飛ぶ（代理店リストではなくURLで飛ぶ）
   // ── ページ遷移系（href で直接飛ぶ） ──────────────────────
   const pageHref: string | null =
-    menuType === "contact"           ? "/contact"
-    : menuType === "vp_phone"        ? "/vp-phone"
-    : menuType === "used_car"        ? "/used-cars"
-    : menuType === "life_insurance"  ? "/insurance?tab=life"
+    menuType === "contact"              ? "/contact"
+    : menuType === "vp_phone"           ? "/vp-phone"
+    : menuType === "used_car"           ? "/used-cars"
+    : menuType === "life_insurance"     ? "/insurance?tab=life"
     : menuType === "non_life_insurance" ? "/insurance?tab=non_life"
-    : menuType === "url"             ? (linkUrl || "#")
+    : menuType === "url"                ? (linkUrl || "#")
+    : menuType === "skin" && linkUrl    ? linkUrl   // ① skinでURLがあれば外部リンク
     : null;
 
   if (pageHref !== null) {
-    const isExternal = menuType === "url";
+    const isExternal = menuType === "url" || menuType === "skin";
     return (
       <a
         href={pageHref}
@@ -208,7 +298,7 @@ export default function MenuCard({
     );
   }
 
-  // 肌診断 / 相談窓口 → モーダル表示
+  // 肌診断（代理店リストあり）/ 相談窓口 → モーダル表示
   return (
     <>
       <button onClick={() => setShowModal(true)}

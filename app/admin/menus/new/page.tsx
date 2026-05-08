@@ -26,7 +26,7 @@ const menuTypes = [
   { value: "non_life_insurance", label: "🚗 損害保険相談",     desc: "損害保険相談申込ページへ遷移（内容を管理で変更可）" },
 ];
 
-type SkinShop = { name: string; area: string; address: string; phone: string; url?: string };
+type SkinShop = { name: string; area: string; address: string; phone: string; url?: string; photos?: string[] };
 
 type MenuForm = {
   title: string;
@@ -52,7 +52,7 @@ type MenuForm = {
   sortOrder: number;
 };
 
-const defaultShop: SkinShop = { name: "", area: "", address: "", phone: "", url: "" };
+const defaultShop: SkinShop = { name: "", area: "", address: "", phone: "", url: "", photos: [] };
 
 export default function AdminMenuNewPage() {
   const router = useRouter();
@@ -78,6 +78,33 @@ export default function AdminMenuNewPage() {
   }
   function addShop()          { setForm(f => ({ ...f, skinShops: [...f.skinShops, { ...defaultShop }] })); }
   function removeShop(idx: number) { setForm(f => ({ ...f, skinShops: f.skinShops.filter((_, i) => i !== idx) })); }
+  function moveShop(idx: number, dir: -1 | 1) {
+    setForm(f => {
+      const shops = [...f.skinShops];
+      const target = idx + dir;
+      if (target < 0 || target >= shops.length) return f;
+      [shops[idx], shops[target]] = [shops[target], shops[idx]];
+      return { ...f, skinShops: shops };
+    });
+  }
+  function updateShopPhoto(shopIdx: number, photoIdx: number, url: string) {
+    setForm(f => ({ ...f, skinShops: f.skinShops.map((s, i) => {
+      if (i !== shopIdx) return s;
+      const photos = [...(s.photos ?? [])];
+      photos[photoIdx] = url;
+      return { ...s, photos };
+    }) }));
+  }
+  function addShopPhoto(shopIdx: number) {
+    setForm(f => ({ ...f, skinShops: f.skinShops.map((s, i) =>
+      i === shopIdx ? { ...s, photos: [...(s.photos ?? []), ""] } : s
+    ) }));
+  }
+  function removeShopPhoto(shopIdx: number, photoIdx: number) {
+    setForm(f => ({ ...f, skinShops: f.skinShops.map((s, i) =>
+      i === shopIdx ? { ...s, photos: (s.photos ?? []).filter((_, pi) => pi !== photoIdx) } : s
+    ) }));
+  }
 
   function buildContentData() {
     if (form.menuType === "skin")    return JSON.stringify({ shops: form.skinShops.filter(s => s.name) });
@@ -278,13 +305,26 @@ export default function AdminMenuNewPage() {
               </div>
               {form.skinShops.map((shop, idx) => (
                 <div key={idx} className="rounded-2xl border border-slate-400 p-4 bg-slate-50 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-700">代理店 {idx + 1}</span>
+                  {/* ヘッダー行: 番号 + 並び替え + 削除 */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-700 flex-1">代理店 {idx + 1}</span>
+                    <button type="button"
+                      onClick={() => moveShop(idx, -1)}
+                      disabled={idx === 0}
+                      className="px-2 py-1 rounded-lg border border-slate-300 text-xs text-slate-600 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="上へ">▲</button>
+                    <button type="button"
+                      onClick={() => moveShop(idx, 1)}
+                      disabled={idx === form.skinShops.length - 1}
+                      className="px-2 py-1 rounded-lg border border-slate-300 text-xs text-slate-600 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="下へ">▼</button>
                     {form.skinShops.length > 1 && (
                       <button type="button" onClick={() => removeShop(idx)}
-                        className="text-xs text-red-500 hover:text-red-700">削除</button>
+                        className="px-2 py-1 rounded-lg border border-red-200 text-xs text-red-500 hover:bg-red-50">削除</button>
                     )}
                   </div>
+
+                  {/* 基本フィールド */}
                   <div className="grid grid-cols-2 gap-3">
                     {[
                       { field: "name"    as const, label: "店舗名 *",    placeholder: "○○美容院" },
@@ -299,6 +339,41 @@ export default function AdminMenuNewPage() {
                           placeholder={placeholder}
                           value={shop[field] ?? ""}
                           onChange={e => updateShop(idx, field, e.target.value)} />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 写真アップロード（最大5枚） */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-slate-700">📷 写真（最大5枚）</label>
+                      {(shop.photos ?? []).length < 5 && (
+                        <button type="button" onClick={() => addShopPhoto(idx)}
+                          className="rounded-lg bg-slate-700 px-2.5 py-1 text-xs text-white hover:bg-slate-800">
+                          ＋ 写真を追加
+                        </button>
+                      )}
+                    </div>
+                    {(shop.photos ?? []).length === 0 && (
+                      <p className="text-xs text-slate-400">写真はまだ登録されていません。「＋ 写真を追加」から追加できます。</p>
+                    )}
+                    {(shop.photos ?? []).map((photoUrl, pi) => (
+                      <div key={pi} className="flex items-start gap-2 rounded-xl border border-slate-200 bg-white p-2">
+                        <div className="text-xs text-slate-500 font-medium mt-2 w-5 shrink-0">{pi + 1}</div>
+                        {photoUrl && (
+                          <img src={photoUrl} alt={`写真${pi + 1}`}
+                            className="h-14 w-14 rounded-lg object-cover shrink-0 border border-slate-200" />
+                        )}
+                        <div className="flex-1 space-y-1.5">
+                          <ImageUpload
+                            value={photoUrl}
+                            onChange={url => updateShopPhoto(idx, pi, url)}
+                          />
+                        </div>
+                        <button type="button" onClick={() => removeShopPhoto(idx, pi)}
+                          className="mt-1 rounded-lg border border-red-200 px-2 py-1 text-xs text-red-500 hover:bg-red-50 shrink-0">
+                          削除
+                        </button>
                       </div>
                     ))}
                   </div>
