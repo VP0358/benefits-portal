@@ -211,9 +211,17 @@ export async function POST(request: Request) {
     console.log(`[import-direct] Credix結果CSV検出: header=[${header.join("|")}]`);
     console.log(`[import-direct] Credix: codeIdx(K列)=${codeIdx}, resultIdx=${resultIdx}, dateIdx=${dateIdx}`);
 
-    // ── CSV から 決済ID → { isOk, paidDate } マップを構築 ──
+    // ── M列（決済金額）列インデックス取得 ──
+    const amountIdx = (() => {
+      let i = header.findIndex(h => h.includes("決済金額") || h.includes("amount") || h === "金額");
+      if (i === -1) i = 12; // デフォルト M列
+      return i;
+    })();
+    console.log(`[import-direct] Credix: amountIdx(M列)=${amountIdx}`);
+
+    // ── CSV から 決済ID → { isOk, paidDate, amount } マップを構築 ──
     // 同一決済IDに複数行ある場合、成功行を優先
-    const csvIdMap = new Map<string, { isOk: boolean; paidDate: Date | undefined }>();
+    const csvIdMap = new Map<string, { isOk: boolean; paidDate: Date | undefined; amount: number }>();
 
     for (const line of dataLines) {
       if (!line.trim()) continue;
@@ -237,11 +245,15 @@ export async function POST(request: Request) {
       const rawDate = dateIdx >= 0 ? (cols[dateIdx] ?? "") : "";
       const paidDate = parseCsvDate(rawDate) ?? undefined;
 
+      // M列から決済金額を読み取る（数字のみ抽出、カンマ除去）
+      const rawAmount = amountIdx >= 0 ? (cols[amountIdx] ?? "0") : "0";
+      const amount = parseInt(rawAmount.replace(/[^0-9]/g, ""), 10) || 0;
+
       // 同一IDは成功優先で登録
       if (!csvIdMap.has(normId)) {
-        csvIdMap.set(normId, { isOk, paidDate });
+        csvIdMap.set(normId, { isOk, paidDate, amount });
       } else if (isOk && !csvIdMap.get(normId)!.isOk) {
-        csvIdMap.set(normId, { isOk, paidDate });
+        csvIdMap.set(normId, { isOk, paidDate, amount });
       }
     }
 
@@ -308,12 +320,25 @@ export async function POST(request: Request) {
     console.log(`[import-direct] Credix: 決済ID→会員マップ ${cardIdToMember.size}件構築`);
 
     // ── 照合: CSV決済ID → 会員 ──
-    // memberCode → { isOk, paidDate, member } の結果マップ
-    const matchedMap = new Map<string, { isOk: boolean; paidDate: Date | undefined; member: MemberRow }>();
+    // memberCode → { isOk, paidDate, amount, member } の結果マップ
+    const matchedMap = new Map<string, { isOk: boolean; paidDate: Date | undefined; amount: number; member: MemberRow }>();
+
+    // CSV内で会員未照合のIDを詳細に収集（原因究明用）
+    const unmatchedCsvIds: { rawId: string; normId: string; reason: string }[] = [];
 
     for (const [normId, entry] of csvIdMap) {
       const member = cardIdToMember.get(normId);
-      if (!member) continue;
+      if (!member) {
+        // 未照合の原因を特定: DB全会員のIDと照合して最も近いものを探す
+        let reason = "会員DBにこの決済IDが登録されていない";
+        // 前後の0埋めや大文字小文字違いで近いものがあるか確認
+        const similar = Array.from(cardIdToMember.keys()).find(k =>
+          k.padStart(10, "0") === normId.padStart(10, "0")
+        );
+        if (similar) reason = `大文字小文字・0埋め違いの可能性: DB側=${similar}`;
+        unmatchedCsvIds.push({ rawId: normId, normId, reason });
+        continue;
+      }
       // 同一会員で複数決済IDがヒットした場合: 成功優先
       const existing = matchedMap.get(member.memberCode);
       if (!existing || (entry.isOk && !existing.isOk)) {
@@ -347,6 +372,9 @@ export async function POST(request: Request) {
     const paidMembers    = matchedMembers.filter(m => m.isOk);
     const failedMembers  = matchedMembers.filter(m => !m.isOk);
 
+    // CSV M列から合計金額を計算（実際の決済金額を使用）
+    const totalPaidAmount = paidMembers.reduce((sum, m) => sum + (m.amount > 0 ? m.amount : 16500), 0);
+
     if (!autoShipRun) {
       // AutoShipRun を自動作成
       autoShipRun = await prisma.autoShipRun.create({
@@ -357,7 +385,7 @@ export async function POST(request: Request) {
           totalCount:     matchedMembers.length,
           paidCount:      paidMembers.length,
           failedCount:    failedMembers.length,
-          totalAmount:    paidMembers.length * 16500,
+          totalAmount:    totalPaidAmount,
           importedAt:     now,
           completedAt:    now,
         },
@@ -372,7 +400,7 @@ export async function POST(request: Request) {
           paidCount:   { increment: paidMembers.length },
           failedCount: { increment: failedMembers.length },
           totalCount:  { increment: matchedMembers.length },
-          totalAmount: { increment: paidMembers.length * 16500 },
+          totalAmount: { increment: totalPaidAmount },
           importedAt:  now,
           completedAt: now,
         },
@@ -381,7 +409,10 @@ export async function POST(request: Request) {
     }
 
     // ── AutoShipOrder を upsert（照合済み会員分） ──
-    for (const { isOk, paidDate, member } of matchedMap.values()) {
+    for (const { isOk, paidDate, amount, member } of matchedMap.values()) {
+      // CSV M列の金額を使用（0の場合はデフォルト16500）
+      const unitPrice   = amount > 0 ? amount : 16500;
+      const totalAmount = unitPrice;
       try {
         await prisma.autoShipOrder.upsert({
           where: {
@@ -403,14 +434,16 @@ export async function POST(request: Request) {
             memberPostal:  member.user.mlmRegistration?.deliveryPostalCode ?? member.user.postalCode ?? null,
             memberAddress: member.user.mlmRegistration?.deliveryAddress ?? member.user.address ?? null,
             creditCardId:  member.creditCardId ?? null,
-            unitPrice:     16500,
-            totalAmount:   16500,
+            unitPrice,
+            totalAmount,
             points:        150,
             status:        isOk ? "paid" : "failed",
             paidAt:        isOk ? (paidDate ?? now) : null,
             failReason:    isOk ? null : "決済失敗",
           },
           update: {
+            unitPrice,
+            totalAmount,
             status:     isOk ? "paid" : "failed",
             paidAt:     isOk ? (paidDate ?? now) : null,
             failReason: isOk ? null : "決済失敗",
@@ -429,13 +462,8 @@ export async function POST(request: Request) {
       }
     }
 
-    // CSV にあるが会員未照合のIDを収集（デバッグ用）
-    let csvUnmatchedCount = 0;
-    for (const normId of csvIdMap.keys()) {
-      if (!cardIdToMember.has(normId)) {
-        csvUnmatchedCount++;
-      }
-    }
+    // CSV にあるが会員未照合のIDを詳細収集（原因究明）
+    const csvUnmatchedCount = unmatchedCsvIds.length;
     if (csvUnmatchedCount > 0) {
       unmatchedItems.push(`CSV内で会員未照合の決済ID: ${csvUnmatchedCount}件`);
     }
@@ -452,6 +480,19 @@ export async function POST(request: Request) {
     }
 
     console.log(`[import-direct] Credix: 完了 paid=${paidCount}件 failed=${failedCount}件 CSVunmatched=${csvUnmatchedCount}件`);
+    if (unmatchedCsvIds.length > 0) {
+      console.log(`[import-direct] Credix: 未照合ID詳細 → ${JSON.stringify(unmatchedCsvIds.slice(0, 10))}`);
+    }
+
+    // 未照合IDの詳細をwarningsに追加（UI表示用）
+    if (unmatchedCsvIds.length > 0) {
+      const detail = unmatchedCsvIds
+        .slice(0, 20)
+        .map(u => `ID「${u.rawId}」: ${u.reason}`)
+        .join(" / ");
+      warnings.push(`📋 CSV未照合ID詳細 (${unmatchedCsvIds.length}件): ${detail}`);
+      warnings.push(`💡 対処法: MLM会員詳細画面で「クレジット①②③」欄にこれらの決済IDを登録してください。`);
+    }
 
     return NextResponse.json({
       paidCount,
@@ -470,6 +511,11 @@ export async function POST(request: Request) {
         failedCount,
         csvUnmatchedCount,
         unmatchedSample:  unmatchedItems.slice(0, 10),
+        // 未照合IDの生の値一覧（原因究明用）
+        unmatchedCsvIdDetails: unmatchedCsvIds.slice(0, 20).map(u => ({
+          id:     u.rawId,
+          reason: u.reason,
+        })),
       },
     }, { status: 200 });
   }

@@ -992,6 +992,25 @@ export default function AutoShipPanel() {
                       未照合サンプル({(csvImportResult.debug.unmatchedSample as string[]).length}件): {(csvImportResult.debug.unmatchedSample as string[]).join(", ")}
                     </div>
                   )}
+                  {/* 未照合CSV決済IDの詳細（原因究明用） */}
+                  {Array.isArray(csvImportResult.debug.unmatchedCsvIdDetails) && (csvImportResult.debug.unmatchedCsvIdDetails as {id: string; reason: string}[]).length > 0 && (
+                    <div className="mt-2 border-t border-orange-200 pt-2">
+                      <div className="text-orange-700 font-semibold mb-1">
+                        🔍 CSV未照合 決済ID詳細（{(csvImportResult.debug.unmatchedCsvIdDetails as {id: string; reason: string}[]).length}件）
+                      </div>
+                      <div className="text-[11px] bg-orange-50 rounded p-2 space-y-0.5">
+                        {(csvImportResult.debug.unmatchedCsvIdDetails as {id: string; reason: string}[]).map((u, i) => (
+                          <div key={i} className="flex gap-2">
+                            <span className="text-orange-800 font-mono font-bold shrink-0">ID: {u.id}</span>
+                            <span className="text-orange-600">→ {u.reason}</span>
+                          </div>
+                        ))}
+                        <div className="mt-1 text-blue-600 font-medium">
+                          💡 対処法: 上記のIDをMLM会員詳細の「クレジット①②③」欄に登録してください
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </details>
             )}
