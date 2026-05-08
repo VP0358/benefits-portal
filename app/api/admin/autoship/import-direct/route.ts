@@ -101,6 +101,7 @@ export async function POST(request: Request) {
   let effectivePaymentMethod = paymentMethod;
   let isMufg = false;
   let isCredix = false;
+  let isCredixInternalFormat = false; // スコープを外に出してデバッグ出力で参照可能にする
 
   if (isMufgFixedFormat(uint8)) {
     // ══════════════════════════════════════════════════════════════
@@ -229,7 +230,7 @@ export async function POST(request: Request) {
       h.includes("sendid") || h.includes("sendpoint") || h.includes("id(sendid)")
     );
     // Type B: 社内出力クレディックスCSV（顧客ID + 会員コード のヘッダーを持つ）
-    const isCredixInternalFormat =
+    isCredixInternalFormat =
       !isCredixResultFormat &&
       header.includes("顧客id") &&
       (header.includes("会員コード") || header.some(h => h.includes("会員コード")));
@@ -650,7 +651,7 @@ export async function POST(request: Request) {
     console.log(`[import-direct] Credix: 合計照合 ${totalMatched}件 (電話:${matchedByPhone} + メール:${matchedByEmail})`);
 
     if (totalMatched === 0) {
-      warnings.push(`⚠️ 照合が0件でした。会員の電話番号・メールアドレスがCSVと一致するか確認してください。また、対象会員の「クレジット①②③」に決済IDが登録されているか確認してください。`);
+      warnings.push(`⚠️ 照合が0件でした。会員の電話番号・メールアドレスがCSVと一致するか確認してください。また、対象会員の「クレジット①（クレディックス）」に決済IDが登録されているか確認してください。`);
     }
   }
 
