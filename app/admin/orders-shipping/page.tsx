@@ -101,8 +101,8 @@ const DATE_TYPES = [
 const PAY_STATUS_OPTS = [{ value: "", label: "無制限" }, { value: "unpaid", label: "未完了" }, { value: "paid", label: "完了" }, { value: "ignored", label: "無視" }]
 const SHIP_STATUS_OPTS = [{ value: "", label: "無制限" }, { value: "unshipped", label: "未完了" }, { value: "shipped", label: "完了" }, { value: "ignored", label: "無視" }]
 const BULK_ACTIONS = [
-  { value: "", label: "備考に" },
-  { value: "setNote", label: "備考に" },
+  { value: "",           label: "── 選択してください ──" },
+  { value: "setNote",    label: "備考に" },
   { value: "setNoteSlip", label: "備考(納品書)に" },
   { value: "setNoteAll", label: "備考・備考(納品書)に" },
 ]
@@ -492,14 +492,13 @@ export default function OrdersShippingPage() {
 
   const handleBulkExecute = async () => {
     if (selected.size === 0) { alert("伝票を選択してください"); return }
-    if (!bulkAction && !bulkNote) { alert("アクションを選択してください"); return }
+    if (!bulkAction) { alert("アクション（備考の種類）を選択してください"); return }
+    if (!bulkNote) { alert("入力テキストを入力してください"); return }
     setBulkProcessing(true)
     try {
-      if (bulkNote && bulkAction) {
-        const action = bulkAction === "setNoteAll" ? "setNote" : bulkAction
-        await bulkPatch(action, bulkNote)
-        if (bulkAction === "setNoteAll") await bulkPatch("setNoteSlip", bulkNote)
-      }
+      const action = bulkAction === "setNoteAll" ? "setNote" : bulkAction
+      await bulkPatch(action, bulkNote)
+      if (bulkAction === "setNoteAll") await bulkPatch("setNoteSlip", bulkNote)
       fetchOrders()
       setBulkNote("")
     } catch { alert("処理に失敗しました") }
@@ -630,6 +629,37 @@ export default function OrdersShippingPage() {
       setSummarySelected(prev => { const s = new Set(prev); s.delete(orderId); return s })
     } finally {
       setDeletingOrderId(null)
+    }
+  }
+
+  // ─── 選択伝票の一括削除 ──────────────────────────────
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) { alert("伝票を選択してください"); return }
+    const ids = Array.from(selected)
+    if (!confirm(`選択した ${ids.length} 件の伝票を削除しますか？\nこの操作は取り消せません。`)) return
+    setBulkDeleting(true)
+    try {
+      const res = await fetch("/api/admin/orders-shipping", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderIds: ids, action: "bulkDelete" }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert("削除に失敗しました: " + (data.error || "不明なエラー"))
+        return
+      }
+      setSelected(new Set())
+      setSummaryOrders(prev => prev ? prev.filter(o => !ids.includes(o.id)) : prev)
+      setSummarySelected(prev => { const s = new Set(prev); ids.forEach(id => s.delete(id)); return s })
+      fetchSummary()
+      fetchOrders()
+      alert(`削除完了: ${data.deleted ?? ids.length}件 削除しました`)
+    } catch {
+      alert("削除処理中にエラーが発生しました")
+    } finally {
+      setBulkDeleting(false)
     }
   }
 
@@ -1149,7 +1179,7 @@ export default function OrdersShippingPage() {
               className="px-3 py-1.5 bg-gray-100 border border-gray-300 rounded text-sm hover:bg-gray-200">
               にする
             </button>
-            <button onClick={() => setBulkPaidDate(today.toISOString().split("T")[0])}
+            <button onClick={() => setBulkPaidDate(todayJST())}
               className="px-3 py-1.5 border border-gray-300 rounded text-sm hover:bg-gray-50">
               クリア
             </button>
@@ -1214,7 +1244,33 @@ export default function OrdersShippingPage() {
               <input ref={debitInputRef} type="file" accept=".csv" className="hidden" onChange={handleDebitImport} />
             </label>
 
+            {/* ── 伝票削除ボタン（ボタン群の末尾に配置） ── */}
+            <div className="flex items-center gap-1 pl-2 border-l-2 border-red-300">
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded text-sm font-bold transition-colors ${
+                  selected.size > 0
+                    ? "bg-red-600 text-white hover:bg-red-700 active:bg-red-800 shadow"
+                    : "bg-red-100 text-red-400 cursor-not-allowed"
+                }`}
+                title={selected.size > 0 ? `選択した${selected.size}件を削除` : "下の一覧でチェックして選択してください"}
+              >
+                {bulkDeleting
+                  ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  : <span>🗑</span>}
+                {bulkDeleting
+                  ? "削除中..."
+                  : selected.size > 0
+                    ? `選択伝票を削除（${selected.size}件）`
+                    : "選択伝票を削除"}
+              </button>
+              {selected.size > 0 && (
+                <span className="text-xs text-red-500 whitespace-nowrap">※取消不可</span>
+              )}
+            </div>
           </div>
+
         </div>
       </div>
 
@@ -1431,6 +1487,51 @@ export default function OrdersShippingPage() {
                   </button>
                 </span>
                 {summaryBulkProcessing && <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" />}
+                {/* ── 未処理伝票一覧：削除ボタン ── */}
+                <span className="border-l-2 border-red-300 pl-2 flex items-center gap-1">
+                  <button
+                    onClick={async () => {
+                      if (summarySelected.size === 0) { alert("伝票を選択してください"); return }
+                      const ids = Array.from(summarySelected)
+                      if (!confirm(`選択した ${ids.length} 件の伝票を削除しますか？\nこの操作は取り消せません。`)) return
+                      setBulkDeleting(true)
+                      try {
+                        const res = await fetch("/api/admin/orders-shipping", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ orderIds: ids, action: "bulkDelete" }),
+                        })
+                        const data = await res.json()
+                        if (!res.ok) { alert("削除に失敗しました: " + (data.error || "不明なエラー")); return }
+                        setSummaryOrders(prev => prev ? prev.filter(o => !ids.includes(o.id)) : prev)
+                        setSummarySelected(new Set())
+                        fetchSummary()
+                        fetchOrders()
+                        alert(`削除完了: ${data.deleted ?? ids.length}件 削除しました`)
+                      } catch { alert("削除処理中にエラーが発生しました") }
+                      finally { setBulkDeleting(false) }
+                    }}
+                    disabled={bulkDeleting || summarySelected.size === 0}
+                    className={`flex items-center gap-1 px-3 py-1 rounded text-xs font-bold transition-colors ${
+                      summarySelected.size > 0
+                        ? "bg-red-600 text-white hover:bg-red-700 shadow"
+                        : "bg-red-100 text-red-300 cursor-not-allowed"
+                    }`}
+                    title={summarySelected.size > 0 ? `選択した${summarySelected.size}件を削除` : "伝票を選択してください"}
+                  >
+                    {bulkDeleting
+                      ? <RefreshCw className="w-3 h-3 animate-spin" />
+                      : <span>🗑</span>}
+                    {bulkDeleting
+                      ? "削除中..."
+                      : summarySelected.size > 0
+                        ? `選択伝票を削除（${summarySelected.size}件）`
+                        : "選択伝票を削除"}
+                  </button>
+                  {summarySelected.size > 0 && (
+                    <span className="text-xs text-red-500 whitespace-nowrap">※取消不可</span>
+                  )}
+                </span>
               </div>
             )}
 
@@ -1596,12 +1697,24 @@ export default function OrdersShippingPage() {
                 <Download className="w-3.5 h-3.5" />ヤマトCSV
               </button>
               {selected.size > 0 && (
-                <button
-                  onClick={handleBulkDeliveryNote}
-                  className="flex items-center gap-1 text-xs px-3 py-1 bg-indigo-600 text-white border border-indigo-700 rounded hover:bg-indigo-700 font-medium"
-                  title="チェックした伝票の納品書PDFを一括ダウンロード">
-                  <Download className="w-3.5 h-3.5" />納品書PDF一括出力（{selected.size}件）
-                </button>
+                <>
+                  <button
+                    onClick={handleBulkDeliveryNote}
+                    className="flex items-center gap-1 text-xs px-3 py-1 bg-indigo-600 text-white border border-indigo-700 rounded hover:bg-indigo-700 font-medium"
+                    title="チェックした伝票の納品書PDFを一括ダウンロード">
+                    <Download className="w-3.5 h-3.5" />納品書PDF一括出力（{selected.size}件）
+                  </button>
+                  <button
+                    onClick={handleBulkDelete}
+                    disabled={bulkDeleting}
+                    className="flex items-center gap-1 text-xs px-3 py-1 bg-red-600 text-white border border-red-700 rounded hover:bg-red-700 disabled:opacity-50 font-medium"
+                    title="選択した伝票を一括削除（取り消し不可）">
+                    {bulkDeleting
+                      ? <RefreshCw className="w-3 h-3 animate-spin" />
+                      : <span>🗑</span>}
+                    {bulkDeleting ? "削除中..." : `一括削除（${selected.size}件）`}
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -1868,6 +1981,38 @@ export default function OrdersShippingPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* ── 伝票一覧下部：選択伝票の削除 ── */}
+          {searched && orders.length > 0 && (
+            <div className="border-t-2 border-red-200 bg-red-50 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-red-700">🗑 選択した伝票を削除</span>
+                  {selected.size > 0
+                    ? <span className="text-xs text-white bg-red-600 rounded-full px-2.5 py-0.5 font-bold">{selected.size}件選択中</span>
+                    : <span className="text-xs text-red-400">（チェックボックスで伝票を選択してください）</span>
+                  }
+                </div>
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleting || selected.size === 0}
+                  className="flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 active:bg-red-800 disabled:bg-gray-300 disabled:cursor-not-allowed shadow transition-colors"
+                >
+                  {bulkDeleting
+                    ? <RefreshCw className="w-4 h-4 animate-spin" />
+                    : <span className="text-base leading-none">🗑</span>}
+                  {bulkDeleting
+                    ? "削除中..."
+                    : selected.size > 0
+                      ? `選択した ${selected.size} 件を削除する`
+                      : "削除する（伝票を選択してください）"}
+                </button>
+                {selected.size > 0 && (
+                  <span className="text-xs text-red-500 font-medium">⚠ 削除後は元に戻せません</span>
+                )}
+              </div>
             </div>
           )}
         </div>

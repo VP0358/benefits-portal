@@ -486,6 +486,19 @@ export async function PATCH(request: NextRequest) {
       case "setOrderedAt":
         updateData = { orderedAt: value ? new Date(value) : new Date() }
         break
+      case "bulkDelete": {
+        // 一括削除：関連レコードも含めてトランザクションで削除
+        const bigIds = ids.map(BigInt)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await prisma.$transaction(async (tx: any) => {
+          await tx.shippingLabel.deleteMany({ where: { orderId: { in: bigIds } } })
+          await tx.orderItem.deleteMany({ where: { orderId: { in: bigIds } } })
+          await tx.pointUsage.updateMany({ where: { orderId: { in: bigIds } }, data: { orderId: null } })
+          await tx.mlmPurchase.updateMany({ where: { orderId: { in: bigIds } }, data: { orderId: null } })
+          await tx.order.deleteMany({ where: { id: { in: bigIds } } })
+        })
+        return NextResponse.json({ success: true, deleted: ids.length })
+      }
       default:
         return NextResponse.json({ success: false, error: "Unknown action" }, { status: 400 })
     }
