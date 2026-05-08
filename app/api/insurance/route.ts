@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma"
 import { auth } from "@/auth"
 import { sendInsuranceApplicationEmail } from "@/lib/mailer"
 
-const NOTIFY_TO = "info@c-p.link"
+const DEFAULT_NOTIFY = "info@c-p.link"
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,6 +23,26 @@ export async function POST(req: NextRequest) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: "メールアドレスの形式が正しくありません" }, { status: 400 })
     }
+
+    // ── 保険種別ごとに管理側設定から通知先メールアドレスを取得 ──
+    const isLife = (insuranceType ?? "life") === "life"
+    const settingKey = isLife ? "lifeInsuranceSettings" : "nonLifeInsuranceSettings"
+    let notifyTo: string[] = [DEFAULT_NOTIFY]
+    try {
+      const setting = await prisma.siteSetting.findUnique({
+        where: { settingKey },
+      })
+      if (setting?.settingValue) {
+        const parsed = JSON.parse(setting.settingValue)
+        // notifyEmails（新形式）→ adminEmail（旧形式）の順でフォールバック
+        const emails: string[] = Array.isArray(parsed.notifyEmails)
+          ? parsed.notifyEmails.filter((e: string) => e && e.trim())
+          : parsed.adminEmail
+          ? [parsed.adminEmail.trim()]
+          : []
+        if (emails.length > 0) notifyTo = emails
+      }
+    } catch { /* 設定取得失敗は無視してデフォルト使用 */ }
 
     // ログインユーザー取得（任意）
     let userId: bigint | null = null
@@ -59,8 +79,19 @@ export async function POST(req: NextRequest) {
       note: note || "",
     }
 
-    await sendInsuranceApplicationEmail({ to: NOTIFY_TO, isAdmin: true,  data }).catch(e => console.error("[insurance] admin mail error:", e))
-    await sendInsuranceApplicationEmail({ to: email,     isAdmin: false, data }).catch(e => console.error("[insurance] customer mail error:", e))
+    // 管理者通知メール（設定された全アドレス）
+    await sendInsuranceApplicationEmail({
+      to:      notifyTo,
+      isAdmin: true,
+      data,
+    }).catch(e => console.error("[insurance] admin mail error:", e))
+
+    // お客様への確認メール
+    await sendInsuranceApplicationEmail({
+      to:      email,
+      isAdmin: false,
+      data,
+    }).catch(e => console.error("[insurance] customer mail error:", e))
 
     return NextResponse.json({ ok: true }, { status: 201 })
   } catch (err) {

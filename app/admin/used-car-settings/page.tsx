@@ -36,7 +36,7 @@ export default function UsedCarSettingsPage() {
   const [driveOpts,     setDriveOpts]     = useState<string[]>(DEFAULT_DRIVE_OPTIONS);
   const [studlessOpts,  setStudlessOpts]  = useState<string[]>(DEFAULT_STUDLESS_OPTIONS);
   const [requiredFields, setRequiredFields] = useState(DEFAULT_REQUIRED_FIELDS);
-  const [adminEmail,    setAdminEmail]    = useState("");
+  const [notifyEmails,  setNotifyEmails]  = useState<string[]>([""]);
   const [adminNote,     setAdminNote]     = useState("");
 
   useEffect(() => {
@@ -53,7 +53,12 @@ export default function UsedCarSettingsPage() {
           if (Array.isArray(uc.driveOptions))    setDriveOpts(uc.driveOptions);
           if (Array.isArray(uc.studlessOptions)) setStudlessOpts(uc.studlessOptions);
           if (Array.isArray(uc.requiredFields))  setRequiredFields(uc.requiredFields);
-          if (uc.adminEmail)    setAdminEmail(uc.adminEmail);
+          if (Array.isArray(uc.notifyEmails) && uc.notifyEmails.length > 0) {
+            setNotifyEmails(uc.notifyEmails);
+          } else if (uc.adminEmail) {
+            // 旧フォーマット互換
+            setNotifyEmails([uc.adminEmail]);
+          }
           if (uc.adminNote)     setAdminNote(uc.adminNote);
         }
         setLoading(false);
@@ -88,7 +93,7 @@ export default function UsedCarSettingsPage() {
           driveOptions:    driveOpts,
           studlessOptions: studlessOpts,
           requiredFields,
-          adminEmail,
+          notifyEmails: notifyEmails.map(e => e.trim()).filter(Boolean),
           adminNote,
         },
       }),
@@ -241,17 +246,50 @@ export default function UsedCarSettingsPage() {
           </button>
         </div>
 
-        {/* ━━━ 管理者向け設定 ━━━ */}
+        {/* ━━━ 申込通知メール設定 ━━━ */}
         <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
-          <h2 className="text-sm font-bold text-slate-800">⚙️ 管理者向け設定</h2>
-
-          <div>
-            <label className={lbl}>申込通知メール送信先（空白 = デフォルトアドレス）</label>
-            <input type="email" className={inp}
-              placeholder="admin@example.com"
-              value={adminEmail}
-              onChange={e => setAdminEmail(e.target.value)} />
-            <p className="text-xs text-slate-400 mt-1">申込が来たときに通知するメールアドレスです</p>
+          <h2 className="text-sm font-bold text-slate-800">📧 申込通知メール送信先</h2>
+          <p className="text-xs text-slate-500">
+            お客様から申し込みがあった際に通知を受け取るメールアドレスを設定してください。<br />
+            最大5件まで設定でき、設定されたアドレス全てに通知が届きます。
+          </p>
+          <div className="space-y-2">
+            {notifyEmails.map((email, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 w-5 shrink-0 text-right">{idx + 1}</span>
+                <input
+                  type="email"
+                  className={inp}
+                  placeholder="example@email.com"
+                  value={email}
+                  onChange={e => setNotifyEmails(prev => prev.map((v, i) => i === idx ? e.target.value : v))}
+                />
+                {notifyEmails.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setNotifyEmails(prev => prev.filter((_, i) => i !== idx))}
+                    className="rounded-xl border border-red-200 px-3 py-2 text-xs text-red-500 hover:bg-red-50 whitespace-nowrap shrink-0"
+                  >
+                    削除
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {notifyEmails.length < 5 && (
+            <button
+              type="button"
+              onClick={() => setNotifyEmails(prev => [...prev, ""])}
+              className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700 hover:bg-emerald-100"
+            >
+              ＋ メールアドレスを追加
+            </button>
+          )}
+          <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+            <p className="text-xs text-amber-700 leading-relaxed">
+              ⚠️ 未入力の場合はシステムデフォルトアドレスに通知されます。<br />
+              申し込み内容（お名前・電話番号・希望車種など）が全て通知メールに記載されます。
+            </p>
           </div>
 
           <div>

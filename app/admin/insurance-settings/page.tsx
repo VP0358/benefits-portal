@@ -4,12 +4,12 @@ import { FormEvent, useEffect, useState } from "react";
 
 // ── デフォルト値 ──────────────────────────────────────────
 const DEFAULT_LIFE: LifeInsuranceSettings = {
-  headline:    "生命保険 無料相談申込",
-  description: "下記内容をご記入の上、送信してください。\n確認後、担当より記載メールアドレスへご連絡いたします。",
-  badges:      "🛡️ 安心の保障,💰 無料相談,📞 オンライン対応,✅ 専門FP在籍",
-  footerNote:  "※初回ご相談はオンラインでのご相談となります",
-  adminEmail:  "",
-  adminNote:   "",
+  headline:      "生命保険 無料相談申込",
+  description:   "下記内容をご記入の上、送信してください。\n確認後、担当より記載メールアドレスへご連絡いたします。",
+  badges:        "🛡️ 安心の保障,💰 無料相談,📞 オンライン対応,✅ 専門FP在籍",
+  footerNote:    "※初回ご相談はオンラインでのご相談となります",
+  notifyEmails:  [""],
+  adminNote:     "",
 };
 
 const DEFAULT_NON_LIFE_PRODUCTS = [
@@ -19,33 +19,33 @@ const DEFAULT_NON_LIFE_PRODUCTS = [
 ];
 
 const DEFAULT_NON_LIFE: NonLifeInsuranceSettings = {
-  headline:    "損害保険 無料相談申込",
-  description: "下記内容をご記入の上、送信してください。\n確認後、担当より記載メールアドレスへご連絡いたします。",
-  badges:      "🚗 自動車保険,🏠 火災保険,🐾 ペット保険,✅ 専門FP在籍",
-  footerNote:  "※初回ご相談はオンラインでのご相談となります",
-  products:    DEFAULT_NON_LIFE_PRODUCTS,
-  adminEmail:  "",
-  adminNote:   "",
+  headline:      "損害保険 無料相談申込",
+  description:   "下記内容をご記入の上、送信してください。\n確認後、担当より記載メールアドレスへご連絡いたします。",
+  badges:        "🚗 自動車保険,🏠 火災保険,🐾 ペット保険,✅ 専門FP在籍",
+  footerNote:    "※初回ご相談はオンラインでのご相談となります",
+  products:      DEFAULT_NON_LIFE_PRODUCTS,
+  notifyEmails:  [""],
+  adminNote:     "",
 };
 
 // ── 型定義 ────────────────────────────────────────────────
 interface LifeInsuranceSettings {
-  headline:    string;
-  description: string;
-  badges:      string;
-  footerNote:  string;
-  adminEmail:  string;
-  adminNote:   string;
+  headline:      string;
+  description:   string;
+  badges:        string;
+  footerNote:    string;
+  notifyEmails:  string[];
+  adminNote:     string;
 }
 
 interface NonLifeInsuranceSettings {
-  headline:    string;
-  description: string;
-  badges:      string;
-  footerNote:  string;
-  products:    string[];
-  adminEmail:  string;
-  adminNote:   string;
+  headline:      string;
+  description:   string;
+  badges:        string;
+  footerNote:    string;
+  products:      string[];
+  notifyEmails:  string[];
+  adminNote:     string;
 }
 
 // ── スタイル ─────────────────────────────────────────────
@@ -76,25 +76,32 @@ export default function InsuranceSettingsPage() {
       .then(d => {
         if (d.lifeInsuranceSettings) {
           const s = d.lifeInsuranceSettings;
+          // 旧フォーマット(adminEmail)との互換
+          const lifeEmails = Array.isArray(s.notifyEmails) && s.notifyEmails.length > 0
+            ? s.notifyEmails
+            : s.adminEmail ? [s.adminEmail] : [""];
           setLife({
-            headline:    s.headline    ?? DEFAULT_LIFE.headline,
-            description: s.description ?? DEFAULT_LIFE.description,
-            badges:      Array.isArray(s.badges) ? s.badges.join(",") : (s.badges ?? DEFAULT_LIFE.badges),
-            footerNote:  s.footerNote  ?? DEFAULT_LIFE.footerNote,
-            adminEmail:  s.adminEmail  ?? "",
-            adminNote:   s.adminNote   ?? "",
+            headline:     s.headline    ?? DEFAULT_LIFE.headline,
+            description:  s.description ?? DEFAULT_LIFE.description,
+            badges:       Array.isArray(s.badges) ? s.badges.join(",") : (s.badges ?? DEFAULT_LIFE.badges),
+            footerNote:   s.footerNote  ?? DEFAULT_LIFE.footerNote,
+            notifyEmails: lifeEmails,
+            adminNote:    s.adminNote   ?? "",
           });
         }
         if (d.nonLifeInsuranceSettings) {
           const s = d.nonLifeInsuranceSettings;
+          const nonLifeEmails = Array.isArray(s.notifyEmails) && s.notifyEmails.length > 0
+            ? s.notifyEmails
+            : s.adminEmail ? [s.adminEmail] : [""];
           setNonLife({
-            headline:    s.headline    ?? DEFAULT_NON_LIFE.headline,
-            description: s.description ?? DEFAULT_NON_LIFE.description,
-            badges:      Array.isArray(s.badges) ? s.badges.join(",") : (s.badges ?? DEFAULT_NON_LIFE.badges),
-            footerNote:  s.footerNote  ?? DEFAULT_NON_LIFE.footerNote,
-            products:    Array.isArray(s.products) && s.products.length > 0 ? s.products : DEFAULT_NON_LIFE_PRODUCTS,
-            adminEmail:  s.adminEmail  ?? "",
-            adminNote:   s.adminNote   ?? "",
+            headline:     s.headline    ?? DEFAULT_NON_LIFE.headline,
+            description:  s.description ?? DEFAULT_NON_LIFE.description,
+            badges:       Array.isArray(s.badges) ? s.badges.join(",") : (s.badges ?? DEFAULT_NON_LIFE.badges),
+            footerNote:   s.footerNote  ?? DEFAULT_NON_LIFE.footerNote,
+            products:     Array.isArray(s.products) && s.products.length > 0 ? s.products : DEFAULT_NON_LIFE_PRODUCTS,
+            notifyEmails: nonLifeEmails,
+            adminNote:    s.adminNote   ?? "",
           });
         }
         setLoading(false);
@@ -111,22 +118,22 @@ export default function InsuranceSettingsPage() {
 
     if (tab === "life") {
       payload.lifeInsuranceSettings = {
-        headline:    life.headline,
-        description: life.description,
-        badges:      life.badges.split(",").map(s => s.trim()).filter(Boolean),
-        footerNote:  life.footerNote,
-        adminEmail:  life.adminEmail,
-        adminNote:   life.adminNote,
+        headline:     life.headline,
+        description:  life.description,
+        badges:       life.badges.split(",").map(s => s.trim()).filter(Boolean),
+        footerNote:   life.footerNote,
+        notifyEmails: life.notifyEmails.map(e => e.trim()).filter(Boolean),
+        adminNote:    life.adminNote,
       };
     } else {
       payload.nonLifeInsuranceSettings = {
-        headline:    nonLife.headline,
-        description: nonLife.description,
-        badges:      nonLife.badges.split(",").map(s => s.trim()).filter(Boolean),
-        footerNote:  nonLife.footerNote,
-        products:    nonLife.products.filter(Boolean),
-        adminEmail:  nonLife.adminEmail,
-        adminNote:   nonLife.adminNote,
+        headline:     nonLife.headline,
+        description:  nonLife.description,
+        badges:       nonLife.badges.split(",").map(s => s.trim()).filter(Boolean),
+        footerNote:   nonLife.footerNote,
+        products:     nonLife.products.filter(Boolean),
+        notifyEmails: nonLife.notifyEmails.map(e => e.trim()).filter(Boolean),
+        adminNote:    nonLife.adminNote,
       };
     }
 
@@ -242,16 +249,50 @@ export default function InsuranceSettingsPage() {
               </div>
             </div>
 
-            {/* 管理者向け設定 */}
+            {/* 申込通知メール設定（生命保険） */}
             <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
-              <h2 className="text-sm font-bold text-slate-800">⚙️ 管理者向け設定（生命保険）</h2>
-              <div>
-                <label className={lbl}>申込通知メール送信先（空白 = デフォルトアドレス）</label>
-                <input type="email" className={inp}
-                  placeholder="admin@example.com"
-                  value={life.adminEmail}
-                  onChange={e => setLife(p => ({ ...p, adminEmail: e.target.value }))} />
-                <p className="text-xs text-slate-400 mt-1">申込が来たときに通知するメールアドレスです</p>
+              <h2 className="text-sm font-bold text-slate-800">📧 申込通知メール送信先（生命保険）</h2>
+              <p className="text-xs text-slate-500">
+                お客様から申し込みがあった際に通知を受け取るメールアドレスを設定します。<br />
+                最大5件まで設定でき、設定されたアドレス全てに通知が届きます。
+              </p>
+              <div className="space-y-2">
+                {life.notifyEmails.map((email, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-500 w-5 shrink-0 text-right">{idx + 1}</span>
+                    <input
+                      type="email"
+                      className={inp}
+                      placeholder="example@email.com"
+                      value={email}
+                      onChange={e => setLife(p => ({ ...p, notifyEmails: p.notifyEmails.map((v, i) => i === idx ? e.target.value : v) }))}
+                    />
+                    {life.notifyEmails.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setLife(p => ({ ...p, notifyEmails: p.notifyEmails.filter((_, i) => i !== idx) }))}
+                        className="rounded-xl border border-red-200 px-3 py-2 text-xs text-red-500 hover:bg-red-50 whitespace-nowrap shrink-0"
+                      >
+                        削除
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {life.notifyEmails.length < 5 && (
+                <button
+                  type="button"
+                  onClick={() => setLife(p => ({ ...p, notifyEmails: [...p.notifyEmails, ""] }))}
+                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700 hover:bg-emerald-100"
+                >
+                  ＋ メールアドレスを追加
+                </button>
+              )}
+              <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
+                <p className="text-xs text-blue-700 leading-relaxed">
+                  ⚠️ 未入力の場合はシステムデフォルトアドレスに通知されます。<br />
+                  申し込み内容（お名前・電話番号・希望日時など）が全て通知メールに記載されます。
+                </p>
               </div>
               <div>
                 <label className={lbl}>管理者向け内部メモ（会員には表示されません）</label>
@@ -344,16 +385,50 @@ export default function InsuranceSettingsPage() {
               </button>
             </div>
 
-            {/* 管理者向け設定 */}
+            {/* 申込通知メール設定（損害保険） */}
             <div className="rounded-3xl bg-white p-6 shadow-sm space-y-4">
-              <h2 className="text-sm font-bold text-slate-800">⚙️ 管理者向け設定（損害保険）</h2>
-              <div>
-                <label className={lbl}>申込通知メール送信先（空白 = デフォルトアドレス）</label>
-                <input type="email" className={inp}
-                  placeholder="admin@example.com"
-                  value={nonLife.adminEmail}
-                  onChange={e => setNonLife(p => ({ ...p, adminEmail: e.target.value }))} />
-                <p className="text-xs text-slate-400 mt-1">申込が来たときに通知するメールアドレスです</p>
+              <h2 className="text-sm font-bold text-slate-800">📧 申込通知メール送信先（損害保険）</h2>
+              <p className="text-xs text-slate-500">
+                お客様から申し込みがあった際に通知を受け取るメールアドレスを設定します。<br />
+                最大5件まで設定でき、設定されたアドレス全てに通知が届きます。
+              </p>
+              <div className="space-y-2">
+                {nonLife.notifyEmails.map((email, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-500 w-5 shrink-0 text-right">{idx + 1}</span>
+                    <input
+                      type="email"
+                      className={inp}
+                      placeholder="example@email.com"
+                      value={email}
+                      onChange={e => setNonLife(p => ({ ...p, notifyEmails: p.notifyEmails.map((v, i) => i === idx ? e.target.value : v) }))}
+                    />
+                    {nonLife.notifyEmails.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setNonLife(p => ({ ...p, notifyEmails: p.notifyEmails.filter((_, i) => i !== idx) }))}
+                        className="rounded-xl border border-red-200 px-3 py-2 text-xs text-red-500 hover:bg-red-50 whitespace-nowrap shrink-0"
+                      >
+                        削除
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {nonLife.notifyEmails.length < 5 && (
+                <button
+                  type="button"
+                  onClick={() => setNonLife(p => ({ ...p, notifyEmails: [...p.notifyEmails, ""] }))}
+                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700 hover:bg-emerald-100"
+                >
+                  ＋ メールアドレスを追加
+                </button>
+              )}
+              <div className="rounded-xl bg-orange-50 border border-orange-200 px-4 py-3">
+                <p className="text-xs text-orange-700 leading-relaxed">
+                  ⚠️ 未入力の場合はシステムデフォルトアドレスに通知されます。<br />
+                  申し込み内容（お名前・電話番号・希望日時・希望損保商品など）が全て通知メールに記載されます。
+                </p>
               </div>
               <div>
                 <label className={lbl}>管理者向け内部メモ（会員には表示されません）</label>

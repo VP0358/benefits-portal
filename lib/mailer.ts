@@ -749,7 +749,7 @@ interface UsedCarData {
 export async function sendUsedCarApplicationEmail({
   to, isAdmin, data,
 }: {
-  to: string
+  to: string | string[]
   isAdmin: boolean
   data: UsedCarData
 }) {
@@ -988,7 +988,7 @@ export interface InsuranceApplicationData {
 export async function sendInsuranceApplicationEmail({
   to, isAdmin, data,
 }: {
-  to: string
+  to: string | string[]
   isAdmin: boolean
   data: InsuranceApplicationData
 }) {
