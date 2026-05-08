@@ -278,13 +278,13 @@ export async function POST(request: Request) {
             email: true,
             postalCode: true,
             address: true,
-          },
-        },
-        mlmRegistration: {
-          select: {
-            deliveryPostalCode: true,
-            deliveryAddress: true,
-            deliveryName: true,
+            mlmRegistration: {
+              select: {
+                deliveryPostalCode: true,
+                deliveryAddress: true,
+                deliveryName: true,
+              },
+            },
           },
         },
       },
@@ -400,8 +400,8 @@ export async function POST(request: Request) {
             memberNameKana: member.user.nameKana ?? null,
             memberPhone:   member.mobile ?? member.user.phone ?? null,
             memberEmail:   member.user.email ?? null,
-            memberPostal:  member.mlmRegistration?.deliveryPostalCode ?? member.user.postalCode ?? null,
-            memberAddress: member.mlmRegistration?.deliveryAddress ?? member.user.address ?? null,
+            memberPostal:  member.user.mlmRegistration?.deliveryPostalCode ?? member.user.postalCode ?? null,
+            memberAddress: member.user.mlmRegistration?.deliveryAddress ?? member.user.address ?? null,
             creditCardId:  member.creditCardId ?? null,
             unitPrice:     16500,
             totalAmount:   16500,
