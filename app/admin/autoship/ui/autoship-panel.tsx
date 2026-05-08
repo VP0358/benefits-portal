@@ -901,7 +901,7 @@ export default function AutoShipPanel() {
           ⚠️ <strong>対応フォーマット</strong>:<br />
           <span className="font-semibold">① 三菱UFJファクター固定長TXT（自動判定）</span>: ファイル名が <code className="bg-yellow-100 px-1 rounded">SIRR*.txt</code> / <code className="bg-yellow-100 px-1 rounded">SIRD*.txt</code> 等の形式。支払い方法は「口座引き落とし」に自動切り替えされます。<br />
           <span className="font-semibold">② クレディックスCSV - 社内送信用（自動判定）</span>: システムが出力した <code className="bg-yellow-100 px-1 rounded">顧客ID,会員コード,氏名,...</code> 形式のCSV。会員コードで直接照合し全件成功として処理します。<br />
-          <span className="font-semibold">③ クレディックスCSV - 結果返送用（自動判定）</span>: クレディックスから届く <code className="bg-yellow-100 px-1 rounded">IPコード,オーダーNo,電話番号,決済日時,結果,...,ID(sendid),...</code> 形式。<strong>K列（ID(sendid)）= 決済ID</strong> を MLM会員詳細の「クレジット①②③（クレディックス）」欄の値と完全一致で照合。WC付きID・数字のみIDの両方に対応。フォールバックとして電話番号照合も実施。<br />
+          <span className="font-semibold">③ クレディックスCSV - 結果返送用（自動判定）</span>: クレディックスから届く <code className="bg-yellow-100 px-1 rounded">IPコード,オーダーNo,電話番号,決済日時,結果,...,ID(sendid),...</code> 形式。<strong>照合条件：MLM会員詳細の「クレジット①②③（クレディックス）」に決済IDが登録されている会員のみ対象。</strong> 照合キー：電話番号（C列）→ 1次、メール（H列）→ 2次。K列（ID(sendid)）は決済結果（成功/失敗）の判定にのみ使用。WC付きID・数字のみID両方に対応。<br />
           <span className="font-semibold">④ 汎用フォーマット</span>: ヘッダーに「会員コード（code）」「決済結果（result/status）」列が必要。
           結果コード: <code className="bg-yellow-100 px-1 rounded">OK</code>/<code className="bg-yellow-100 px-1 rounded">1</code> = 成功。
           <br /><br />
@@ -979,6 +979,9 @@ export default function AutoShipPanel() {
                   )}
                   {csvImportResult.debug.credixPhoneMapSize !== undefined && (
                     <div>Credix電話番号数: <strong>{String(csvImportResult.debug.credixPhoneMapSize)}</strong></div>
+                  )}
+                  {csvImportResult.debug.credixEmailMapSize !== undefined && (
+                    <div>Credixメール数: <strong>{String(csvImportResult.debug.credixEmailMapSize)}</strong></div>
                   )}
                   {Array.isArray(csvImportResult.debug.matchedOrderIds) && (csvImportResult.debug.matchedOrderIds as string[]).length > 0 && (
                     <div className="text-green-600 mt-1">

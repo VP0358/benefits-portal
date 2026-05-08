@@ -203,11 +203,13 @@ export async function POST(request: Request, { params }: Params) {
       let dateIdx: number;
 
       let phoneIdx = -1;
+      let emailIdx = -1;
       if (isCredixResultFormat) {
         // ★ Credix結果CSV照合方針:
-        //   K列(index=10) の ID(sendid) を credixSendIdMap に格納
-        //   WC付きID（例: WC14857601）も数字のみID（例: 69823944）も両方対象
-        //   DB の MlmMember.creditCardId / creditCardId2 / creditCardId3 と完全一致で照合
+        //   電話番号（C列）→ MlmMember.mobile / User.phone で会員を特定（1次）
+        //   メール（H列）→ User.email で会員を特定（2次）
+        //   K列 ID(sendid) は決済結果（成功/失敗）の判定のみに使用
+        //   対象: creditCardId / creditCardId2 / creditCardId3 が登録されている会員のみ
         codeIdx   = header.findIndex(h => h.includes("sendid") || h === "id(sendid)" || h.includes("id(send)"));
         resultIdx = header.findIndex(h => h.includes("結果") || h.includes("result"));
         dateIdx   = header.findIndex(h =>
@@ -215,13 +217,14 @@ export async function POST(request: Request, { params }: Params) {
           h.includes("date") || h.includes("datetime")
         );
         phoneIdx  = header.findIndex(h => h.includes("電話番号") || h.includes("phone") || h.includes("tel"));
+        emailIdx  = header.findIndex(h => h.includes("e-mail") || h.includes("email") || h.includes("メール"));
         if (codeIdx   === -1) codeIdx   = 10;
         if (resultIdx === -1) resultIdx = 4;
         if (dateIdx   === -1) dateIdx   = 3;
         if (phoneIdx  === -1) phoneIdx  = 2;
         reasonIdx = -1;
         console.log(`[import-result] Credix結果CSV検出: header=[${header.join("|")}]`);
-        console.log(`[import-result] Credix: K列(codeIdx=${codeIdx})=ID(sendid) → creditCardId照合モード (WC付き・数字のみ両方対象)`);
+        console.log(`[import-result] Credix: 電話番号(phoneIdx=${phoneIdx}) / メール(emailIdx=${emailIdx}) → 会員照合 / K列(codeIdx=${codeIdx})=結果判定のみ`);
       } else if (isCredixInternalFormat) {
         // Type B: 社内出力クレディックスCSV（会員コード列で直接照合・全件成功）
         codeIdx   = header.findIndex(h => h === "会員コード" || h.includes("会員コード"));
@@ -255,9 +258,9 @@ export async function POST(request: Request, { params }: Params) {
         return raw.replace(/-/g, "").replace(/^\+81/, "0").trim();
       }
 
-      // Credix結果CSV用マップ
-      const credixSendIdMap = new Map<string, { ok: boolean; paidDate?: Date }>();
-      const credixPhoneMap  = new Map<string, { ok: boolean; paidDate?: Date }>();
+      // Credix結果CSV用マップ（電話番号・メールで照合）
+      const credixPhoneMap = new Map<string, { ok: boolean; paidDate?: Date }>();
+      const credixEmailMap = new Map<string, { ok: boolean; paidDate?: Date }>();
 
       for (const line of dataLines) {
         if (!line.trim()) continue;
@@ -274,10 +277,8 @@ export async function POST(request: Request, { params }: Params) {
             resultMap.set(rawCode, { ok: true, paidDate });
           }
         } else if (isCredixResultFormat) {
-          // ── Credix結果CSV: K列(ID(sendid)) を credixSendIdMap へ格納 ──
-          //   WC付きID（例: WC14857601）も数字のみID（例: 69823944）も両方対象
-          const rawSendId = codeIdx >= 0 ? (cols[codeIdx] ?? "") : "";
-          if (!rawSendId || rawSendId === "-") continue;
+          // ── Credix結果CSV: 電話番号・メール → credixPhoneMap / credixEmailMap へ格納 ──
+          //   K列 ID(sendid) は結果判定のみ（WC付き・数字のみ両方対応）
 
           // 結果判定（「決済完了」等 → isOk=true）
           let isOk = true;
@@ -287,14 +288,7 @@ export async function POST(request: Request, { params }: Params) {
                    rawResult.toUpperCase() === "OK" || rawResult === "0" || rawResult === "1";
           }
 
-          // sendid → credixSendIdMap（同一IDは成功優先で1件のみ登録）
-          if (!credixSendIdMap.has(rawSendId)) {
-            credixSendIdMap.set(rawSendId, { ok: isOk, paidDate });
-          } else if (isOk && !credixSendIdMap.get(rawSendId)!.ok) {
-            credixSendIdMap.set(rawSendId, { ok: isOk, paidDate });
-          }
-
-          // 電話番号フォールバック用: credixPhoneMapにも格納
+          // 電話番号 → credixPhoneMap（同一電話番号は成功優先で1件のみ）
           if (phoneIdx >= 0) {
             const rawPhone = cols[phoneIdx] ?? "";
             const phone = normalizePhone(rawPhone);
@@ -303,6 +297,18 @@ export async function POST(request: Request, { params }: Params) {
                 credixPhoneMap.set(phone, { ok: isOk, paidDate });
               } else if (isOk && !credixPhoneMap.get(phone)!.ok) {
                 credixPhoneMap.set(phone, { ok: isOk, paidDate });
+              }
+            }
+          }
+
+          // メール → credixEmailMap（同一メールは成功優先で1件のみ）
+          if (emailIdx >= 0) {
+            const rawEmail = (cols[emailIdx] ?? "").toLowerCase().trim();
+            if (rawEmail && rawEmail !== "-" && rawEmail !== "non" && rawEmail.includes("@")) {
+              if (!credixEmailMap.has(rawEmail)) {
+                credixEmailMap.set(rawEmail, { ok: isOk, paidDate });
+              } else if (isOk && !credixEmailMap.get(rawEmail)!.ok) {
+                credixEmailMap.set(rawEmail, { ok: isOk, paidDate });
               }
             }
           }
@@ -320,67 +326,60 @@ export async function POST(request: Request, { params }: Params) {
       }
 
       if (isCredixResultFormat) {
-        console.log(`[import-result] Credix結果CSV: K列(sendid) ${credixSendIdMap.size}件抽出 / 電話番号 ${credixPhoneMap.size}件抽出`);
+        console.log(`[import-result] Credix結果CSV: 電話番号 ${credixPhoneMap.size}件抽出 / メール ${credixEmailMap.size}件抽出`);
 
-        // credixSendIdMap → resultMap 変換
-        // run.orders に紐づく MlmMember の creditCardId / creditCardId2 / creditCardId3 を取得し照合
+        // run.orders に紐づく MlmMember（creditCardId登録済み）を取得
         const memberIds = run.orders.map(o => o.mlmMemberId);
         const members = await prisma.mlmMember.findMany({
-          where: { id: { in: memberIds } },
+          where: {
+            id: { in: memberIds },
+            creditCardId: { not: null },
+          },
           select: {
             id: true,
             memberCode: true,
             mobile: true,
-            creditCardId:  true,
-            creditCardId2: true,
-            creditCardId3: true,
-            user: { select: { phone: true } },
+            creditCardId: true,
+            user: { select: { phone: true, email: true } },
           },
         });
         const memberMap = new Map(members.map(m => [m.memberCode, m]));
+        console.log(`[import-result] Credix: creditCardId登録済み対象会員 ${members.length}件 / run.orders ${run.orders.length}件`);
 
-        let matchBySendId = 0;
-        let matchByPhone  = 0;
+        let matchByPhone = 0;
+        let matchByEmail = 0;
 
         for (const order of run.orders) {
           const member = memberMap.get(order.memberCode);
-          if (!member) continue;
+          if (!member) continue; // creditCardId未登録の会員はスキップ
 
-          // 1次照合: creditCardId（1〜3枠）→ credixSendIdMap と完全一致
-          let entry: { ok: boolean; paidDate?: Date } | null = null;
-          for (const cid of [member.creditCardId, member.creditCardId2, member.creditCardId3]) {
-            if (cid && cid.trim() && credixSendIdMap.has(cid.trim())) {
-              const e = credixSendIdMap.get(cid.trim())!;
-              if (e.ok) { entry = e; break; }
-              // 失敗レコードも記録（成功なければ失敗として扱う）
-              if (!entry) entry = e;
-            }
-          }
-          if (entry) {
-            resultMap.set(order.memberCode, { ok: entry.ok, paidDate: entry.paidDate });
-            if (entry.ok) matchBySendId++;
-            continue;
-          }
-
-          // 2次照合（フォールバック）: 電話番号 → credixPhoneMap
+          // 1次照合: 電話番号 → credixPhoneMap
           const phoneUser   = normalizePhone(member.user?.phone ?? "");
           const phoneMobile = normalizePhone(member.mobile ?? "");
           const phoneEntry =
             (phoneUser   && credixPhoneMap.has(phoneUser))   ? credixPhoneMap.get(phoneUser)! :
             (phoneMobile && credixPhoneMap.has(phoneMobile)) ? credixPhoneMap.get(phoneMobile)! :
             null;
-          if (phoneEntry && phoneEntry.ok) {
-            resultMap.set(order.memberCode, { ok: true, paidDate: phoneEntry.paidDate });
-            matchByPhone++;
+          if (phoneEntry) {
+            resultMap.set(order.memberCode, { ok: phoneEntry.ok, paidDate: phoneEntry.paidDate });
+            if (phoneEntry.ok) matchByPhone++;
+            continue;
+          }
+
+          // 2次照合: メール → credixEmailMap
+          const email = (member.user?.email ?? "").toLowerCase().trim();
+          const emailEntry = (email && credixEmailMap.has(email)) ? credixEmailMap.get(email)! : null;
+          if (emailEntry) {
+            resultMap.set(order.memberCode, { ok: emailEntry.ok, paidDate: emailEntry.paidDate });
+            if (emailEntry.ok) matchByEmail++;
           }
         }
 
-        const totalMatch = matchBySendId + matchByPhone;
-        console.log(`[import-result] Credix照合: creditCardId ${matchBySendId}件 + 電話番号 ${matchByPhone}件 = 合計 ${totalMatch}件マッチ / run.orders ${run.orders.length}件`);
+        const totalMatch = matchByPhone + matchByEmail;
+        console.log(`[import-result] Credix照合: 電話番号 ${matchByPhone}件 + メール ${matchByEmail}件 = 合計 ${totalMatch}件マッチ`);
 
-        if (totalMatch === 0 && credixSendIdMap.size > 0) {
-          const sampleSendIds = Array.from(credixSendIdMap.keys()).slice(0, 3);
-          console.warn(`[import-result] ⚠️ 照合0件。DBのcreditCardIdにCSVのID(sendid)が登録されているか確認。サンプルsendid: ${sampleSendIds.join(", ")}`);
+        if (totalMatch === 0) {
+          console.warn(`[import-result] ⚠️ 照合0件。会員の電話番号・メールがCSVと一致するか、またcreditCardIdが登録されているか確認してください。`);
         }
       } else if (isCredixInternalFormat) {
         console.log(`[import-result] クレディックス社内CSV: 会員コード ${resultMap.size}件抽出`);
