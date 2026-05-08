@@ -241,6 +241,7 @@ export async function POST(request: Request) {
     let reasonIdx: number;
     let dateIdx: number;
     let phoneIdx: number = -1; // 電話番号列（Credix結果CSVで使用）
+    let emailIdx: number = -1; // メール列（Credix結果CSVで使用）
     // 会員コード列（社内クレディックスCSVで使用）
     let memberCodeIdx: number = -1;
 
@@ -258,7 +259,7 @@ export async function POST(request: Request) {
         h.includes("date") || h.includes("datetime")
       );
       phoneIdx  = header.findIndex(h => h.includes("電話番号") || h.includes("phone") || h.includes("tel"));
-      const emailIdx = header.findIndex(h => h.includes("e-mail") || h.includes("email") || h.includes("メール"));
+      emailIdx  = header.findIndex(h => h.includes("e-mail") || h.includes("email") || h.includes("メール"));
       if (codeIdx   === -1) codeIdx   = 10;
       if (resultIdx === -1) resultIdx = 4;
       if (dateIdx   === -1) dateIdx   = 3;
