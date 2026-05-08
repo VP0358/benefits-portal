@@ -299,7 +299,7 @@ export default function AutoShipPanel() {
   const [csvImportPm, setCsvImportPm] = useState<string>("credit_card");
   const [csvImportPmAutoDetected, setCsvImportPmAutoDetected] = useState(false);
   const [csvImportLoading, setCsvImportLoading] = useState(false);
-  const [csvImportResult, setCsvImportResult] = useState<{ paidCount: number; failedCount: number; newRunId?: string; effectivePaymentMethod?: string; debug?: Record<string, unknown>; warnings?: string[] } | null>(null);
+  const [csvImportResult, setCsvImportResult] = useState<{ paidCount: number; failedCount: number; matchedCount?: number; unmatchedCount?: number; newRunId?: string; effectivePaymentMethod?: string; debug?: Record<string, unknown>; warnings?: string[] } | null>(null);
 
   /* ─── 一覧取得 ─── */
   const loadRuns = useCallback(async () => {
@@ -468,13 +468,14 @@ export default function AutoShipPanel() {
       let data: Record<string, unknown> = {};
       try { data = rawText ? JSON.parse(rawText) : {}; } catch { /* ignore */ }
       if (!res.ok) throw new Error((data.error as string) ?? `サーバーエラー (${res.status})`);
-      setCsvImportResult({ paidCount: data.paidCount as number, failedCount: data.failedCount as number, newRunId: data.runId as string | undefined, effectivePaymentMethod: data.effectivePaymentMethod as string | undefined, debug: data._debug as Record<string, unknown> | undefined, warnings: data.warnings as string[] | undefined });
+      setCsvImportResult({ paidCount: data.paidCount as number, failedCount: data.failedCount as number, matchedCount: data.matchedCount as number | undefined, unmatchedCount: data.unmatchedCount as number | undefined, newRunId: data.runId as string | undefined, effectivePaymentMethod: data.effectivePaymentMethod as string | undefined, debug: data._debug as Record<string, unknown> | undefined, warnings: data.warnings as string[] | undefined });
       const pmLabel = data.effectivePaymentMethod === "bank_transfer" ? "口座引き落とし" :
                       data.effectivePaymentMethod === "credit_card"   ? "クレジットカード" :
                       (data.effectivePaymentMethod as string | undefined) ?? csvImportPm;
+      const unmatchedCount = data.unmatchedCount as number | undefined;
       setMsg({
         type: "success",
-        text: `CSVインポート完了: 決済成功 ${data.paidCount} 件 / 失敗 ${data.failedCount} 件。支払い方法: ${pmLabel}。当月アクティブ反映済み。`,
+        text: `CSVインポート完了: 入金日セット ${data.paidCount} 件${unmatchedCount != null && unmatchedCount > 0 ? ` / 照合できなかった件数 ${unmatchedCount} 件（伝票未作成または伝票の電話番号・会員コード不一致）` : ""}。支払い方法: ${pmLabel}。`,
       });
       loadRuns();
     } catch (e: unknown) {
@@ -898,10 +899,20 @@ export default function AutoShipPanel() {
         </div>
         <div className="mt-3 p-3 bg-yellow-50 rounded-lg text-xs text-yellow-800 border border-yellow-200 mb-3">
           ⚠️ <strong>対応フォーマット</strong>:<br />
-          <span className="font-semibold">① 三菱UFJファクター固定長TXT（自動判定）</span>: ファイル名が <code className="bg-yellow-100 px-1 rounded">SIRR*.txt</code> / <code className="bg-yellow-100 px-1 rounded">SIRD*.txt</code> 等の形式。支払い方法は「口座引き落とし」に自動切り替えされます。ファイル内全行を引き落とし成功として処理します。<br />
-          <span className="font-semibold">② クレディックスCSV（自動判定）</span>: ヘッダーに「ID(sendid)」列を含む形式。ファイル内全行を決済成功として処理します。<br />
-          <span className="font-semibold">③ 汎用フォーマット</span>: ヘッダーに「会員コード（code）」「決済結果（result/status）」列が必要。
+          <span className="font-semibold">① 三菱UFJファクター固定長TXT（自動判定）</span>: ファイル名が <code className="bg-yellow-100 px-1 rounded">SIRR*.txt</code> / <code className="bg-yellow-100 px-1 rounded">SIRD*.txt</code> 等の形式。支払い方法は「口座引き落とし」に自動切り替えされます。<br />
+          <span className="font-semibold">② クレディックスCSV - 社内送信用（自動判定）</span>: システムが出力した <code className="bg-yellow-100 px-1 rounded">顧客ID,会員コード,氏名,...</code> 形式のCSV。会員コードで直接照合し全件成功として処理します。<br />
+          <span className="font-semibold">③ クレディックスCSV - 結果返送用（自動判定）</span>: クレディックスから届く <code className="bg-yellow-100 px-1 rounded">IPコード,オーダーNo,電話番号,決済日時,結果,...,ID(sendid),...</code> 形式。<strong>K列（ID(sendid)）= 決済ID</strong> を MLM会員詳細の「クレジット①②③（クレディックス）」欄の値と完全一致で照合。WC付きID・数字のみIDの両方に対応。フォールバックとして電話番号照合も実施。<br />
+          <span className="font-semibold">④ 汎用フォーマット</span>: ヘッダーに「会員コード（code）」「決済結果（result/status）」列が必要。
           結果コード: <code className="bg-yellow-100 px-1 rounded">OK</code>/<code className="bg-yellow-100 px-1 rounded">1</code> = 成功。
+          <br /><br />
+          📥 <strong>サンプルフォーマット</strong>:&nbsp;
+          <a href="/csv-samples/credix_%E9%80%81%E4%BF%A1%E7%94%A8%E3%82%B5%E3%83%B3%E3%83%97%E3%83%AB.csv" download className="text-blue-600 underline">クレディックス送信用CSV</a>
+          &nbsp;|&nbsp;
+          <a href="/csv-samples/credix_%E7%B5%90%E6%9E%9C%E8%BF%94%E9%80%81%E7%94%A8%E3%82%B5%E3%83%B3%E3%83%97%E3%83%AB.csv" download className="text-blue-600 underline">クレディックス結果返送用CSV</a>
+          &nbsp;|&nbsp;
+          <a href="/csv-samples/mufg_%E9%80%81%E4%BF%A1%E7%94%A8%E3%82%B5%E3%83%B3%E3%83%97%E3%83%AB.csv" download className="text-blue-600 underline">三菱UFJ送信用CSV</a>
+          &nbsp;|&nbsp;
+          <a href="/csv-samples/mufg_TXT%E3%83%95%E3%82%A9%E3%83%BC%E3%83%9E%E3%83%83%E3%83%88%E8%AA%AC%E6%98%8E.txt" download className="text-blue-600 underline">三菱UFJ TXTフォーマット説明</a>
         </div>
         <div className="flex flex-wrap gap-3">
           <button
@@ -924,6 +935,15 @@ export default function AutoShipPanel() {
           <div className="mt-3 p-3 bg-green-50 rounded-lg text-sm border border-green-200">
             <p className="font-semibold text-green-800">✅ インポート完了</p>
             <p className="text-green-700">決済成功: <strong>{csvImportResult.paidCount}件</strong> / 失敗: <strong>{csvImportResult.failedCount}件</strong></p>
+            {/* 照合件数サマリー */}
+            {csvImportResult.matchedCount !== undefined && (
+              <p className="text-xs text-gray-600 mt-1">
+                ファイル照合: <strong>{csvImportResult.matchedCount}件</strong>一致
+                {csvImportResult.unmatchedCount !== undefined && csvImportResult.unmatchedCount > 0 && (
+                  <span className="text-orange-600 ml-2">/ 伝票未照合: <strong>{csvImportResult.unmatchedCount}件</strong></span>
+                )}
+              </p>
+            )}
             {csvImportResult.effectivePaymentMethod && (
               <p className="text-xs text-gray-500 mt-1">
                 支払い方法: {csvImportResult.effectivePaymentMethod === "bank_transfer" ? "🏦 口座引き落とし" : csvImportResult.effectivePaymentMethod === "credit_card" ? "💳 クレジットカード" : csvImportResult.effectivePaymentMethod}
@@ -938,31 +958,37 @@ export default function AutoShipPanel() {
               </button>
             )}
             {csvImportResult.warnings && csvImportResult.warnings.length > 0 && (
-              <details className="mt-2">
-                <summary className="text-xs text-orange-500 cursor-pointer hover:text-orange-700">⚠️ 後処理に一部エラー（決済カウントは正確です）</summary>
-                <div className="mt-1 p-2 bg-orange-50 rounded text-xs text-orange-700 overflow-auto max-h-32">
-                  {csvImportResult.warnings.map((w, i) => <div key={i}>{w}</div>)}
+              <details className="mt-2" open={csvImportResult.unmatchedCount !== undefined && csvImportResult.unmatchedCount > 0}>
+                <summary className="text-xs text-orange-500 cursor-pointer hover:text-orange-700">
+                  ⚠️ {csvImportResult.warnings.some(w => w.startsWith("⚠️")) ? "件数不一致・後処理情報" : "後処理に一部エラー"}（クリックで詳細）
+                </summary>
+                <div className="mt-1 p-2 bg-orange-50 rounded text-xs text-orange-700 overflow-auto max-h-48">
+                  {csvImportResult.warnings.map((w, i) => <div key={i} className="mb-1 break-all">{w}</div>)}
                 </div>
               </details>
             )}
             {csvImportResult.debug && (
               <details className="mt-2">
                 <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">🔍 デバッグ情報（クリックで展開）</summary>
-                <div className="mt-1 p-2 bg-gray-50 rounded text-xs font-mono text-gray-600 overflow-auto max-h-48">
-                  <div>isMufg: <strong>{String(csvImportResult.debug.isMufg)}</strong></div>
-                  <div>effectivePaymentMethod: <strong>{String(csvImportResult.debug.effectivePaymentMethod)}</strong> (sent: {String(csvImportResult.debug.originalPaymentMethod)})</div>
-                  <div>resultMapSize: <strong>{String(csvImportResult.debug.resultMapSize)}</strong></div>
-                  <div>runOrdersCount: <strong>{String(csvImportResult.debug.runOrdersCount)}</strong></div>
-                  <div>matchedCount: <strong>{String(csvImportResult.debug.matchedCount)}</strong></div>
-                  <div>mufgAccountMapSize: <strong>{String(csvImportResult.debug.mufgAccountMapSize ?? "-")}</strong></div>
-                  {Array.isArray(csvImportResult.debug.mufgAccountSample) && (
-                    <div>mufgAccountSample: [{(csvImportResult.debug.mufgAccountSample as string[]).join(", ")}]</div>
+                <div className="mt-1 p-2 bg-gray-50 rounded text-xs font-mono text-gray-600 overflow-auto max-h-64">
+                  <div>isMufg: <strong>{String(csvImportResult.debug.isMufg)}</strong> / isCredix: <strong>{String(csvImportResult.debug.isCredix)}</strong></div>
+                  <div>effectivePaymentMethod: <strong>{String(csvImportResult.debug.effectivePaymentMethod)}</strong></div>
+                  <div>ファイル件数: <strong>{String(csvImportResult.debug.fileRecordCount ?? "-")}</strong> / 入金反映: <strong>{String(csvImportResult.debug.paidCount)}</strong> / 未照合: <strong>{String(csvImportResult.debug.unmatchedCount ?? "-")}</strong></div>
+                  {csvImportResult.debug.mufgMemberMapSize !== undefined && (
+                    <div>MUFG会員コード数（×2含む）: <strong>{String(csvImportResult.debug.mufgMemberMapSize)}</strong></div>
                   )}
-                  {Array.isArray(csvImportResult.debug.runOrdersSampleAccountNumbers) && (
-                    <div>runOrders accountNumbers sample: [{(csvImportResult.debug.runOrdersSampleAccountNumbers as (string|null)[]).map(v => v ?? "null").join(", ")}]</div>
+                  {csvImportResult.debug.credixPhoneMapSize !== undefined && (
+                    <div>Credix電話番号数: <strong>{String(csvImportResult.debug.credixPhoneMapSize)}</strong></div>
                   )}
-                  {Array.isArray(csvImportResult.debug.unmatchedOrders) && (csvImportResult.debug.unmatchedOrders as unknown[]).length > 0 && (
-                    <div className="text-orange-600">未照合orders({(csvImportResult.debug.unmatchedOrders as unknown[]).length}件): {JSON.stringify(csvImportResult.debug.unmatchedOrders).slice(0, 200)}</div>
+                  {Array.isArray(csvImportResult.debug.matchedOrderIds) && (csvImportResult.debug.matchedOrderIds as string[]).length > 0 && (
+                    <div className="text-green-600 mt-1">
+                      照合済みOrderID: [{(csvImportResult.debug.matchedOrderIds as string[]).join(", ")}]
+                    </div>
+                  )}
+                  {Array.isArray(csvImportResult.debug.unmatchedSample) && (csvImportResult.debug.unmatchedSample as string[]).length > 0 && (
+                    <div className="text-orange-600 mt-1">
+                      未照合サンプル({(csvImportResult.debug.unmatchedSample as string[]).length}件): {(csvImportResult.debug.unmatchedSample as string[]).join(", ")}
+                    </div>
                   )}
                 </div>
               </details>
