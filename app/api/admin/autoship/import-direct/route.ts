@@ -447,26 +447,14 @@ export async function POST(request: Request) {
 
       const orders = await prisma.order.findMany({
         where: {
-          userId:   user.id,
-          slipType: "autoship",
-          AND: [
-            {
-              OR: [
-                { paymentStatus: "unpaid" },
-                { paymentStatus: "pending" },
-                { paymentStatus: null },
-              ],
-            },
-            {
-              orderedAt: {
-                gte: new Date(twoMonthsAgo.getTime() - 9 * 60 * 60 * 1000),
-                lt:  new Date(twoMonthsAhead.getTime() - 9 * 60 * 60 * 1000),
-              },
-            },
-            {
-              OR: ORDER_PM_FILTER.map(pm => ({ paymentMethod: pm })),
-            },
-          ],
+          userId:        user.id,
+          slipType:      "autoship",
+          paymentStatus: { in: ["unpaid", "pending"] },
+          orderedAt: {
+            gte: new Date(twoMonthsAgo.getTime() - 9 * 60 * 60 * 1000),
+            lt:  new Date(twoMonthsAhead.getTime() - 9 * 60 * 60 * 1000),
+          },
+          OR: ORDER_PM_FILTER.map(pm => ({ paymentMethod: pm })),
         },
         orderBy: { orderedAt: "desc" },
         take: 1,
@@ -581,24 +569,14 @@ export async function POST(request: Request) {
 
       const orders = await prisma.order.findMany({
         where: {
-          userId:   member.userId,
-          slipType: "autoship",
-          AND: [
-            {
-              OR: [
-                { paymentStatus: "unpaid" },
-                { paymentStatus: "pending" },
-                { paymentStatus: null },
-              ],
-            },
-            {
-              orderedAt: {
-                gte: new Date(twoMonthsAgo2.getTime() - 9 * 60 * 60 * 1000),
-                lt:  new Date(twoMonthsAhead2.getTime() - 9 * 60 * 60 * 1000),
-              },
-            },
-            { OR: ORDER_PM_FILTER.map(pm => ({ paymentMethod: pm })) },
-          ],
+          userId:        member.userId,
+          slipType:      "autoship",
+          paymentStatus: { in: ["unpaid", "pending"] },
+          orderedAt: {
+            gte: new Date(twoMonthsAgo2.getTime() - 9 * 60 * 60 * 1000),
+            lt:  new Date(twoMonthsAhead2.getTime() - 9 * 60 * 60 * 1000),
+          },
+          OR: ORDER_PM_FILTER.map(pm => ({ paymentMethod: pm })),
         },
         orderBy: { orderedAt: "desc" },
         take: 1,
@@ -932,19 +910,11 @@ async function processFromDatabase(
       const extEnd   = new Date(monthEndUtc.getTime()   + 30 * 24 * 60 * 60 * 1000);
       orders = await prisma.order.findMany({
         where: {
-          userId:    m.userId,
-          slipType:  "autoship",
-          AND: [
-            {
-              OR: [
-                { paymentStatus: "unpaid" },
-                { paymentStatus: "pending" },
-                { paymentStatus: null },
-              ],
-            },
-            { orderedAt: { gte: extStart, lt: extEnd } },
-            { OR: ORDER_PM_FILTER.map(pm => ({ paymentMethod: pm })) },
-          ],
+          userId:        m.userId,
+          slipType:      "autoship",
+          paymentStatus: { in: ["unpaid", "pending"] },
+          orderedAt:     { gte: extStart, lt: extEnd },
+          OR: ORDER_PM_FILTER.map(pm => ({ paymentMethod: pm })),
         },
         orderBy: { orderedAt: "desc" },
         take: 1,
