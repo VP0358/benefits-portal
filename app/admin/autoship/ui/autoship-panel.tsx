@@ -473,9 +473,10 @@ export default function AutoShipPanel() {
                       data.effectivePaymentMethod === "credit_card"   ? "クレジットカード" :
                       (data.effectivePaymentMethod as string | undefined) ?? csvImportPm;
       const unmatchedCount = data.unmatchedCount as number | undefined;
+      const matchedCount = data.matchedCount as number | undefined;
       setMsg({
         type: "success",
-        text: `CSVインポート完了: 入金日セット ${data.paidCount} 件${unmatchedCount != null && unmatchedCount > 0 ? ` / 照合できなかった件数 ${unmatchedCount} 件（伝票未作成または伝票の電話番号・会員コード不一致）` : ""}。支払い方法: ${pmLabel}。`,
+        text: `CSVインポート完了: 決済成功 ${data.paidCount} 件 / 失敗 ${data.failedCount ?? 0} 件${matchedCount != null ? ` / 照合 ${matchedCount} 件` : ""}${unmatchedCount != null && unmatchedCount > 0 ? ` / CSV未照合 ${unmatchedCount} 件` : ""}。支払い方法: ${pmLabel}。`,
       });
       loadRuns();
     } catch (e: unknown) {
@@ -901,7 +902,7 @@ export default function AutoShipPanel() {
           ⚠️ <strong>対応フォーマット</strong>:<br />
           <span className="font-semibold">① 三菱UFJファクター固定長TXT（自動判定）</span>: ファイル名が <code className="bg-yellow-100 px-1 rounded">SIRR*.txt</code> / <code className="bg-yellow-100 px-1 rounded">SIRD*.txt</code> 等の形式。支払い方法は「口座引き落とし」に自動切り替えされます。<br />
           <span className="font-semibold">② クレディックスCSV - 社内送信用（自動判定）</span>: システムが出力した <code className="bg-yellow-100 px-1 rounded">顧客ID,会員コード,氏名,...</code> 形式のCSV。会員コードで直接照合し全件成功として処理します。<br />
-          <span className="font-semibold">③ クレディックスCSV - 結果返送用（自動判定）</span>: クレディックスから届く <code className="bg-yellow-100 px-1 rounded">IPコード,オーダーNo,電話番号,決済日時,結果,...,ID(sendid),...</code> 形式。<strong>照合条件：MLM会員詳細の「クレジット①（クレディックス）」に決済IDが登録されている会員のみ対象。</strong> 照合キー：電話番号（C列）→ 1次、メール（H列）→ 2次。K列（ID(sendid)）は決済結果（成功/失敗）の判定にのみ使用。WC付きID・数字のみID両方に対応。<br />
+          <span className="font-semibold">③ クレディックスCSV - 結果返送用（自動判定）</span>: クレディックスから届く <code className="bg-yellow-100 px-1 rounded">IPコード,オーダーNo,電話番号,決済日時,結果,...,ID(sendid),...</code> 形式。<strong>照合条件：MLM会員詳細の「クレジット①②③（クレディックス）」いずれかに決済IDが登録されている会員のみ対象。</strong> 照合キー：<strong>K列（ID(sendid)）の決済ID</strong>（「WC付き数字」または「数字のみ」）と会員の決済ID①②③を照合。照合完了後、AutoShipRun・AutoShipOrder・MlmPurchase・PointWallet を自動作成・更新します。<br />
           <span className="font-semibold">④ 汎用フォーマット</span>: ヘッダーに「会員コード（code）」「決済結果（result/status）」列が必要。
           結果コード: <code className="bg-yellow-100 px-1 rounded">OK</code>/<code className="bg-yellow-100 px-1 rounded">1</code> = 成功。
           <br /><br />
@@ -971,17 +972,15 @@ export default function AutoShipPanel() {
               <details className="mt-2">
                 <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">🔍 デバッグ情報（クリックで展開）</summary>
                 <div className="mt-1 p-2 bg-gray-50 rounded text-xs font-mono text-gray-600 overflow-auto max-h-64">
-                  <div>isMufg: <strong>{String(csvImportResult.debug.isMufg)}</strong> / isCredix: <strong>{String(csvImportResult.debug.isCredix)}</strong></div>
-                  <div>effectivePaymentMethod: <strong>{String(csvImportResult.debug.effectivePaymentMethod)}</strong></div>
-                  <div>ファイル件数: <strong>{String(csvImportResult.debug.fileRecordCount ?? "-")}</strong> / 入金反映: <strong>{String(csvImportResult.debug.paidCount)}</strong> / 未照合: <strong>{String(csvImportResult.debug.unmatchedCount ?? "-")}</strong></div>
-                  {csvImportResult.debug.mufgMemberMapSize !== undefined && (
-                    <div>MUFG会員コード数（×2含む）: <strong>{String(csvImportResult.debug.mufgMemberMapSize)}</strong></div>
+                  <div>入金反映: <strong>{String(csvImportResult.debug.paidCount ?? "-")}</strong> / 失敗: <strong>{String(csvImportResult.debug.failedCount ?? "-")}</strong> / CSV未照合: <strong>{String(csvImportResult.debug.csvUnmatchedCount ?? "-")}</strong></div>
+                  {csvImportResult.debug.csvIdCount !== undefined && (
+                    <div>CSV決済ID数: <strong>{String(csvImportResult.debug.csvIdCount)}</strong> / 会員数: <strong>{String(csvImportResult.debug.memberCount ?? "-")}</strong> / 決済IDマップ: <strong>{String(csvImportResult.debug.cardIdMapSize ?? "-")}</strong></div>
                   )}
-                  {csvImportResult.debug.credixPhoneMapSize !== undefined && (
-                    <div>Credix電話番号数: <strong>{String(csvImportResult.debug.credixPhoneMapSize)}</strong></div>
+                  {csvImportResult.debug.matchedCount !== undefined && (
+                    <div>照合結果（成功＋失敗）: <strong>{String(csvImportResult.debug.matchedCount)}</strong>件</div>
                   )}
-                  {csvImportResult.debug.credixEmailMapSize !== undefined && (
-                    <div>Credixメール数: <strong>{String(csvImportResult.debug.credixEmailMapSize)}</strong></div>
+                  {csvImportResult.debug.memberCodeCount !== undefined && (
+                    <div>MUFG/汎用 会員コード数: <strong>{String(csvImportResult.debug.memberCodeCount)}</strong></div>
                   )}
                   {Array.isArray(csvImportResult.debug.matchedOrderIds) && (csvImportResult.debug.matchedOrderIds as string[]).length > 0 && (
                     <div className="text-green-600 mt-1">

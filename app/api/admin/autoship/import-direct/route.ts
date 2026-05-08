@@ -6,29 +6,46 @@ export const maxDuration = 300 // Vercel最大300秒
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/app/api/admin/route-guard";
+import { getMlmDisplayName } from "@/lib/mlm-display-name";
 
 /**
- * POST: クレディックス / 三菱UFJファクター から出力されたCSVを直接インポート
+ * POST: クレディックス結果CSVを直接インポート
  *
- * ★ 照合対象: オートシップ有効会員一覧から「選択した伝票を一括作成」で作られた
- *   Order テーブルの伝票（slipType=autoship）
+ * ═══════════════════════════════════════════════════════════════
+ * ① クレディックス結果CSV 照合ロジック
+ * ═══════════════════════════════════════════════════════════════
+ *   CSVフォーマット（クレディックスから届く）:
+ *     IPコード, オーダーNo, 電話番号, 決済日時, 結果, 3D認証,
+ *     取り消し日, E-mail, 発行ID, 発行パスワード, ID(sendid),
+ *     SENDPOINT, 決済金額, 支払回数, 処理方式
  *
- * 照合ロジック:
- *   - MUFG固定長TXT: memberCode（会員番号-枝番）→ User.memberCode → Order.userId
- *   - Credix結果CSV:
- *       対象絞り込み: MlmMember.creditCardId（①のみ）が登録されている会員のみ
- *       1次照合: 電話番号（CSV C列）→ MlmMember.mobile / User.phone
- *       2次照合: メール（CSV H列）→ User.email
- *       ※ K列 ID(sendid) は決済結果（成功/失敗）の判定のみに使用（照合キーではない）
- *       ※ WC付きID・数字のみID 両方対応
+ *   ② 照合キー: K列（ID(sendid)）の値
+ *       - 「WC付き数字」例: WC1485760
+ *       - 「数字のみ」例: 69823944
+ *       → 数字部分を正規化して比較
  *
- * 処理内容:
- *   - CSVファイルの支払い完了情報と Order テーブルを照合
- *   - 一致した Order の paidAt（入金日）と paymentStatus=paid をセット
- *   - MlmPurchase が未作成なら作成し、会員を active に更新
+ *   ③ 照合先: MLM会員管理 > MLM会員詳細
+ *       MlmMember.creditCardId  （クレジット①）
+ *       MlmMember.creditCardId2 （クレジット②）
+ *       MlmMember.creditCardId3 （クレジット③）
+ *       いずれかが一致する会員を対象とする
+ *       記載のない人（全て null）は対象外
+ *
+ *   ④ 照合後: 金額・購入反映を自動実行
+ *       - AutoShipRun が未作成なら自動作成
+ *       - AutoShipOrder を upsert（照合済み会員分）
+ *       - MlmPurchase 登録・MlmMember.status=active・PointWallet付与
+ *
+ *   ⑤ 伝票作成: AutoShipOrder を自動作成（照合完了分）
+ *
+ *   ⑥ 完了後: AutoShipRun.status=completed に更新 → タブに表示
+ *
+ * ═══════════════════════════════════════════════════════════════
+ * 三菱UFJファクター TXT も引き続きサポート（照合ロジック変更なし）
+ * ═══════════════════════════════════════════════════════════════
  *
  * FormData:
- *   file:          CSV ファイル（省略可: noFile=true の場合はDBから自動取得）
+ *   file:          CSV / TXT ファイル（省略可: noFile=true の場合はDBから自動取得）
  *   targetMonth:   YYYY-MM
  *   paymentMethod: credit_card | bank_transfer
  *   noFile:        "true" の場合、ファイルなしでDBのオートシップ有効会員を全員取込
@@ -57,9 +74,7 @@ export async function POST(request: Request) {
   const arrayBuffer = await file.arrayBuffer();
   const uint8 = new Uint8Array(arrayBuffer);
 
-  // ── フォーマット自動判定 ──
-  // 三菱UFJファクター固定長TXTフォーマット判定:
-  //   先頭5バイトが数字のみ かつ カンマが少ない
+  // ── フォーマット自動判定: 三菱UFJファクター固定長TXT ──
   function isMufgFixedFormat(buf: Uint8Array): boolean {
     for (let i = 0; i < Math.min(5, buf.length); i++) {
       if (buf[i] < 0x30 || buf[i] > 0x39) return false;
@@ -74,310 +89,457 @@ export async function POST(request: Request) {
   // ── CSV日時文字列 → Date 変換ヘルパー ──
   function parseCsvDate(str: string): Date | null {
     if (!str || str === "-" || str === "") return null;
-    // YYYY/MM/DD HH:MM:SS または YYYY-MM-DD HH:MM:SS 形式
     const m1 = str.match(/^(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
     if (m1) {
       const [, y, mo, d, h = "0", mi = "0", s = "0"] = m1;
-      // JST → UTC
       const jst = new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi), Number(s));
       return new Date(jst.getTime() - 9 * 60 * 60 * 1000);
     }
     return null;
   }
 
-  // ── 電話番号正規化ヘルパー ──
-  function normalizePhone(raw: string): string {
-    return raw.replace(/-/g, "").replace(/^\+81/, "0").trim();
+  // ── 決済ID正規化: WC付き・数字のみ両方を数字部分のみに正規化 ──
+  function normalizeCardId(raw: string): string {
+    const s = raw.trim();
+    // WC数字 → 数字のみ
+    const wcMatch = s.match(/^WC(\d+)$/i);
+    if (wcMatch) return wcMatch[1];
+    // 数字のみ
+    if (/^\d+$/.test(s)) return s;
+    return s;
   }
 
-  // ── 照合結果マップ ──
-  // memberCode → { ok, paidDate } （MUFG・汎用CSV用）
-  const resultMap = new Map<string, { ok: boolean; reason?: string; paidDate?: Date }>();
-  // 電話番号 → { ok, paidDate } （Credix結果CSV: 1次照合用）
-  const credixPhoneMap = new Map<string, { ok: boolean; paidDate?: Date }>();
-  // メール → { ok, paidDate } （Credix結果CSV: 2次照合用）
-  const credixEmailMap = new Map<string, { ok: boolean; paidDate?: Date }>();
+  // ── 決済IDが一致するかチェック（両方向） ──
+  function cardIdMatch(csvId: string, memberCardId: string | null): boolean {
+    if (!memberCardId) return false;
+    const normCsv    = normalizeCardId(csvId);
+    const normMember = normalizeCardId(memberCardId);
+    return normCsv !== "" && normCsv === normMember;
+  }
 
-  let effectivePaymentMethod = paymentMethod;
-  let isMufg = false;
-  let isCredix = false;
-  let isCredixInternalFormat = false; // スコープを外に出してデバッグ出力で参照可能にする
-
+  // ══════════════════════════════════════════════════════════════
+  // 三菱UFJファクター 固定長TXT
+  // ══════════════════════════════════════════════════════════════
   if (isMufgFixedFormat(uint8)) {
-    // ══════════════════════════════════════════════════════════════
-    // 三菱UFJファクター 固定長TXT
-    // ══════════════════════════════════════════════════════════════
-    // 照合キー: tail32[16:22] = 会員番号6桁, tail32[22:24] = 枝番2桁
-    // → memberCode = "会員番号-枝番" 例: "128776-01"
+    return await processMufgTxt(arrayBuffer, uint8, targetMonth);
+  }
 
-    const [ty, tm] = targetMonth.split("-").map(Number);
-    const lastDayOfMonth = new Date(ty, tm, 0); // 月末日 00:00 JST
-    const paidDateForAll = new Date(lastDayOfMonth.getTime() - 9 * 60 * 60 * 1000);
+  // ══════════════════════════════════════════════════════════════
+  // CSV フォーマット（クレディックス結果CSV / 社内CSV / 汎用CSV）
+  // ══════════════════════════════════════════════════════════════
+  function looksLikeShiftJis(buf: Uint8Array): boolean {
+    for (let i = 0; i < Math.min(buf.length, 4096); i++) {
+      const b = buf[i];
+      if ((b >= 0x81 && b <= 0x9F) || (b >= 0xE0 && b <= 0xEF)) return true;
+    }
+    return false;
+  }
 
-    const rawBytes = new Uint8Array(arrayBuffer);
-    const byteLines: Uint8Array[] = [];
-    let start = 0;
-    for (let i = 0; i < rawBytes.length; i++) {
-      if (rawBytes[i] === 0x0A) {
-        const end = (i > 0 && rawBytes[i-1] === 0x0D) ? i - 1 : i;
-        byteLines.push(rawBytes.slice(start, end));
-        start = i + 1;
+  const hasUtf8Bom = uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF;
+  let rawText: string;
+  if (!hasUtf8Bom && looksLikeShiftJis(uint8)) {
+    rawText = new TextDecoder("shift-jis").decode(arrayBuffer);
+  } else {
+    rawText = new TextDecoder("utf-8").decode(arrayBuffer);
+  }
+
+  const text  = rawText.replace(/^\uFEFF/, "");
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter(l => l.trim());
+  if (lines.length < 1) {
+    return NextResponse.json({ error: "CSVにデータがありません" }, { status: 400 });
+  }
+
+  function parseCsvLine(line: string): string[] {
+    const result: string[] = [];
+    let current = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQuotes = !inQuotes; }
+      else if (ch === "," && !inQuotes) { result.push(current.trim()); current = ""; }
+      else { current += ch; }
+    }
+    result.push(current.trim());
+    return result;
+  }
+
+  const headerRaw = parseCsvLine(lines[0]);
+  const header    = headerRaw.map(h => h.replace(/^"|"$/g, "").replace(/^\uFEFF/, "").trim().toLowerCase());
+
+  // ──────────────────────────────────────────────────────────────
+  // クレディックス結果CSV判定
+  //   ヘッダーに sendid / id(sendid) / sendpoint を含む
+  // ──────────────────────────────────────────────────────────────
+  const isCredixResultFormat = header.some(h =>
+    h.includes("sendid") || h.includes("sendpoint") || h.includes("id(sendid)")
+  );
+
+  // 社内クレディックスCSV（送信用）
+  const isCredixInternalFormat =
+    !isCredixResultFormat &&
+    header.includes("顧客id") &&
+    (header.includes("会員コード") || header.some(h => h.includes("会員コード")));
+
+  const dataLines = lines.slice(1).filter(l => l.trim());
+  if (dataLines.length === 0) {
+    return NextResponse.json({ error: "CSVにデータ行がありません（ヘッダー行のみ）" }, { status: 400 });
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // ★ クレディックス結果CSV: K列（ID(sendid)）で照合
+  // ══════════════════════════════════════════════════════════════
+  if (isCredixResultFormat) {
+    // 列インデックス取得
+    const codeIdx   = (() => {
+      let i = header.findIndex(h => h === "id(sendid)" || h.includes("sendid"));
+      if (i === -1) i = 10; // デフォルト K列
+      return i;
+    })();
+    const resultIdx = (() => {
+      let i = header.findIndex(h => h.includes("結果") || h === "result");
+      if (i === -1) i = 4;
+      return i;
+    })();
+    const dateIdx   = (() => {
+      let i = header.findIndex(h =>
+        h.includes("決済日時") || h.includes("処理日時") || h.includes("日時") || h.includes("date")
+      );
+      if (i === -1) i = 3;
+      return i;
+    })();
+
+    console.log(`[import-direct] Credix結果CSV検出: header=[${header.join("|")}]`);
+    console.log(`[import-direct] Credix: codeIdx(K列)=${codeIdx}, resultIdx=${resultIdx}, dateIdx=${dateIdx}`);
+
+    // ── CSV から 決済ID → { isOk, paidDate } マップを構築 ──
+    // 同一決済IDに複数行ある場合、成功行を優先
+    const csvIdMap = new Map<string, { isOk: boolean; paidDate: Date | undefined }>();
+
+    for (const line of dataLines) {
+      if (!line.trim()) continue;
+      const cols = parseCsvLine(line).map(c => c.replace(/^"|"$/g, "").trim());
+      if (cols.length === 0) continue;
+
+      const rawId = cols[codeIdx] ?? "";
+      if (!rawId || rawId === "-" || rawId === "") continue;
+
+      const normId = normalizeCardId(rawId);
+      if (!normId) continue;
+
+      // 結果判定
+      let isOk = true;
+      if (resultIdx >= 0 && cols[resultIdx] !== undefined && cols[resultIdx] !== "") {
+        const rawResult = cols[resultIdx];
+        isOk = rawResult.includes("完了") || rawResult.includes("成功") ||
+               rawResult.toUpperCase() === "OK" || rawResult === "0" || rawResult === "1";
+      }
+
+      const rawDate = dateIdx >= 0 ? (cols[dateIdx] ?? "") : "";
+      const paidDate = parseCsvDate(rawDate) ?? undefined;
+
+      // 同一IDは成功優先で登録
+      if (!csvIdMap.has(normId)) {
+        csvIdMap.set(normId, { isOk, paidDate });
+      } else if (isOk && !csvIdMap.get(normId)!.isOk) {
+        csvIdMap.set(normId, { isOk, paidDate });
       }
     }
-    if (start < rawBytes.length) byteLines.push(rawBytes.slice(start));
 
-    for (const byteLine of byteLines) {
-      if (byteLine.length < 50) continue;
-      // U+FFFD (ef bf bd) → '?' 正規化
-      const norm: number[] = [];
-      let bi = 0;
-      while (bi < byteLine.length) {
-        if (bi + 2 < byteLine.length &&
-            byteLine[bi] === 0xEF && byteLine[bi+1] === 0xBF && byteLine[bi+2] === 0xBD) {
-          norm.push(0x3F); bi += 3;
-        } else {
-          norm.push(byteLine[bi]); bi++;
+    console.log(`[import-direct] Credix: CSV決済ID ${csvIdMap.size}件抽出`);
+
+    // ── 対象会員取得: creditCardId①②③ のいずれかが登録されている会員 ──
+    const allMlmMembers = await prisma.mlmMember.findMany({
+      where: {
+        autoshipEnabled: true,
+        status: { not: "withdrawn" },
+        OR: [
+          { creditCardId:  { not: null } },
+          { creditCardId2: { not: null } },
+          { creditCardId3: { not: null } },
+        ],
+      },
+      select: {
+        id: true,
+        userId: true,
+        memberCode: true,
+        creditCardId:  true,
+        creditCardId2: true,
+        creditCardId3: true,
+        mobile: true,
+        companyName: true,
+        autoshipStartDate: true,
+        autoshipStopDate: true,
+        autoshipSuspendMonths: true,
+        user: {
+          select: {
+            name: true,
+            nameKana: true,
+            phone: true,
+            email: true,
+            postalCode: true,
+            address: true,
+          },
+        },
+        mlmRegistration: {
+          select: {
+            deliveryPostalCode: true,
+            deliveryAddress: true,
+            deliveryName: true,
+          },
+        },
+      },
+    });
+
+    console.log(`[import-direct] Credix: creditCardId①②③登録済み会員 ${allMlmMembers.length}件`);
+
+    // ── 会員の決済ID → 会員マップを構築 ──
+    // 1つの会員が3枠持つため、各枠の正規化IDをキーにマップ
+    type MemberRow = typeof allMlmMembers[0];
+    const cardIdToMember = new Map<string, MemberRow>();
+    for (const m of allMlmMembers) {
+      for (const cid of [m.creditCardId, m.creditCardId2, m.creditCardId3]) {
+        if (!cid) continue;
+        const normCid = normalizeCardId(cid);
+        if (normCid && !cardIdToMember.has(normCid)) {
+          cardIdToMember.set(normCid, m);
         }
       }
-      if (norm.length < 50) continue;
+    }
+    console.log(`[import-direct] Credix: 決済ID→会員マップ ${cardIdToMember.size}件構築`);
 
-      const first5 = norm.slice(0, 5).map(b => String.fromCharCode(b)).join("");
-      if (first5.startsWith("19") || first5.startsWith("80") ||
-          first5.trimStart().startsWith("9") || first5.trim() === "" ||
-          !/^\d/.test(first5)) continue;
+    // ── 照合: CSV決済ID → 会員 ──
+    // memberCode → { isOk, paidDate, member } の結果マップ
+    const matchedMap = new Map<string, { isOk: boolean; paidDate: Date | undefined; member: MemberRow }>();
 
-      // ASCII数字の連続ブロックで末尾32桁を取得
-      const normStr = norm.map(b => (b >= 0x30 && b <= 0x39) ? String.fromCharCode(b) : " ").join("");
-      const digitBlocks = normStr.match(/\d{20,}/g);
-      if (!digitBlocks || digitBlocks.length === 0) continue;
-      const tail32 = digitBlocks[digitBlocks.length - 1].slice(0, 32);
-      if (tail32.length < 24) continue;
-
-      const memberNoRaw = tail32.slice(16, 22);
-      if (!/^\d+$/.test(memberNoRaw)) continue;
-      const memberNo = memberNoRaw.replace(/^0+/, "") || "0";
-      const branchNoRaw = tail32.slice(22, 24);
-      if (!/^\d+$/.test(branchNoRaw)) continue;
-      const branchNo    = branchNoRaw; // "01"
-      const branchNoInt = String(parseInt(branchNoRaw, 10)); // "1"（フォールバック）
-      const memberCodeFull   = `${memberNo}-${branchNo}`;
-      const memberCodeNoZero = `${memberNo}-${branchNoInt}`;
-
-      if (!resultMap.has(memberCodeFull)) {
-        resultMap.set(memberCodeFull, { ok: true, paidDate: paidDateForAll });
-      }
-      if (memberCodeFull !== memberCodeNoZero && !resultMap.has(memberCodeNoZero)) {
-        resultMap.set(memberCodeNoZero, { ok: true, paidDate: paidDateForAll });
+    for (const [normId, entry] of csvIdMap) {
+      const member = cardIdToMember.get(normId);
+      if (!member) continue;
+      // 同一会員で複数決済IDがヒットした場合: 成功優先
+      const existing = matchedMap.get(member.memberCode);
+      if (!existing || (entry.isOk && !existing.isOk)) {
+        matchedMap.set(member.memberCode, { ...entry, member });
       }
     }
 
-    effectivePaymentMethod = "bank_transfer";
-    isMufg = true;
-    console.log(`[import-direct] MUFG TXT検出: ${resultMap.size}会員コード抽出`);
+    const now = new Date();
+    const [ty, tm] = targetMonth.split("-").map(Number);
+    const targetMonthStart = new Date(ty, tm - 1, 1);
 
-  } else {
-    // ══════════════════════════════════════════════════════════════
-    // CSV フォーマット（クレディックス / 汎用）
-    // ══════════════════════════════════════════════════════════════
-    function looksLikeShiftJis(buf: Uint8Array): boolean {
-      for (let i = 0; i < Math.min(buf.length, 4096); i++) {
-        const b = buf[i];
-        if ((b >= 0x81 && b <= 0x9F) || (b >= 0xE0 && b <= 0xEF)) return true;
-      }
-      return false;
+    let paidCount   = 0;
+    let failedCount = 0;
+    const unmatchedItems: string[] = [];
+    const warnings: string[] = [];
+
+    console.log(`[import-direct] Credix: 照合結果 ${matchedMap.size}件（成功+失敗合計）`);
+
+    if (matchedMap.size === 0) {
+      warnings.push("⚠️ 照合が0件でした。MLM会員詳細の「クレジット①②③（クレディックス）」に登録された決済IDとCSVのK列（ID(sendid)）が一致する会員が見つかりませんでした。");
     }
 
-    const hasUtf8Bom = uint8[0] === 0xEF && uint8[1] === 0xBB && uint8[2] === 0xBF;
-    let rawText: string;
-    if (!hasUtf8Bom && looksLikeShiftJis(uint8)) {
-      rawText = new TextDecoder("shift-jis").decode(arrayBuffer);
+    // ── AutoShipRun を取得または作成 ──
+    let autoShipRun = await prisma.autoShipRun.findUnique({
+      where: {
+        targetMonth_paymentMethod: { targetMonth, paymentMethod: "credit_card" },
+      },
+    });
+
+    const matchedMembers = Array.from(matchedMap.values());
+    const paidMembers    = matchedMembers.filter(m => m.isOk);
+    const failedMembers  = matchedMembers.filter(m => !m.isOk);
+
+    if (!autoShipRun) {
+      // AutoShipRun を自動作成
+      autoShipRun = await prisma.autoShipRun.create({
+        data: {
+          targetMonth,
+          paymentMethod:  "credit_card",
+          status:         "completed",
+          totalCount:     matchedMembers.length,
+          paidCount:      paidMembers.length,
+          failedCount:    failedMembers.length,
+          totalAmount:    paidMembers.length * 16500,
+          importedAt:     now,
+          completedAt:    now,
+        },
+      });
+      console.log(`[import-direct] Credix: AutoShipRun 新規作成 id=${autoShipRun.id}`);
     } else {
-      rawText = new TextDecoder("utf-8").decode(arrayBuffer);
+      // 既存 AutoShipRun を更新
+      await prisma.autoShipRun.update({
+        where: { id: autoShipRun.id },
+        data: {
+          status:      "completed",
+          paidCount:   { increment: paidMembers.length },
+          failedCount: { increment: failedMembers.length },
+          totalCount:  { increment: matchedMembers.length },
+          totalAmount: { increment: paidMembers.length * 16500 },
+          importedAt:  now,
+          completedAt: now,
+        },
+      });
+      console.log(`[import-direct] Credix: AutoShipRun 既存更新 id=${autoShipRun.id}`);
     }
 
-    const text  = rawText.replace(/^\uFEFF/, "");
-    const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter(l => l.trim());
-    if (lines.length < 1) {
-      return NextResponse.json({ error: "CSVにデータがありません" }, { status: 400 });
-    }
+    // ── AutoShipOrder を upsert（照合済み会員分） ──
+    for (const { isOk, paidDate, member } of matchedMap.values()) {
+      try {
+        await prisma.autoShipOrder.upsert({
+          where: {
+            autoShipRunId_mlmMemberId: {
+              autoShipRunId: autoShipRun.id,
+              mlmMemberId:   member.id,
+            },
+          },
+          create: {
+            autoShipRunId: autoShipRun.id,
+            mlmMemberId:   member.id,
+            targetMonth,
+            paymentMethod: "credit_card",
+            memberCode:    member.memberCode,
+            memberName:    getMlmDisplayName(member.user.name, member.companyName),
+            memberNameKana: member.user.nameKana ?? null,
+            memberPhone:   member.mobile ?? member.user.phone ?? null,
+            memberEmail:   member.user.email ?? null,
+            memberPostal:  member.mlmRegistration?.deliveryPostalCode ?? member.user.postalCode ?? null,
+            memberAddress: member.mlmRegistration?.deliveryAddress ?? member.user.address ?? null,
+            creditCardId:  member.creditCardId ?? null,
+            unitPrice:     16500,
+            totalAmount:   16500,
+            points:        150,
+            status:        isOk ? "paid" : "failed",
+            paidAt:        isOk ? (paidDate ?? now) : null,
+            failReason:    isOk ? null : "決済失敗",
+          },
+          update: {
+            status:     isOk ? "paid" : "failed",
+            paidAt:     isOk ? (paidDate ?? now) : null,
+            failReason: isOk ? null : "決済失敗",
+          },
+        });
 
-    function parseCsvLine(line: string): string[] {
-      const result: string[] = [];
-      let current = "";
-      let inQuotes = false;
-      for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        if (ch === '"') { inQuotes = !inQuotes; }
-        else if (ch === "," && !inQuotes) { result.push(current.trim()); current = ""; }
-        else { current += ch; }
+        if (isOk) {
+          paidCount++;
+        } else {
+          failedCount++;
+          unmatchedItems.push(`${member.memberCode}(決済失敗)`);
+        }
+      } catch (e) {
+        console.error(`[import-direct] AutoShipOrder upsertエラー(${member.memberCode}):`, e);
+        failedCount++;
       }
-      result.push(current.trim());
-      return result;
     }
 
-    const headerRaw = parseCsvLine(lines[0]);
-    const header    = headerRaw.map(h => h.replace(/^"|"$/g, "").replace(/^\uFEFF/, "").trim().toLowerCase());
+    // CSV にあるが会員未照合のIDを収集（デバッグ用）
+    let csvUnmatchedCount = 0;
+    for (const normId of csvIdMap.keys()) {
+      if (!cardIdToMember.has(normId)) {
+        csvUnmatchedCount++;
+      }
+    }
+    if (csvUnmatchedCount > 0) {
+      unmatchedItems.push(`CSV内で会員未照合の決済ID: ${csvUnmatchedCount}件`);
+    }
 
-    // ──────────────────────────────────────────────────────────────
-    // クレディックスCSV判定（3種類対応）
-    //   Type A: クレディックスから届く結果CSV → ヘッダーに sendid / id(sendid) を含む
-    //           → 電話番号で照合
-    //   Type B: システムが出力した送信用CSV → ヘッダーが「顧客ID,会員コード,氏名,...」
-    //           → 会員コードで直接照合（送信データをそのまま全件成功として取り込む）
-    //   ※ 上記いずれかを isCredixFormat で統合管理
-    // ──────────────────────────────────────────────────────────────
-    const isCredixResultFormat = header.some(h =>   // Type A: クレディックス結果CSV
-      h.includes("sendid") || h.includes("sendpoint") || h.includes("id(sendid)")
+    // ── 後処理: paid 会員に MlmPurchase / PointWallet / MlmMember.status 更新 ──
+    await Promise.allSettled(
+      paidMembers.map(async ({ paidDate, member }) => {
+        await updateMemberAfterPayment(member.userId, targetMonth, paidDate ?? now);
+      })
     );
-    // Type B: 社内出力クレディックスCSV（顧客ID + 会員コード のヘッダーを持つ）
-    isCredixInternalFormat =
-      !isCredixResultFormat &&
-      header.includes("顧客id") &&
-      (header.includes("会員コード") || header.some(h => h.includes("会員コード")));
 
-    const isCredixFormat = isCredixResultFormat || isCredixInternalFormat;
+    if (unmatchedItems.length > 0) {
+      warnings.push(`⚠️ 照合できなかった件数: ${unmatchedItems.length}件 → ${unmatchedItems.slice(0, 20).join(", ")}`);
+    }
 
-    let codeIdx: number;  // sendid列（Credix結果CSV）or 会員コード列（社内CSV・汎用）
-    let resultIdx: number;
-    let reasonIdx: number;
-    let dateIdx: number;
-    let phoneIdx: number = -1; // 電話番号列（Credix結果CSVで使用）
-    let emailIdx: number = -1; // メール列（Credix結果CSVで使用）
-    // 会員コード列（社内クレディックスCSVで使用）
-    let memberCodeIdx: number = -1;
+    console.log(`[import-direct] Credix: 完了 paid=${paidCount}件 failed=${failedCount}件 CSVunmatched=${csvUnmatchedCount}件`);
 
-    if (isCredixResultFormat) {
-      // ★ Credix結果CSV照合方針:
-      //   電話番号（C列）→ MlmMember.mobile / User.phone で会員を特定（1次）
-      //   メール（H列）→ User.email で会員を特定（2次）
-      //   K列 ID(sendid) は決済結果（成功/失敗）の判定のみに使用
-      //   対象: creditCardId（①のみ）が登録されている会員のみ
-      isCredix  = true; // isCredix=trueルート（電話番号/メール照合）で処理
-      codeIdx   = header.findIndex(h => h.includes("sendid") || h === "id(sendid)" || h.includes("id(send)"));
-      resultIdx = header.findIndex(h => h.includes("結果") || h.includes("result"));
-      dateIdx   = header.findIndex(h =>
-        h.includes("決済日時") || h.includes("処理日時") || h.includes("日時") ||
-        h.includes("date") || h.includes("datetime")
-      );
-      phoneIdx  = header.findIndex(h => h.includes("電話番号") || h.includes("phone") || h.includes("tel"));
-      emailIdx  = header.findIndex(h => h.includes("e-mail") || h.includes("email") || h.includes("メール"));
-      if (codeIdx   === -1) codeIdx   = 10;
-      if (resultIdx === -1) resultIdx = 4;
-      if (dateIdx   === -1) dateIdx   = 3;
-      if (phoneIdx  === -1) phoneIdx  = 2;
-      reasonIdx = -1;
-      console.log(`[import-direct] Credix結果CSV検出: header=[${header.join("|")}]`);
-      console.log(`[import-direct] Credix: 電話番号(phoneIdx=${phoneIdx}) / メール(emailIdx=${emailIdx}) → 会員照合モード / K列(codeIdx=${codeIdx})=結果判定のみ`);
-    } else if (isCredixInternalFormat) {
-      // isCredix = false のまま（resultMap を使う汎用照合ルートで処理）
-      // 社内クレディックスCSV（送信フォーマット）: 会員コード列で直接照合
-      memberCodeIdx = header.findIndex(h => h === "会員コード" || h.includes("会員コード"));
-      dateIdx       = header.findIndex(h => h.includes("処理年月") || h.includes("日時") || h.includes("date"));
-      resultIdx     = -1; // 結果列なし（送信CSVのため全件成功とみなす）
-      reasonIdx     = -1;
-      codeIdx       = memberCodeIdx >= 0 ? memberCodeIdx : 1; // デフォルト列1
-      console.log(`[import-direct] クレディックス社内CSV検出（会員コード照合モード）: header=[${header.join("|")}]`);
-      console.log(`[import-direct] memberCodeIdx=${memberCodeIdx}, codeIdx=${codeIdx}, dateIdx=${dateIdx}`);
+    return NextResponse.json({
+      paidCount,
+      failedCount,
+      matchedCount:          matchedMap.size,
+      unmatchedCount:        unmatchedItems.length,
+      effectivePaymentMethod: "credit_card",
+      runId:                 autoShipRun.id.toString(),
+      warnings:              warnings.length > 0 ? warnings : undefined,
+      _debug: {
+        csvIdCount:       csvIdMap.size,
+        memberCount:      allMlmMembers.length,
+        cardIdMapSize:    cardIdToMember.size,
+        matchedCount:     matchedMap.size,
+        paidCount,
+        failedCount,
+        csvUnmatchedCount,
+        unmatchedSample:  unmatchedItems.slice(0, 10),
+      },
+    }, { status: 200 });
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // 社内クレディックスCSV / 汎用CSV: 会員コード照合
+  // ══════════════════════════════════════════════════════════════
+  {
+    let codeIdx = -1;
+    let resultIdx = -1;
+    let dateIdx   = -1;
+    let reasonIdx = -1;
+
+    if (isCredixInternalFormat) {
+      codeIdx   = header.findIndex(h => h === "会員コード" || h.includes("会員コード"));
+      dateIdx   = header.findIndex(h => h.includes("処理年月") || h.includes("日時") || h.includes("date"));
+      if (codeIdx === -1) codeIdx = 1;
+      console.log(`[import-direct] クレディックス社内CSV検出: codeIdx=${codeIdx}, dateIdx=${dateIdx}`);
     } else {
       codeIdx = header.findIndex(h =>
         h.includes("会員コード") || h.includes("membercode") || h === "code" ||
         h.includes("会員no") || h.includes("会員番号") || h.includes("member_code") ||
         h.includes("コード") || h.includes("会員") || h.includes("顧客コード") ||
-        h.includes("customercode") || h.includes("customer_code") || h === "id" ||
-        h.includes("member id") || h.includes("memberid")
+        h.includes("customercode") || h === "id" || h.includes("memberid")
       );
       resultIdx = header.findIndex(h =>
         h.includes("結果") || h.includes("result") || h.includes("status") || h.includes("決済")
       );
       dateIdx = header.findIndex(h =>
-        h.includes("決済日時") || h.includes("処理日時") || h.includes("日時") ||
-        h.includes("date") || h.includes("datetime")
+        h.includes("決済日時") || h.includes("処理日時") || h.includes("日時") || h.includes("date")
       );
       reasonIdx = header.findIndex(h =>
         h.includes("理由") || h.includes("reason") || h.includes("error") || h.includes("失敗")
       );
-    }
 
-    const dataLines = lines.length > 1 ? lines.slice(1) : [];
-    let noHeaderMode = false;
-    if (!isCredixFormat && codeIdx === -1) {
-      const firstVal = headerRaw[0]?.replace(/^"|"$/g, "").trim() ?? "";
-      if (/^[0-9]+(-[0-9]+)?$/.test(firstVal)) {
-        noHeaderMode = true;
-        codeIdx = 0; resultIdx = -1; reasonIdx = -1;
-      } else if (dataLines.length > 0) {
-        codeIdx = 0; resultIdx = -1; reasonIdx = -1;
-      } else {
-        return NextResponse.json(
-          {
-            error: `CSVの形式が正しくありません（会員コード列が見つかりません）。\n検出されたヘッダー列: [${headerRaw.join(", ")}]\n\n対応フォーマット:\n① クレディックスCSV（.csv）: ヘッダーに「ID(sendid)」列を含む形式\n② 三菱UFJファクター固定長TXT（.txt）: ファイル名が SIRR*.txt 等の固定長形式\n③ 汎用CSV: ヘッダーに「会員コード」「code」等の列を含む形式`,
-            detectedHeaders: headerRaw,
-          },
-          { status: 400 }
-        );
+      if (codeIdx === -1) {
+        const firstVal = headerRaw[0]?.replace(/^"|"$/g, "").trim() ?? "";
+        if (/^[0-9]+(-[0-9]+)?$/.test(firstVal)) {
+          codeIdx = 0; resultIdx = -1; reasonIdx = -1;
+        } else if (dataLines.length > 0) {
+          codeIdx = 0; resultIdx = -1; reasonIdx = -1;
+        } else {
+          return NextResponse.json(
+            {
+              error: `CSVの形式が正しくありません（会員コード列が見つかりません）。\n検出されたヘッダー列: [${headerRaw.join(", ")}]\n\n対応フォーマット:\n① クレディックスCSV（.csv）: ヘッダーに「ID(sendid)」列を含む形式\n② 三菱UFJファクター固定長TXT（.txt）: 固定長形式\n③ 汎用CSV: ヘッダーに「会員コード」等の列を含む形式`,
+              detectedHeaders: headerRaw,
+            },
+            { status: 400 }
+          );
+        }
       }
     }
 
-    const effectiveDataLines = noHeaderMode ? lines : dataLines;
-    if (effectiveDataLines.length === 0) {
-      return NextResponse.json({ error: "CSVにデータ行がありません（ヘッダー行のみ）" }, { status: 400 });
-    }
-
-    for (const line of effectiveDataLines) {
+    const resultMap = new Map<string, { ok: boolean; reason?: string; paidDate?: Date }>();
+    for (const line of dataLines) {
       if (!line.trim()) continue;
       const cols    = parseCsvLine(line).map(c => c.replace(/^"|"$/g, "").trim());
       if (cols.length === 0) continue;
+
+      const rawCode = cols[codeIdx] ?? "";
+      if (!rawCode || rawCode === "-") continue;
 
       const rawDate  = dateIdx >= 0 ? (cols[dateIdx] ?? "") : "";
       const paidDate = parseCsvDate(rawDate) ?? undefined;
 
       if (isCredixInternalFormat) {
-        // ── 社内クレディックスCSV: 会員コードで resultMap に格納（全件成功扱い） ──
-        const rawCode = cols[codeIdx] ?? "";
-        if (!rawCode || rawCode === "-") continue;
         if (!resultMap.has(rawCode)) {
           resultMap.set(rawCode, { ok: true, paidDate });
         }
-      } else if (isCredixResultFormat) {
-        // ── Credix結果CSV: 電話番号・メール → credixPhoneMap / credixEmailMap へ格納 ──
-        //   K列 ID(sendid) は結果判定のみに使用（WC付き・数字のみ両方対応）
-        
-        // 結果判定（「決済完了」等 → isOk=true）
-        let isOk = true;
-        if (resultIdx >= 0 && cols[resultIdx] !== undefined && cols[resultIdx] !== "") {
-          const rawResult = cols[resultIdx];
-          isOk = rawResult.includes("完了") || rawResult.includes("成功") ||
-                 rawResult.toUpperCase() === "OK" || rawResult === "0" || rawResult === "1";
-        }
-
-        // 電話番号 → credixPhoneMap（同一電話番号は成功優先で1件のみ登録）
-        if (phoneIdx >= 0) {
-          const rawPhone = cols[phoneIdx] ?? "";
-          const phone = normalizePhone(rawPhone);
-          if (phone && phone !== "-" && phone.length >= 7 && phone !== "non") {
-            if (!credixPhoneMap.has(phone)) {
-              credixPhoneMap.set(phone, { ok: isOk, paidDate });
-            } else if (isOk && !credixPhoneMap.get(phone)!.ok) {
-              credixPhoneMap.set(phone, { ok: isOk, paidDate });
-            }
-          }
-        }
-
-        // メール → credixEmailMap（同一メールは成功優先で1件のみ登録）
-        if (emailIdx >= 0) {
-          const rawEmail = (cols[emailIdx] ?? "").toLowerCase().trim();
-          if (rawEmail && rawEmail !== "-" && rawEmail !== "non" && rawEmail.includes("@")) {
-            if (!credixEmailMap.has(rawEmail)) {
-              credixEmailMap.set(rawEmail, { ok: isOk, paidDate });
-            } else if (isOk && !credixEmailMap.get(rawEmail)!.ok) {
-              credixEmailMap.set(rawEmail, { ok: isOk, paidDate });
-            }
-          }
-        }
       } else {
-        // ── 汎用CSV: 会員コードで照合 ──
-        const rawCode = cols[codeIdx] ?? "";
-        if (!rawCode || rawCode === "-") continue;
         const result = resultIdx >= 0 ? (cols[resultIdx] ?? "") : "";
         const ok = result === "" || result === "OK" || result === "0" ||
                    result.toLowerCase() === "success" ||
@@ -389,324 +551,8 @@ export async function POST(request: Request) {
       }
     }
 
-    if (isCredixResultFormat) {
-      console.log(`[import-direct] Credix結果CSV: 電話番号 ${credixPhoneMap.size}件抽出 / メール ${credixEmailMap.size}件抽出`);
-    } else if (isCredixInternalFormat) {
-      console.log(`[import-direct] クレディックス社内CSV: 会員コード ${resultMap.size}件抽出`);
-    }
+    return await processGenericCsv(resultMap, targetMonth, paymentMethod);
   }
-
-  // ══════════════════════════════════════════════════════════════
-  // ★ 照合対象: Order テーブル（slipType=autoship）
-  //   「選択した伝票を一括作成」で作成した伝票に入金日をセットする
-  //
-  // ★ 重要: orderedAt による月絞り込みは行わない
-  //   理由: 一括伝票作成は「今日の日付」で orderedAt が設定されるため、
-  //   CSVインポート時の月指定と一致しないことがある。
-  //   代わりに paymentStatus=unpaid（未払い）の最新オートシップ伝票を対象とする。
-  // ══════════════════════════════════════════════════════════════
-
-  const now = new Date();
-
-  // 対象月の範囲（参考情報・デバッグ用）
-  const [year, month] = targetMonth.split("-").map(Number);
-  const monthStart    = new Date(year, month - 1, 1);
-  const monthEnd      = new Date(year, month, 1);
-  const monthStartUtc = new Date(monthStart.getTime() - 9 * 60 * 60 * 1000);
-  const monthEndUtc   = new Date(monthEnd.getTime()   - 9 * 60 * 60 * 1000);
-
-  // Order.paymentMethod のマッピング（mlm-members/orders の PM_LABELS と合わせる）
-  // MlmMember.paymentMethod: "credit_card" / "bank_transfer"
-  // Order.paymentMethod:     "card" / "bank_transfer" （一括作成時のbulkPaymentMethod参照）
-  const ORDER_PM_FILTER = effectivePaymentMethod === "bank_transfer"
-    ? ["bank_transfer", "振替(銀行)", "振替"]
-    : ["card", "credit_card", "カード"];
-
-  let paidCount   = 0;
-  let failedCount = 0;
-  const matchedOrderIds: string[] = [];
-  const unmatchedItems: string[] = [];
-  const warnings: string[] = [];
-
-  // ── MUFG / 汎用CSV: memberCode → User.id → Order で照合 ──
-  if (!isCredix) {
-    const memberCodes = Array.from(resultMap.keys());
-    console.log(`[import-direct] MUFG/汎用: 照合対象memberCode ${memberCodes.length}件`);
-
-    for (const memberCode of memberCodes) {
-      const entry = resultMap.get(memberCode)!;
-      if (!entry.ok) continue;
-
-      // User.memberCode でユーザーを検索
-      const user = await prisma.user.findUnique({
-        where: { memberCode },
-        select: { id: true },
-      });
-
-      if (!user) {
-        unmatchedItems.push(`${memberCode}(会員未登録)`);
-        continue;
-      }
-
-      // このユーザーの当月オートシップ Order を取得
-      // ★ orderedAt で絞り込まず、paymentStatus=unpaid の最新伝票を優先
-      //   ただし作成日が前後2か月以内の伝票に限定（誤適用防止）
-      const twoMonthsAgo = new Date(monthStart.getTime() - 60 * 24 * 60 * 60 * 1000);
-      const twoMonthsAhead = new Date(monthEnd.getTime() + 60 * 24 * 60 * 60 * 1000);
-
-      const orders = await prisma.order.findMany({
-        where: {
-          userId:        user.id,
-          slipType:      "autoship",
-          paymentStatus: { in: ["unpaid", "pending"] },
-          orderedAt: {
-            gte: new Date(twoMonthsAgo.getTime() - 9 * 60 * 60 * 1000),
-            lt:  new Date(twoMonthsAhead.getTime() - 9 * 60 * 60 * 1000),
-          },
-          OR: ORDER_PM_FILTER.map(pm => ({ paymentMethod: pm })),
-        },
-        orderBy: { orderedAt: "desc" },
-        take: 1,
-      });
-
-      // 未払い伝票がない場合は、支払済みを含む当月伝票も確認
-      const targetOrders = orders.length > 0 ? orders : await prisma.order.findMany({
-        where: {
-          userId:   user.id,
-          slipType: "autoship",
-          orderedAt: { gte: monthStartUtc, lt: monthEndUtc },
-          OR: ORDER_PM_FILTER.map(pm => ({ paymentMethod: pm })),
-        },
-        orderBy: { orderedAt: "desc" },
-        take: 1,
-      });
-
-      if (targetOrders.length === 0) {
-        unmatchedItems.push(`${memberCode}(オートシップ伝票なし)`);
-        console.log(`[import-direct] 未照合(オートシップ伝票なし): ${memberCode}`);
-        continue;
-      }
-
-      // 対象Orderに入金日をセット
-      for (const order of targetOrders) {
-        await prisma.order.update({
-          where: { id: order.id },
-          data: {
-            paidAt:        entry.paidDate ?? now,
-            paymentStatus: "paid",
-          },
-        });
-        matchedOrderIds.push(order.id.toString());
-      }
-      paidCount++;
-
-      // MlmPurchase / MlmMember / PointWallet 更新
-      await updateMemberAfterPayment(user.id, targetMonth, entry.paidDate ?? now);
-    }
-
-  } else {
-    // ── Credix結果CSV: AutoShipOrder ベースで照合 ──
-    //    対象: targetMonth・credit_card の AutoShipRun に紐づく AutoShipOrder
-    //          かつ creditCardId（①のみ）が登録されている会員のみ
-    //    1次照合: 電話番号（CSV C列）→ MlmMember.mobile / User.phone
-    //    2次照合: メール（CSV H列）→ User.email
-
-    console.log(`[import-direct] Credix: CSV電話番号 ${credixPhoneMap.size}件 / メール ${credixEmailMap.size}件 抽出`);
-
-    // ── 対象 AutoShipRun を取得（targetMonth × credit_card） ──
-    const autoShipRun = await prisma.autoShipRun.findUnique({
-      where: {
-        targetMonth_paymentMethod: {
-          targetMonth,
-          paymentMethod: "credit_card",
-        },
-      },
-      include: {
-        orders: {
-          select: {
-            id: true,
-            mlmMemberId: true,
-            memberCode: true,
-            memberPhone: true,
-            memberEmail: true,
-            status: true,
-          },
-        },
-      },
-    });
-
-    if (!autoShipRun) {
-      warnings.push(`⚠️ 対象月 ${targetMonth} のクレジットカード AutoShipRun が見つかりません。先に「対象会員を一括選択して伝票作成」を実行してください。`);
-      console.warn(`[import-direct] Credix: AutoShipRun が存在しない (targetMonth=${targetMonth}, paymentMethod=credit_card)`);
-    } else {
-      console.log(`[import-direct] Credix: AutoShipRun id=${autoShipRun.id} / orders=${autoShipRun.orders.length}件`);
-
-      // AutoShipOrder に紐づく MlmMember（creditCardId登録済み）を一括取得
-      const memberIds = autoShipRun.orders.map(o => o.mlmMemberId);
-      const mlmMembers = await prisma.mlmMember.findMany({
-        where: {
-          id: { in: memberIds },
-          creditCardId: { not: null },
-        },
-        select: {
-          id: true,
-          userId: true,
-          memberCode: true,
-          mobile: true,
-          creditCardId: true,
-          user: { select: { phone: true, email: true } },
-        },
-      });
-      const memberByCode = new Map(mlmMembers.map(m => [m.memberCode, m]));
-      console.log(`[import-direct] Credix: creditCardId登録済み会員 ${mlmMembers.length}件 / AutoShipOrder ${autoShipRun.orders.length}件`);
-
-      // ── 照合: AutoShipOrder ループ → 電話/メールで credixPhoneMap / credixEmailMap を引く ──
-      // resultMap に memberCode → { ok, paidDate } を格納
-      let matchByPhone = 0;
-      let matchByEmail = 0;
-
-      for (const order of autoShipRun.orders) {
-        const member = memberByCode.get(order.memberCode);
-        if (!member) {
-          // creditCardId未登録 → スキップ
-          continue;
-        }
-
-        // 1次照合: 電話番号
-        const phoneUser   = normalizePhone(member.user?.phone ?? "");
-        const phoneMobile = normalizePhone(member.mobile ?? "");
-        const phoneEntry =
-          (phoneUser   && phoneUser.length >= 7   && credixPhoneMap.has(phoneUser))   ? credixPhoneMap.get(phoneUser)! :
-          (phoneMobile && phoneMobile.length >= 7 && credixPhoneMap.has(phoneMobile)) ? credixPhoneMap.get(phoneMobile)! :
-          null;
-
-        if (phoneEntry) {
-          resultMap.set(order.memberCode, { ok: phoneEntry.ok, paidDate: phoneEntry.paidDate });
-          if (phoneEntry.ok) matchByPhone++;
-          continue;
-        }
-
-        // 2次照合: メール
-        const email = (member.user?.email ?? "").toLowerCase().trim();
-        const emailEntry = (email && credixEmailMap.has(email)) ? credixEmailMap.get(email)! : null;
-        if (emailEntry) {
-          resultMap.set(order.memberCode, { ok: emailEntry.ok, paidDate: emailEntry.paidDate });
-          if (emailEntry.ok) matchByEmail++;
-        }
-      }
-
-      const totalMatched = matchByPhone + matchByEmail;
-      console.log(`[import-direct] Credix照合: 電話 ${matchByPhone}件 + メール ${matchByEmail}件 = 合計 ${totalMatched}件`);
-
-      if (totalMatched === 0) {
-        warnings.push(`⚠️ 照合が0件でした。会員の電話番号・メールアドレスがCSVと一致するか確認してください。また、対象会員の「クレジット①（クレディックス）」に決済IDが登録されているか確認してください。`);
-      }
-
-      // ── AutoShipOrder を一括更新（paidDate ごとに updateMany） ──
-      const paidByDate = new Map<string, bigint[]>(); // ISO文字列 → AutoShipOrder.id[]
-      const failedOrders: { id: bigint; memberCode: string }[] = [];
-
-      for (const order of autoShipRun.orders) {
-        const res = resultMap.get(order.memberCode);
-        if (!res) {
-          unmatchedItems.push(`${order.memberCode}(CSV未照合)`);
-          continue;
-        }
-        if (res.ok) {
-          const dateKey = (res.paidDate ?? now).toISOString();
-          if (!paidByDate.has(dateKey)) paidByDate.set(dateKey, []);
-          paidByDate.get(dateKey)!.push(order.id);
-          paidCount++;
-        } else {
-          failedOrders.push({ id: order.id, memberCode: order.memberCode });
-          failedCount++;
-          unmatchedItems.push(`${order.memberCode}(決済失敗)`);
-        }
-      }
-
-      // paid: paidDate ごとに updateMany
-      for (const [dateKey, ids] of paidByDate) {
-        await prisma.autoShipOrder.updateMany({
-          where: { id: { in: ids } },
-          data:  { status: "paid", paidAt: new Date(dateKey) },
-        });
-        matchedOrderIds.push(...ids.map(id => id.toString()));
-      }
-
-      // failed: status=failed に更新
-      if (failedOrders.length > 0) {
-        await prisma.autoShipOrder.updateMany({
-          where: { id: { in: failedOrders.map(fo => fo.id) } },
-          data:  { status: "failed", failReason: "決済失敗" },
-        });
-      }
-
-      // AutoShipRun の集計を更新
-      await prisma.autoShipRun.update({
-        where: { id: autoShipRun.id },
-        data: {
-          status:      "completed",
-          paidCount,
-          failedCount,
-          importedAt:  now,
-          completedAt: now,
-        },
-      });
-
-      // ── 後処理: MlmPurchase / MlmMember.status / PointWallet を paid 会員に適用 ──
-      const paidMemberCodes = new Set<string>();
-      for (const [dateKey, ids] of paidByDate) {
-        for (const orderId of ids) {
-          const ord = autoShipRun.orders.find(o => o.id === orderId);
-          if (ord) paidMemberCodes.add(ord.memberCode);
-        }
-        void dateKey; // suppress unused warning
-      }
-
-      await Promise.allSettled(
-        Array.from(paidMemberCodes).map(async (memberCode) => {
-          const member = memberByCode.get(memberCode);
-          if (!member) return;
-          const paidDate = resultMap.get(memberCode)?.paidDate ?? now;
-          await updateMemberAfterPayment(member.userId, targetMonth, paidDate);
-        })
-      );
-    }
-  }
-
-  // 未照合の警告メッセージ
-  if (unmatchedItems.length > 0) {
-    const msg = `⚠️ 照合できなかった件数: ${unmatchedItems.length}件 → ${unmatchedItems.slice(0, 20).join(", ")}`;
-    warnings.push(msg);
-    console.warn("[import-direct]", msg);
-  }
-
-  const fileSize = isMufg ? resultMap.size / 2 : (isCredix ? credixPhoneMap.size : resultMap.size);
-  console.log(`[import-direct] 完了: ファイル約${Math.ceil(fileSize)}件 → 入金反映${paidCount}件, 未照合${unmatchedItems.length}件`);
-
-  return NextResponse.json({
-    paidCount,
-    failedCount,
-    matchedOrderCount: matchedOrderIds.length,
-    unmatchedCount:    unmatchedItems.length,
-    effectivePaymentMethod,
-    warnings: warnings.length > 0 ? warnings : undefined,
-    _debug: {
-      isMufg,
-      isCredix,
-      isCredixInternalFormat,
-      effectivePaymentMethod,
-      fileRecordCount: Math.ceil(fileSize),
-      mufgMemberMapSize:          isMufg ? resultMap.size : undefined,
-      credixPhoneMapSize:         isCredix ? credixPhoneMap.size : undefined,
-      credixEmailMapSize:         isCredix ? credixEmailMap.size : undefined,
-      credixInternalMemberCount:  isCredixInternalFormat ? resultMap.size : undefined,
-      paidCount,
-      unmatchedCount: unmatchedItems.length,
-      unmatchedSample: unmatchedItems.slice(0, 10),
-      matchedOrderIds: matchedOrderIds.slice(0, 10),
-    },
-  }, { status: 200 });
 
   } catch (unexpectedErr) {
     console.error("[import-direct] 予期しないエラー:", unexpectedErr);
@@ -717,12 +563,192 @@ export async function POST(request: Request) {
   }
 }
 
-/**
- * 入金確認後の後処理:
- * - MlmPurchase が未作成なら作成
- * - MlmMember.status を active に更新
- * - PointWallet にSAVボーナス付与
- */
+// ══════════════════════════════════════════════════════════════
+// 三菱UFJファクター 固定長TXT 処理
+// ══════════════════════════════════════════════════════════════
+async function processMufgTxt(
+  arrayBuffer: ArrayBuffer,
+  _uint8: Uint8Array,
+  targetMonth: string
+): Promise<Response> {
+  const [ty, tm] = targetMonth.split("-").map(Number);
+  const lastDayOfMonth = new Date(ty, tm, 0);
+  const paidDateForAll = new Date(lastDayOfMonth.getTime() - 9 * 60 * 60 * 1000);
+
+  const rawBytes = new Uint8Array(arrayBuffer);
+  const resultMap = new Map<string, { ok: boolean; reason?: string; paidDate?: Date }>();
+
+  const byteLines: Uint8Array[] = [];
+  let start = 0;
+  for (let i = 0; i < rawBytes.length; i++) {
+    if (rawBytes[i] === 0x0A) {
+      const end = (i > 0 && rawBytes[i-1] === 0x0D) ? i - 1 : i;
+      byteLines.push(rawBytes.slice(start, end));
+      start = i + 1;
+    }
+  }
+  if (start < rawBytes.length) byteLines.push(rawBytes.slice(start));
+
+  for (const byteLine of byteLines) {
+    if (byteLine.length < 50) continue;
+    const norm: number[] = [];
+    let bi = 0;
+    while (bi < byteLine.length) {
+      if (bi + 2 < byteLine.length &&
+          byteLine[bi] === 0xEF && byteLine[bi+1] === 0xBF && byteLine[bi+2] === 0xBD) {
+        norm.push(0x3F); bi += 3;
+      } else {
+        norm.push(byteLine[bi]); bi++;
+      }
+    }
+    if (norm.length < 50) continue;
+
+    const first5 = norm.slice(0, 5).map(b => String.fromCharCode(b)).join("");
+    if (first5.startsWith("19") || first5.startsWith("80") ||
+        first5.trimStart().startsWith("9") || first5.trim() === "" ||
+        !/^\d/.test(first5)) continue;
+
+    const normStr = norm.map(b => (b >= 0x30 && b <= 0x39) ? String.fromCharCode(b) : " ").join("");
+    const digitBlocks = normStr.match(/\d{20,}/g);
+    if (!digitBlocks || digitBlocks.length === 0) continue;
+    const tail32 = digitBlocks[digitBlocks.length - 1].slice(0, 32);
+    if (tail32.length < 24) continue;
+
+    const memberNoRaw = tail32.slice(16, 22);
+    if (!/^\d+$/.test(memberNoRaw)) continue;
+    const memberNo    = memberNoRaw.replace(/^0+/, "") || "0";
+    const branchNoRaw = tail32.slice(22, 24);
+    if (!/^\d+$/.test(branchNoRaw)) continue;
+    const branchNo    = branchNoRaw;
+    const branchNoInt = String(parseInt(branchNoRaw, 10));
+    const memberCodeFull   = `${memberNo}-${branchNo}`;
+    const memberCodeNoZero = `${memberNo}-${branchNoInt}`;
+
+    if (!resultMap.has(memberCodeFull)) {
+      resultMap.set(memberCodeFull, { ok: true, paidDate: paidDateForAll });
+    }
+    if (memberCodeFull !== memberCodeNoZero && !resultMap.has(memberCodeNoZero)) {
+      resultMap.set(memberCodeNoZero, { ok: true, paidDate: paidDateForAll });
+    }
+  }
+
+  console.log(`[import-direct] MUFG TXT検出: ${resultMap.size}会員コード抽出`);
+  return await processGenericCsv(resultMap, targetMonth, "bank_transfer");
+}
+
+// ══════════════════════════════════════════════════════════════
+// 汎用CSV（MUFG・社内CSV）: memberCode → Order 照合
+// ══════════════════════════════════════════════════════════════
+async function processGenericCsv(
+  resultMap: Map<string, { ok: boolean; reason?: string; paidDate?: Date }>,
+  targetMonth: string,
+  paymentMethod: "credit_card" | "bank_transfer"
+): Promise<Response> {
+  const now = new Date();
+  const [year, month] = targetMonth.split("-").map(Number);
+  const monthStart    = new Date(year, month - 1, 1);
+  const monthEnd      = new Date(year, month, 1);
+  const monthStartUtc = new Date(monthStart.getTime() - 9 * 60 * 60 * 1000);
+  const monthEndUtc   = new Date(monthEnd.getTime()   - 9 * 60 * 60 * 1000);
+
+  const ORDER_PM_FILTER = paymentMethod === "bank_transfer"
+    ? ["bank_transfer", "振替(銀行)", "振替"]
+    : ["card", "credit_card", "カード"];
+
+  let paidCount   = 0;
+  let failedCount = 0;
+  const matchedOrderIds: string[] = [];
+  const unmatchedItems:  string[] = [];
+  const warnings: string[] = [];
+  const effectivePaymentMethod = paymentMethod;
+
+  const memberCodes = Array.from(resultMap.keys());
+  console.log(`[import-direct] 汎用/MUFG: 照合対象memberCode ${memberCodes.length}件`);
+
+  for (const memberCode of memberCodes) {
+    const entry = resultMap.get(memberCode)!;
+    if (!entry.ok) continue;
+
+    const user = await prisma.user.findUnique({
+      where: { memberCode },
+      select: { id: true },
+    });
+    if (!user) {
+      unmatchedItems.push(`${memberCode}(会員未登録)`);
+      continue;
+    }
+
+    const twoMonthsAgo   = new Date(monthStart.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const twoMonthsAhead = new Date(monthEnd.getTime()   + 60 * 24 * 60 * 60 * 1000);
+
+    const orders = await prisma.order.findMany({
+      where: {
+        userId:        user.id,
+        slipType:      "autoship",
+        paymentStatus: { in: ["unpaid", "pending"] },
+        orderedAt: {
+          gte: new Date(twoMonthsAgo.getTime() - 9 * 60 * 60 * 1000),
+          lt:  new Date(twoMonthsAhead.getTime() - 9 * 60 * 60 * 1000),
+        },
+        OR: ORDER_PM_FILTER.map(pm => ({ paymentMethod: pm })),
+      },
+      orderBy: { orderedAt: "desc" },
+      take: 1,
+    });
+
+    const targetOrders = orders.length > 0 ? orders : await prisma.order.findMany({
+      where: {
+        userId:   user.id,
+        slipType: "autoship",
+        orderedAt: { gte: monthStartUtc, lt: monthEndUtc },
+        OR: ORDER_PM_FILTER.map(pm => ({ paymentMethod: pm })),
+      },
+      orderBy: { orderedAt: "desc" },
+      take: 1,
+    });
+
+    if (targetOrders.length === 0) {
+      unmatchedItems.push(`${memberCode}(オートシップ伝票なし)`);
+      continue;
+    }
+
+    for (const order of targetOrders) {
+      await prisma.order.update({
+        where: { id: order.id },
+        data:  { paidAt: entry.paidDate ?? now, paymentStatus: "paid" },
+      });
+      matchedOrderIds.push(order.id.toString());
+    }
+    paidCount++;
+    await updateMemberAfterPayment(user.id, targetMonth, entry.paidDate ?? now);
+  }
+
+  if (unmatchedItems.length > 0) {
+    warnings.push(`⚠️ 照合できなかった件数: ${unmatchedItems.length}件 → ${unmatchedItems.slice(0, 20).join(", ")}`);
+  }
+
+  console.log(`[import-direct] 汎用/MUFG完了: paid=${paidCount}件 unmatched=${unmatchedItems.length}件`);
+
+  return NextResponse.json({
+    paidCount,
+    failedCount,
+    matchedOrderCount:     matchedOrderIds.length,
+    unmatchedCount:        unmatchedItems.length,
+    effectivePaymentMethod,
+    warnings:              warnings.length > 0 ? warnings : undefined,
+    _debug: {
+      memberCodeCount: memberCodes.length,
+      paidCount,
+      unmatchedCount:  unmatchedItems.length,
+      unmatchedSample: unmatchedItems.slice(0, 10),
+      matchedOrderIds: matchedOrderIds.slice(0, 10),
+    },
+  }, { status: 200 });
+}
+
+// ══════════════════════════════════════════════════════════════
+// 入金後処理: MlmPurchase 登録・MlmMember.status=active・PointWallet付与
+// ══════════════════════════════════════════════════════════════
 async function updateMemberAfterPayment(
   userId: bigint,
   targetMonth: string,
@@ -734,7 +760,6 @@ async function updateMemberAfterPayment(
   const AUTOSHIP_RATE = 0.05;
   const savingsPoints = Math.floor(AUTOSHIP_BASE * AUTOSHIP_RATE); // 750pt
 
-  // MlmMember を1回だけ取得して使い回す
   let mlmMemberId: bigint | null = null;
   try {
     const mlmMember = await prisma.mlmMember.findUnique({
@@ -748,14 +773,10 @@ async function updateMemberAfterPayment(
     return;
   }
 
-  // MlmPurchase 重複チェック → 未作成なら作成
+  // MlmPurchase: 未作成なら作成
   try {
     const existing = await prisma.mlmPurchase.findFirst({
-      where: {
-        mlmMemberId,
-        purchaseMonth:  targetMonth,
-        purchaseStatus: "autoship",
-      },
+      where: { mlmMemberId, purchaseMonth: targetMonth, purchaseStatus: "autoship" },
     });
     if (!existing) {
       await prisma.mlmPurchase.create({
@@ -777,7 +798,7 @@ async function updateMemberAfterPayment(
     console.error(`[import-direct] MlmPurchase作成エラー(userId=${userId}):`, e);
   }
 
-  // MlmMember.status → active & PointWallet を並列更新
+  // MlmMember.status → active / PointWallet / savingsPoints を並列更新
   await Promise.allSettled([
     prisma.mlmMember.update({
       where: { id: mlmMemberId },
@@ -808,13 +829,9 @@ async function updateMemberAfterPayment(
   ]);
 }
 
-/**
- * ファイルなしモード（「当月アクティブ反映」ボタン）:
- * DBのオートシップ有効会員を対象月・支払方法でフィルタして
- * 当月のオートシップ Order を全て paid にする
- *
- * 伝票がない場合は新規作成する
- */
+// ══════════════════════════════════════════════════════════════
+// ファイルなしモード（「当月アクティブ反映」ボタン）
+// ══════════════════════════════════════════════════════════════
 async function processFromDatabase(
   targetMonth: string,
   paymentMethod: "credit_card" | "bank_transfer"
@@ -828,7 +845,6 @@ async function processFromDatabase(
   const monthStartUtc    = new Date(targetMonthStart.getTime() - 9 * 60 * 60 * 1000);
   const monthEndUtc      = new Date(nextMonthStart.getTime()   - 9 * 60 * 60 * 1000);
 
-  // オートシップ有効会員を paymentMethod フィールドで絞り込む
   const allMembers = await prisma.mlmMember.findMany({
     where: {
       autoshipEnabled: true,
@@ -850,7 +866,6 @@ async function processFromDatabase(
     },
   });
 
-  // 対象月・停止日・停止月でフィルタ
   const mlmMembers = allMembers.filter(m => {
     if (m.autoshipStartDate && m.autoshipStartDate > targetMonthStart) return false;
     if (m.autoshipStopDate  && m.autoshipStopDate  < nextMonthStart)   return false;
@@ -877,7 +892,6 @@ async function processFromDatabase(
   const noOrderMembers: string[] = [];
 
   for (const m of mlmMembers) {
-    // 当月の未払いオートシップ Order を取得（paymentMethod でも絞り込む）
     let orders = await prisma.order.findMany({
       where: {
         userId:    m.userId,
@@ -888,7 +902,6 @@ async function processFromDatabase(
       orderBy: { orderedAt: "desc" },
     });
 
-    // 当月に伝票がない場合は前後30日も検索（orderedAtが多少ずれていても対応）
     if (orders.length === 0) {
       const extStart = new Date(monthStartUtc.getTime() - 30 * 24 * 60 * 60 * 1000);
       const extEnd   = new Date(monthEndUtc.getTime()   + 30 * 24 * 60 * 60 * 1000);
@@ -906,7 +919,6 @@ async function processFromDatabase(
     }
 
     if (orders.length === 0) {
-      // 伝票がない場合は新規作成（DB自動取込モードのみ許可）
       try {
         await prisma.order.create({
           data: {
@@ -934,7 +946,6 @@ async function processFromDatabase(
       continue;
     }
 
-    // 既存Orderを paid に更新
     for (const order of orders) {
       await prisma.order.update({
         where: { id: order.id },
