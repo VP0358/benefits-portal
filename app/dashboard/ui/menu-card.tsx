@@ -8,7 +8,8 @@ type SkinShop = {
   address: string;
   phone: string;
   url?: string;
-  photos?: string[]; // ② 写真最大5枚
+  websiteUrl?: string;
+  photos?: string[]; // 写真最大5枚
 };
 
 type MenuCardProps = {
@@ -83,7 +84,13 @@ function SkinModal({ title, shops, onClose }: { title: string; shops: SkinShop[]
                   {shop.url && (
                     <a href={shop.url} target="_blank" rel="noopener noreferrer"
                       className="text-xs text-blue-600 underline">
-                      🔗 予約サイト
+                      📅 ご予約はこちら
+                    </a>
+                  )}
+                  {shop.websiteUrl && (
+                    <a href={shop.websiteUrl} target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-slate-500 underline">
+                      🔗 ウェブサイト
                     </a>
                   )}
                 </div>

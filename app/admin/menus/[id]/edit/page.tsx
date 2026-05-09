@@ -26,7 +26,7 @@ const menuTypes = [
   { value: "non_life_insurance", label: "🚗 損害保険相談",     desc: "損害保険相談申込ページへ遷移（内容を管理で変更可）" },
 ];
 
-type SkinShop = { name: string; area: string; address: string; phone: string; url?: string; photos?: string[] };
+type SkinShop = { name: string; area: string; address: string; phone: string; url?: string; websiteUrl?: string; photos?: string[] };
 
 type MenuForm = {
   title: string;
@@ -52,7 +52,7 @@ type MenuForm = {
   sortOrder: number;
 };
 
-const defaultShop: SkinShop = { name: "", area: "", address: "", phone: "", url: "", photos: [] };
+const defaultShop: SkinShop = { name: "", area: "", address: "", phone: "", url: "", websiteUrl: "", photos: [] };
 
 export default function AdminMenuEditPage() {
   const params = useParams<{ id: string }>();
@@ -403,11 +403,12 @@ export default function AdminMenuEditPage() {
                   {/* 基本フィールド */}
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { field: "name"    as const, label: "店舗名 *",    placeholder: "○○美容院" },
-                      { field: "area"    as const, label: "エリア",       placeholder: "東京都" },
-                      { field: "address" as const, label: "住所",         placeholder: "渋谷区○○1-2-3", span: true },
-                      { field: "phone"   as const, label: "電話番号",     placeholder: "03-1234-5678" },
-                      { field: "url"     as const, label: "予約URL（任意）", placeholder: "https://..." },
+                      { field: "name"       as const, label: "店舗名 *",            placeholder: "○○美容院" },
+                      { field: "area"       as const, label: "エリア",               placeholder: "東京都" },
+                      { field: "address"    as const, label: "住所",                 placeholder: "渋谷区○○1-2-3", span: true },
+                      { field: "phone"      as const, label: "電話番号",             placeholder: "03-1234-5678" },
+                      { field: "url"        as const, label: "予約URL（任意）",       placeholder: "https://..." },
+                      { field: "websiteUrl" as const, label: "ウェブサイトURL（任意）", placeholder: "https://..." },
                     ].map(({ field, label, placeholder, span }) => (
                       <div key={field} className={span ? "col-span-2" : ""}>
                         <label className="mb-1 block text-xs text-slate-700">{label}</label>
@@ -434,7 +435,7 @@ export default function AdminMenuEditPage() {
                       <p className="text-xs text-slate-400">写真はまだ登録されていません。「＋ 写真を追加」から追加できます。</p>
                     )}
                     {(shop.photos ?? []).map((photoUrl, pi) => (
-                      <div key={pi} className="flex items-start gap-2 rounded-xl border border-slate-200 bg-white p-2">
+                      <div key={`${idx}-${pi}-${photoUrl}`} className="flex items-start gap-2 rounded-xl border border-slate-200 bg-white p-2">
                         <div className="text-xs text-slate-500 font-medium mt-2 w-5 shrink-0">{pi + 1}</div>
                         {photoUrl && (
                           <img src={photoUrl} alt={`写真${pi + 1}`}

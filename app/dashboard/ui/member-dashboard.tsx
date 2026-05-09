@@ -12,7 +12,7 @@ interface DashboardPoints {
 }
 interface Announcement { id:string; title:string; content:string; tag:string; isPublished:boolean; publishedAt:string|null; }
 interface Menu { id:string; title:string; subtitle?:string|null; iconType?:string|null; menuType?:string|null; linkUrl?:string; contentData?:string|null; }
-type SkinShop = { name:string; area:string; address:string; phone:string; url?:string; photos?:string[]; };
+type SkinShop = { name:string; area:string; address:string; phone:string; url?:string; websiteUrl?:string; photos?:string[]; };
 
 // ── デザイントークン（参考画像：ライトベージュ×深紺ゴールドサロンUI） ──
 const GOLD       = "#c9a84c";
@@ -1155,11 +1155,22 @@ export default function MemberDashboard({
                           ))}
                         </div>
                       )}
-                      {/* URLボタン */}
+                      {/* 予約URLボタン */}
                       {shop.url&&(
                         <a href={shop.url} target="_blank" rel="noopener noreferrer"
                           className="mt-3 flex items-center justify-center gap-1.5 w-full rounded-xl py-2 text-xs font-jp font-semibold transition hover:opacity-80"
                           style={{background:`${GOLD}18`,color:GOLD_LIGHT,border:`1px solid ${GOLD}35`}}>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                          </svg>
+                          ご予約はこちら
+                        </a>
+                      )}
+                      {/* ウェブサイトURLボタン */}
+                      {shop.websiteUrl&&(
+                        <a href={shop.websiteUrl} target="_blank" rel="noopener noreferrer"
+                          className="mt-2 flex items-center justify-center gap-1.5 w-full rounded-xl py-2 text-xs font-jp font-semibold transition hover:opacity-80"
+                          style={{background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.55)",border:"1px solid rgba(255,255,255,0.15)"}}>
                           <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
                           </svg>
