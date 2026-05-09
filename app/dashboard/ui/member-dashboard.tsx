@@ -1012,7 +1012,13 @@ export default function MemberDashboard({
                   <button key={m.id} type="button"
                     onClick={()=>{
                       let shops:SkinShop[]=[];
-                      try{ if(m.contentData) shops=JSON.parse(m.contentData); }catch(_e){}
+                      try{
+                        if(m.contentData){
+                          const parsed=JSON.parse(m.contentData);
+                          if(Array.isArray(parsed)) shops=parsed;
+                          else if(parsed && Array.isArray(parsed.shops)) shops=parsed.shops;
+                        }
+                      }catch(_e){}
                       setSkinModal({menuId:m.id,title:m.title,shops});
                     }}
                     className="w-full rounded-2xl overflow-hidden transition-all hover:scale-[1.03] active:scale-95 text-left"
