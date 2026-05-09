@@ -161,13 +161,13 @@ function SkinModal({ title, shops, onClose }: { title: string; shops: SkinShop[]
 // ─── 相談窓口モーダル ─────────────────────────────────────
 function ContactModal({
   title, note, onClose,
-  userName, userPhone, userEmail,
+  userName, userPhone, userEmail, userMemberCode,
 }: {
   title: string; note: string; onClose: () => void;
-  userName: string; userPhone: string; userEmail: string;
+  userName: string; userPhone: string; userEmail: string; userMemberCode: string;
 }) {
   const [form, setForm] = useState({
-    name: userName, phone: userPhone, email: userEmail, content: "",
+    memberId: userMemberCode, name: userName, phone: userPhone, email: userEmail, content: "",
   });
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -181,7 +181,13 @@ function ContactModal({
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, menuTitle: title }),
+        body: JSON.stringify({
+          name:      form.name,
+          phone:     form.phone,
+          email:     form.email,
+          menuTitle: title,
+          content:   `【会員ID: ${form.memberId}】\n${form.content}`,
+        }),
       });
       if (!res.ok) throw new Error("failed");
       setDone(true);
@@ -219,6 +225,13 @@ function ContactModal({
               </div>
             )}
             <form onSubmit={onSubmit} className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">会員ID <span className="text-red-500">*</span></label>
+                <input required
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:border-slate-400"
+                  placeholder="例：M0001"
+                  value={form.memberId} onChange={e => setForm({ ...form, memberId: e.target.value })} />
+              </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">お名前 <span className="text-red-500">*</span></label>
                 <input required
@@ -261,8 +274,8 @@ function ContactModal({
 // ─── メニューカード（メイン） ─────────────────────────────
 export default function MenuCard({
   title, subtitle, iconType, menuType, linkUrl, contentData,
-  userName, userPhone, userEmail,
-}: MenuCardProps & { userName: string; userPhone: string; userEmail: string }) {
+  userName, userPhone, userEmail, userMemberCode,
+}: MenuCardProps & { userName: string; userPhone: string; userEmail: string; userMemberCode: string }) {
   const [showModal, setShowModal] = useState(false);
 
   const icon = iconMap[iconType || "star"] || "⭐";
@@ -321,7 +334,7 @@ export default function MenuCard({
       {showModal && menuType === "contact" && (
         <ContactModal
           title={title} note={contactNote}
-          userName={userName} userPhone={userPhone} userEmail={userEmail}
+          userName={userName} userPhone={userPhone} userEmail={userEmail} userMemberCode={userMemberCode}
           onClose={() => setShowModal(false)}
         />
       )}

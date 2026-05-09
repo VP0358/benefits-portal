@@ -31,12 +31,23 @@ export default function ContactPage() {
   const [error,      setError]      = useState("");
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [form, setForm] = useState({
+    memberId: "",
     name:     "",
     phone:    "",
     email:    "",
     category: "",
     content:  "",
   });
+
+  // ログイン中の会員IDを自動セット
+  useEffect(() => {
+    fetch("/api/my/profile")
+      .then(r => r.json())
+      .then((data: { memberCode?: string }) => {
+        if (data?.memberCode) setForm(f => ({ ...f, memberId: data.memberCode ?? "" }));
+      })
+      .catch(() => {});
+  }, []);
 
   // 福利厚生メニューからカテゴリを動的取得
   useEffect(() => {
@@ -60,6 +71,11 @@ export default function ContactPage() {
     setLoading(true);
     setError("");
 
+    if (!form.memberId.trim()) {
+      setError("会員IDを入力してください。");
+      setLoading(false);
+      return;
+    }
     if (!form.name.trim()) {
       setError("お名前を入力してください。");
       setLoading(false);
@@ -85,7 +101,7 @@ export default function ContactPage() {
           phone:     form.phone,
           email:     form.email,
           menuTitle: form.category,
-          content:   form.content,
+          content:   `【会員ID: ${form.memberId}】\n${form.content}`,
         }),
       });
       if (!res.ok) throw new Error("送信失敗");
@@ -214,6 +230,21 @@ export default function ContactPage() {
           }}>
           <div className="h-0.5" style={{ background: `linear-gradient(90deg,transparent,${GOLD}50,${GOLD}70,${GOLD}50,transparent)` }}/>
           <form onSubmit={onSubmit} className="p-5 space-y-4">
+
+            {/* 会員ID */}
+            <div>
+              <label className={labelClass} style={{ color: `${NAVY}80` }}>
+                会員ID <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                className={inputClass}
+                placeholder="例：M0001"
+                value={form.memberId}
+                onChange={(e) => setForm({ ...form, memberId: e.target.value })}
+              />
+            </div>
 
             {/* お名前 */}
             <div>
