@@ -13,7 +13,7 @@ const menuSchema = z.object({
   title: z.string().min(1).max(255),
   subtitle: z.string().max(255).optional().nullable(),
   iconType: z.string().max(50).optional().nullable(),
-  imageUrl: z.string().url().max(500).optional().nullable().or(z.literal("")),
+  imageUrl: z.string().max(5000000).optional().nullable().or(z.literal("")),  // Base64対応
   linkUrl: z.string().max(500).optional().nullable().default(""),
   menuType: z.string().max(50).default("url"),
   contentData: z.string().optional().nullable(),

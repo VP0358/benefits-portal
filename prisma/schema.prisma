@@ -130,7 +130,7 @@ model Menu {
   title       String   @unique @db.VarChar(255)
   subtitle    String?  @db.VarChar(255)
   iconType    String?  @db.VarChar(50)
-  imageUrl    String?  @db.VarChar(500)
+  imageUrl    String?  @db.Text
   linkUrl     String   @default("") @db.VarChar(500)
   menuType    String   @default("url") @db.VarChar(50)
   contentData String?  @db.Text
