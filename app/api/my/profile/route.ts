@@ -47,8 +47,9 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { name, nameKana, phone, postalCode, address, newEmail,
-          currentPassword, newPassword } = body;
+  // 基本情報（name/nameKana/phone/postalCode/address）は管理側でのみ変更可能
+  // 会員側はメールアドレスとパスワードのみ変更可
+  const { newEmail, currentPassword, newPassword } = body;
 
   const user = await prisma.user.findUnique({
     where: { id: BigInt(session.user.id) },
@@ -86,12 +87,9 @@ export async function PATCH(req: NextRequest) {
   }
 
   // 更新データ構築
+  // ※ 基本情報（name/nameKana/phone/postalCode/address）は管理側でのみ変更可能
+  //   会員側からの変更リクエストは無視する
   const updateData: Record<string, unknown> = {};
-  if (name)       updateData.name       = name;
-  if (nameKana !== undefined) updateData.nameKana = nameKana;
-  if (phone !== undefined)    updateData.phone    = phone;
-  if (postalCode !== undefined) updateData.postalCode = postalCode;
-  if (address !== undefined)  updateData.address  = address;
   if (newEmail && newEmail !== user.email) updateData.email = newEmail;
   if (newPassword) updateData.passwordHash = await hash(newPassword, 10);
 

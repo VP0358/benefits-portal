@@ -67,6 +67,34 @@ function InputField({ label, required, children }: { label: string; required?: b
   );
 }
 
+function ReadOnlyField({ label, value, multiline }: { label: string; value: string; multiline?: boolean }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold font-jp mb-1.5" style={{ color: `${NAVY}70` }}>
+        {label}
+      </label>
+      <div
+        className="w-full font-jp"
+        style={{
+          background: "rgba(10,22,40,0.03)",
+          border: `1px solid rgba(10,22,40,0.08)`,
+          color: `${NAVY}90`,
+          borderRadius: "12px",
+          padding: "12px 16px",
+          fontSize: "14px",
+          minHeight: multiline ? "80px" : undefined,
+          whiteSpace: multiline ? "pre-wrap" : undefined,
+          lineHeight: "1.6",
+          cursor: "not-allowed",
+          userSelect: "text",
+        }}
+      >
+        {value || <span style={{ color: `${NAVY}35` }}>—</span>}
+      </div>
+    </div>
+  );
+}
+
 const inputStyle = {
   background: "rgba(10,22,40,0.05)",
   border: `1px solid rgba(10,22,40,0.12)`,
@@ -194,7 +222,7 @@ export default function ProfilePage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name, nameKana, phone, postalCode, address,
+        // 基本情報（name/nameKana/phone/postalCode/address）は送信しない（管理側のみ変更可）
         newEmail:        newEmail !== profile?.email ? newEmail : undefined,
         currentPassword: currentPw || undefined,
         newPassword:     newPw || undefined,
@@ -203,9 +231,9 @@ export default function ProfilePage() {
     const data = await res.json();
     setSaving(false);
     if (!res.ok) { setError(data.error ?? "更新に失敗しました。"); return; }
-    setSuccess("登録情報を更新しました！");
+    setSuccess("更新しました！");
     setCurrentPw(""); setNewPw(""); setConfirmPw("");
-    setProfile(data);
+    setProfile(prev => prev ? { ...prev, email: data.email ?? prev.email } : prev);
     if (data.emailChanged) {
       setSuccess("メールアドレスを変更しました。再ログインしてください。");
       setTimeout(() => {
@@ -349,29 +377,39 @@ export default function ProfilePage() {
         {/* フォーム */}
         <form onSubmit={handleSubmit} className="space-y-4">
 
-          {/* 基本情報 */}
+          {/* 基本情報（読み取り専用） */}
           <LinenCard className="overflow-hidden">
             <SectionHeader
               icon={<svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: GOLD }}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>}
               title="基本情報"
             />
+            {/* FAXアナウンス */}
+            <div className="mx-5 mt-4 rounded-xl px-4 py-3.5" style={{ background: "rgba(201,168,76,0.10)", border: "1px solid rgba(201,168,76,0.30)" }}>
+              <div className="flex items-start gap-2.5">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: GOLD }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <div>
+                  <p className="text-xs font-bold font-jp mb-1" style={{ color: GOLD }}>基本情報の変更について</p>
+                  <p className="text-xs font-jp leading-relaxed" style={{ color: `${NAVY}80` }}>
+                    基本情報は管理者のみ変更可能です。<br/>
+                    変更をご希望の場合は、下記FAX番号へ変更依頼書をお送りください。
+                  </p>
+                  <div className="flex items-center gap-2 mt-2.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: GOLD }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                    </svg>
+                    <p className="text-sm font-bold tracking-wider" style={{ color: NAVY }}>FAX：050-3385-7788</p>
+                  </div>
+                </div>
+              </div>
+            </div>
             <div className="px-5 py-4 space-y-4">
-              <InputField label="お名前" required>
-                <input type="text" required value={name} onChange={e => setName(e.target.value)} style={inputStyle as React.CSSProperties} placeholder="山田 太郎"/>
-              </InputField>
-              <InputField label="フリガナ">
-                <input type="text" value={nameKana} onChange={e => setNameKana(e.target.value)} style={inputStyle as React.CSSProperties} placeholder="ヤマダ タロウ"/>
-              </InputField>
-              <InputField label="電話番号">
-                <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} style={inputStyle as React.CSSProperties} placeholder="090-1234-5678"/>
-              </InputField>
-              <InputField label="郵便番号">
-                <input type="text" value={postalCode} onChange={e => setPostalCode(e.target.value)} style={inputStyle as React.CSSProperties} placeholder="123-4567"/>
-              </InputField>
-              <InputField label="住所">
-                <textarea value={address} onChange={e => setAddress(e.target.value)} rows={3}
-                  style={{ ...inputStyle, resize: "none" } as React.CSSProperties} placeholder="東京都渋谷区..."/>
-              </InputField>
+              <ReadOnlyField label="お名前" value={name} />
+              <ReadOnlyField label="フリガナ" value={nameKana} />
+              <ReadOnlyField label="電話番号" value={phone} />
+              <ReadOnlyField label="郵便番号" value={postalCode} />
+              <ReadOnlyField label="住所" value={address} multiline />
             </div>
           </LinenCard>
 
@@ -421,11 +459,11 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* 送信ボタン */}
+          {/* 送信ボタン（メール・パスワード変更のみ） */}
           <button type="submit" disabled={saving}
             className="w-full py-4 rounded-2xl text-white font-bold text-base disabled:opacity-50 transition font-jp"
             style={{ background: `linear-gradient(135deg,${GOLD},${ORANGE})`, boxShadow: `0 4px 16px rgba(201,168,76,0.25)` }}>
-            {saving ? "更新中..." : "登録情報を更新する"}
+            {saving ? "更新中..." : "メール・パスワードを更新する"}
           </button>
 
           <button type="button" onClick={() => router.push("/dashboard")}
