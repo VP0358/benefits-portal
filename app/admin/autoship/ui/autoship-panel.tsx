@@ -302,16 +302,20 @@ export default function AutoShipPanel() {
   const [csvImportResult, setCsvImportResult] = useState<{
     paidCount: number;
     failedCount: number;
+    csvTotalRows?: number;       // ★ CSV総行数（重複ID含む全行数）
     matchedCount?: number;
     unmatchedCount?: number;
+    csvUnmatchedCount?: number;  // ★ CSV未照合ID数（未照合カテゴリ）
     newRunId?: string;
     effectivePaymentMethod?: string;
     debug?: Record<string, unknown>;
     warnings?: string[];
-    // 要件②⑦: 成功者・失敗者の詳細一覧（会員ID・氏名付き）
+    // 照合成功者・照合失敗者の詳細一覧（会員ID・氏名付き）
     successMembers?: { memberCode: string; memberName: string; paidDate: string | null; amount: number; resultText: string }[];
     failedMembers?:  { memberCode: string; memberName: string; creditIds: string[]; normCreditIds?: string[] }[];
-    // CSV内で会員DBに照合できなかった決済ID一覧（DB未登録）
+    // ★ 照合失敗者（DB登録済みだがCSV未一致）
+    matchFailMembers?: { memberCode: string; memberName: string; creditIds: string[]; normCreditIds?: string[] }[];
+    // ★ 未照合: CSV内で会員DBに照合できなかった決済ID一覧（DB未登録）
     unmatchedCsvIds?: { rawId: string; normId: string }[];
   } | null>(null);
 
@@ -485,15 +489,18 @@ export default function AutoShipPanel() {
       setCsvImportResult({
         paidCount:              data.paidCount as number,
         failedCount:            data.failedCount as number,
+        csvTotalRows:           data.csvTotalRows as number | undefined,
         matchedCount:           data.matchedCount as number | undefined,
         unmatchedCount:         data.unmatchedCount as number | undefined,
+        csvUnmatchedCount:      data.csvUnmatchedCount as number | undefined,
         newRunId:               data.runId as string | undefined,
         effectivePaymentMethod: data.effectivePaymentMethod as string | undefined,
         debug:                  data._debug as Record<string, unknown> | undefined,
         warnings:               data.warnings as string[] | undefined,
-        successMembers:         data.successMembers as { memberCode: string; memberName: string; paidDate: string | null; amount: number; resultText: string }[] | undefined,
-        failedMembers:          data.failedMembers  as { memberCode: string; memberName: string; creditIds: string[]; normCreditIds?: string[] }[] | undefined,
-        unmatchedCsvIds:        data.unmatchedCsvIds as { rawId: string; normId: string }[] | undefined,
+        successMembers:         data.successMembers   as { memberCode: string; memberName: string; paidDate: string | null; amount: number; resultText: string }[] | undefined,
+        failedMembers:          data.failedMembers    as { memberCode: string; memberName: string; creditIds: string[]; normCreditIds?: string[] }[] | undefined,
+        matchFailMembers:       data.matchFailMembers as { memberCode: string; memberName: string; creditIds: string[]; normCreditIds?: string[] }[] | undefined,
+        unmatchedCsvIds:        data.unmatchedCsvIds  as { rawId: string; normId: string }[] | undefined,
       });
       const pmLabel = data.effectivePaymentMethod === "bank_transfer" ? "口座引き落とし" :
                       data.effectivePaymentMethod === "credit_card"   ? "クレジットカード" :
@@ -985,26 +992,38 @@ export default function AutoShipPanel() {
                   </span>
                 )}
               </div>
+              {/* CSV総行数バナー */}
+              {csvImportResult.csvTotalRows != null && (
+                <div className="bg-gray-700 px-4 py-1.5 text-center text-xs text-gray-200">
+                  CSV取込総行数: <span className="font-black text-white text-sm" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace", fontVariantNumeric: "slashed-zero" }}>{csvImportResult.csvTotalRows}</span> 件
+                </div>
+              )}
               <div className="grid grid-cols-3 divide-x divide-gray-200 bg-white">
+                {/* ① 照合成功: DB登録あり かつ CSVに該当IDあり */}
                 <div className="px-4 py-3 text-center">
-                  <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">決済成功</div>
+                  <div className="text-[11px] font-semibold text-green-600 uppercase tracking-wider mb-1">✅ 照合成功</div>
+                  <div className="text-xs text-gray-400 mb-1">DB登録あり＋CSV一致</div>
                   {/* ⑤ 要件: 0とOの判別が容易なフォント（スラッシュ付きゼロ）を使用 */}
                   <div className="text-2xl font-black text-green-600" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace", fontVariantNumeric: "slashed-zero" }}>
                     {csvImportResult.paidCount}
                   </div>
                   <div className="text-[10px] text-gray-400 mt-0.5">件</div>
                 </div>
+                {/* ② 照合失敗: DB登録あり だがCSVに不在 */}
                 <div className="px-4 py-3 text-center">
-                  <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">決済失敗（DB検出）</div>
+                  <div className="text-[11px] font-semibold text-red-600 uppercase tracking-wider mb-1">❌ 照合失敗</div>
+                  <div className="text-xs text-gray-400 mb-1">DB登録あり＋CSV不在</div>
                   <div className="text-2xl font-black text-red-500" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace", fontVariantNumeric: "slashed-zero" }}>
-                    {csvImportResult.failedMembers?.length ?? csvImportResult.failedCount}
+                    {csvImportResult.matchFailMembers?.length ?? csvImportResult.failedMembers?.length ?? csvImportResult.failedCount}
                   </div>
                   <div className="text-[10px] text-gray-400 mt-0.5">件</div>
                 </div>
+                {/* ③ 未照合: CSVにIDあり だが会員DB未登録 */}
                 <div className="px-4 py-3 text-center">
-                  <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1">CSV未照合ID</div>
+                  <div className="text-[11px] font-semibold text-orange-600 uppercase tracking-wider mb-1">⚠️ 未照合</div>
+                  <div className="text-xs text-gray-400 mb-1">CSVあり＋DB未登録</div>
                   <div className="text-2xl font-black text-orange-500" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace", fontVariantNumeric: "slashed-zero" }}>
-                    {csvImportResult.unmatchedCount ?? 0}
+                    {csvImportResult.csvUnmatchedCount ?? csvImportResult.unmatchedCount ?? 0}
                   </div>
                   <div className="text-[10px] text-gray-400 mt-0.5">件</div>
                 </div>
@@ -1069,15 +1088,16 @@ export default function AutoShipPanel() {
               </div>
             )}
 
-            {/* ── 決済失敗者一覧（要件①②③④） ── */}
-            {csvImportResult.failedMembers && csvImportResult.failedMembers.length > 0 && (
+            {/* ── 照合失敗者一覧（DB登録あり・CSV不在） ── */}
+            {(csvImportResult.matchFailMembers ?? csvImportResult.failedMembers) &&
+             ((csvImportResult.matchFailMembers ?? csvImportResult.failedMembers)!.length > 0) && (
               <div className="rounded-xl border border-red-200 overflow-hidden">
                 <div className="bg-red-600 px-4 py-2 flex items-center gap-2">
-                  <span className="text-white font-bold text-sm">❌ 決済失敗者一覧</span>
+                  <span className="text-white font-bold text-sm">❌ 照合失敗者一覧</span>
                   <span className="bg-red-100 text-red-800 text-xs font-bold px-2 py-0.5 rounded-full" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>
-                    {csvImportResult.failedMembers.length}件
+                    {(csvImportResult.matchFailMembers ?? csvImportResult.failedMembers)!.length}件
                   </span>
-                  <span className="text-red-200 text-[11px] ml-auto">会員DBで検出：決済ID①②③は登録済みだがCSVに不在（未決済）</span>
+                  <span className="text-red-200 text-[11px] ml-auto">DB登録済みの決済ID①②③がCSVに不在（未決済）</span>
                 </div>
                 <div className="overflow-x-auto max-h-72 overflow-y-auto">
                   <table className="min-w-full text-xs">
@@ -1090,7 +1110,7 @@ export default function AutoShipPanel() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-red-100 bg-white">
-                      {csvImportResult.failedMembers.map((m, i) => (
+                      {(csvImportResult.matchFailMembers ?? csvImportResult.failedMembers)!.map((m, i) => (
                         <tr key={m.memberCode} className="hover:bg-red-50">
                           <td className="px-3 py-1.5 text-gray-400 text-[11px]" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>{i + 1}</td>
                           <td className="px-3 py-1.5">
@@ -1116,11 +1136,11 @@ export default function AutoShipPanel() {
               </div>
             )}
 
-            {/* ── CSV未照合ID一覧（会員DB未登録）── */}
+            {/* ── 未照合ID一覧（CSVあり・DB未登録）── */}
             {csvImportResult.unmatchedCsvIds && csvImportResult.unmatchedCsvIds.length > 0 && (
               <div className="rounded-xl border border-orange-200 overflow-hidden">
                 <div className="bg-orange-500 px-4 py-2 flex items-center gap-2">
-                  <span className="text-white font-bold text-sm">🔍 CSV未照合ID一覧</span>
+                  <span className="text-white font-bold text-sm">⚠️ 未照合ID一覧（CSV記載・DB未登録）</span>
                   <span className="bg-orange-100 text-orange-800 text-xs font-bold px-2 py-0.5 rounded-full" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>
                     {csvImportResult.unmatchedCsvIds.length}件
                   </span>
@@ -1182,7 +1202,7 @@ export default function AutoShipPanel() {
                   🔍 デバッグ情報（クリックで展開）
                 </summary>
                 <div className="p-3 bg-gray-50 text-xs font-mono text-gray-600 space-y-1">
-                  <div>CSV決済ID数: <strong>{String(csvImportResult.debug.csvIdCount ?? "-")}</strong> / 会員数: <strong>{String(csvImportResult.debug.memberCount ?? "-")}</strong> / 照合マップ: <strong>{String(csvImportResult.debug.cardIdMapSize ?? "-")}</strong></div>
+                  <div>CSV総行数: <strong>{String(csvImportResult.debug.csvTotalRows ?? "-")}</strong> / CSV決済ID数（ユニーク）: <strong>{String(csvImportResult.debug.csvIdCount ?? "-")}</strong> / 会員数: <strong>{String(csvImportResult.debug.memberCount ?? "-")}</strong></div>
                   <div>照合件数: <strong>{String(csvImportResult.debug.matchedCount ?? "-")}</strong> / 成功: <strong>{String(csvImportResult.debug.paidCount ?? "-")}</strong> / 失敗: <strong>{String(csvImportResult.debug.failedCount ?? "-")}</strong></div>
                   <div>CSV未照合: <strong>{String(csvImportResult.debug.csvUnmatchedCount ?? "-")}</strong> / 会員DB失敗者: <strong>{String(csvImportResult.debug.failedMemberCount ?? "-")}</strong></div>
                   {csvImportResult.unmatchedCsvIds && csvImportResult.unmatchedCsvIds.length > 0 && (

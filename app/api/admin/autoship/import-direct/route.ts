@@ -274,8 +274,10 @@ async function processCredixResultCsv(
 
   console.log(`[import-direct] Credix結果CSV: sendidIdx=${sendidIdx}, dateIdx=${dateIdx}, resultIdx=${resultIdx}, amountIdx=${amountIdx}`);
 
-  // ── CSV から 正規化決済ID → { resultText, isOk, paidDate, amount } マップを構築 ──
-  // 要件③: 同一決済IDで複数行ある場合でも、CSVにIDがあれば決済成功者と認定（成功優先）
+  // ── CSV から 正規化決済ID → エントリ配列マップを構築 ──
+  // ★ バグ修正①: 同一決済IDで複数行ある場合に全行を保持（配列）
+  //   旧実装は単一エントリで上書きしていたため、重複ID分の行数が脱落し
+  //   CSV117行→108ユニークID→97照合成功 という件数不一致が発生していた
   // 要件⑥: normalizeCardId() = WCプレフィックス除去 + 先頭ゼロ全除去（両方向）で照合
   const csvIdMap = new Map<string, {
     rawId: string;
@@ -283,7 +285,10 @@ async function processCredixResultCsv(
     isOk: boolean;
     paidDate: Date | undefined;
     amount: number;
-  }>();
+  }[]>();
+
+  // CSV総行数カウント（重複ID含む全行数）
+  let csvTotalRows = 0;
 
   for (const line of dataLines) {
     if (!line.trim()) continue;
@@ -309,24 +314,20 @@ async function processCredixResultCsv(
     const rawAmount = amountIdx >= 0 ? (cols[amountIdx] ?? "0") : "0";
     const amount = parseInt(rawAmount.replace(/[^0-9]/g, ""), 10) || 0;
 
-    // 要件③: 同一IDは成功優先で登録（CSVにIDが存在 = 成功者）
-    // isOk は結果列が明示的に失敗を示す場合のみ false
+    // 結果判定: 明確な失敗文字列のみ false（それ以外はCSVに記載あり = 成功）
     let isOk = true;
     if (resultText !== "") {
       const rt = resultText.toLowerCase();
-      // 明確な失敗文字列のみ false（それ以外はCSVに記載あり = 成功）
       isOk = !(rt.includes("失敗") || rt.includes("エラー") || rt === "ng" || rt.includes("error"));
     }
 
-    if (!csvIdMap.has(normId)) {
-      csvIdMap.set(normId, { rawId, resultText, isOk, paidDate, amount });
-    } else if (isOk && !csvIdMap.get(normId)!.isOk) {
-      // 同一IDで成功行が後から来たら上書き
-      csvIdMap.set(normId, { rawId, resultText, isOk, paidDate, amount });
-    }
+    // ★ バグ修正①: 全行を配列に追加（上書きせず全行保持）
+    if (!csvIdMap.has(normId)) { csvIdMap.set(normId, []); }
+    csvIdMap.get(normId)!.push({ rawId, resultText, isOk, paidDate, amount });
+    csvTotalRows++;
   }
 
-  console.log(`[import-direct] Credix: CSV決済ID ${csvIdMap.size}件抽出`);
+  console.log(`[import-direct] Credix: CSV総行数=${csvTotalRows}件 ユニークID=${csvIdMap.size}件抽出`);
 
   // ── 対象会員取得: creditCardId①②③ のいずれかが登録されている全会員 ──
   // autoshipEnabled は問わず、決済IDが登録されている会員を全件対象とする
@@ -407,16 +408,24 @@ async function processCredixResultCsv(
   // CSV未照合ID（会員DB未登録）
   const unmatchedCsvIds: { rawId: string; normId: string }[] = [];
 
-  for (const [normId, entry] of csvIdMap) {
+  for (const [normId, entries] of csvIdMap) {
     const member = cardIdToMember.get(normId);
     if (!member) {
-      unmatchedCsvIds.push({ rawId: entry.rawId, normId });
+      // rawId は最初の行のものを代表値として使用
+      unmatchedCsvIds.push({ rawId: entries[0]?.rawId ?? normId, normId });
       continue;
     }
+    // ★ バグ修正①: 同一IDの複数行を集約（金額合計、isOkはいずれか成功なら成功）
+    const isOk    = entries.some(e => e.isOk);
+    const paidDate = entries.find(e => e.isOk)?.paidDate ?? entries[0]?.paidDate;
+    const amount  = entries.reduce((s, e) => s + (e.amount > 0 ? e.amount : 0), 0);
+    const resultText = entries.find(e => e.isOk)?.resultText ?? entries[0]?.resultText ?? "";
+    const rawId   = entries.find(e => e.isOk)?.rawId ?? entries[0]?.rawId ?? normId;
+
     // 同一会員で複数決済IDがヒットした場合: 成功優先
     const existing = matchedMap.get(member.memberCode);
-    if (!existing || (entry.isOk && !existing.isOk)) {
-      matchedMap.set(member.memberCode, { ...entry, member });
+    if (!existing || (isOk && !existing.isOk)) {
+      matchedMap.set(member.memberCode, { isOk, paidDate, amount, resultText, member });
     }
   }
 
@@ -684,22 +693,34 @@ async function processCredixResultCsv(
     resultText: e.resultText,
   }));
 
-  console.log(`[import-direct] Credix: 完了 paid=${paidCount}件 failed=${failedCount}件 DB失敗者=${failedMembers.length}件 CSVunmatched=${unmatchedCsvIds.length}件`);
+  console.log(`[import-direct] Credix: 完了 CSV総行数=${csvTotalRows}件 paid=${paidCount}件 failed=${failedCount}件 DB失敗者=${failedMembers.length}件 CSVunmatched=${unmatchedCsvIds.length}件`);
+
+  // 照合失敗者（DBに決済IDがあるがCSV未照合）をUIに返す
+  const matchFailMembers = failedMemberList.map(m => ({
+    memberCode:   m.memberCode,
+    memberName:   m.memberName,
+    creditIds:    m.creditIds,
+    normCreditIds: m.normCreditIds,
+  }));
 
   return NextResponse.json({
     paidCount,
     failedCount,
+    csvTotalRows,                             // ★ 追加: CSV総行数（重複ID含む全行数）
     matchedCount:           matchedMap.size,
     unmatchedCount:         unmatchedCsvIds.length,
+    csvUnmatchedCount:      unmatchedCsvIds.length, // ★ 追加: 未照合CSV ID数
     effectivePaymentMethod: "credit_card",
     runId:                  autoShipRun?.id.toString(),
     // 要件⑦: 成功者・失敗者の詳細一覧
     successMembers:         successMemberList,
-    failedMembers:          failedMemberList,  // 要件①③: DB検出の決済失敗者一覧（会員ID・氏名・登録決済ID付き）
-    // ② CSV内で会員DBに照合できなかった決済ID一覧（MLM会員詳細への登録を促す）
+    failedMembers:          failedMemberList,        // 要件①③: DB検出の決済失敗者一覧
+    matchFailMembers,                                // ★ 追加: UI用照合失敗者一覧
+    // ② CSV内で会員DBに照合できなかった決済ID一覧
     unmatchedCsvIds:        unmatchedCsvIds.map(u => ({ rawId: u.rawId, normId: u.normId })),
     warnings:               warnings.length > 0 ? warnings : undefined,
     _debug: {
+      csvTotalRows,
       csvIdCount:       csvIdMap.size,
       memberCount:      allMlmMembers.length,
       cardIdMapSize:    cardIdToMember.size,
