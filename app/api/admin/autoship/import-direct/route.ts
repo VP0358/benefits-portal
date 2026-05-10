@@ -559,15 +559,12 @@ async function processCredixResultCsv(
     }
   }
 
-  // ── AutoShipRun カウントをDB実値で再計算 ──
-  const agg = await prisma.autoShipOrder.aggregate({
-    where: { autoShipRunId: autoShipRun.id },
-    _count: { id: true },
-    _sum:   { totalAmount: true },
-  });
+  // ── AutoShipRun カウント・金額をDB実値で再計算 ──
+  // totalAmount は決済成功（paid）分のみ集計（失敗者分は含めない）
   const paidAgg = await prisma.autoShipOrder.aggregate({
     where: { autoShipRunId: autoShipRun.id, status: "paid" },
     _count: { id: true },
+    _sum:   { totalAmount: true },
   });
   const failedAgg = await prisma.autoShipOrder.aggregate({
     where: { autoShipRunId: autoShipRun.id, status: "failed" },
@@ -576,10 +573,10 @@ async function processCredixResultCsv(
   await prisma.autoShipRun.update({
     where: { id: autoShipRun.id },
     data: {
-      totalCount:  agg._count.id,
+      totalCount:  paidAgg._count.id,                  // 件数 = 成功件数のみ
       paidCount:   paidAgg._count.id,
       failedCount: failedAgg._count.id,
-      totalAmount: agg._sum.totalAmount ?? 0,
+      totalAmount: paidAgg._sum.totalAmount ?? 0,      // 金額 = 成功分のみ
     },
   });
 
