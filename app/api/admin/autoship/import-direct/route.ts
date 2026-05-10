@@ -472,11 +472,15 @@ async function processCredixResultCsv(
     console.log(`[import-direct] Credix: 既存Run(id=${existingRun.id})とOrderを削除して再作成`);
   }
 
-  // 会員単位の成功/失敗エントリ
+  // 会員単位の成功/失敗エントリ（AutoShipOrder保存用）
   const matchedEntries  = Array.from(memberMatchMap.values());
   const paidEntries     = matchedEntries.filter(e => e.isOk);
   const csvFailEntries  = matchedEntries.filter(e => !e.isOk);
-  const totalPaidAmount = paidEntries.reduce((sum, e) => sum + (e.amount > 0 ? e.amount : 16500), 0);
+
+  // ① CSV行単位のカウント・金額（重複IDも個別にカウント）
+  const csvPaidRows   = matchedCsvRows.filter(r => r.isOk);
+  const csvPaidCount  = csvPaidRows.length;
+  const csvTotalPaidAmount = csvPaidRows.reduce((sum, r) => sum + (r.amount > 0 ? r.amount : 16500), 0);
 
   // ② 新規Runを作成
   const autoShipRun = await prisma.autoShipRun.create({
@@ -484,10 +488,10 @@ async function processCredixResultCsv(
       targetMonth,
       paymentMethod: "credit_card",
       status:        "completed",
-      totalCount:    matchedEntries.length,
-      paidCount:     paidEntries.length,
+      totalCount:    csvPaidCount,                                       // CSV行単位の成功件数
+      paidCount:     csvPaidCount,                                       // CSV行単位の成功件数
       failedCount:   csvFailEntries.length + failedMembers.length,
-      totalAmount:   totalPaidAmount,
+      totalAmount:   csvTotalPaidAmount,                                 // CSV行単位の成功金額
       importedAt:    now,
       completedAt:   now,
     },
@@ -559,13 +563,9 @@ async function processCredixResultCsv(
     }
   }
 
-  // ── AutoShipRun カウント・金額をDB実値で再計算 ──
-  // totalAmount は決済成功（paid）分のみ集計（失敗者分は含めない）
-  const paidAgg = await prisma.autoShipOrder.aggregate({
-    where: { autoShipRunId: autoShipRun.id, status: "paid" },
-    _count: { id: true },
-    _sum:   { totalAmount: true },
-  });
+  // ── AutoShipRun カウント・金額を再計算（CSV行単位）──
+  // paidCount/totalCount = CSV行単位の成功件数（重複IDも個別カウント）
+  // totalAmount = CSV行単位の成功金額
   const failedAgg = await prisma.autoShipOrder.aggregate({
     where: { autoShipRunId: autoShipRun.id, status: "failed" },
     _count: { id: true },
@@ -573,10 +573,10 @@ async function processCredixResultCsv(
   await prisma.autoShipRun.update({
     where: { id: autoShipRun.id },
     data: {
-      totalCount:  paidAgg._count.id,                  // 件数 = 成功件数のみ
-      paidCount:   paidAgg._count.id,
+      totalCount:  csvPaidCount,           // CSV行単位の成功件数（重複ID個別カウント）
+      paidCount:   csvPaidCount,           // 同上
       failedCount: failedAgg._count.id,
-      totalAmount: paidAgg._sum.totalAmount ?? 0,      // 金額 = 成功分のみ
+      totalAmount: csvTotalPaidAmount,     // CSV行単位の成功金額
     },
   });
 
