@@ -299,7 +299,25 @@ export default function AutoShipPanel() {
   const [csvImportPm, setCsvImportPm] = useState<string>("credit_card");
   const [csvImportPmAutoDetected, setCsvImportPmAutoDetected] = useState(false);
   const [csvImportLoading, setCsvImportLoading] = useState(false);
-  const [csvImportResult, setCsvImportResult] = useState<{ paidCount: number; failedCount: number; matchedCount?: number; unmatchedCount?: number; newRunId?: string; effectivePaymentMethod?: string; debug?: Record<string, unknown>; warnings?: string[] } | null>(null);
+  const [csvImportResult, setCsvImportResult] = useState<{
+    paidCount: number;
+    failedCount: number;
+    csvTotalRows?: number;       // ★ CSV総行数（重複ID含む全行数）
+    matchedCount?: number;
+    unmatchedCount?: number;
+    csvUnmatchedCount?: number;  // ★ CSV未照合ID数（未照合カテゴリ）
+    newRunId?: string;
+    effectivePaymentMethod?: string;
+    debug?: Record<string, unknown>;
+    warnings?: string[];
+    // 照合成功者・照合失敗者の詳細一覧（会員ID・氏名付き）
+    successMembers?: { memberCode: string; memberName: string; paidDate: string | null; amount: number; resultText: string }[];
+    failedMembers?:  { memberCode: string; memberName: string; creditIds: string[]; normCreditIds?: string[] }[];
+    // ★ 照合失敗者（DB登録済みだがCSV未一致）
+    matchFailMembers?: { memberCode: string; memberName: string; creditIds: string[]; normCreditIds?: string[] }[];
+    // ★ 未照合: CSV内で会員DBに照合できなかった決済ID一覧（DB未登録）
+    unmatchedCsvIds?: { rawId: string; normId: string }[];
+  } | null>(null);
 
   /* ─── 一覧取得 ─── */
   const loadRuns = useCallback(async () => {
@@ -468,15 +486,29 @@ export default function AutoShipPanel() {
       let data: Record<string, unknown> = {};
       try { data = rawText ? JSON.parse(rawText) : {}; } catch { /* ignore */ }
       if (!res.ok) throw new Error((data.error as string) ?? `サーバーエラー (${res.status})`);
-      setCsvImportResult({ paidCount: data.paidCount as number, failedCount: data.failedCount as number, matchedCount: data.matchedCount as number | undefined, unmatchedCount: data.unmatchedCount as number | undefined, newRunId: data.runId as string | undefined, effectivePaymentMethod: data.effectivePaymentMethod as string | undefined, debug: data._debug as Record<string, unknown> | undefined, warnings: data.warnings as string[] | undefined });
+      setCsvImportResult({
+        paidCount:              data.paidCount as number,
+        failedCount:            data.failedCount as number,
+        csvTotalRows:           data.csvTotalRows as number | undefined,
+        matchedCount:           data.matchedCount as number | undefined,
+        unmatchedCount:         data.unmatchedCount as number | undefined,
+        csvUnmatchedCount:      data.csvUnmatchedCount as number | undefined,
+        newRunId:               data.runId as string | undefined,
+        effectivePaymentMethod: data.effectivePaymentMethod as string | undefined,
+        debug:                  data._debug as Record<string, unknown> | undefined,
+        warnings:               data.warnings as string[] | undefined,
+        successMembers:         data.successMembers   as { memberCode: string; memberName: string; paidDate: string | null; amount: number; resultText: string }[] | undefined,
+        failedMembers:          data.failedMembers    as { memberCode: string; memberName: string; creditIds: string[]; normCreditIds?: string[] }[] | undefined,
+        matchFailMembers:       data.matchFailMembers as { memberCode: string; memberName: string; creditIds: string[]; normCreditIds?: string[] }[] | undefined,
+        unmatchedCsvIds:        data.unmatchedCsvIds  as { rawId: string; normId: string }[] | undefined,
+      });
       const pmLabel = data.effectivePaymentMethod === "bank_transfer" ? "口座引き落とし" :
                       data.effectivePaymentMethod === "credit_card"   ? "クレジットカード" :
                       (data.effectivePaymentMethod as string | undefined) ?? csvImportPm;
-      const unmatchedCount = data.unmatchedCount as number | undefined;
-      const matchedCount = data.matchedCount as number | undefined;
+      const failedMemberCount = (data.failedMembers as unknown[] | undefined)?.length ?? (data.failedCount as number ?? 0);
       setMsg({
         type: "success",
-        text: `CSVインポート完了: 決済成功 ${data.paidCount} 件 / 失敗 ${data.failedCount ?? 0} 件${matchedCount != null ? ` / 照合 ${matchedCount} 件` : ""}${unmatchedCount != null && unmatchedCount > 0 ? ` / CSV未照合 ${unmatchedCount} 件` : ""}。支払い方法: ${pmLabel}。`,
+        text: `CSVインポート完了: 決済成功 ${data.paidCount} 件 / 決済失敗 ${failedMemberCount} 件。支払い方法: ${pmLabel}。`,
       });
       loadRuns();
     } catch (e: unknown) {
@@ -833,11 +865,25 @@ export default function AutoShipPanel() {
 
       {/* ──── CSV直接インポート ──── */}
       <div className="bg-white border border-green-100 rounded-xl p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-gray-800 mb-1">📂 CSVデータ取り込み（クレディックス / 三菱UFJファクター）</h2>
-        <p className="text-xs text-gray-500 mb-3">
-          決済会社から出力されたCSVをここで直接インポートできます。インポート後、決済成功会員を当月アクティブとして自動反映します。
-          伝票が未作成の場合は自動作成されます。
-        </p>
+        <h2 className="text-base font-bold text-gray-800 mb-1" style={{ fontFamily: "'BIZ UDGothic', 'Noto Sans JP', sans-serif" }}>
+          📂 クレディックスCSV取り込み（決済成功者・失敗者 判定）
+        </h2>
+        <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200 text-xs text-blue-800 leading-relaxed">
+          <p className="font-bold mb-1">📋 取り込みの仕組み</p>
+          <p>管理側で決済IDを設定 → クレディックスに決済依頼 → <strong>決済成功者のみ</strong>がCSVに記載されて返送される</p>
+          <p className="mt-1">→ このCSVを取り込み、<span className="text-green-700 font-bold">決済成功者</span>と<span className="text-red-600 font-bold">決済失敗者（CSVに記載なし ＝ 会員DBで検出）</span>を自動判定・一覧表示します</p>
+          <div className="mt-2 p-2 bg-white rounded border border-blue-200 space-y-0.5">
+            <p className="font-semibold text-blue-700">🔑 照合ルール（先頭0埋め違い廃止）</p>
+            <p>• 照合キー: <strong>K列（ID(sendid)）</strong> のみ使用</p>
+            <p>• 正規化: WCプレフィックス除去 → <strong className="text-green-700">先頭ゼロを全て除去（両方向）</strong>して比較</p>
+            <p className="pl-3 text-[11px] text-gray-500" style={{ fontFamily: "'Courier New', monospace" }}>
+              WC01485760 → 1485760　／　01485760 → 1485760　／　1485760 → 1485760　→ すべて一致✅
+            </p>
+            <p>• CSVとDB登録値で先頭ゼロの桁数が違っていても<strong>必ず一致</strong>します</p>
+            <p>• 1会員に決済ID①②③が複数ある場合、<strong>いずれか1つでも</strong>CSVに存在すれば決済成功</p>
+            <p>• <strong className="text-red-600">決済失敗者</strong>: 決済ID①②③が登録済みだがCSVに1件も一致しない会員（DB検出）</p>
+          </div>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-3">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">対象月</label>
@@ -933,82 +979,235 @@ export default function AutoShipPanel() {
           </button>
         </div>
         {csvImportResult && (
-          <div className="mt-3 p-3 bg-green-50 rounded-lg text-sm border border-green-200">
-            <p className="font-semibold text-green-800">✅ インポート完了</p>
-            <p className="text-green-700">決済成功: <strong>{csvImportResult.paidCount}件</strong> / 失敗: <strong>{csvImportResult.failedCount}件</strong></p>
-            {/* 照合件数サマリー */}
-            {csvImportResult.matchedCount !== undefined && (
-              <p className="text-xs text-gray-600 mt-1">
-                ファイル照合: <strong>{csvImportResult.matchedCount}件</strong>一致
-                {csvImportResult.unmatchedCount !== undefined && csvImportResult.unmatchedCount > 0 && (
-                  <span className="text-orange-600 ml-2">/ 伝票未照合: <strong>{csvImportResult.unmatchedCount}件</strong></span>
+          <div className="mt-4 space-y-3">
+            {/* ── サマリーカード ── */}
+            <div className="rounded-xl border border-gray-200 overflow-hidden">
+              <div className="bg-gray-800 px-4 py-2.5 flex items-center justify-between">
+                <span className="text-white font-bold text-sm tracking-wide">📊 取込結果サマリー</span>
+                {csvImportResult.effectivePaymentMethod && (
+                  <span className="text-gray-300 text-xs font-mono">
+                    {csvImportResult.effectivePaymentMethod === "bank_transfer" ? "🏦 口座引き落とし" :
+                     csvImportResult.effectivePaymentMethod === "credit_card"   ? "💳 クレジットカード" :
+                     csvImportResult.effectivePaymentMethod}
+                  </span>
                 )}
-              </p>
+              </div>
+              {/* CSV総行数バナー */}
+              {csvImportResult.csvTotalRows != null && (
+                <div className="bg-gray-700 px-4 py-1.5 text-center text-xs text-gray-200">
+                  CSV取込総行数: <span className="font-black text-white text-sm" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace", fontVariantNumeric: "slashed-zero" }}>{csvImportResult.csvTotalRows}</span> 件
+                </div>
+              )}
+              <div className="grid grid-cols-3 divide-x divide-gray-200 bg-white">
+                {/* ① 照合成功: DB登録あり かつ CSVに該当IDあり */}
+                <div className="px-4 py-3 text-center">
+                  <div className="text-[11px] font-semibold text-green-600 uppercase tracking-wider mb-1">✅ 照合成功</div>
+                  <div className="text-xs text-gray-400 mb-1">DB登録あり＋CSV一致</div>
+                  {/* ⑤ 要件: 0とOの判別が容易なフォント（スラッシュ付きゼロ）を使用 */}
+                  <div className="text-2xl font-black text-green-600" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace", fontVariantNumeric: "slashed-zero" }}>
+                    {csvImportResult.paidCount}
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">件</div>
+                </div>
+                {/* ② 照合失敗: DB登録あり だがCSVに不在 */}
+                <div className="px-4 py-3 text-center">
+                  <div className="text-[11px] font-semibold text-red-600 uppercase tracking-wider mb-1">❌ 照合失敗</div>
+                  <div className="text-xs text-gray-400 mb-1">DB登録あり＋CSV不在</div>
+                  <div className="text-2xl font-black text-red-500" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace", fontVariantNumeric: "slashed-zero" }}>
+                    {csvImportResult.matchFailMembers?.length ?? csvImportResult.failedMembers?.length ?? csvImportResult.failedCount}
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">件</div>
+                </div>
+                {/* ③ 未照合: CSVにIDあり だが会員DB未登録 */}
+                <div className="px-4 py-3 text-center">
+                  <div className="text-[11px] font-semibold text-orange-600 uppercase tracking-wider mb-1">⚠️ 未照合</div>
+                  <div className="text-xs text-gray-400 mb-1">CSVあり＋DB未登録</div>
+                  <div className="text-2xl font-black text-orange-500" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace", fontVariantNumeric: "slashed-zero" }}>
+                    {csvImportResult.csvUnmatchedCount ?? csvImportResult.unmatchedCount ?? 0}
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">件</div>
+                </div>
+              </div>
+              {csvImportResult.newRunId && (
+                <div className="px-4 py-2 bg-indigo-50 border-t border-indigo-100">
+                  <button
+                    onClick={() => openDetail(csvImportResult.newRunId!)}
+                    className="text-xs text-indigo-700 hover:underline font-medium"
+                  >
+                    → 作成された伝票を確認（Run ID: {csvImportResult.newRunId}）
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* ── 決済成功者一覧（要件②⑦） ── */}
+            {csvImportResult.successMembers && csvImportResult.successMembers.length > 0 && (
+              <div className="rounded-xl border border-green-200 overflow-hidden">
+                <div className="bg-green-700 px-4 py-2 flex items-center gap-2">
+                  <span className="text-white font-bold text-sm">✅ 決済成功者一覧</span>
+                  <span className="bg-green-100 text-green-800 text-xs font-bold px-2 py-0.5 rounded-full" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>
+                    {csvImportResult.successMembers.length}件
+                  </span>
+                </div>
+                <div className="overflow-x-auto max-h-72 overflow-y-auto">
+                  <table className="min-w-full text-xs">
+                    <thead className="bg-green-50 sticky top-0 z-10" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace" }}>
+                      <tr className="text-green-800 text-[11px] uppercase tracking-wide">
+                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">#</th>
+                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">会員ID</th>
+                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">氏名</th>
+                        <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">決済金額</th>
+                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">決済日時</th>
+                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">結果</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-green-100 bg-white">
+                      {csvImportResult.successMembers.map((m, i) => (
+                        <tr key={m.memberCode} className="hover:bg-green-50">
+                          <td className="px-3 py-1.5 text-gray-400 text-[11px]" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>{i + 1}</td>
+                          <td className="px-3 py-1.5">
+                            <span className="font-bold text-green-700 bg-green-50 border border-green-200 rounded px-1.5 py-0.5 text-[11px] select-all" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace", letterSpacing: "0.04em" }}>
+                              {m.memberCode}
+                            </span>
+                          </td>
+                          <td className="px-3 py-1.5 font-semibold text-gray-800 whitespace-nowrap">{m.memberName}</td>
+                          <td className="px-3 py-1.5 text-right font-bold text-gray-700 whitespace-nowrap" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>
+                            {m.amount > 0 ? `¥${m.amount.toLocaleString()}` : "—"}
+                          </td>
+                          <td className="px-3 py-1.5 text-gray-500 whitespace-nowrap text-[11px]" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>
+                            {m.paidDate ? new Date(m.paidDate).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
+                          </td>
+                          <td className="px-3 py-1.5 text-green-600 whitespace-nowrap">
+                            {m.resultText || "決済完了"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
-            {csvImportResult.effectivePaymentMethod && (
-              <p className="text-xs text-gray-500 mt-1">
-                支払い方法: {csvImportResult.effectivePaymentMethod === "bank_transfer" ? "🏦 口座引き落とし" : csvImportResult.effectivePaymentMethod === "credit_card" ? "💳 クレジットカード" : csvImportResult.effectivePaymentMethod}
-              </p>
+
+            {/* ── 照合失敗者一覧（DB登録あり・CSV不在） ── */}
+            {(csvImportResult.matchFailMembers ?? csvImportResult.failedMembers) &&
+             ((csvImportResult.matchFailMembers ?? csvImportResult.failedMembers)!.length > 0) && (
+              <div className="rounded-xl border border-red-200 overflow-hidden">
+                <div className="bg-red-600 px-4 py-2 flex items-center gap-2">
+                  <span className="text-white font-bold text-sm">❌ 照合失敗者一覧</span>
+                  <span className="bg-red-100 text-red-800 text-xs font-bold px-2 py-0.5 rounded-full" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>
+                    {(csvImportResult.matchFailMembers ?? csvImportResult.failedMembers)!.length}件
+                  </span>
+                  <span className="text-red-200 text-[11px] ml-auto">DB登録済みの決済ID①②③がCSVに不在（未決済）</span>
+                </div>
+                <div className="overflow-x-auto max-h-72 overflow-y-auto">
+                  <table className="min-w-full text-xs">
+                    <thead className="bg-red-50 sticky top-0 z-10" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace" }}>
+                      <tr className="text-red-800 text-[11px] uppercase tracking-wide">
+                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">#</th>
+                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">会員ID</th>
+                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">氏名</th>
+                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">登録決済ID①②③（DB登録値）</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-red-100 bg-white">
+                      {(csvImportResult.matchFailMembers ?? csvImportResult.failedMembers)!.map((m, i) => (
+                        <tr key={m.memberCode} className="hover:bg-red-50">
+                          <td className="px-3 py-1.5 text-gray-400 text-[11px]" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>{i + 1}</td>
+                          <td className="px-3 py-1.5">
+                            <span className="font-bold text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 text-[11px] select-all" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace", letterSpacing: "0.04em" }}>
+                              {m.memberCode}
+                            </span>
+                          </td>
+                          <td className="px-3 py-1.5 font-semibold text-gray-800 whitespace-nowrap">{m.memberName}</td>
+                          <td className="px-3 py-1.5">
+                            <div className="flex flex-wrap gap-1">
+                              {m.creditIds.map((id, j) => (
+                                <span key={j} className="text-[11px] bg-gray-100 border border-gray-300 rounded px-1.5 py-0.5 text-gray-700 select-all" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace", letterSpacing: "0.05em" }}>
+                                  {id}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
-            {csvImportResult.newRunId && (
-              <button
-                onClick={() => openDetail(csvImportResult.newRunId!)}
-                className="mt-2 text-xs text-indigo-600 hover:underline"
-              >
-                → 作成された伝票を確認
-              </button>
+
+            {/* ── 未照合ID一覧（CSVあり・DB未登録）── */}
+            {csvImportResult.unmatchedCsvIds && csvImportResult.unmatchedCsvIds.length > 0 && (
+              <div className="rounded-xl border border-orange-200 overflow-hidden">
+                <div className="bg-orange-500 px-4 py-2 flex items-center gap-2">
+                  <span className="text-white font-bold text-sm">⚠️ 未照合ID一覧（CSV記載・DB未登録）</span>
+                  <span className="bg-orange-100 text-orange-800 text-xs font-bold px-2 py-0.5 rounded-full" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>
+                    {csvImportResult.unmatchedCsvIds.length}件
+                  </span>
+                  <span className="text-orange-100 text-[11px] ml-auto">CSVに存在するが会員DBの決済ID①②③に未登録</span>
+                </div>
+                <div className="overflow-x-auto max-h-60 overflow-y-auto">
+                  <table className="min-w-full text-xs">
+                    <thead className="bg-orange-50 sticky top-0 z-10" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace" }}>
+                      <tr className="text-orange-800 text-[11px] uppercase tracking-wide">
+                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">#</th>
+                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">CSV元の値（K列）</th>
+                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">正規化後（照合キー）</th>
+                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">対処</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-orange-100 bg-white">
+                      {csvImportResult.unmatchedCsvIds.map((u, i) => (
+                        <tr key={i} className="hover:bg-orange-50">
+                          <td className="px-3 py-1.5 text-gray-400 text-[11px]" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>{i + 1}</td>
+                          <td className="px-3 py-1.5">
+                            <span className="font-bold text-orange-700 bg-orange-50 border border-orange-200 rounded px-1.5 py-0.5 text-[11px] select-all" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace", letterSpacing: "0.05em", fontVariantNumeric: "slashed-zero" }}>
+                              {u.rawId}
+                            </span>
+                          </td>
+                          <td className="px-3 py-1.5">
+                            <span className="text-[11px] text-gray-500 bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5 select-all" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace", fontVariantNumeric: "slashed-zero" }}>
+                              {u.normId}
+                            </span>
+                          </td>
+                          <td className="px-3 py-1.5 text-[11px] text-gray-500">
+                            MLM会員詳細 → クレジット①②③に登録
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
+
+            {/* ── 警告 ── */}
             {csvImportResult.warnings && csvImportResult.warnings.length > 0 && (
-              <details className="mt-2" open={csvImportResult.unmatchedCount !== undefined && csvImportResult.unmatchedCount > 0}>
-                <summary className="text-xs text-orange-500 cursor-pointer hover:text-orange-700">
-                  ⚠️ {csvImportResult.warnings.some(w => w.startsWith("⚠️")) ? "件数不一致・後処理情報" : "後処理に一部エラー"}（クリックで詳細）
+              <details className="rounded-xl border border-yellow-200 overflow-hidden">
+                <summary className="bg-yellow-50 px-4 py-2 cursor-pointer text-xs text-yellow-700 font-semibold hover:bg-yellow-100 flex items-center gap-2">
+                  ⚠️ 警告情報（{csvImportResult.warnings.length}件）
                 </summary>
-                <div className="mt-1 p-2 bg-orange-50 rounded text-xs text-orange-700 overflow-auto max-h-48">
-                  {csvImportResult.warnings.map((w, i) => <div key={i} className="mb-1 break-all">{w}</div>)}
+                <div className="p-3 bg-yellow-50 text-xs text-yellow-700 space-y-1">
+                  {csvImportResult.warnings.map((w, i) => (
+                    <div key={i} className="break-all leading-relaxed">{w}</div>
+                  ))}
                 </div>
               </details>
             )}
+
+            {/* ── デバッグ情報 ── */}
             {csvImportResult.debug && (
-              <details className="mt-2">
-                <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">🔍 デバッグ情報（クリックで展開）</summary>
-                <div className="mt-1 p-2 bg-gray-50 rounded text-xs font-mono text-gray-600 overflow-auto max-h-64">
-                  <div>入金反映: <strong>{String(csvImportResult.debug.paidCount ?? "-")}</strong> / 失敗: <strong>{String(csvImportResult.debug.failedCount ?? "-")}</strong> / CSV未照合: <strong>{String(csvImportResult.debug.csvUnmatchedCount ?? "-")}</strong></div>
-                  {csvImportResult.debug.csvIdCount !== undefined && (
-                    <div>CSV決済ID数: <strong>{String(csvImportResult.debug.csvIdCount)}</strong> / 会員数: <strong>{String(csvImportResult.debug.memberCount ?? "-")}</strong> / 決済IDマップ: <strong>{String(csvImportResult.debug.cardIdMapSize ?? "-")}</strong></div>
-                  )}
-                  {csvImportResult.debug.matchedCount !== undefined && (
-                    <div>照合結果（成功＋失敗）: <strong>{String(csvImportResult.debug.matchedCount)}</strong>件</div>
-                  )}
-                  {csvImportResult.debug.memberCodeCount !== undefined && (
-                    <div>MUFG/汎用 会員コード数: <strong>{String(csvImportResult.debug.memberCodeCount)}</strong></div>
-                  )}
-                  {Array.isArray(csvImportResult.debug.matchedOrderIds) && (csvImportResult.debug.matchedOrderIds as string[]).length > 0 && (
-                    <div className="text-green-600 mt-1">
-                      照合済みOrderID: [{(csvImportResult.debug.matchedOrderIds as string[]).join(", ")}]
-                    </div>
-                  )}
-                  {Array.isArray(csvImportResult.debug.unmatchedSample) && (csvImportResult.debug.unmatchedSample as string[]).length > 0 && (
-                    <div className="text-orange-600 mt-1">
-                      未照合サンプル({(csvImportResult.debug.unmatchedSample as string[]).length}件): {(csvImportResult.debug.unmatchedSample as string[]).join(", ")}
-                    </div>
-                  )}
-                  {/* 未照合CSV決済IDの詳細（原因究明用） */}
-                  {Array.isArray(csvImportResult.debug.unmatchedCsvIdDetails) && (csvImportResult.debug.unmatchedCsvIdDetails as {id: string; reason: string}[]).length > 0 && (
-                    <div className="mt-2 border-t border-orange-200 pt-2">
-                      <div className="text-orange-700 font-semibold mb-1">
-                        🔍 CSV未照合 決済ID詳細（{(csvImportResult.debug.unmatchedCsvIdDetails as {id: string; reason: string}[]).length}件）
-                      </div>
-                      <div className="text-[11px] bg-orange-50 rounded p-2 space-y-0.5">
-                        {(csvImportResult.debug.unmatchedCsvIdDetails as {id: string; reason: string}[]).map((u, i) => (
-                          <div key={i} className="flex gap-2">
-                            <span className="text-orange-800 font-mono font-bold shrink-0">ID: {u.id}</span>
-                            <span className="text-orange-600">→ {u.reason}</span>
-                          </div>
-                        ))}
-                        <div className="mt-1 text-blue-600 font-medium">
-                          💡 対処法: 上記のIDをMLM会員詳細の「クレジット①②③」欄に登録してください
-                        </div>
-                      </div>
+              <details className="rounded-xl border border-gray-200 overflow-hidden">
+                <summary className="bg-gray-50 px-4 py-2 cursor-pointer text-xs text-gray-500 hover:bg-gray-100 flex items-center gap-2">
+                  🔍 デバッグ情報（クリックで展開）
+                </summary>
+                <div className="p-3 bg-gray-50 text-xs font-mono text-gray-600 space-y-1">
+                  <div>CSV総行数: <strong>{String(csvImportResult.debug.csvTotalRows ?? "-")}</strong> / CSV決済ID数（ユニーク）: <strong>{String(csvImportResult.debug.csvIdCount ?? "-")}</strong> / 会員数: <strong>{String(csvImportResult.debug.memberCount ?? "-")}</strong></div>
+                  <div>照合件数: <strong>{String(csvImportResult.debug.matchedCount ?? "-")}</strong> / 成功: <strong>{String(csvImportResult.debug.paidCount ?? "-")}</strong> / 失敗: <strong>{String(csvImportResult.debug.failedCount ?? "-")}</strong></div>
+                  <div>CSV未照合: <strong>{String(csvImportResult.debug.csvUnmatchedCount ?? "-")}</strong> / 会員DB失敗者: <strong>{String(csvImportResult.debug.failedMemberCount ?? "-")}</strong></div>
+                  {csvImportResult.unmatchedCsvIds && csvImportResult.unmatchedCsvIds.length > 0 && (
+                    <div className="text-orange-600 mt-1 break-all">
+                      未照合ID（正規化後）: {csvImportResult.unmatchedCsvIds.map(u => u.normId).join(", ")}
                     </div>
                   )}
                 </div>
@@ -1267,48 +1466,158 @@ export default function AutoShipPanel() {
                   </div>
                 </div>
 
-                {/* ─── 注文一覧 ─── */}
+                {/* ─── 注文一覧（成功・失敗 分割表示）─── */}
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-800 mb-2">注文明細 ({detail.orders.length}件)</h3>
-                  <div className="overflow-x-auto rounded-lg border">
-                    <table className="min-w-full text-xs">
-                      <thead>
-                        <tr className="bg-gray-50 text-gray-500 uppercase tracking-wide">
-                          <th className="px-3 py-2 text-left">会員コード</th>
-                          <th className="px-3 py-2 text-left">氏名</th>
-                          <th className="px-3 py-2 text-left">電話</th>
-                          <th className="px-3 py-2 text-right">金額</th>
-                          <th className="px-3 py-2 text-center">ステータス</th>
-                          <th className="px-3 py-2 text-left">決済日</th>
-                          <th className="px-3 py-2 text-left">失敗理由</th>
-                          <th className="px-3 py-2 text-center">納品書</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {detail.orders.map(o => (
-                          <tr key={o.id} className="hover:bg-gray-50">
-                            <td className="px-3 py-2 font-mono text-gray-700">{o.memberCode}</td>
-                            <td className="px-3 py-2 text-gray-800">
-                              {o.memberName}
-                              {o.memberNameKana && <div className="text-gray-400">{o.memberNameKana}</div>}
-                            </td>
-                            <td className="px-3 py-2 text-gray-500">{o.memberPhone ?? "—"}</td>
-                            <td className="px-3 py-2 text-right font-medium text-gray-800">{fmtYen(o.totalAmount)}</td>
-                            <td className="px-3 py-2 text-center">
-                              <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${ORDER_STATUS_COLORS[o.status]}`}>
-                                {ORDER_STATUS_LABELS[o.status]}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 text-gray-500">{o.paidAt ? fmtDate(o.paidAt) : "—"}</td>
-                            <td className="px-3 py-2 text-red-500">{o.failReason ?? ""}</td>
-                            <td className="px-3 py-2 text-center">
-                              {o.deliveryNoteId ? <span className="text-green-600">✓</span> : <span className="text-gray-300">—</span>}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <h3 className="text-sm font-semibold text-gray-800 mb-3">注文明細 ({detail.orders.length}件)</h3>
+
+                  {/* 成功者テーブル */}
+                  {detail.orders.filter(o => o.status === "paid").length > 0 && (
+                    <div className="mb-4 rounded-xl border border-green-200 overflow-hidden">
+                      <div className="bg-green-700 px-4 py-2 flex items-center gap-2">
+                        <span className="text-white font-bold text-xs">✅ 決済成功者</span>
+                        <span className="bg-green-100 text-green-800 text-xs font-bold px-2 py-0.5 rounded-full" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace", fontVariantNumeric: "slashed-zero" }}>
+                          {detail.orders.filter(o => o.status === "paid").length}件
+                        </span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace", fontSize: "12px", fontVariantNumeric: "slashed-zero" }}>
+                          <thead>
+                            <tr className="bg-green-50 text-green-800 text-[11px] uppercase tracking-wide">
+                              <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">#</th>
+                              <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">会員コード</th>
+                              <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">氏名</th>
+                              <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">電話番号</th>
+                              <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">決済金額</th>
+                              <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">決済日時</th>
+                              <th className="px-3 py-2 text-center font-semibold whitespace-nowrap">納品書</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-green-100 bg-white">
+                            {detail.orders.filter(o => o.status === "paid").map((o, idx) => (
+                              <tr key={o.id} className="hover:bg-green-50">
+                                <td className="px-3 py-2 text-gray-400 text-[11px]">{idx + 1}</td>
+                                <td className="px-3 py-2">
+                                  <span className="font-mono font-bold text-green-700 bg-green-50 border border-green-200 rounded px-1.5 py-0.5 text-[11px] select-all">
+                                    {o.memberCode}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 font-semibold text-gray-800 whitespace-nowrap">
+                                  {o.memberName}
+                                  {o.memberNameKana && <div className="text-gray-400 text-[10px] font-normal">{o.memberNameKana}</div>}
+                                </td>
+                                <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{o.memberPhone ?? "—"}</td>
+                                <td className="px-3 py-2 text-right font-bold text-gray-800 whitespace-nowrap">
+                                  {fmtYen(o.totalAmount)}
+                                </td>
+                                <td className="px-3 py-2 text-gray-600 whitespace-nowrap text-[11px]">
+                                  {o.paidAt ? fmtDate(o.paidAt) : "—"}
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  {o.deliveryNoteId
+                                    ? <span className="text-green-600 font-bold">✓</span>
+                                    : <span className="text-gray-300">—</span>}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 失敗者テーブル */}
+                  {detail.orders.filter(o => o.status === "failed").length > 0 && (
+                    <div className="mb-4 rounded-xl border border-red-200 overflow-hidden">
+                      <div className="bg-red-600 px-4 py-2 flex items-center gap-2">
+                        <span className="text-white font-bold text-xs">❌ 決済失敗者</span>
+                        <span className="bg-red-100 text-red-800 text-xs font-bold px-2 py-0.5 rounded-full" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace", fontVariantNumeric: "slashed-zero" }}>
+                          {detail.orders.filter(o => o.status === "failed").length}件
+                        </span>
+                        <span className="text-red-200 text-[11px] ml-auto">会員DB検出：CSV未照合（未決済）</span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace", fontSize: "12px", fontVariantNumeric: "slashed-zero" }}>
+                          <thead>
+                            <tr className="bg-red-50 text-red-800 text-[11px] uppercase tracking-wide">
+                              <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">#</th>
+                              <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">会員コード</th>
+                              <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">氏名</th>
+                              <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">電話番号</th>
+                              <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">金額</th>
+                              <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">失敗理由</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-red-100 bg-white">
+                            {detail.orders.filter(o => o.status === "failed").map((o, idx) => (
+                              <tr key={o.id} className="hover:bg-red-50">
+                                <td className="px-3 py-2 text-gray-400 text-[11px]">{idx + 1}</td>
+                                <td className="px-3 py-2">
+                                  <span className="font-mono font-bold text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 text-[11px] select-all">
+                                    {o.memberCode}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 font-semibold text-gray-800 whitespace-nowrap">
+                                  {o.memberName}
+                                  {o.memberNameKana && <div className="text-gray-400 text-[10px] font-normal">{o.memberNameKana}</div>}
+                                </td>
+                                <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{o.memberPhone ?? "—"}</td>
+                                <td className="px-3 py-2 text-right text-gray-600 whitespace-nowrap">
+                                  {fmtYen(o.totalAmount)}
+                                </td>
+                                <td className="px-3 py-2 text-red-600 whitespace-nowrap">
+                                  {o.failReason || "CSVに記載なし（決済失敗）"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 未処理・その他 */}
+                  {detail.orders.filter(o => o.status !== "paid" && o.status !== "failed").length > 0 && (
+                    <div className="rounded-xl border border-gray-200 overflow-hidden">
+                      <div className="bg-gray-700 px-4 py-2 flex items-center gap-2">
+                        <span className="text-white font-bold text-xs">⏳ 未処理・その他</span>
+                        <span className="bg-gray-100 text-gray-800 text-xs font-mono font-bold px-2 py-0.5 rounded-full">
+                          {detail.orders.filter(o => o.status !== "paid" && o.status !== "failed").length}件
+                        </span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace", fontSize: "12px", fontVariantNumeric: "slashed-zero" }}>
+                          <thead>
+                            <tr className="bg-gray-50 text-gray-600 text-[11px] uppercase tracking-wide">
+                              <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">#</th>
+                              <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">会員コード</th>
+                              <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">氏名</th>
+                              <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">金額</th>
+                              <th className="px-3 py-2 text-center font-semibold whitespace-nowrap">ステータス</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 bg-white">
+                            {detail.orders.filter(o => o.status !== "paid" && o.status !== "failed").map((o, idx) => (
+                              <tr key={o.id} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 text-gray-400 text-[11px]">{idx + 1}</td>
+                                <td className="px-3 py-2">
+                                  <span className="font-mono font-bold text-gray-600 bg-gray-50 border border-gray-300 rounded px-1.5 py-0.5 text-[11px] select-all">
+                                    {o.memberCode}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{o.memberName}</td>
+                                <td className="px-3 py-2 text-right text-gray-600">{fmtYen(o.totalAmount)}</td>
+                                <td className="px-3 py-2 text-center">
+                                  <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${ORDER_STATUS_COLORS[o.status]}`}>
+                                    {ORDER_STATUS_LABELS[o.status]}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
