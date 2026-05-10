@@ -1402,9 +1402,7 @@ export default function AutoShipPanel() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <span className="text-gray-700">{r.totalCount} 件</span>
-                    {r.paidCount > 0 && <span className="ml-1 text-green-600 text-xs">({r.paidCount}成功)</span>}
-                    {r.failedCount > 0 && <span className="ml-1 text-red-600 text-xs">({r.failedCount}失敗)</span>}
+                    <span className="text-gray-700">{r.paidCount} 件</span>
                   </td>
                   <td className="px-4 py-3 text-right font-medium text-gray-800">{fmtYen(r.totalAmount)}</td>
                   <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(r.exportedAt)}</td>
