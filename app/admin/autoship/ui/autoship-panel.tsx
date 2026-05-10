@@ -302,22 +302,25 @@ export default function AutoShipPanel() {
   const [csvImportResult, setCsvImportResult] = useState<{
     paidCount: number;
     failedCount: number;
-    csvTotalRows?: number;       // ★ CSV総行数（重複ID含む全行数）
+    csvTotalRows?: number;
     matchedCount?: number;
     unmatchedCount?: number;
-    csvUnmatchedCount?: number;  // ★ CSV未照合ID数（未照合カテゴリ）
+    csvUnmatchedCount?: number;
     newRunId?: string;
     effectivePaymentMethod?: string;
     debug?: Record<string, unknown>;
     warnings?: string[];
-    // 照合成功者・照合失敗者の詳細一覧（会員ID・氏名付き）
-    successMembers?: { memberCode: string; memberName: string; paidDate: string | null; amount: number; resultText: string }[];
-    failedMembers?:  { memberCode: string; memberName: string; creditIds: string[]; normCreditIds?: string[] }[];
-    // ★ 照合失敗者（DB登録済みだがCSV未一致）
-    matchFailMembers?: { memberCode: string; memberName: string; creditIds: string[]; normCreditIds?: string[] }[];
-    // ★ 未照合: CSV内で会員DBに照合できなかった決済ID一覧（DB未登録）
-    unmatchedCsvIds?: { rawId: string; normId: string }[];
+    // ① 照合成功者一覧（CSV個別行・重複あり）
+    successMembers?: { memberCode: string; memberName: string; paidDate: string | null; amount: number; resultText: string; rawId?: string; rowIndex?: number }[];
+    // ③ アクティブ照合失敗者（DBあり・CSV不在・活動中）
+    matchFailMembers?: { memberCode: string; memberName: string; memberStatus?: string; creditIds: string[]; normCreditIds?: string[] }[];
+    // ③ 退会/停止/解約等照合失敗者
+    withdrawnFailMembers?: { memberCode: string; memberName: string; memberStatus?: string; creditIds: string[]; normCreditIds?: string[] }[];
+    // ① 未照合ID一覧（CSV個別行・重複あり）
+    unmatchedCsvIds?: { rawId: string; normId: string; rowIndex?: number }[];
   } | null>(null);
+  // 4タブ切り替え
+  const [csvResultTab, setCsvResultTab] = useState<"success" | "fail" | "withdrawn" | "unmatched">("success");
 
   /* ─── 一覧取得 ─── */
   const loadRuns = useCallback(async () => {
@@ -497,11 +500,12 @@ export default function AutoShipPanel() {
         effectivePaymentMethod: data.effectivePaymentMethod as string | undefined,
         debug:                  data._debug as Record<string, unknown> | undefined,
         warnings:               data.warnings as string[] | undefined,
-        successMembers:         data.successMembers   as { memberCode: string; memberName: string; paidDate: string | null; amount: number; resultText: string }[] | undefined,
-        failedMembers:          data.failedMembers    as { memberCode: string; memberName: string; creditIds: string[]; normCreditIds?: string[] }[] | undefined,
-        matchFailMembers:       data.matchFailMembers as { memberCode: string; memberName: string; creditIds: string[]; normCreditIds?: string[] }[] | undefined,
-        unmatchedCsvIds:        data.unmatchedCsvIds  as { rawId: string; normId: string }[] | undefined,
+        successMembers:         data.successMembers        as { memberCode: string; memberName: string; paidDate: string | null; amount: number; resultText: string; rawId?: string; rowIndex?: number }[] | undefined,
+        matchFailMembers:       data.matchFailMembers      as { memberCode: string; memberName: string; memberStatus?: string; creditIds: string[]; normCreditIds?: string[] }[] | undefined,
+        withdrawnFailMembers:   data.withdrawnFailMembers  as { memberCode: string; memberName: string; memberStatus?: string; creditIds: string[]; normCreditIds?: string[] }[] | undefined,
+        unmatchedCsvIds:        data.unmatchedCsvIds       as { rawId: string; normId: string; rowIndex?: number }[] | undefined,
       });
+      setCsvResultTab("success");
       const pmLabel = data.effectivePaymentMethod === "bank_transfer" ? "口座引き落とし" :
                       data.effectivePaymentMethod === "credit_card"   ? "クレジットカード" :
                       (data.effectivePaymentMethod as string | undefined) ?? csvImportPm;
@@ -978,206 +982,301 @@ export default function AutoShipPanel() {
             {csvImportLoading ? "取り込み中…" : "🗄️ DB会員から当月アクティブ反映（CSVなし）"}
           </button>
         </div>
-        {csvImportResult && (
+        {csvImportResult && (() => {
+          const successList   = csvImportResult.successMembers      ?? [];
+          const failList      = csvImportResult.matchFailMembers     ?? [];
+          const withdrawnList = csvImportResult.withdrawnFailMembers ?? [];
+          const unmatchedList = csvImportResult.unmatchedCsvIds      ?? [];
+          const monoFont = { fontFamily: "'Courier New','Lucida Console','Noto Sans Mono',monospace", fontVariantNumeric: "slashed-zero" as const };
+
+          // ステータス日本語ラベル
+          const statusLabel = (s?: string) => {
+            if (!s) return "";
+            const m: Record<string, string> = { active: "活動中", autoship: "AS", lapsed: "失効", suspended: "停止", withdrawn: "退会", midCancel: "中途解約" };
+            return m[s] ?? s;
+          };
+          const statusColor = (s?: string) => {
+            const m: Record<string, string> = { active: "bg-green-100 text-green-700", autoship: "bg-blue-100 text-blue-700", lapsed: "bg-gray-100 text-gray-600", suspended: "bg-yellow-100 text-yellow-700", withdrawn: "bg-red-100 text-red-600", midCancel: "bg-orange-100 text-orange-700" };
+            return m[s ?? ""] ?? "bg-gray-100 text-gray-600";
+          };
+
+          // タブ定義
+          const tabs = [
+            { key: "success"   as const, label: "✅ 決済成功者",       count: successList.length,   color: "green"  },
+            { key: "fail"      as const, label: "❌ 照合失敗者",       count: failList.length,      color: "red"    },
+            { key: "withdrawn" as const, label: "🚫 退会照合失敗者",   count: withdrawnList.length, color: "purple" },
+            { key: "unmatched" as const, label: "⚠️ 未照合ID",         count: unmatchedList.length, color: "orange" },
+          ] as const;
+
+          const tabActiveCls = (color: string) => {
+            const m: Record<string, string> = {
+              green:  "border-green-500 text-green-700 bg-green-50",
+              red:    "border-red-500 text-red-700 bg-red-50",
+              purple: "border-purple-500 text-purple-700 bg-purple-50",
+              orange: "border-orange-500 text-orange-700 bg-orange-50",
+            };
+            return m[color] ?? "border-gray-400 text-gray-700 bg-gray-50";
+          };
+          const tabInactiveCls = "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50";
+
+          return (
           <div className="mt-4 space-y-3">
             {/* ── サマリーカード ── */}
             <div className="rounded-xl border border-gray-200 overflow-hidden">
               <div className="bg-gray-800 px-4 py-2.5 flex items-center justify-between">
                 <span className="text-white font-bold text-sm tracking-wide">📊 取込結果サマリー</span>
-                {csvImportResult.effectivePaymentMethod && (
-                  <span className="text-gray-300 text-xs font-mono">
-                    {csvImportResult.effectivePaymentMethod === "bank_transfer" ? "🏦 口座引き落とし" :
-                     csvImportResult.effectivePaymentMethod === "credit_card"   ? "💳 クレジットカード" :
-                     csvImportResult.effectivePaymentMethod}
-                  </span>
-                )}
+                <span className="text-gray-300 text-xs font-mono">
+                  {csvImportResult.effectivePaymentMethod === "bank_transfer" ? "🏦 口座引き落とし" :
+                   csvImportResult.effectivePaymentMethod === "credit_card"   ? "💳 クレジットカード" :
+                   (csvImportResult.effectivePaymentMethod ?? "")}
+                </span>
               </div>
               {/* CSV総行数バナー */}
               {csvImportResult.csvTotalRows != null && (
                 <div className="bg-gray-700 px-4 py-1.5 text-center text-xs text-gray-200">
-                  CSV取込総行数: <span className="font-black text-white text-sm" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace", fontVariantNumeric: "slashed-zero" }}>{csvImportResult.csvTotalRows}</span> 件
+                  CSV取込総行数（個別行）: <span className="font-black text-white text-sm" style={monoFont}>{csvImportResult.csvTotalRows}</span> 件
                 </div>
               )}
-              <div className="grid grid-cols-3 divide-x divide-gray-200 bg-white">
-                {/* ① 照合成功: DB登録あり かつ CSVに該当IDあり */}
-                <div className="px-4 py-3 text-center">
-                  <div className="text-[11px] font-semibold text-green-600 uppercase tracking-wider mb-1">✅ 照合成功</div>
-                  <div className="text-xs text-gray-400 mb-1">DB登録あり＋CSV一致</div>
-                  {/* ⑤ 要件: 0とOの判別が容易なフォント（スラッシュ付きゼロ）を使用 */}
-                  <div className="text-2xl font-black text-green-600" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace", fontVariantNumeric: "slashed-zero" }}>
-                    {csvImportResult.paidCount}
-                  </div>
-                  <div className="text-[10px] text-gray-400 mt-0.5">件</div>
-                </div>
-                {/* ② 照合失敗: DB登録あり だがCSVに不在 */}
-                <div className="px-4 py-3 text-center">
-                  <div className="text-[11px] font-semibold text-red-600 uppercase tracking-wider mb-1">❌ 照合失敗</div>
-                  <div className="text-xs text-gray-400 mb-1">DB登録あり＋CSV不在</div>
-                  <div className="text-2xl font-black text-red-500" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace", fontVariantNumeric: "slashed-zero" }}>
-                    {csvImportResult.matchFailMembers?.length ?? csvImportResult.failedMembers?.length ?? csvImportResult.failedCount}
-                  </div>
-                  <div className="text-[10px] text-gray-400 mt-0.5">件</div>
-                </div>
-                {/* ③ 未照合: CSVにIDあり だが会員DB未登録 */}
-                <div className="px-4 py-3 text-center">
-                  <div className="text-[11px] font-semibold text-orange-600 uppercase tracking-wider mb-1">⚠️ 未照合</div>
-                  <div className="text-xs text-gray-400 mb-1">CSVあり＋DB未登録</div>
-                  <div className="text-2xl font-black text-orange-500" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace", fontVariantNumeric: "slashed-zero" }}>
-                    {csvImportResult.csvUnmatchedCount ?? csvImportResult.unmatchedCount ?? 0}
-                  </div>
-                  <div className="text-[10px] text-gray-400 mt-0.5">件</div>
-                </div>
+              {/* 4カテゴリ数値 */}
+              <div className="grid grid-cols-4 divide-x divide-gray-200 bg-white">
+                {tabs.map(t => {
+                  const colorMap: Record<string, { num: string; sub: string; desc: string }> = {
+                    green:  { num: "text-green-600",  sub: "text-green-400",  desc: "DB登録あり＋CSV一致" },
+                    red:    { num: "text-red-500",    sub: "text-red-400",    desc: "DB登録あり＋CSV不在（活動中）" },
+                    purple: { num: "text-purple-500", sub: "text-purple-400", desc: "DB登録あり＋CSV不在（退会等）" },
+                    orange: { num: "text-orange-500", sub: "text-orange-400", desc: "CSVあり＋DB未登録" },
+                  };
+                  const c = colorMap[t.color];
+                  return (
+                    <button
+                      key={t.key}
+                      onClick={() => setCsvResultTab(t.key)}
+                      className={`px-2 py-3 text-center transition ${csvResultTab === t.key ? "ring-2 ring-inset " + tabActiveCls(t.color) : "hover:bg-gray-50"}`}
+                    >
+                      <div className="text-[10px] font-semibold uppercase tracking-wider mb-1 truncate">{t.label}</div>
+                      <div className="text-[10px] text-gray-400 mb-1 truncate">{c.desc}</div>
+                      <div className={`text-2xl font-black ${c.num}`} style={monoFont}>{t.count}</div>
+                      <div className={`text-[10px] mt-0.5 ${c.sub}`}>件</div>
+                    </button>
+                  );
+                })}
               </div>
               {csvImportResult.newRunId && (
                 <div className="px-4 py-2 bg-indigo-50 border-t border-indigo-100">
-                  <button
-                    onClick={() => openDetail(csvImportResult.newRunId!)}
-                    className="text-xs text-indigo-700 hover:underline font-medium"
-                  >
+                  <button onClick={() => openDetail(csvImportResult.newRunId!)} className="text-xs text-indigo-700 hover:underline font-medium">
                     → 作成された伝票を確認（Run ID: {csvImportResult.newRunId}）
                   </button>
                 </div>
               )}
             </div>
 
-            {/* ── 決済成功者一覧（要件②⑦） ── */}
-            {csvImportResult.successMembers && csvImportResult.successMembers.length > 0 && (
+            {/* ── タブナビ ── */}
+            <div className="flex border-b border-gray-200">
+              {tabs.map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => setCsvResultTab(t.key)}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold border-b-2 -mb-px transition ${csvResultTab === t.key ? tabActiveCls(t.color) : tabInactiveCls}`}
+                >
+                  {t.label}
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${csvResultTab === t.key ? "" : "bg-gray-100 text-gray-500"}`} style={monoFont}>
+                    {t.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* ── タブコンテンツ ── */}
+
+            {/* ① 決済成功者一覧 */}
+            {csvResultTab === "success" && (
               <div className="rounded-xl border border-green-200 overflow-hidden">
                 <div className="bg-green-700 px-4 py-2 flex items-center gap-2">
                   <span className="text-white font-bold text-sm">✅ 決済成功者一覧</span>
-                  <span className="bg-green-100 text-green-800 text-xs font-bold px-2 py-0.5 rounded-full" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>
-                    {csvImportResult.successMembers.length}件
-                  </span>
+                  <span className="bg-green-100 text-green-800 text-xs font-bold px-2 py-0.5 rounded-full" style={monoFont}>{successList.length}件</span>
+                  <span className="text-green-200 text-[11px] ml-auto">CSV個別行・重複IDあり</span>
                 </div>
-                <div className="overflow-x-auto max-h-72 overflow-y-auto">
-                  <table className="min-w-full text-xs">
-                    <thead className="bg-green-50 sticky top-0 z-10" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace" }}>
-                      <tr className="text-green-800 text-[11px] uppercase tracking-wide">
-                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">#</th>
-                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">会員ID</th>
-                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">氏名</th>
-                        <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">決済金額</th>
-                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">決済日時</th>
-                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">結果</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-green-100 bg-white">
-                      {csvImportResult.successMembers.map((m, i) => (
-                        <tr key={m.memberCode} className="hover:bg-green-50">
-                          <td className="px-3 py-1.5 text-gray-400 text-[11px]" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>{i + 1}</td>
-                          <td className="px-3 py-1.5">
-                            <span className="font-bold text-green-700 bg-green-50 border border-green-200 rounded px-1.5 py-0.5 text-[11px] select-all" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace", letterSpacing: "0.04em" }}>
-                              {m.memberCode}
-                            </span>
-                          </td>
-                          <td className="px-3 py-1.5 font-semibold text-gray-800 whitespace-nowrap">{m.memberName}</td>
-                          <td className="px-3 py-1.5 text-right font-bold text-gray-700 whitespace-nowrap" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>
-                            {m.amount > 0 ? `¥${m.amount.toLocaleString()}` : "—"}
-                          </td>
-                          <td className="px-3 py-1.5 text-gray-500 whitespace-nowrap text-[11px]" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>
-                            {m.paidDate ? new Date(m.paidDate).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
-                          </td>
-                          <td className="px-3 py-1.5 text-green-600 whitespace-nowrap">
-                            {m.resultText || "決済完了"}
-                          </td>
+                {successList.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-gray-400">決済成功者はいません</div>
+                ) : (
+                  <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                    <table className="min-w-full text-xs">
+                      <thead className="bg-green-50 sticky top-0 z-10">
+                        <tr className="text-green-800 text-[11px] uppercase tracking-wide">
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">#</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">CSV行</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">会員ID</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">氏名</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">K列ID（CSV元値）</th>
+                          <th className="px-3 py-2 text-right font-semibold whitespace-nowrap">決済金額</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">決済日時</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">結果</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-green-100 bg-white">
+                        {successList.map((m, i) => (
+                          <tr key={i} className="hover:bg-green-50">
+                            <td className="px-3 py-1.5 text-gray-400 text-[11px]" style={monoFont}>{i + 1}</td>
+                            <td className="px-3 py-1.5 text-gray-400 text-[11px]" style={monoFont}>{m.rowIndex ?? "—"}</td>
+                            <td className="px-3 py-1.5">
+                              <span className="font-bold text-green-700 bg-green-50 border border-green-200 rounded px-1.5 py-0.5 text-[11px] select-all" style={monoFont}>{m.memberCode}</span>
+                            </td>
+                            <td className="px-3 py-1.5 font-semibold text-gray-800 whitespace-nowrap">{m.memberName}</td>
+                            <td className="px-3 py-1.5">
+                              <span className="text-[11px] bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 text-gray-600 select-all" style={monoFont}>{m.rawId ?? "—"}</span>
+                            </td>
+                            <td className="px-3 py-1.5 text-right font-bold text-gray-700 whitespace-nowrap" style={monoFont}>{m.amount > 0 ? `¥${m.amount.toLocaleString()}` : "—"}</td>
+                            <td className="px-3 py-1.5 text-gray-500 whitespace-nowrap text-[11px]" style={monoFont}>
+                              {m.paidDate ? new Date(m.paidDate).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
+                            </td>
+                            <td className="px-3 py-1.5 text-green-600 whitespace-nowrap">{m.resultText || "決済完了"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* ── 照合失敗者一覧（DB登録あり・CSV不在） ── */}
-            {(csvImportResult.matchFailMembers ?? csvImportResult.failedMembers) &&
-             ((csvImportResult.matchFailMembers ?? csvImportResult.failedMembers)!.length > 0) && (
+            {/* ② 照合失敗者一覧（活動中） */}
+            {csvResultTab === "fail" && (
               <div className="rounded-xl border border-red-200 overflow-hidden">
                 <div className="bg-red-600 px-4 py-2 flex items-center gap-2">
-                  <span className="text-white font-bold text-sm">❌ 照合失敗者一覧</span>
-                  <span className="bg-red-100 text-red-800 text-xs font-bold px-2 py-0.5 rounded-full" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>
-                    {(csvImportResult.matchFailMembers ?? csvImportResult.failedMembers)!.length}件
-                  </span>
-                  <span className="text-red-200 text-[11px] ml-auto">DB登録済みの決済ID①②③がCSVに不在（未決済）</span>
+                  <span className="text-white font-bold text-sm">❌ 照合失敗者一覧（活動中）</span>
+                  <span className="bg-red-100 text-red-800 text-xs font-bold px-2 py-0.5 rounded-full" style={monoFont}>{failList.length}件</span>
+                  <span className="text-red-200 text-[11px] ml-auto">DB登録済み決済ID①②③がCSVに不在（active/autoship）</span>
                 </div>
-                <div className="overflow-x-auto max-h-72 overflow-y-auto">
-                  <table className="min-w-full text-xs">
-                    <thead className="bg-red-50 sticky top-0 z-10" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace" }}>
-                      <tr className="text-red-800 text-[11px] uppercase tracking-wide">
-                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">#</th>
-                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">会員ID</th>
-                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">氏名</th>
-                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">登録決済ID①②③（DB登録値）</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-red-100 bg-white">
-                      {(csvImportResult.matchFailMembers ?? csvImportResult.failedMembers)!.map((m, i) => (
-                        <tr key={m.memberCode} className="hover:bg-red-50">
-                          <td className="px-3 py-1.5 text-gray-400 text-[11px]" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>{i + 1}</td>
-                          <td className="px-3 py-1.5">
-                            <span className="font-bold text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 text-[11px] select-all" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace", letterSpacing: "0.04em" }}>
-                              {m.memberCode}
-                            </span>
-                          </td>
-                          <td className="px-3 py-1.5 font-semibold text-gray-800 whitespace-nowrap">{m.memberName}</td>
-                          <td className="px-3 py-1.5">
-                            <div className="flex flex-wrap gap-1">
-                              {m.creditIds.map((id, j) => (
-                                <span key={j} className="text-[11px] bg-gray-100 border border-gray-300 rounded px-1.5 py-0.5 text-gray-700 select-all" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace", letterSpacing: "0.05em" }}>
-                                  {id}
-                                </span>
-                              ))}
-                            </div>
-                          </td>
+                {failList.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-gray-400">照合失敗者はいません</div>
+                ) : (
+                  <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                    <table className="min-w-full text-xs">
+                      <thead className="bg-red-50 sticky top-0 z-10">
+                        <tr className="text-red-800 text-[11px] uppercase tracking-wide">
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">#</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">会員ID</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">氏名</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">ステータス</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">登録決済ID①②③</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-red-100 bg-white">
+                        {failList.map((m, i) => (
+                          <tr key={i} className="hover:bg-red-50">
+                            <td className="px-3 py-1.5 text-gray-400 text-[11px]" style={monoFont}>{i + 1}</td>
+                            <td className="px-3 py-1.5">
+                              <span className="font-bold text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 text-[11px] select-all" style={monoFont}>{m.memberCode}</span>
+                            </td>
+                            <td className="px-3 py-1.5 font-semibold text-gray-800 whitespace-nowrap">{m.memberName}</td>
+                            <td className="px-3 py-1.5">
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${statusColor(m.memberStatus)}`}>{statusLabel(m.memberStatus)}</span>
+                            </td>
+                            <td className="px-3 py-1.5">
+                              <div className="flex flex-wrap gap-1">
+                                {m.creditIds.map((id, j) => (
+                                  <span key={j} className="text-[11px] bg-gray-100 border border-gray-300 rounded px-1.5 py-0.5 text-gray-700 select-all" style={monoFont}>{id}</span>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* ── 未照合ID一覧（CSVあり・DB未登録）── */}
-            {csvImportResult.unmatchedCsvIds && csvImportResult.unmatchedCsvIds.length > 0 && (
+            {/* ③ 退会照合失敗者一覧 */}
+            {csvResultTab === "withdrawn" && (
+              <div className="rounded-xl border border-purple-200 overflow-hidden">
+                <div className="bg-purple-700 px-4 py-2 flex items-center gap-2">
+                  <span className="text-white font-bold text-sm">🚫 退会照合失敗者一覧</span>
+                  <span className="bg-purple-100 text-purple-800 text-xs font-bold px-2 py-0.5 rounded-full" style={monoFont}>{withdrawnList.length}件</span>
+                  <span className="text-purple-200 text-[11px] ml-auto">退会・停止・失効・中途解約ステータスの会員</span>
+                </div>
+                {withdrawnList.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-gray-400">退会照合失敗者はいません</div>
+                ) : (
+                  <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                    <table className="min-w-full text-xs">
+                      <thead className="bg-purple-50 sticky top-0 z-10">
+                        <tr className="text-purple-800 text-[11px] uppercase tracking-wide">
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">#</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">会員ID</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">氏名</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">ステータス</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">登録決済ID①②③</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-purple-100 bg-white">
+                        {withdrawnList.map((m, i) => (
+                          <tr key={i} className="hover:bg-purple-50">
+                            <td className="px-3 py-1.5 text-gray-400 text-[11px]" style={monoFont}>{i + 1}</td>
+                            <td className="px-3 py-1.5">
+                              <span className="font-bold text-purple-700 bg-purple-50 border border-purple-200 rounded px-1.5 py-0.5 text-[11px] select-all" style={monoFont}>{m.memberCode}</span>
+                            </td>
+                            <td className="px-3 py-1.5 font-semibold text-gray-800 whitespace-nowrap">{m.memberName}</td>
+                            <td className="px-3 py-1.5">
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${statusColor(m.memberStatus)}`}>{statusLabel(m.memberStatus)}</span>
+                            </td>
+                            <td className="px-3 py-1.5">
+                              <div className="flex flex-wrap gap-1">
+                                {m.creditIds.map((id, j) => (
+                                  <span key={j} className="text-[11px] bg-gray-100 border border-gray-300 rounded px-1.5 py-0.5 text-gray-700 select-all" style={monoFont}>{id}</span>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ④ 未照合ID一覧（CSV個別行） */}
+            {csvResultTab === "unmatched" && (
               <div className="rounded-xl border border-orange-200 overflow-hidden">
                 <div className="bg-orange-500 px-4 py-2 flex items-center gap-2">
-                  <span className="text-white font-bold text-sm">⚠️ 未照合ID一覧（CSV記載・DB未登録）</span>
-                  <span className="bg-orange-100 text-orange-800 text-xs font-bold px-2 py-0.5 rounded-full" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>
-                    {csvImportResult.unmatchedCsvIds.length}件
-                  </span>
-                  <span className="text-orange-100 text-[11px] ml-auto">CSVに存在するが会員DBの決済ID①②③に未登録</span>
+                  <span className="text-white font-bold text-sm">⚠️ 未照合ID一覧</span>
+                  <span className="bg-orange-100 text-orange-800 text-xs font-bold px-2 py-0.5 rounded-full" style={monoFont}>{unmatchedList.length}件</span>
+                  <span className="text-orange-100 text-[11px] ml-auto">CSV記載・DB会員未登録（個別行）</span>
                 </div>
-                <div className="overflow-x-auto max-h-60 overflow-y-auto">
-                  <table className="min-w-full text-xs">
-                    <thead className="bg-orange-50 sticky top-0 z-10" style={{ fontFamily: "'Courier New', 'Lucida Console', 'Noto Sans Mono', monospace" }}>
-                      <tr className="text-orange-800 text-[11px] uppercase tracking-wide">
-                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">#</th>
-                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">CSV元の値（K列）</th>
-                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">正規化後（照合キー）</th>
-                        <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">対処</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-orange-100 bg-white">
-                      {csvImportResult.unmatchedCsvIds.map((u, i) => (
-                        <tr key={i} className="hover:bg-orange-50">
-                          <td className="px-3 py-1.5 text-gray-400 text-[11px]" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace" }}>{i + 1}</td>
-                          <td className="px-3 py-1.5">
-                            <span className="font-bold text-orange-700 bg-orange-50 border border-orange-200 rounded px-1.5 py-0.5 text-[11px] select-all" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace", letterSpacing: "0.05em", fontVariantNumeric: "slashed-zero" }}>
-                              {u.rawId}
-                            </span>
-                          </td>
-                          <td className="px-3 py-1.5">
-                            <span className="text-[11px] text-gray-500 bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5 select-all" style={{ fontFamily: "'Courier New', 'Noto Sans Mono', monospace", fontVariantNumeric: "slashed-zero" }}>
-                              {u.normId}
-                            </span>
-                          </td>
-                          <td className="px-3 py-1.5 text-[11px] text-gray-500">
-                            MLM会員詳細 → クレジット①②③に登録
-                          </td>
+                {unmatchedList.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-gray-400">未照合IDはありません</div>
+                ) : (
+                  <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                    <table className="min-w-full text-xs">
+                      <thead className="bg-orange-50 sticky top-0 z-10">
+                        <tr className="text-orange-800 text-[11px] uppercase tracking-wide">
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">#</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">CSV行</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">CSV元の値（K列）</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">正規化後</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">対処</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-orange-100 bg-white">
+                        {unmatchedList.map((u, i) => (
+                          <tr key={i} className="hover:bg-orange-50">
+                            <td className="px-3 py-1.5 text-gray-400 text-[11px]" style={monoFont}>{i + 1}</td>
+                            <td className="px-3 py-1.5 text-gray-400 text-[11px]" style={monoFont}>{u.rowIndex ?? "—"}</td>
+                            <td className="px-3 py-1.5">
+                              <span className="font-bold text-orange-700 bg-orange-50 border border-orange-200 rounded px-1.5 py-0.5 text-[11px] select-all" style={monoFont}>{u.rawId}</span>
+                            </td>
+                            <td className="px-3 py-1.5">
+                              <span className="text-[11px] text-gray-500 bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5 select-all" style={monoFont}>{u.normId}</span>
+                            </td>
+                            <td className="px-3 py-1.5 text-[11px] text-gray-500">MLM会員詳細 → クレジット①②③に登録</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1188,8 +1287,8 @@ export default function AutoShipPanel() {
                   ⚠️ 警告情報（{csvImportResult.warnings.length}件）
                 </summary>
                 <div className="p-3 bg-yellow-50 text-xs text-yellow-700 space-y-1">
-                  {csvImportResult.warnings.map((w, i) => (
-                    <div key={i} className="break-all leading-relaxed">{w}</div>
+                  {csvImportResult.warnings.map((w, wi) => (
+                    <div key={wi} className="break-all leading-relaxed">{w}</div>
                   ))}
                 </div>
               </details>
@@ -1202,19 +1301,17 @@ export default function AutoShipPanel() {
                   🔍 デバッグ情報（クリックで展開）
                 </summary>
                 <div className="p-3 bg-gray-50 text-xs font-mono text-gray-600 space-y-1">
-                  <div>CSV総行数: <strong>{String(csvImportResult.debug.csvTotalRows ?? "-")}</strong> / CSV決済ID数（ユニーク）: <strong>{String(csvImportResult.debug.csvIdCount ?? "-")}</strong> / 会員数: <strong>{String(csvImportResult.debug.memberCount ?? "-")}</strong></div>
-                  <div>照合件数: <strong>{String(csvImportResult.debug.matchedCount ?? "-")}</strong> / 成功: <strong>{String(csvImportResult.debug.paidCount ?? "-")}</strong> / 失敗: <strong>{String(csvImportResult.debug.failedCount ?? "-")}</strong></div>
-                  <div>CSV未照合: <strong>{String(csvImportResult.debug.csvUnmatchedCount ?? "-")}</strong> / 会員DB失敗者: <strong>{String(csvImportResult.debug.failedMemberCount ?? "-")}</strong></div>
-                  {csvImportResult.unmatchedCsvIds && csvImportResult.unmatchedCsvIds.length > 0 && (
-                    <div className="text-orange-600 mt-1 break-all">
-                      未照合ID（正規化後）: {csvImportResult.unmatchedCsvIds.map(u => u.normId).join(", ")}
-                    </div>
-                  )}
+                  <div>CSV総行数: <strong>{String(csvImportResult.debug.csvTotalRows ?? "-")}</strong> / 会員数: <strong>{String(csvImportResult.debug.memberCount ?? "-")}</strong></div>
+                  <div>照合会員数: <strong>{String(csvImportResult.debug.matchedMemberCount ?? "-")}</strong> / CSV照合行数: <strong>{String(csvImportResult.debug.matchedCsvRowCount ?? "-")}</strong></div>
+                  <div>成功: <strong>{String(csvImportResult.debug.paidCount ?? "-")}</strong> / 失敗: <strong>{String(csvImportResult.debug.failedCount ?? "-")}</strong></div>
+                  <div>活動中失敗: <strong>{String(csvImportResult.debug.activeFailCount ?? "-")}</strong> / 退会等失敗: <strong>{String(csvImportResult.debug.inactiveFailCount ?? "-")}</strong></div>
+                  <div>CSV未照合行: <strong>{String(csvImportResult.debug.csvUnmatchedCount ?? "-")}</strong></div>
                 </div>
               </details>
             )}
           </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* ──── メッセージ ──── */}
