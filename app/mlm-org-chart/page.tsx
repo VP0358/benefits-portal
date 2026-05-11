@@ -89,23 +89,57 @@ function getLevelColor(level: number) {
 // ── ④ ステータス設定
 // DBの MlmMemberStatus enum 値: active / autoship / lapsed / suspended / withdrawn / midCancel
 type StatusConfig = {
-  emoji: string; label: string; borderColor: string; bgColor: string;
+  icon: string;   // SVGアイコンキー
+  label: string; borderColor: string; bgColor: string;
   textColor: string; badgeBg: string; badgeText: string;
+  iconColor: string;  // アイコンの塗り色
 };
 const STATUS_CONFIG: Record<string, StatusConfig> = {
-  active:    { emoji: "😊", label: "活動中",   borderColor: "#22c55e", bgColor: "rgba(34,197,94,0.07)",   textColor: "#16a34a", badgeBg: "rgba(34,197,94,0.14)",   badgeText: "#16a34a" },
-  autoship:  { emoji: "🤖", label: "オートシップ", borderColor: "#6366f1", bgColor: "rgba(99,102,241,0.07)",  textColor: "#4f46e5", badgeBg: "rgba(99,102,241,0.14)",  badgeText: "#6366f1" },
-  lapsed:    { emoji: "😵", label: "失効",     borderColor: "#ef4444", bgColor: "rgba(239,68,68,0.07)",   textColor: "#b91c1c", badgeBg: "rgba(239,68,68,0.14)",   badgeText: "#b91c1c" },
-  suspended: { emoji: "😵", label: "停止",     borderColor: "#dc2626", bgColor: "rgba(220,38,38,0.08)",   textColor: "#991b1b", badgeBg: "rgba(220,38,38,0.14)",   badgeText: "#991b1b" },
-  withdrawn: { emoji: "😢", label: "退会",     borderColor: "#9ca3af", bgColor: "rgba(156,163,175,0.07)", textColor: "#6b7280", badgeBg: "rgba(156,163,175,0.12)", badgeText: "#6b7280" },
-  midCancel: { emoji: "😢", label: "中途解約", borderColor: "#3b82f6", bgColor: "rgba(59,130,246,0.07)",  textColor: "#1d4ed8", badgeBg: "rgba(59,130,246,0.14)",  badgeText: "#1d4ed8" },
+  //           icon          label           borderColor   bgColor                         textColor   badgeBg                         badgeText   iconColor
+  active:    { icon: "check-circle", label: "活動中",      borderColor: "#22c55e", bgColor: "rgba(34,197,94,0.07)",   textColor: "#16a34a", badgeBg: "rgba(34,197,94,0.14)",   badgeText: "#16a34a", iconColor: "#22c55e" },
+  autoship:  { icon: "robot",        label: "オートシップ", borderColor: "#6366f1", bgColor: "rgba(99,102,241,0.07)",  textColor: "#4f46e5", badgeBg: "rgba(99,102,241,0.14)",  badgeText: "#6366f1", iconColor: "#818cf8" },
+  lapsed:    { icon: "x-circle",     label: "失効",        borderColor: "#ef4444", bgColor: "rgba(239,68,68,0.07)",   textColor: "#b91c1c", badgeBg: "rgba(239,68,68,0.14)",   badgeText: "#b91c1c", iconColor: "#ef4444" },
+  suspended: { icon: "pause-circle", label: "停止",        borderColor: "#dc2626", bgColor: "rgba(220,38,38,0.08)",   textColor: "#991b1b", badgeBg: "rgba(220,38,38,0.14)",   badgeText: "#991b1b", iconColor: "#f87171" },
+  withdrawn: { icon: "logout",       label: "退会",        borderColor: "#9ca3af", bgColor: "rgba(156,163,175,0.07)", textColor: "#6b7280", badgeBg: "rgba(156,163,175,0.12)", badgeText: "#6b7280", iconColor: "#9ca3af" },
+  midCancel: { icon: "clock",        label: "中途解約",    borderColor: "#3b82f6", bgColor: "rgba(59,130,246,0.07)",  textColor: "#1d4ed8", badgeBg: "rgba(59,130,246,0.14)",  badgeText: "#1d4ed8", iconColor: "#60a5fa" },
 };
 const DEFAULT_STATUS: StatusConfig = {
-  emoji: "❓", label: "不明", borderColor: "#9ca3af", bgColor: "rgba(156,163,175,0.06)",
-  textColor: "#6b7280", badgeBg: "rgba(156,163,175,0.10)", badgeText: "#6b7280",
+  icon: "question", label: "不明", borderColor: "#9ca3af", bgColor: "rgba(156,163,175,0.06)",
+  textColor: "#6b7280", badgeBg: "rgba(156,163,175,0.10)", badgeText: "#6b7280", iconColor: "#9ca3af",
 };
 function getStatusConfig(status: string): StatusConfig {
   return STATUS_CONFIG[status] ?? DEFAULT_STATUS;
+}
+
+// ── SVGステータスアイコン ────────────────────────────────────
+// 絵文字と違い color props で自由に色を変更できる
+function StatusIcon({ iconKey, color, size = 20 }: { iconKey: string; color: string; size?: number }) {
+  const s = size;
+  const props = { width: s, height: s, viewBox: "0 0 24 24", fill: "none",
+    stroke: color, strokeWidth: 2.2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  switch (iconKey) {
+    // active: チェックマーク付き丸 → 緑でアクティブ感
+    case "check-circle":
+      return <svg {...props}><circle cx="12" cy="12" r="10"/><polyline points="9 12 11.5 14.5 15.5 9.5"/></svg>;
+    // autoship: ロボット/歯車 → 自動処理感
+    case "robot":
+      return <svg {...props}><rect x="5" y="8" width="14" height="10" rx="2"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/><circle cx="9" cy="13" r="1" fill={color} stroke="none"/><circle cx="15" cy="13" r="1" fill={color} stroke="none"/><path d="M9 17h6"/></svg>;
+    // lapsed: ×印丸 → 失効/無効
+    case "x-circle":
+      return <svg {...props}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>;
+    // suspended: 一時停止 → 停止中
+    case "pause-circle":
+      return <svg {...props}><circle cx="12" cy="12" r="10"/><line x1="10" y1="8" x2="10" y2="16"/><line x1="14" y1="8" x2="14" y2="16"/></svg>;
+    // withdrawn: 出口矢印 → 退会/離脱
+    case "logout":
+      return <svg {...props}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
+    // midCancel: 時計 → 処理中/途中
+    case "clock":
+      return <svg {...props}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+    // fallback
+    default:
+      return <svg {...props}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
+  }
 }
 
 const ALERT_BORDER: Record<string, string> = {
@@ -124,7 +158,7 @@ function NodeDetailModal({ node, onClose }: { node: NodeData; onClose: () => voi
     { label: "登録タイプ",         value: MEMBER_TYPE_LABELS[node.memberType] ?? node.memberType },
     { label: "都道府県",           value: node.prefecture ?? "—" },
     { label: "直接紹介数",         value: `${node.directReferralCount}名` },
-    { label: "ステータス",         value: `${sc.emoji} ${sc.label}` },
+    { label: "ステータス",         value: sc.label },
     { label: "レベル",             value: `LV.${node.currentLevel}` + (LEVEL_LABELS[node.currentLevel] ? ` (${LEVEL_LABELS[node.currentLevel]})` : "") },
     { label: "最終ポイント計上日", value: node.lastPointMonth ?? "—" },
     { label: "傘下人数",           value: `${node.totalDescendants}名` },
@@ -141,10 +175,10 @@ function NodeDetailModal({ node, onClose }: { node: NodeData; onClose: () => voi
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="w-14 h-14 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
-                style={{ background: sc.bgColor, border: `2px solid ${sc.borderColor}60`, fontSize: "32px" }}>
+                style={{ background: sc.bgColor, border: `2px solid ${sc.borderColor}60` }}>
                 {node.avatarUrl
                   ? <img src={node.avatarUrl} alt={node.name} className="w-full h-full object-cover rounded-full" />
-                  : <span style={{ lineHeight: 1 }}>{sc.emoji}</span>}
+                  : <StatusIcon iconKey={sc.icon} color={sc.iconColor} size={32} />}
               </div>
               <div>
                 <div className="font-bold text-base text-gray-900 leading-tight">{node.name}</div>
@@ -152,8 +186,9 @@ function NodeDetailModal({ node, onClose }: { node: NodeData; onClose: () => voi
                 <div className="flex items-center gap-1.5 mt-1">
                   <span className="text-[10px] font-black px-2 py-0.5 rounded-full"
                     style={{ background: lc.bg, color: lc.text, border: `1px solid ${lc.border}` }}>LV.{node.currentLevel}</span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                    style={{ background: sc.badgeBg, color: sc.badgeText }}>{sc.emoji} {sc.label}</span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: sc.badgeBg, color: sc.badgeText }}>
+                    <StatusIcon iconKey={sc.icon} color={sc.iconColor} size={11} />{sc.label}</span>
                 </div>
               </div>
             </div>
@@ -213,11 +248,11 @@ function MemberCard({ node, depth, onClick }: {
         {/* アバター */}
         <div className="flex-shrink-0 flex flex-col items-center justify-center mr-2.5">
           <div className="rounded-full flex items-center justify-center overflow-hidden"
-            style={{ width: "42px", height: "42px", fontSize: "24px",
-              background: `${sc.borderColor}18`, border: `2px solid ${sc.borderColor}50`, lineHeight: 1 }}>
+            style={{ width: "42px", height: "42px",
+              background: `${sc.borderColor}18`, border: `2px solid ${sc.borderColor}50` }}>
             {node.avatarUrl
               ? <img src={node.avatarUrl} alt={node.name} className="w-full h-full object-cover" />
-              : <span style={{ lineHeight: 1 }}>{sc.emoji}</span>}
+              : <StatusIcon iconKey={sc.icon} color={sc.iconColor} size={24} />}
           </div>
         </div>
         <div className="flex-1 min-w-0 flex flex-col gap-0.5">
@@ -230,7 +265,7 @@ function MemberCard({ node, depth, onClick }: {
           <div>
             <span className="inline-flex items-center gap-1 font-bold rounded-full px-1.5 py-0.5 leading-none"
               style={{ fontSize: "10px", background: sc.badgeBg, color: sc.badgeText, border: `1px solid ${sc.borderColor}30` }}>
-              {sc.emoji} {sc.label}
+              <StatusIcon iconKey={sc.icon} color={sc.iconColor} size={10} />{sc.label}
             </span>
           </div>
           <div className="flex items-center gap-2 mt-0.5">
@@ -318,7 +353,7 @@ function LegendPanel() {
           <span key={key} className="inline-flex items-center gap-1.5 font-bold rounded-lg px-2.5 py-1.5"
             style={{ fontSize: "12px", background: sc.badgeBg, color: sc.badgeText,
               border: `1.5px solid ${sc.borderColor}70`, lineHeight: 1.4 }}>
-            <span style={{ fontSize: "15px", lineHeight: 1 }}>{sc.emoji}</span>
+            <StatusIcon iconKey={sc.icon} color={sc.iconColor} size={16} />
             {sc.label}
           </span>
         ))}
@@ -458,7 +493,7 @@ function ListRow({ node, depth, orgType, onNodeClick }: {
         style={{ background: NAVY_CARD3, border: `1.5px solid ${GOLD}20`, fontSize: "16px" }}>
         {node.avatarUrl
           ? <img src={node.avatarUrl} alt={node.name} className="w-full h-full object-cover" />
-          : <span style={{ lineHeight: 1 }}>{sc.emoji}</span>}
+          : <StatusIcon iconKey={sc.icon} color={sc.iconColor} size={18} />}
       </div>
       <div className="flex-1 min-w-0">
         <div className="font-semibold truncate" style={{ fontSize: "13px", color: nameColor }}>{node.name}</div>
@@ -467,7 +502,7 @@ function ListRow({ node, depth, orgType, onNodeClick }: {
       <div className="flex items-center gap-1.5 flex-shrink-0">
         <span style={{ fontSize: "10px", color: `${GOLD}80` }}>{MEMBER_TYPE_LABELS[node.memberType] ?? node.memberType}</span>
         <span className="font-bold" style={{ fontSize: "11px", color: GOLD_LIGHT }}>{node.selfPoints.toLocaleString()}pt</span>
-        <span style={{ fontSize: "16px" }}>{sc.emoji}</span>
+        <StatusIcon iconKey={sc.icon} color={sc.iconColor} size={18} />
       </div>
     </div>
   );
@@ -487,17 +522,17 @@ function DepthStatsModal({ depthStats, totalCount, activeCount, onClose }: {
   const beyond8Total  = beyond8.reduce((s, d) => s + d.total, 0);
   const beyond8Active = beyond8.reduce((s, d) => s + d.active, 0);
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+    <div className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ background: "rgba(10,22,40,0.88)", backdropFilter: "blur(8px)" }} onClick={onClose}>
-      <div className="w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl overflow-hidden"
+      <div className="w-full mx-4 sm:mx-0 sm:max-w-sm rounded-3xl overflow-hidden"
         style={{ background: `linear-gradient(160deg,${NAVY} 0%,${NAVY_CARD} 30%,${NAVY_CARD2} 100%)`,
           border: `1px solid ${GOLD}40`, maxHeight: "85vh" }}
         onClick={e => e.stopPropagation()}>
         <div className="h-0.5" style={{ background: `linear-gradient(90deg,transparent,${GOLD_LIGHT} 50%,transparent)` }} />
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid rgba(201,168,76,0.15)` }}>
           <div>
-            <p style={{ fontSize: "9px", letterSpacing: "0.22em", fontWeight: 700, color: `${GOLD}60` }}>ACTIVE BREAKDOWN</p>
-            <h2 className="font-bold text-white text-sm mt-0.5">段別アクティブ内訳</h2>
+            <p style={{ fontSize: "11px", letterSpacing: "0.18em", fontWeight: 800, color: GOLD_LIGHT }}>ACTIVE BREAKDOWN</p>
+            <h2 className="font-black text-white mt-1" style={{ fontSize: "17px" }}>段別アクティブ内訳</h2>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold"
             style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.45)" }}>✕</button>
@@ -507,8 +542,8 @@ function DepthStatsModal({ depthStats, totalCount, activeCount, onClose }: {
             { label: "アクティブ計", value: activeCount, color: "#22c55e" }].map(item => (
             <div key={item.label} className="rounded-xl p-3 text-center"
               style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <div className="text-2xl font-black" style={{ color: item.color }}>{item.value.toLocaleString()}</div>
-              <div style={{ fontSize: "10px", marginTop: "2px", color: "rgba(255,255,255,0.40)" }}>{item.label}</div>
+              <div className="text-3xl font-black" style={{ color: item.color }}>{item.value.toLocaleString()}</div>
+              <div style={{ fontSize: "12px", marginTop: "3px", color: "rgba(255,255,255,0.65)", fontWeight: 600 }}>{item.label}</div>
             </div>
           ))}
         </div>
@@ -519,14 +554,14 @@ function DepthStatsModal({ depthStats, totalCount, activeCount, onClose }: {
           {upTo7.map(stat => (
             <div key={stat.depth} className="rounded-xl px-4 py-2.5 flex items-center gap-3"
               style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-              <div className="w-10 h-8 rounded-lg flex items-center justify-center font-black text-xs flex-shrink-0"
-                style={{ background: `${GOLD}18`, color: GOLD_LIGHT, border: `1px solid ${GOLD}35` }}>
+              <div className="w-12 h-9 rounded-lg flex items-center justify-center font-black flex-shrink-0"
+                style={{ fontSize: "11px", background: `${GOLD}18`, color: GOLD_LIGHT, border: `1px solid ${GOLD}35` }}>
                 M{stat.depth}段
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold text-white">{stat.active}名 アクティブ</span>
-                  <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.40)" }}>/ {stat.total}名</span>
+                  <span className="font-bold text-white" style={{ fontSize: "13px" }}>{stat.active}名 アクティブ</span>
+                  <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.60)", fontWeight: 600 }}>/ {stat.total}名</span>
                 </div>
                 <div className="h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
                   <div className="h-1.5 rounded-full"
@@ -535,7 +570,7 @@ function DepthStatsModal({ depthStats, totalCount, activeCount, onClose }: {
                 </div>
               </div>
               <div className="w-10 text-right">
-                <span className="text-xs font-bold" style={{ color: "#4ade80" }}>
+                <span className="font-bold" style={{ fontSize: "13px", color: "#4ade80" }}>
                   {stat.total > 0 ? Math.round(stat.active / stat.total * 100) : 0}%
                 </span>
               </div>
@@ -544,14 +579,14 @@ function DepthStatsModal({ depthStats, totalCount, activeCount, onClose }: {
           {beyond8.length > 0 && (
             <div className="rounded-xl px-4 py-2.5 flex items-center gap-3"
               style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${GOLD}18` }}>
-              <div className="w-10 h-8 rounded-lg flex items-center justify-center font-black flex-shrink-0"
-                style={{ fontSize: "10px", background: `${GOLD}12`, color: GOLD, border: `1px solid ${GOLD}25` }}>
+              <div className="w-12 h-9 rounded-lg flex items-center justify-center font-black flex-shrink-0"
+                style={{ fontSize: "11px", background: `${GOLD}12`, color: GOLD, border: `1px solid ${GOLD}25` }}>
                 8段+
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold text-white">{beyond8Active}名 アクティブ</span>
-                  <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.40)" }}>/ {beyond8Total}名</span>
+                  <span className="font-bold text-white" style={{ fontSize: "13px" }}>{beyond8Active}名 アクティブ</span>
+                  <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.60)", fontWeight: 600 }}>/ {beyond8Total}名</span>
                 </div>
                 <div className="h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
                   <div className="h-1.5 rounded-full"
@@ -560,7 +595,7 @@ function DepthStatsModal({ depthStats, totalCount, activeCount, onClose }: {
                 </div>
               </div>
               <div className="w-10 text-right">
-                <span className="text-xs font-bold" style={{ color: GOLD_LIGHT }}>
+                <span className="font-bold" style={{ fontSize: "13px", color: GOLD_LIGHT }}>
                   {beyond8Total > 0 ? Math.round(beyond8Active / beyond8Total * 100) : 0}%
                 </span>
               </div>
@@ -836,7 +871,7 @@ export default function MlmOrgChartPage() {
                   boxShadow: "0 4px 12px rgba(10,22,40,0.10)", cursor: isMatrix ? "pointer" : "default" }}>
                 <div className="text-3xl font-black mb-0.5" style={{ color: "#22c55e" }}>{activeCount.toLocaleString()}</div>
                 <div className="font-bold" style={{ fontSize: "11px", color: "rgba(34,197,94,0.80)" }}>✅ アクティブ</div>
-                <div style={{ fontSize: "9px", marginTop: "2px", color: "rgba(10,22,40,0.40)" }}>
+                <div style={{ fontSize: "10px", marginTop: "3px", color: "rgba(10,22,40,0.65)", fontWeight: 700 }}>
                   {isMatrix ? "▶ タップで段別内訳" : "自分起点・全段"}
                 </div>
               </button>
