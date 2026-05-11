@@ -1200,7 +1200,7 @@ export default function MemberDashboard({
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
             style={{background:"rgba(10,22,40,0.92)",backdropFilter:"blur(8px)"}}
             onClick={()=>{setSkinModal(null);}}>
-            <div className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl flex flex-col"
+            <div className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl flex flex-col overflow-hidden"
               style={{
                 background:`linear-gradient(160deg,${NAVY} 0%,${NAVY_CARD} 30%,${NAVY_CARD2} 70%,${NAVY_CARD3} 100%)`,
                 border:`1px solid ${GOLD}40`,
