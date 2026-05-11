@@ -1273,21 +1273,30 @@ export default function MlmMemberDetailPage() {
             </div>
           </div>
 
-          {/* ④ 利用可能ポイント */}
-          <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 flex flex-col gap-2">
-            <div className="flex items-center gap-1.5">
-              <i className="fas fa-coins text-amber-500 text-sm" />
-              <span className="text-xs font-bold text-amber-700">利用可能ポイント</span>
-            </div>
-            <div className="flex-1 flex items-center justify-center rounded-lg bg-amber-100 border border-amber-200 px-3 py-4">
-              <div className="text-center">
-                <div className="text-2xl font-extrabold text-amber-700">
-                  {(m.user.pointWallet?.availablePointsBalance ?? 0).toLocaleString()}
+          {/* ④ 利用可能ポイント = SAV合計付与pt + 手動追加pt + 外部追加pt */}
+          {(() => {
+            const calcAvailable =
+              (m.savingsPoints ?? 0) +
+              (m.user.pointWallet?.manualPointsBalance ?? 0) +
+              (m.user.pointWallet?.externalPointsBalance ?? 0);
+            return (
+              <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 flex flex-col gap-2">
+                <div className="flex items-center gap-1.5">
+                  <i className="fas fa-coins text-amber-500 text-sm" />
+                  <span className="text-xs font-bold text-amber-700">利用可能ポイント</span>
                 </div>
-                <div className="text-[11px] text-amber-500 mt-0.5">pt</div>
+                <div className="flex-1 flex items-center justify-center rounded-lg bg-amber-100 border border-amber-200 px-3 py-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-extrabold text-amber-700">
+                      {calcAvailable.toLocaleString()}
+                    </div>
+                    <div className="text-[11px] text-amber-500 mt-0.5">pt</div>
+                    <div className="text-[10px] text-amber-400 mt-1">SAV＋手動＋外部</div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
 
         </div>
       </section>
@@ -1318,9 +1327,15 @@ export default function MlmMemberDetailPage() {
                 <div className="text-slate-500">自動pt残高</div>
                 <div className="font-bold text-slate-700">{(m.user.pointWallet?.autoPointsBalance ?? 0).toLocaleString()} pt</div>
               </div>
-              <div className="bg-violet-50 rounded-lg">
-                <div className="text-violet-500">利用可能</div>
-                <div className="font-bold text-violet-700">{(m.user.pointWallet?.availablePointsBalance ?? 0).toLocaleString()} pt</div>
+              <div className="bg-amber-50 rounded-lg">
+                <div className="text-amber-500">利用可能</div>
+                <div className="font-bold text-amber-700">
+                  {(
+                    (m.savingsPoints ?? 0) +
+                    (m.user.pointWallet?.manualPointsBalance ?? 0) +
+                    (m.user.pointWallet?.externalPointsBalance ?? 0)
+                  ).toLocaleString()} pt
+                </div>
               </div>
             </div>
 
