@@ -89,164 +89,32 @@ function getLevelColor(level: number) {
 // ── ④ ステータス設定
 // DBの MlmMemberStatus enum 値: active / autoship / lapsed / suspended / withdrawn / midCancel
 type StatusConfig = {
-  icon: string;      // SVGアイコンキー
+  emoji: string;     // 絵文字アイコン
   label: string; borderColor: string; bgColor: string;
   textColor: string; badgeBg: string; badgeText: string;
-  iconColor: string; // アイコンの塗り色
 };
 const STATUS_CONFIG: Record<string, StatusConfig> = {
   // DB enum値（6種）
-  active:    { icon: "face-smile",   label: "活動中",      borderColor: "#22c55e", bgColor: "rgba(34,197,94,0.07)",   textColor: "#16a34a", badgeBg: "rgba(34,197,94,0.14)",   badgeText: "#16a34a", iconColor: "#eab308" },
-  autoship:  { icon: "robot",        label: "オートシップ", borderColor: "#6366f1", bgColor: "rgba(99,102,241,0.07)",  textColor: "#4f46e5", badgeBg: "rgba(99,102,241,0.14)",  badgeText: "#6366f1", iconColor: "#818cf8" },
-  lapsed:    { icon: "face-dizzy",   label: "失効",        borderColor: "#ef4444", bgColor: "rgba(239,68,68,0.07)",   textColor: "#b91c1c", badgeBg: "rgba(239,68,68,0.14)",   badgeText: "#b91c1c", iconColor: "#ef4444" },
-  suspended: { icon: "face-xeyes",   label: "停止",        borderColor: "#f97316", bgColor: "rgba(249,115,22,0.07)",  textColor: "#c2410c", badgeBg: "rgba(249,115,22,0.14)",  badgeText: "#c2410c", iconColor: "#f97316" },
-  withdrawn: { icon: "face-tear",    label: "退会",        borderColor: "#9ca3af", bgColor: "rgba(156,163,175,0.07)", textColor: "#6b7280", badgeBg: "rgba(156,163,175,0.12)", badgeText: "#6b7280", iconColor: "#9ca3af" },
-  midCancel: { icon: "face-wavy",    label: "中途解約",    borderColor: "#9ca3af", bgColor: "rgba(156,163,175,0.07)", textColor: "#6b7280", badgeBg: "rgba(156,163,175,0.12)", badgeText: "#6b7280", iconColor: "#9ca3af" },
+  //            emoji  label           borderColor   bgColor                         textColor   badgeBg                         badgeText
+  active:    { emoji: "😊", label: "活動中",      borderColor: "#22c55e", bgColor: "rgba(34,197,94,0.07)",   textColor: "#16a34a", badgeBg: "rgba(34,197,94,0.14)",   badgeText: "#16a34a" },
+  autoship:  { emoji: "🤖", label: "オートシップ", borderColor: "#6366f1", bgColor: "rgba(99,102,241,0.07)",  textColor: "#4f46e5", badgeBg: "rgba(99,102,241,0.14)",  badgeText: "#6366f1" },
+  lapsed:    { emoji: "😱", label: "失効",        borderColor: "#ef4444", bgColor: "rgba(239,68,68,0.07)",   textColor: "#b91c1c", badgeBg: "rgba(239,68,68,0.14)",   badgeText: "#b91c1c" },
+  suspended: { emoji: "😵", label: "停止",        borderColor: "#f97316", bgColor: "rgba(249,115,22,0.07)",  textColor: "#c2410c", badgeBg: "rgba(249,115,22,0.14)",  badgeText: "#c2410c" },
+  withdrawn: { emoji: "😢", label: "退会",        borderColor: "#9ca3af", bgColor: "rgba(156,163,175,0.07)", textColor: "#6b7280", badgeBg: "rgba(156,163,175,0.12)", badgeText: "#6b7280" },
+  midCancel: { emoji: "😬", label: "中途解約",    borderColor: "#9ca3af", bgColor: "rgba(156,163,175,0.07)", textColor: "#6b7280", badgeBg: "rgba(156,163,175,0.12)", badgeText: "#6b7280" },
 };
 // 凡例表示用追加エントリ（DBには存在しないが凡例に説明として表示）
 const LEGEND_EXTRA: StatusConfig[] = [
-  { icon: "sprout",    label: "登録中",      borderColor: "#4ade80", bgColor: "rgba(74,222,128,0.07)",  textColor: "#15803d", badgeBg: "rgba(74,222,128,0.14)",  badgeText: "#15803d", iconColor: "#4ade80" },
-  { icon: "hourglass", label: "入金待ち",    borderColor: "#fbbf24", bgColor: "rgba(251,191,36,0.07)",  textColor: "#92400e", badgeBg: "rgba(251,191,36,0.14)",  badgeText: "#92400e", iconColor: "#fbbf24" },
-  { icon: "face-wavy", label: "クーリングオフ", borderColor: "#9ca3af", bgColor: "rgba(156,163,175,0.07)", textColor: "#6b7280", badgeBg: "rgba(156,163,175,0.12)", badgeText: "#6b7280", iconColor: "#9ca3af" },
+  { emoji: "🌱", label: "登録中",        borderColor: "#4ade80", bgColor: "rgba(74,222,128,0.07)",  textColor: "#15803d", badgeBg: "rgba(74,222,128,0.14)",  badgeText: "#15803d" },
+  { emoji: "⏳", label: "入金待ち",      borderColor: "#fbbf24", bgColor: "rgba(251,191,36,0.07)",  textColor: "#92400e", badgeBg: "rgba(251,191,36,0.14)",  badgeText: "#92400e" },
+  { emoji: "😬", label: "クーリングオフ", borderColor: "#9ca3af", bgColor: "rgba(156,163,175,0.07)", textColor: "#6b7280", badgeBg: "rgba(156,163,175,0.12)", badgeText: "#6b7280" },
 ];
 const DEFAULT_STATUS: StatusConfig = {
-  icon: "question", label: "不明", borderColor: "#9ca3af", bgColor: "rgba(156,163,175,0.06)",
-  textColor: "#6b7280", badgeBg: "rgba(156,163,175,0.10)", badgeText: "#6b7280", iconColor: "#9ca3af",
+  emoji: "❓", label: "不明", borderColor: "#9ca3af", bgColor: "rgba(156,163,175,0.06)",
+  textColor: "#6b7280", badgeBg: "rgba(156,163,175,0.10)", badgeText: "#6b7280",
 };
 function getStatusConfig(status: string): StatusConfig {
   return STATUS_CONFIG[status] ?? DEFAULT_STATUS;
-}
-
-// ── SVGステータスアイコン ────────────────────────────────────
-// カラー指定で色が変わる顔型 SVG アイコン
-function StatusIcon({ iconKey, color, size = 20 }: { iconKey: string; color: string; size?: number }) {
-  const s = size;
-  // 顔パーツ（目・口）は fill で塗りつぶす
-  const base = { width: s, height: s, viewBox: "0 0 24 24" };
-  const sw = Math.max(1.4, s * 0.1);  // strokeWidth を size に比例
-  switch (iconKey) {
-
-    // active: 黄色のニコニコ顔
-    case "face-smile":
-      return (
-        <svg {...base} fill="none">
-          <circle cx="12" cy="12" r="10" stroke={color} strokeWidth={sw} fill={color+"22"}/>
-          {/* 目 */}
-          <circle cx="9"  cy="10" r="1.3" fill={color}/>
-          <circle cx="15" cy="10" r="1.3" fill={color}/>
-          {/* ニコニコ口 */}
-          <path d="M8 14 Q12 18 16 14" stroke={color} strokeWidth={sw} fill="none" strokeLinecap="round"/>
-        </svg>
-      );
-
-    // autoship: ロボット顔
-    case "robot":
-      return (
-        <svg {...base} fill="none">
-          <rect x="4" y="7" width="16" height="12" rx="3" stroke={color} strokeWidth={sw}/>
-          <path d="M9 7V5.5a3 3 0 0 1 6 0V7" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
-          {/* 目(円型) */}
-          <circle cx="9"  cy="13" r="1.5" fill={color}/>
-          <circle cx="15" cy="13" r="1.5" fill={color}/>
-          {/* 口(ストレート) */}
-          <line x1="9" y1="17" x2="15" y2="17" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
-          {/* アンテナ */}
-          <line x1="12" y1="4" x2="12" y2="7" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
-          <circle cx="12" cy="3.5" r="1" fill={color}/>
-        </svg>
-      );
-
-    // lapsed: 赤いビックリ顔（目が×）
-    case "face-dizzy":
-      return (
-        <svg {...base} fill="none">
-          <circle cx="12" cy="12" r="10" stroke={color} strokeWidth={sw} fill={color+"15"}/>
-          {/* 目: ×印 */}
-          <line x1="7.5" y1="8.5" x2="9.5"  y2="10.5" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
-          <line x1="9.5" y1="8.5" x2="7.5"  y2="10.5" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
-          <line x1="14.5" y1="8.5" x2="16.5" y2="10.5" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
-          <line x1="16.5" y1="8.5" x2="14.5" y2="10.5" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
-          {/* 口: 驚き形 */}
-          <ellipse cx="12" cy="16" rx="2.5" ry="1.8" stroke={color} strokeWidth={sw} fill="none"/>
-        </svg>
-      );
-
-    // suspended: オレンジの目が×顔
-    case "face-xeyes":
-      return (
-        <svg {...base} fill="none">
-          <circle cx="12" cy="12" r="10" stroke={color} strokeWidth={sw} fill={color+"15"}/>
-          {/* 目: ×印 */}
-          <line x1="7.5" y1="8.5" x2="9.5"  y2="10.5" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
-          <line x1="9.5" y1="8.5" x2="7.5"  y2="10.5" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
-          <line x1="14.5" y1="8.5" x2="16.5" y2="10.5" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
-          <line x1="16.5" y1="8.5" x2="14.5" y2="10.5" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
-          {/* 口: 平坦 */}
-          <line x1="8.5" y1="16" x2="15.5" y2="16" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
-        </svg>
-      );
-
-    // withdrawn: グレーの涙顔
-    case "face-tear":
-      return (
-        <svg {...base} fill="none">
-          <circle cx="12" cy="12" r="10" stroke={color} strokeWidth={sw} fill={color+"15"}/>
-          {/* 目 */}
-          <circle cx="9"  cy="10" r="1.2" fill={color}/>
-          <circle cx="15" cy="10" r="1.2" fill={color}/>
-          {/* 涙 */}
-          <path d="M15 10.5 Q16 13 15 14.5 Q14 16 15 14.5" stroke={color} strokeWidth={sw*0.9} fill="none" strokeLinecap="round"/>
-          {/* 下向き口 */}
-          <path d="M8.5 16.5 Q12 14 15.5 16.5" stroke={color} strokeWidth={sw} fill="none" strokeLinecap="round"/>
-        </svg>
-      );
-
-    // midCancel / cooling-off: グレーの口がなみなみ顔
-    case "face-wavy":
-      return (
-        <svg {...base} fill="none">
-          <circle cx="12" cy="12" r="10" stroke={color} strokeWidth={sw} fill={color+"15"}/>
-          {/* 目 */}
-          <circle cx="9"  cy="10" r="1.2" fill={color}/>
-          <circle cx="15" cy="10" r="1.2" fill={color}/>
-          {/* なみなみ口 */}
-          <path d="M8 15.5 Q9.5 14 11 15.5 Q12.5 17 14 15.5 Q15.5 14 16 15.5"
-            stroke={color} strokeWidth={sw} fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      );
-
-    // 登録中: 新芽
-    case "sprout":
-      return (
-        <svg {...base} fill="none">
-          <path d="M12 21V10" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
-          <path d="M12 10 C12 10 7 9 6 4 C9 4 12 7 12 10Z" stroke={color} strokeWidth={sw} fill={color+"30"} strokeLinejoin="round"/>
-          <path d="M12 13 C12 13 16 11 18 7 C15 6 12 9 12 13Z" stroke={color} strokeWidth={sw} fill={color+"30"} strokeLinejoin="round"/>
-        </svg>
-      );
-
-    // 入金待ち: 砂時計
-    case "hourglass":
-      return (
-        <svg {...base} fill="none">
-          <path d="M6 3h12M6 21h12" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
-          <path d="M6 3 Q6 12 12 12 Q18 12 18 21 M18 3 Q18 12 12 12 Q6 12 6 21"
-            stroke={color} strokeWidth={sw} fill="none" strokeLinejoin="round"/>
-          {/* 流れ落ちる砂 */}
-          <path d="M9 18.5 Q12 16 15 18.5" stroke={color} strokeWidth={sw*0.8} fill={color+"40"} strokeLinecap="round"/>
-        </svg>
-      );
-
-    // fallback
-    default:
-      return (
-        <svg {...base} fill="none">
-          <circle cx="12" cy="12" r="10" stroke={color} strokeWidth={sw}/>
-          <line x1="12" y1="8" x2="12" y2="12" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
-          <circle cx="12" cy="16" r="0.8" fill={color}/>
-        </svg>
-      );
-  }
 }
 
 const ALERT_BORDER: Record<string, string> = {
@@ -285,7 +153,7 @@ function NodeDetailModal({ node, onClose }: { node: NodeData; onClose: () => voi
                 style={{ background: sc.bgColor, border: `2px solid ${sc.borderColor}60` }}>
                 {node.avatarUrl
                   ? <img src={node.avatarUrl} alt={node.name} className="w-full h-full object-cover rounded-full" />
-                  : <StatusIcon iconKey={sc.icon} color={sc.iconColor} size={32} />}
+                  : <span style={{ fontSize: "32px", lineHeight: 1 }}>{sc.emoji}</span>}
               </div>
               <div>
                 <div className="font-bold text-base text-gray-900 leading-tight">{node.name}</div>
@@ -295,7 +163,7 @@ function NodeDetailModal({ node, onClose }: { node: NodeData; onClose: () => voi
                     style={{ background: lc.bg, color: lc.text, border: `1px solid ${lc.border}` }}>LV.{node.currentLevel}</span>
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
                     style={{ background: sc.badgeBg, color: sc.badgeText }}>
-                    <StatusIcon iconKey={sc.icon} color={sc.iconColor} size={11} />{sc.label}</span>
+                    {sc.emoji} {sc.label}</span>
                 </div>
               </div>
             </div>
@@ -359,7 +227,7 @@ function MemberCard({ node, depth, onClick }: {
               background: `${sc.borderColor}18`, border: `2px solid ${sc.borderColor}50` }}>
             {node.avatarUrl
               ? <img src={node.avatarUrl} alt={node.name} className="w-full h-full object-cover" />
-              : <StatusIcon iconKey={sc.icon} color={sc.iconColor} size={24} />}
+              : <span style={{ fontSize: "24px", lineHeight: 1 }}>{sc.emoji}</span>}
           </div>
         </div>
         <div className="flex-1 min-w-0 flex flex-col gap-0.5">
@@ -372,7 +240,7 @@ function MemberCard({ node, depth, onClick }: {
           <div>
             <span className="inline-flex items-center gap-1 font-bold rounded-full px-1.5 py-0.5 leading-none"
               style={{ fontSize: "10px", background: sc.badgeBg, color: sc.badgeText, border: `1px solid ${sc.borderColor}30` }}>
-              <StatusIcon iconKey={sc.icon} color={sc.iconColor} size={10} />{sc.label}
+              {sc.emoji} {sc.label}
             </span>
           </div>
           <div className="flex items-center gap-2 mt-0.5">
@@ -464,7 +332,7 @@ function LegendPanel() {
           <span key={i} className="inline-flex items-center gap-1.5 font-bold rounded-lg px-2.5 py-1.5"
             style={{ fontSize: "12px", background: sc.badgeBg, color: sc.badgeText,
               border: `1.5px solid ${sc.borderColor}70`, lineHeight: 1.4 }}>
-            <StatusIcon iconKey={sc.icon} color={sc.iconColor} size={16} />
+            <span style={{ fontSize: "16px", lineHeight: 1 }}>{sc.emoji}</span>
             {sc.label}
           </span>
         ))}
@@ -604,7 +472,7 @@ function ListRow({ node, depth, orgType, onNodeClick }: {
         style={{ background: NAVY_CARD3, border: `1.5px solid ${GOLD}20`, fontSize: "16px" }}>
         {node.avatarUrl
           ? <img src={node.avatarUrl} alt={node.name} className="w-full h-full object-cover" />
-          : <StatusIcon iconKey={sc.icon} color={sc.iconColor} size={18} />}
+          : <span style={{ fontSize: "18px", lineHeight: 1 }}>{sc.emoji}</span>}
       </div>
       <div className="flex-1 min-w-0">
         <div className="font-semibold truncate" style={{ fontSize: "13px", color: nameColor }}>{node.name}</div>
@@ -613,7 +481,7 @@ function ListRow({ node, depth, orgType, onNodeClick }: {
       <div className="flex items-center gap-1.5 flex-shrink-0">
         <span style={{ fontSize: "10px", color: `${GOLD}80` }}>{MEMBER_TYPE_LABELS[node.memberType] ?? node.memberType}</span>
         <span className="font-bold" style={{ fontSize: "11px", color: GOLD_LIGHT }}>{node.selfPoints.toLocaleString()}pt</span>
-        <StatusIcon iconKey={sc.icon} color={sc.iconColor} size={18} />
+        <span style={{ fontSize: "18px", lineHeight: 1 }}>{sc.emoji}</span>
       </div>
     </div>
   );
