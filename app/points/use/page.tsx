@@ -140,28 +140,41 @@ export default function UsePointsPage() {
               <span className="font-label text-sm mb-2" style={{ color: `${GOLD}80` }}>pt</span>
             </div>
 
-            {/* SAVpt のみ表示 */}
-            <div className="rounded-2xl p-3.5 relative overflow-hidden"
-              style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}28` }}>
-              <div className="absolute top-0 right-0 w-16 h-16 rounded-full opacity-[0.05]"
-                style={{ background: GOLD, transform: "translate(30%,-30%)" }}/>
-              <p className="font-label text-[8px] tracking-[0.20em] font-bold mb-0.5" style={{ color: `${GOLD}75` }}>SAVpt</p>
-              <p className="font-jp text-xs mb-2 leading-tight font-semibold" style={{ color: `${GOLD}65` }}>貯金ボーナス</p>
-              <div className="flex items-end gap-1">
-                <span className="text-3xl font-black text-white">{wallet === null ? "—" : savPt.toLocaleString()}</span>
-                <span className="text-xs mb-0.5 font-label" style={{ color: `${GOLD}65` }}>pt</span>
-              </div>
-              {/* 内訳（自動+手動） */}
-              {wallet !== null && (
-                <div className="mt-2 pt-2 flex gap-4" style={{ borderTop: `1px solid ${GOLD}20` }}>
-                  <p className="text-xs font-jp" style={{ color: `${GOLD}60` }}>
-                    自動: <span className="font-bold" style={{ color: `${GOLD}90` }}>{wallet.externalPointsBalance.toLocaleString()}pt</span>
-                  </p>
-                  <p className="text-xs font-jp" style={{ color: `${GOLD}60` }}>
-                    手動: <span className="font-bold" style={{ color: `${GOLD}90` }}>{wallet.manualPointsBalance.toLocaleString()}pt</span>
-                  </p>
+            {/* 内訳 3枠 */}
+            <div className="grid grid-cols-3 gap-2">
+              {/* 1. 貯金ボーナス合計付与pt */}
+              <div className="rounded-xl p-2.5 flex flex-col gap-1"
+                style={{ background: `${GOLD}12`, border: `1px solid ${GOLD}30` }}>
+                <p className="font-jp text-[9px] leading-tight font-semibold" style={{ color: `${GOLD}75` }}>貯金ボーナス{"\n"}合計付与pt</p>
+                <div className="flex items-end gap-0.5 mt-auto">
+                  <span className="text-lg font-black text-white leading-none">
+                    {wallet === null ? "—" : (wallet.savingsPoints ?? 0).toLocaleString()}
+                  </span>
+                  <span className="text-[9px] mb-0.5 font-label" style={{ color: `${GOLD}65` }}>pt</span>
                 </div>
-              )}
+              </div>
+              {/* 2. サービスポイント（手動） */}
+              <div className="rounded-xl p-2.5 flex flex-col gap-1"
+                style={{ background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.28)" }}>
+                <p className="font-jp text-[9px] leading-tight font-semibold" style={{ color: "rgba(165,180,252,0.85)" }}>サービス{"\n"}ポイント</p>
+                <div className="flex items-end gap-0.5 mt-auto">
+                  <span className="text-lg font-black text-white leading-none">
+                    {wallet === null ? "—" : (wallet.manualPointsBalance ?? 0).toLocaleString()}
+                  </span>
+                  <span className="text-[9px] mb-0.5" style={{ color: "rgba(165,180,252,0.65)" }}>pt</span>
+                </div>
+              </div>
+              {/* 3. 外部ポイント（自動） */}
+              <div className="rounded-xl p-2.5 flex flex-col gap-1"
+                style={{ background: "rgba(52,211,153,0.10)", border: "1px solid rgba(52,211,153,0.25)" }}>
+                <p className="font-jp text-[9px] leading-tight font-semibold" style={{ color: "rgba(110,231,183,0.85)" }}>外部{"\n"}ポイント</p>
+                <div className="flex items-end gap-0.5 mt-auto">
+                  <span className="text-lg font-black text-white leading-none">
+                    {wallet === null ? "—" : (wallet.externalPointsBalance ?? 0).toLocaleString()}
+                  </span>
+                  <span className="text-[9px] mb-0.5" style={{ color: "rgba(110,231,183,0.65)" }}>pt</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
