@@ -846,25 +846,28 @@ export default function MemberDashboard({
             )}
 
             {/* ポイントバー群 */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="flex flex-col gap-2.5">
               {[
                 {label:"先月ポイント",sub:"MLM",value:dashboardPoints.mlmLastMonthPoints,unit:"VPpt",from:GOLD,to:GOLD_LIGHT},
                 {label:"今月ポイント",sub:"MLM",value:dashboardPoints.mlmCurrentMonthPoints,unit:"VPpt",from:ORANGE,to:"#f4a060"},
                 {label:"貯金ボーナス",sub:"SAV",value:dashboardPoints.savingsBonusPoints,unit:"SAV",from:"#34d399",to:"#6ee7b7"},
               ].map(item=>(
-                <div key={item.label} className="rounded-xl p-3" style={{background:"rgba(255,255,255,0.07)",border:`1px solid ${item.from}25`}}>
-                  {/* サブラベル */}
-                  <p className="font-label text-[9px] font-bold tracking-[0.18em] mb-0.5" style={{color:item.from}}>{item.sub}</p>
-                  {/* メインラベル */}
-                  <p className="font-jp text-[11px] font-medium mb-2" style={{color:"rgba(255,255,255,0.75)"}}>{item.label}</p>
-                  {/* 値 */}
-                  <div className="flex items-baseline gap-0.5">
-                    <span className="text-base font-bold" style={{color:"rgba(255,255,255,0.96)"}}>{item.value.toLocaleString()}</span>
-                    <span className="text-[10px] font-semibold" style={{color:item.from}}>{item.unit}</span>
+                <div key={item.label} className="rounded-xl px-4 py-3 flex items-center gap-4"
+                  style={{background:"rgba(255,255,255,0.07)",border:`1px solid ${item.from}30`}}>
+                  {/* 左: サブ+ラベル */}
+                  <div className="flex-shrink-0 w-28">
+                    <p className="font-label text-[10px] font-bold tracking-[0.20em] mb-0.5" style={{color:item.from}}>{item.sub}</p>
+                    <p className="font-jp text-sm font-semibold" style={{color:"rgba(255,255,255,0.82)"}}>{item.label}</p>
                   </div>
-                  {/* プログレスバー */}
-                  <div className="h-1 rounded-full mt-2" style={{background:"rgba(255,255,255,0.10)"}}>
-                    <div className="h-1 rounded-full transition-all duration-700" style={{width:`${Math.min((item.value/10000)*100,100)}%`,background:`linear-gradient(90deg,${item.from},${item.to})`}}/>
+                  {/* 右: 値+プログレスバー */}
+                  <div className="flex-1">
+                    <div className="flex items-baseline gap-1 mb-1.5">
+                      <span className="text-2xl font-black" style={{color:"rgba(255,255,255,0.97)"}}>{item.value.toLocaleString()}</span>
+                      <span className="text-xs font-bold" style={{color:item.from}}>{item.unit}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full" style={{background:"rgba(255,255,255,0.10)"}}>
+                      <div className="h-1.5 rounded-full transition-all duration-700" style={{width:`${Math.min((item.value/10000)*100,100)}%`,background:`linear-gradient(90deg,${item.from},${item.to})`}}/>
+                    </div>
                   </div>
                 </div>
               ))}
