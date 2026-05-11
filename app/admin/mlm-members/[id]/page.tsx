@@ -595,8 +595,13 @@ export default function MlmMemberDetailPage() {
         }),
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? "調整に失敗しました");
+        let errMsg = "調整に失敗しました";
+        try {
+          const errBody = await res.text();
+          const errJson = errBody ? JSON.parse(errBody) : {};
+          errMsg = errJson.error ?? errMsg;
+        } catch { /* keep default message */ }
+        throw new Error(errMsg);
       }
       setPointAdjModal(false);
       setPointAdjAmount("");
