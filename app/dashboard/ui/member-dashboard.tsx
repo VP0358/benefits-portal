@@ -40,8 +40,8 @@ const TAG_LABEL: Record<string,string> = {
 const AVATAR_OPTIONS = ["😊","😎","🦁","🐯","🐼","🦊","🐸","🌸","⭐","🔥","💎","🎯"];
 
 const TRAVEL_FEES: Record<"early"|"standard", Record<number, number>> = {
-  early:    { 1: 2000, 2: 1700, 3: 1500, 4: 1200, 5: 1000 },
-  standard: { 1: 3000, 2: 2700, 3: 2500, 4: 2000, 5: 1500 },
+  early:    { 0: 3500, 1: 2000, 2: 1700, 3: 1500, 4: 1200, 5: 1000 },
+  standard: { 0: 3500, 1: 3000, 2: 2700, 3: 2500, 4: 2000, 5: 1500 },
 };
 
 // ── 福利厚生アイコン（白ベースフラットSVG） ──
@@ -186,10 +186,10 @@ const TravelSubButton = forwardRef<{openModal:()=>void}>(function TravelSubButto
 
   async function handleSubmit(e:React.FormEvent){
     e.preventDefault();
-    if(!form.name||!form.phone||!form.email){setFormError("氏名・電話番号・メールアドレスは必須です");return;}
+    if(!form.memberCode||!form.name||!form.phone||!form.email){setFormError("会員ID・氏名・電話番号・メールアドレスは必須です");return;}
     setSubmitting(true);setFormError("");
     try{
-      const content=`【格安旅行申込】\n会員コード: ${form.memberCode||"未入力"}\n氏名: ${form.name}\n電話番号: ${form.phone}\nメール: ${form.email}\n現在レベル: Lv${form.level}（¥${TRAVEL_FEES.early[form.level].toLocaleString()}/月）\n\n※支払日：毎月15日\n※お支払い方法：銀行振込のみ`;
+      const content=`【格安旅行申込】\n会員コード: ${form.memberCode}\n氏名: ${form.name}\n電話番号: ${form.phone}\nメール: ${form.email}\n現在レベル: Lv${form.level}（¥${TRAVEL_FEES.standard[form.level].toLocaleString()}/月）\n\n※支払日：毎月15日\n※お支払い方法：紹介代理店へ`;
       const res=await fetch("/api/contact",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:form.name,phone:form.phone,email:form.email,content,menuTitle:"格安旅行申込"})});
       if(res.ok){setSubmitted(true);}
       else{const d=await res.json().catch(()=>null);setFormError(d?.error||"申込に失敗しました。");}
@@ -372,24 +372,19 @@ const TravelSubButton = forwardRef<{openModal:()=>void}>(function TravelSubButto
                     </div>
                     <div className="px-4 pb-4">
                       {/* ヘッダー行 */}
-                      <div className="grid grid-cols-3 gap-0 text-[9px] font-bold font-label pb-2 mb-1"
+                      <div className="grid grid-cols-2 gap-0 text-[9px] font-bold font-label pb-2 mb-1"
                         style={{borderBottom:`1px solid rgba(255,255,255,0.06)`}}>
                         <span style={{color:`${GOLD}60`}}>レベル</span>
-                        <span className="text-center" style={{color:GOLD_LIGHT}}>🌟 先着50名</span>
-                        <span className="text-right" style={{color:"#93c5fd"}}>51名以降</span>
+                        <span className="text-right" style={{color:"#93c5fd"}}>月額利用料（税込）</span>
                       </div>
-                      {[1,2,3,4,5].map(l=>(
+                      {[0,1,2,3,4,5].map(l=>(
                         <div key={l}
-                          className="grid grid-cols-3 gap-0 py-1.5 text-xs"
+                          className="grid grid-cols-2 gap-0 py-1.5 text-xs"
                           style={{borderBottom:l<5?`1px solid rgba(255,255,255,0.04)`:"none",
                             background:sub?.level===l?`${GOLD}07`:"transparent"}}>
                           <span className={`font-label font-black ${sub?.level===l?"":"opacity-60"}`}
                             style={{color:sub?.level===l?GOLD:"rgba(255,255,255,0.50)"}}>
                             {sub?.level===l&&<span className="mr-1">▶</span>}Lv{l}
-                          </span>
-                          <span className="text-center font-semibold"
-                            style={{color:sub?.level===l?GOLD_LIGHT:"rgba(255,255,255,0.70)"}}>
-                            ¥{TRAVEL_FEES.early[l].toLocaleString()}
                           </span>
                           <span className="text-right font-semibold"
                             style={{color:sub?.level===l?"#93c5fd":"rgba(255,255,255,0.55)"}}>
@@ -398,7 +393,7 @@ const TravelSubButton = forwardRef<{openModal:()=>void}>(function TravelSubButto
                         </div>
                       ))}
                       <p className="text-[9px] mt-3 font-jp" style={{color:"rgba(255,255,255,0.28)"}}>
-                        ※支払日：毎月15日　※お支払い方法：銀行振込のみ
+                        ※支払日：毎月15日　※お支払い方法：紹介代理店へ
                       </p>
                     </div>
                   </div>
@@ -418,7 +413,7 @@ const TravelSubButton = forwardRef<{openModal:()=>void}>(function TravelSubButto
                       <div className="px-4 pb-4">
                         <form onSubmit={handleSubmit} className="space-y-3">
                           {[
-                            {label:"会員ID",type:"text",key:"memberCode",placeholder:"例: M0001",required:false},
+                            {label:"会員ID",type:"text",key:"memberCode",placeholder:"例: M0001",required:true},
                             {label:"氏名",type:"text",key:"name",placeholder:"山田 太郎",required:true},
                             {label:"電話番号",type:"tel",key:"phone",placeholder:"090-1234-5678",required:true},
                             {label:"メールアドレス",type:"email",key:"email",placeholder:"example@email.com",required:true},
@@ -445,8 +440,8 @@ const TravelSubButton = forwardRef<{openModal:()=>void}>(function TravelSubButto
                             <label className="block text-[11px] font-bold mb-2" style={{color:`${GOLD}75`}}>
                               レベルを選択<span className="text-red-400 ml-1">*</span>
                             </label>
-                            <div className="grid grid-cols-5 gap-1.5">
-                              {[1,2,3,4,5].map(l=>(
+                            <div className="grid grid-cols-3 gap-1.5">
+                              {[0,1,2,3,4,5].map(l=>(
                                 <button key={l} type="button"
                                   onClick={()=>setForm({...form,level:l})}
                                   className="rounded-xl py-2.5 text-center transition-all"
@@ -455,13 +450,13 @@ const TravelSubButton = forwardRef<{openModal:()=>void}>(function TravelSubButto
                                     :{border:"1px solid rgba(255,255,255,0.08)",background:"rgba(255,255,255,0.03)",color:"rgba(255,255,255,0.35)"}}>
                                   <div className="text-[11px] font-black font-label" style={form.level===l?{color:GOLD_LIGHT}:{}}>Lv{l}</div>
                                   <div className="text-[8px] mt-0.5" style={form.level===l?{color:`${GOLD}80`}:{}}>
-                                    ¥{(TRAVEL_FEES.early[l]/1000).toFixed(0)}k
+                                    ¥{(TRAVEL_FEES.standard[l]/1000).toFixed(1)}k
                                   </div>
                                 </button>
                               ))}
                             </div>
                             <p className="text-[9px] mt-1.5 font-jp" style={{color:`${GOLD}50`}}>
-                              選択中: Lv{form.level} → 先着¥{TRAVEL_FEES.early[form.level].toLocaleString()}/月
+                              選択中: Lv{form.level} → ¥{TRAVEL_FEES.standard[form.level].toLocaleString()}/月
                             </p>
                           </div>
 
