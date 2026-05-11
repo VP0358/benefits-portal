@@ -406,8 +406,10 @@ export default function MlmMemberDetailPage() {
     adjustmentAmount: number;
     withholdingTax: number;
     carryoverAmount: number;
+    savingsPointsAdded: number;
     isPublished: boolean;
     note: string | null;
+    runStatus: string;
   }>>([]);
   const [bonusStatementsLoading, setBonusStatementsLoading] = useState(false);
   const [publishingMonth, setPublishingMonth] = useState<string | null>(null);
@@ -1205,21 +1207,88 @@ export default function MlmMemberDetailPage() {
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { label: "自動pt", value: m.user.pointWallet?.autoPointsBalance ?? 0 },
-            { label: "手動pt", value: m.user.pointWallet?.manualPointsBalance ?? 0 },
-            { label: "外部pt", value: m.user.pointWallet?.externalPointsBalance ?? 0 },
-            { label: "利用可能", value: m.user.pointWallet?.availablePointsBalance ?? 0, highlight: true },
-          ].map(({ label, value, highlight }) => (
-            <div key={label} className={`rounded-xl p-3 text-center ${highlight ? "bg-violet-50" : "bg-slate-50"}`}>
-              <div className="text-xs text-slate-500 mb-1">{label}</div>
-              <div className={`text-lg font-bold ${highlight ? "text-violet-700" : "text-slate-700"}`}>{value.toLocaleString()}<span className="text-xs ml-0.5">pt</span></div>
+
+        {/* ── 4タブカード ── */}
+        <div className="grid grid-cols-2 gap-3">
+
+          {/* ① 貯金ボーナス（SAV）*/}
+          {(() => {
+            const now = new Date();
+            const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+            const currentMonthStmt = bonusStatements.find(s => s.bonusMonth === currentMonthStr);
+            const currentMonthSAV = currentMonthStmt?.savingsPointsAdded ?? 0;
+            return (
+              <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50 p-4 flex flex-col gap-2">
+                <div className="flex items-center gap-1.5">
+                  <i className="fas fa-piggy-bank text-emerald-500 text-sm" />
+                  <span className="text-xs font-bold text-emerald-700">貯金ボーナス（SAV）</span>
+                </div>
+                {/* 当月付与pt — 当月ボーナス明細の savingsPointsAdded から取得 */}
+                <div className="rounded-lg bg-white border border-emerald-100 px-3 py-2 flex items-center justify-between">
+                  <span className="text-[11px] text-slate-500">当月付与pt</span>
+                  <span className="text-sm font-bold text-emerald-600">
+                    {currentMonthSAV.toLocaleString()}
+                    <span className="text-[10px] font-normal ml-0.5">SAV</span>
+                  </span>
+                </div>
+                <div className="rounded-lg bg-emerald-100 border border-emerald-200 px-3 py-2 flex items-center justify-between">
+                  <span className="text-[11px] text-emerald-700 font-semibold">合計付与pt</span>
+                  <span className="text-base font-extrabold text-emerald-700">
+                    {(m.savingsPoints ?? 0).toLocaleString()} <span className="text-[10px] font-normal">SAV</span>
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ② 手動追加ポイント */}
+          <div className="rounded-xl border-2 border-blue-200 bg-blue-50 p-4 flex flex-col gap-2">
+            <div className="flex items-center gap-1.5">
+              <i className="fas fa-hand-pointer text-blue-500 text-sm" />
+              <span className="text-xs font-bold text-blue-700">手動追加ポイント</span>
             </div>
-          ))}
-        </div>
-        <div className="mt-3">
-          <InfoRow label="貯金ポイント (SAV)" value={<span className="text-green-600 font-semibold">{(m.savingsPoints ?? 0).toLocaleString()} pt</span>} />
+            <div className="flex-1 flex items-center justify-center rounded-lg bg-white border border-blue-100 px-3 py-4">
+              <div className="text-center">
+                <div className="text-2xl font-extrabold text-blue-700">
+                  {(m.user.pointWallet?.manualPointsBalance ?? 0).toLocaleString()}
+                </div>
+                <div className="text-[11px] text-blue-400 mt-0.5">pt</div>
+              </div>
+            </div>
+          </div>
+
+          {/* ③ 外部追加ポイント */}
+          <div className="rounded-xl border-2 border-violet-200 bg-violet-50 p-4 flex flex-col gap-2">
+            <div className="flex items-center gap-1.5">
+              <i className="fas fa-external-link-alt text-violet-500 text-sm" />
+              <span className="text-xs font-bold text-violet-700">外部追加ポイント</span>
+            </div>
+            <div className="flex-1 flex items-center justify-center rounded-lg bg-white border border-violet-100 px-3 py-4">
+              <div className="text-center">
+                <div className="text-2xl font-extrabold text-violet-700">
+                  {(m.user.pointWallet?.externalPointsBalance ?? 0).toLocaleString()}
+                </div>
+                <div className="text-[11px] text-violet-400 mt-0.5">pt</div>
+              </div>
+            </div>
+          </div>
+
+          {/* ④ 利用可能ポイント */}
+          <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 flex flex-col gap-2">
+            <div className="flex items-center gap-1.5">
+              <i className="fas fa-coins text-amber-500 text-sm" />
+              <span className="text-xs font-bold text-amber-700">利用可能ポイント</span>
+            </div>
+            <div className="flex-1 flex items-center justify-center rounded-lg bg-amber-100 border border-amber-200 px-3 py-4">
+              <div className="text-center">
+                <div className="text-2xl font-extrabold text-amber-700">
+                  {(m.user.pointWallet?.availablePointsBalance ?? 0).toLocaleString()}
+                </div>
+                <div className="text-[11px] text-amber-500 mt-0.5">pt</div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </section>
 

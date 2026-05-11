@@ -61,6 +61,7 @@ export async function GET(req: NextRequest) {
       adjustmentAmount: r.adjustmentAmount ?? 0,
       withholdingTax: r.withholdingTax ?? 0,
       carryoverAmount: r.carryoverAmount ?? 0,
+      savingsPointsAdded: r.savingsPointsAdded ?? 0,
       isPublished: r.isPublished ?? false,
       note: r.bonusRun?.note ?? null,
       runStatus: r.bonusRun?.status ?? "draft",

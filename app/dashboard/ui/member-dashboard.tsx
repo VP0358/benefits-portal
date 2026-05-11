@@ -8,7 +8,6 @@ interface DashboardPoints {
   mlmLastMonthPoints: number;
   mlmCurrentMonthPoints: number;
   savingsBonusPoints: number;
-  mobileReferralPoints: number;
 }
 interface Announcement { id:string; title:string; content:string; tag:string; isPublished:boolean; publishedAt:string|null; }
 interface Menu { id:string; title:string; subtitle?:string|null; iconType?:string|null; menuType?:string|null; linkUrl?:string; contentData?:string|null; }
@@ -634,7 +633,7 @@ export default function MemberDashboard({
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const slideRef = useRef(0);
   const [dashboardPoints, setDashboardPoints] = useState<DashboardPoints>({
-    mlmLastMonthPoints: 0, mlmCurrentMonthPoints: 0, savingsBonusPoints: 0, mobileReferralPoints: 0
+    mlmLastMonthPoints: 0, mlmCurrentMonthPoints: 0, savingsBonusPoints: 0,
   });
   const travelSubRef = useRef<{openModal:()=>void}>(null);
   // 肌診断モーダル状態
@@ -852,26 +851,25 @@ export default function MemberDashboard({
             )}
 
             {/* ポイントバー群 */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {[
                 {label:"先月ポイント",sub:"MLM",value:dashboardPoints.mlmLastMonthPoints,unit:"VPpt",from:GOLD,to:GOLD_LIGHT},
                 {label:"今月ポイント",sub:"MLM",value:dashboardPoints.mlmCurrentMonthPoints,unit:"VPpt",from:ORANGE,to:"#f4a060"},
-                {label:"貯金ボーナス",sub:"SAV",value:dashboardPoints.savingsBonusPoints,unit:"pt",from:"#34d399",to:"#6ee7b7"},
-                {label:"携帯紹介",sub:"MPI",value:dashboardPoints.mobileReferralPoints,unit:"pt",from:"#818cf8",to:"#a78bfa"},
+                {label:"貯金ボーナス",sub:"SAV",value:dashboardPoints.savingsBonusPoints,unit:"SAV",from:"#34d399",to:"#6ee7b7"},
               ].map(item=>(
-                <div key={item.label} className="rounded-xl p-3" style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.06)"}}>
-                  <div className="flex items-baseline justify-between mb-1.5">
-                    <div>
-                      <p className="font-label text-[7px] tracking-[0.18em]" style={{color:`${item.from}70`}}>{item.sub}</p>
-                      <p className="font-jp text-[11px]" style={{color:"rgba(255,255,255,0.50)"}}>{item.label}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-sm font-semibold text-white">{item.value.toLocaleString()}</span>
-                      <span className="text-[9px] ml-0.5" style={{color:`${item.from}70`}}>{item.unit}</span>
-                    </div>
+                <div key={item.label} className="rounded-xl p-3" style={{background:"rgba(255,255,255,0.07)",border:`1px solid ${item.from}25`}}>
+                  {/* サブラベル */}
+                  <p className="font-label text-[9px] font-bold tracking-[0.18em] mb-0.5" style={{color:item.from}}>{item.sub}</p>
+                  {/* メインラベル */}
+                  <p className="font-jp text-[11px] font-medium mb-2" style={{color:"rgba(255,255,255,0.75)"}}>{item.label}</p>
+                  {/* 値 */}
+                  <div className="flex items-baseline gap-0.5">
+                    <span className="text-base font-bold" style={{color:"rgba(255,255,255,0.96)"}}>{item.value.toLocaleString()}</span>
+                    <span className="text-[10px] font-semibold" style={{color:item.from}}>{item.unit}</span>
                   </div>
-                  <div className="h-0.5 rounded-full" style={{background:"rgba(255,255,255,0.08)"}}>
-                    <div className="h-0.5 rounded-full transition-all duration-700" style={{width:`${Math.min((item.value/10000)*100,100)}%`,background:`linear-gradient(90deg,${item.from},${item.to})`}}/>
+                  {/* プログレスバー */}
+                  <div className="h-1 rounded-full mt-2" style={{background:"rgba(255,255,255,0.10)"}}>
+                    <div className="h-1 rounded-full transition-all duration-700" style={{width:`${Math.min((item.value/10000)*100,100)}%`,background:`linear-gradient(90deg,${item.from},${item.to})`}}/>
                   </div>
                 </div>
               ))}
