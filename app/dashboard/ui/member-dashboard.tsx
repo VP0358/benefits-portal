@@ -28,7 +28,7 @@ const PREFECTURES = [
 
 // ── 店舗種別定義 ──
 const SHOP_TYPE_CONFIG: Record<string, { label:string; badge:string; color:string; bgColor:string; borderColor:string; sortOrder:number }> = {
-  hq:         { label:"本部",       badge:"🏢 本部",       color:"#7c3aed", bgColor:"rgba(124,58,237,0.12)",  borderColor:"rgba(124,58,237,0.30)",  sortOrder:0 },
+  hq:         { label:"本部",       badge:"🏢 本部",       color:"#e03535", bgColor:"rgba(220,53,53,0.15)",   borderColor:"rgba(220,53,53,0.40)",   sortOrder:0 },
   direct:     { label:"直営",       badge:"🏪 直営",       color:"#2563eb", bgColor:"rgba(37,99,235,0.12)",   borderColor:"rgba(37,99,235,0.30)",   sortOrder:1 },
   nationwide: { label:"全国",       badge:"🗾 全国対応",   color:"#059669", bgColor:"rgba(5,150,105,0.12)",   borderColor:"rgba(5,150,105,0.30)",   sortOrder:2 },
   authorized: { label:"正規代理店", badge:"✅ 正規代理店", color:"#d97706", bgColor:"rgba(217,119,6,0.12)",   borderColor:"rgba(217,119,6,0.30)",   sortOrder:3 },
@@ -582,40 +582,40 @@ function SkinShopCard({
   const typeCfg = SHOP_TYPE_CONFIG[shop.shopType ?? "agent"] ?? SHOP_TYPE_CONFIG.agent;
   return (
     <div className="rounded-2xl overflow-hidden"
-      style={{background:navyCard2,border:`1px solid ${gold}20`}}>
-      <div className="h-0.5" style={{background:`linear-gradient(90deg,transparent,${gold}55,transparent)`}}/>
+      style={{background:navyCard2,border:`1px solid ${gold}30`}}>
+      <div className="h-1" style={{background:`linear-gradient(90deg,transparent,${gold}80,transparent)`}}/>
       <div className="p-4">
         {/* 店名・種別バッジ */}
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <p className="font-jp font-bold text-white text-sm leading-snug">{shop.name}</p>
-          <span className="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full"
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <p className="font-jp font-bold text-white text-base leading-snug">{shop.name}</p>
+          <span className="flex-shrink-0 text-xs font-bold px-2.5 py-1 rounded-full"
             style={{background:typeCfg.bgColor,color:typeCfg.color,border:`1px solid ${typeCfg.borderColor}`}}>
             {typeCfg.badge}
           </span>
         </div>
-        {/* エリア */}
-        {shop.area && (
-          <p className="text-[10px] mb-1.5" style={{color:`${gold}70`}}>📍 {shop.area}</p>
+        {/* 都道府県 */}
+        {(shop.prefecture || shop.area) && (
+          <p className="text-sm font-bold mb-2" style={{color:gold}}>📍 {shop.prefecture || shop.area}</p>
         )}
         {/* 住所 */}
         {shop.address && (
           <a href={`https://maps.google.com/?q=${encodeURIComponent(shop.address)}`}
             target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-1.5 mb-1.5 group">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{color:`${gold}70`}}>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-            </svg>
-            <span className="text-xs font-jp group-hover:underline" style={{color:"rgba(255,255,255,0.55)"}}>{shop.address}</span>
+            className="flex items-start gap-2 mb-2 group">
+            <span className="flex-shrink-0 mt-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded"
+              style={{background:"rgba(66,133,244,0.25)",color:"#7ab4ff",border:"1px solid rgba(66,133,244,0.40)",whiteSpace:"nowrap"}}>
+              Googleマップ
+            </span>
+            <span className="text-sm font-jp group-hover:underline leading-snug" style={{color:"rgba(255,255,255,0.80)"}}>{shop.address}</span>
           </a>
         )}
         {/* 電話番号 */}
         {shop.phone && (
-          <a href={`tel:${shop.phone}`} className="flex items-center gap-1.5 mb-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{color:`${gold}70`}}>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+          <a href={`tel:${shop.phone}`} className="flex items-center gap-2 mb-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{color:"#6ee7b7"}}>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
             </svg>
-            <span className="text-xs font-jp" style={{color:"rgba(255,255,255,0.55)"}}>{shop.phone}</span>
+            <span className="text-sm font-bold font-jp" style={{color:"#6ee7b7"}}>{shop.phone}</span>
           </a>
         )}
         {/* 写真ギャラリー */}
@@ -1296,18 +1296,30 @@ export default function MemberDashboard({
 
                     {/* ── エリアジャンプボタン ── */}
                     {activeAreaLabels.length > 0 && (
-                      <div className="pt-4 pb-3"
-                        style={{borderTop:`1px solid rgba(255,255,255,0.06)`}}>
-                        <p className="text-[9px] font-bold mb-2 tracking-widest" style={{color:`${GOLD}80`}}>▼ エリアから探す</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {activeAreaLabels.map(label=>(
-                            <button key={label} type="button"
-                              onClick={()=>jumpToArea(label)}
-                              className="rounded-full px-2.5 py-1 text-[10px] font-bold transition-all active:scale-95"
-                              style={{background:`${GOLD}18`,color:GOLD_LIGHT,border:`1px solid ${GOLD}35`}}>
-                              {label.replace("エリア","")}
-                            </button>
-                          ))}
+                      <div className="pt-4 pb-4"
+                        style={{borderTop:`1px solid rgba(255,255,255,0.10)`,borderBottom:`1px solid rgba(255,255,255,0.10)`}}>
+                        <p className="text-sm font-bold mb-3" style={{color:GOLD_LIGHT}}>▼ エリアから探す</p>
+                        <div className="flex flex-wrap gap-2">
+                          {["全国",...activeAreaLabels].map(label=>{
+                            const isZenkoku = label==="全国";
+                            return (
+                              <button key={label} type="button"
+                                onClick={()=>{
+                                  if(isZenkoku){
+                                    if(skinScrollRef.current) skinScrollRef.current.scrollTop=0;
+                                  } else {
+                                    jumpToArea(label);
+                                  }
+                                }}
+                                className="rounded-xl px-3 py-1.5 text-xs font-bold transition-all active:scale-95"
+                                style={isZenkoku
+                                  ?{background:`linear-gradient(135deg,${GOLD},${GOLD_LIGHT})`,color:NAVY,boxShadow:`0 2px 8px ${GOLD}50`}
+                                  :{background:"rgba(255,255,255,0.10)",color:"rgba(255,255,255,0.85)",border:"1px solid rgba(255,255,255,0.20)"}
+                                }>
+                                {label.replace("エリア","")}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -1317,12 +1329,12 @@ export default function MemberDashboard({
                       <div key={area.label}
                         ref={el=>{ skinAreaRefs.current[area.label]=el; }}>
                         {/* エリアバー */}
-                        <div className="flex items-center gap-2 py-2 mt-2 mb-1"
-                          style={{borderBottom:`1px solid ${GOLD}25`}}>
-                          <div className="h-3 w-0.5 rounded-full flex-shrink-0" style={{background:GOLD}}/>
-                          <span className="text-[11px] font-bold font-jp tracking-wide" style={{color:GOLD_LIGHT}}>{area.label}</span>
-                          <span className="text-[9px]" style={{color:"rgba(255,255,255,0.30)"}}>{count}件</span>
-                          <div className="flex-1 h-px" style={{background:`linear-gradient(90deg,${GOLD}30,transparent)`}}/>
+                        <div className="flex items-center gap-2.5 px-3 py-2.5 mt-4 mb-2 rounded-xl"
+                          style={{background:`linear-gradient(90deg,rgba(201,168,76,0.22),rgba(201,168,76,0.08))`,border:`1px solid ${GOLD}50`}}>
+                          <div className="h-4 w-1 rounded-full flex-shrink-0" style={{background:`linear-gradient(180deg,${GOLD_LIGHT},${GOLD})`}}/>
+                          <span className="text-sm font-bold font-jp tracking-wide" style={{color:"#ffffff"}}>{area.label}</span>
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{background:`${GOLD}30`,color:GOLD_LIGHT}}>{count}件</span>
+                          <div className="flex-1 h-px" style={{background:`linear-gradient(90deg,${GOLD}50,transparent)`}}/>
                         </div>
                         {/* 都道府県グループ */}
                         <div className="space-y-3 pt-1 pb-2">
