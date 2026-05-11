@@ -1001,8 +1001,26 @@ export default function MlmMemberDetailPage() {
               { id: m.creditCardId3, expiry: m.creditCardExpiry3, last4: m.creditCardLast4_3, label: "クレジット③" },
             ].map((card, idx) => (card.id || card.expiry || card.last4) ? (
               <InfoRow key={idx} label={`${card.label}（クレディックス）`} value={
-                <span className="font-mono text-xs space-x-2">
-                  {card.id && <span>ID: {card.id}</span>}
+                <span className="font-mono text-xs space-x-2 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  {card.id && (
+                    <>
+                      <span>ID: {card.id}</span>
+                      {/* ★修正③: 照合キー（正規化済みID）を表示 */}
+                      {(() => {
+                        const s = card.id.replace(/[\u3000\t\r\n]/g, " ").trim();
+                        const wcT = s.match(/^WC[\s\-_]*(\d+)$/i);
+                        const norm = wcT ? wcT[1].replace(/^0+/, "") || "0"
+                          : /^\d+$/.test(s) ? s.replace(/^0+/, "") || "0" : null;
+                        const displayId = card.id.trim();
+                        // 正規化できない場合は警告表示
+                        if (!norm) return <span className="bg-red-100 text-red-700 px-1 rounded text-[10px]">⚠️ 照合不可（形式エラー）</span>;
+                        // 正規化後が元のIDと異なる場合（WC付き等）は照合キーを表示
+                        const normWithPrefix = displayId.match(/^WC/i) ? `WC${norm}` : norm;
+                        if (displayId !== normWithPrefix) return <span className="bg-amber-100 text-amber-700 px-1 rounded text-[10px]">照合キー: {norm}</span>;
+                        return <span className="bg-green-50 text-green-700 px-1 rounded text-[10px]">✓ 照合キー: {norm}</span>;
+                      })()}
+                    </>
+                  )}
                   {card.expiry && <span>期限: {card.expiry}</span>}
                   {card.last4 && <span>下4桁: {card.last4}</span>}
                 </span>
@@ -1593,44 +1611,75 @@ export default function MlmMemberDetailPage() {
           {/* クレジットカード情報（クレディックス）3枠 */}
           <div className="md:col-span-2 mt-2">
             <p className="text-xs font-bold text-slate-600 mb-2">💳 クレジットカード情報（クレディックス）</p>
+            {/* ★修正③: 入力ガイドを追加（誤入力防止） */}
+            <div className="mb-2 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-700">
+              <span className="font-bold">💡 決済ID入力ルール：</span>
+              クレディックスCSV照合に使用します。<br />
+              正しい形式：<code className="bg-blue-100 px-1 rounded font-mono">WC1234567</code> または <code className="bg-blue-100 px-1 rounded font-mono">1234567</code>（数字のみ）<br />
+              <span className="text-red-600 font-semibold">❌ NG例：</span><code className="bg-red-100 px-1 rounded font-mono">WC 1234567</code>（スペース）、<code className="bg-red-100 px-1 rounded font-mono">WC-1234567</code>（ハイフン）→ 保存時に自動修正されます
+            </div>
             <div className="space-y-3">
               {([
                 { label: "①", idKey: "creditCardId", expiryKey: "creditCardExpiry", last4Key: "creditCardLast4" },
                 { label: "②", idKey: "creditCardId2", expiryKey: "creditCardExpiry2", last4Key: "creditCardLast4_2" },
                 { label: "③", idKey: "creditCardId3", expiryKey: "creditCardExpiry3", last4Key: "creditCardLast4_3" },
-              ] as const).map((card) => (
-                <div key={card.label} className="rounded-xl border border-slate-200 p-3 space-y-2">
-                  <p className="text-xs font-semibold text-slate-500">カード {card.label}</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    <FormField label="決済ID">
-                      <input
-                        className={inputCls}
-                        value={String(editData[card.idKey] ?? "")}
-                        onChange={e => set(card.idKey, e.target.value)}
-                        placeholder="クレディックス顧客ID"
-                      />
-                    </FormField>
-                    <FormField label="有効期限（MM/YY）">
-                      <input
-                        className={inputCls}
-                        value={String(editData[card.expiryKey] ?? "")}
-                        onChange={e => set(card.expiryKey, e.target.value)}
-                        placeholder="例: 12/28"
-                        maxLength={5}
-                      />
-                    </FormField>
-                    <FormField label="下4桁">
-                      <input
-                        className={inputCls}
-                        value={String(editData[card.last4Key] ?? "")}
-                        onChange={e => set(card.last4Key, e.target.value)}
-                        placeholder="例: 1234"
-                        maxLength={4}
-                      />
-                    </FormField>
+              ] as const).map((card) => {
+                // ★修正③: プレビュー正規化（入力中に照合形式をリアルタイム表示）
+                const rawId = String(editData[card.idKey] ?? "");
+                const previewNorm = (() => {
+                  const s = rawId.replace(/[\u3000\t\r\n]/g, " ").trim();
+                  if (!s || s === "-") return null;
+                  const wcT = s.match(/^WC[\s\-_]*(\d+)$/i);
+                  if (wcT) return `WC${wcT[1]}`;
+                  if (/^\d+$/.test(s)) return s;
+                  return null;
+                })();
+                const hasFormatIssue = rawId.trim() !== "" && previewNorm === null;
+                const willBeAutoFixed = rawId.trim() !== previewNorm && previewNorm !== null && rawId.trim() !== "";
+                return (
+                  <div key={card.label} className="rounded-xl border border-slate-200 p-3 space-y-2">
+                    <p className="text-xs font-semibold text-slate-500">カード {card.label}</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <FormField label="決済ID（照合キー）">
+                        <input
+                          className={`${inputCls} ${hasFormatIssue ? "border-red-400 bg-red-50" : willBeAutoFixed ? "border-amber-400 bg-amber-50" : ""}`}
+                          value={rawId}
+                          onChange={e => set(card.idKey, e.target.value)}
+                          placeholder="例: WC1234567 または 1234567"
+                        />
+                        {/* ★修正③: 照合形式プレビュー */}
+                        {previewNorm && willBeAutoFixed && (
+                          <p className="text-[10px] text-amber-600 mt-0.5">保存時に自動修正 → <code className="font-mono bg-amber-100 px-1 rounded">{previewNorm}</code></p>
+                        )}
+                        {hasFormatIssue && (
+                          <p className="text-[10px] text-red-600 mt-0.5">⚠️ 照合できない形式です。WC＋数字 or 数字のみで入力してください</p>
+                        )}
+                        {previewNorm && !willBeAutoFixed && (
+                          <p className="text-[10px] text-green-600 mt-0.5">✅ 照合キー: <code className="font-mono bg-green-50 px-1 rounded">{previewNorm}</code></p>
+                        )}
+                      </FormField>
+                      <FormField label="有効期限（MM/YY）">
+                        <input
+                          className={inputCls}
+                          value={String(editData[card.expiryKey] ?? "")}
+                          onChange={e => set(card.expiryKey, e.target.value)}
+                          placeholder="例: 12/28"
+                          maxLength={5}
+                        />
+                      </FormField>
+                      <FormField label="下4桁">
+                        <input
+                          className={inputCls}
+                          value={String(editData[card.last4Key] ?? "")}
+                          onChange={e => set(card.last4Key, e.target.value)}
+                          placeholder="例: 1234"
+                          maxLength={4}
+                        />
+                      </FormField>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
           <FormField label="備考">
