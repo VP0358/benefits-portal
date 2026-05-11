@@ -24,6 +24,7 @@ const LINEN      = "#f5f0e8";
 //                  足りなければ manualPointsBalance から補充
 //
 type Wallet = {
+  savingsPoints:         number; // MlmMember.savingsPoints（SAV合計付与pt）
   availablePointsBalance: number;
   autoPointsBalance:     number;
   manualPointsBalance:   number; // SAVpt の一部（手動付与分）
@@ -42,9 +43,10 @@ export default function UsePointsPage() {
     fetch("/api/member/wallet").then(r => r.json()).then(d => setWallet(d)).catch(() => {});
   }, []);
 
-  // SAVpt = external + manual の合算
+  // SAVpt = external + manual の合算（フォーム残高・利用可能量の基準）
   const savPt   = (wallet?.externalPointsBalance ?? 0) + (wallet?.manualPointsBalance ?? 0);
-  const totalPt = wallet?.availablePointsBalance ?? 0;
+  // 利用可能ポイント = SAV合計付与pt + 手動追加pt + 外部追加pt（管理ページと同一計算式）
+  const totalPt = (wallet?.savingsPoints ?? 0) + (wallet?.manualPointsBalance ?? 0) + (wallet?.externalPointsBalance ?? 0);
   const inputAmt = parseInt(amount) || 0;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -59,7 +61,7 @@ export default function UsePointsPage() {
         body: JSON.stringify({
           amount: inputAmt,
           pointType: "sav",
-          description: description || "SAVptポイント利用",
+          description: description || "SAVポイント利用",
         }),
       });
       const data = await res.json();
@@ -225,7 +227,7 @@ export default function UsePointsPage() {
                   type="text" value={description} onChange={e => setDescription(e.target.value)} maxLength={255}
                   className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none font-jp"
                   style={{ background: "rgba(10,22,40,0.05)", border: `1px solid rgba(10,22,40,0.12)`, color: NAVY }}
-                  placeholder="例: SAVptポイント利用"
+                  placeholder="例: SAVポイント利用"
                 />
               </div>
               <button
@@ -233,7 +235,7 @@ export default function UsePointsPage() {
                 disabled={loading || !amount || inputAmt <= 0 || inputAmt > savPt || savPt === 0}
                 className="w-full py-4 rounded-2xl text-white font-bold text-base disabled:opacity-50 transition-all hover:scale-[1.01] active:scale-95 disabled:hover:scale-100"
                 style={{ background: `linear-gradient(135deg,${GOLD_DARK},${GOLD},${GOLD_LIGHT})` }}>
-                {loading ? "処理中..." : `${inputAmt > 0 ? inputAmt.toLocaleString() + "pt を" : ""}SAVptポイント利用`}
+                {loading ? "処理中..." : `${inputAmt > 0 ? inputAmt.toLocaleString() + "pt を" : ""}SAVポイント利用`}
               </button>
             </form>
           </div>
