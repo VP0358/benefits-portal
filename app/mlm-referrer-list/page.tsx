@@ -123,14 +123,14 @@ export default function MlmReferrerListPage() {
             {/* ── サマリーカード（数字・ラベルを大きく・濃く） */}
             <div className="grid grid-cols-3 gap-3">
               {[
-                { label: "直紹介数",   value: data.totalCount,    color: GOLD_LIGHT,  bg: `${GOLD}18`,   border: `${GOLD}40` },
-                { label: "ACT",        value: data.activeCount,   color: "#4ade80",   bg: "rgba(74,222,128,0.12)", border: "rgba(74,222,128,0.30)" },
-                { label: "愛用会員",   value: data.favoriteCount, color: "#fb923c",   bg: "rgba(251,146,60,0.12)", border: "rgba(251,146,60,0.30)" },
+                { label: "直紹介数",   value: data.totalCount,    color: GOLD_LIGHT,  labelColor: GOLD_LIGHT,  bg: `${GOLD}18`,   border: `${GOLD}40` },
+                { label: "ACT",        value: data.activeCount,   color: "#4ade80",   labelColor: "#4ade80",   bg: "rgba(74,222,128,0.12)", border: "rgba(74,222,128,0.30)" },
+                { label: "愛用会員",   value: data.favoriteCount, color: "#fb923c",   labelColor: "#fb923c",   bg: "rgba(251,146,60,0.12)", border: "rgba(251,146,60,0.30)" },
               ].map((s) => (
                 <div key={s.label} className="rounded-2xl p-4 text-center"
                   style={{ background: s.bg, border: `1px solid ${s.border}` }}>
                   <div className="font-black leading-none" style={{ fontSize: "32px", color: s.color }}>{s.value}</div>
-                  <div className="font-bold mt-1.5" style={{ fontSize: "13px", color: "rgba(255,255,255,0.80)" }}>{s.label}</div>
+                  <div className="font-bold mt-1.5" style={{ fontSize: "13px", color: s.labelColor }}>{s.label}</div>
                 </div>
               ))}
             </div>
@@ -159,7 +159,7 @@ export default function MlmReferrerListPage() {
                         className="rounded-full px-4 py-1.5 text-sm font-bold transition"
                         style={filter === f
                           ? { background: `linear-gradient(135deg, ${GOLD}, ${ORANGE})`, color: "white" }
-                          : { background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.70)", border: `1px solid ${GOLD}30` }
+                          : { background: CARD_BG, color: GOLD_LIGHT, border: `1px solid ${GOLD}45` }
                         }>
                         {f === "all" ? "すべて" : f === "active" ? "ACTのみ" : "非アクティブ"}
                       </button>
