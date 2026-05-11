@@ -56,7 +56,7 @@ export type SkinShop = {
   websiteUrl?: string;
   photos?: string[];
   prefecture?: string;   // 都道府県
-  shopType?: string;     // hq / direct / nationwide / authorized / agent
+  shopType?: string;     // hq / direct / authorized / agent（全国対応は除外）
 };
 
 type MenuForm = {
