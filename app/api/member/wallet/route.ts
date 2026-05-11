@@ -15,12 +15,17 @@ export async function GET() {
 
   const userId = BigInt(session.user.id);
 
-  const wallet = await prisma.pointWallet.findUnique({
-    where: { userId },
-  });
+  // PointWallet と MlmMember.savingsPoints を同時取得
+  const [wallet, mlmMember] = await Promise.all([
+    prisma.pointWallet.findUnique({ where: { userId } }),
+    prisma.mlmMember.findUnique({ where: { userId }, select: { savingsPoints: true } }),
+  ]);
+
+  const savingsPoints = mlmMember?.savingsPoints ?? 0;
 
   if (!wallet) {
     return NextResponse.json({
+      savingsPoints,
       availablePointsBalance: 0,
       autoPointsBalance: 0,
       manualPointsBalance: 0,
@@ -31,6 +36,7 @@ export async function GET() {
   }
 
   return NextResponse.json({
+    savingsPoints,
     availablePointsBalance: wallet.availablePointsBalance,
     autoPointsBalance: wallet.autoPointsBalance,
     manualPointsBalance: wallet.manualPointsBalance,
