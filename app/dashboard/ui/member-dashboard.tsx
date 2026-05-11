@@ -1341,13 +1341,13 @@ export default function MemberDashboard({
                           {prefGroups.map(({pref, shops})=>(
                             <div key={pref}>
                               {pref && (
-                                <div className="flex items-center gap-2 mb-1.5">
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                                    style={{background:`${GOLD}14`,color:GOLD_LIGHT,border:`1px solid ${GOLD}28`}}>
-                                    📍 {pref}
+                                <div className="flex items-center gap-2 mb-2 mt-1">
+                                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full"
+                                    style={{background:`${GOLD}20`,color:"#ffffff",border:`1px solid ${GOLD}50`}}>
+                                    {pref}
                                   </span>
-                                  <span className="text-[9px]" style={{color:"rgba(255,255,255,0.25)"}}>{shops.length}件</span>
-                                  <div className="flex-1 h-px" style={{background:`linear-gradient(90deg,${GOLD}20,transparent)`}}/>
+                                  <span className="text-xs font-bold" style={{color:"rgba(255,255,255,0.50)"}}>{shops.length}件</span>
+                                  <div className="flex-1 h-px" style={{background:`linear-gradient(90deg,${GOLD}40,transparent)`}}/>
                                 </div>
                               )}
                               <div className="space-y-2">
