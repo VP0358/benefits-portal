@@ -509,10 +509,37 @@ export default function AutoShipPanel() {
       const pmLabel = data.effectivePaymentMethod === "bank_transfer" ? "口座引き落とし" :
                       data.effectivePaymentMethod === "credit_card"   ? "クレジットカード" :
                       (data.effectivePaymentMethod as string | undefined) ?? csvImportPm;
-      const failedMemberCount = (data.failedMembers as unknown[] | undefined)?.length ?? (data.failedCount as number ?? 0);
+      // 正しいカウント: matchFailMembers（アクティブ照合失敗）+ withdrawnFailMembers（退会等照合失敗）
+      const matchFailCount     = (data.matchFailMembers    as unknown[] | undefined)?.length ?? 0;
+      const withdrawnFailCount = (data.withdrawnFailMembers as unknown[] | undefined)?.length ?? 0;
+      const totalFailMemberCount = matchFailCount + withdrawnFailCount;
+      const csvTotalRows   = (data.csvTotalRows   as number | undefined);
+      const unmatchedCount = (data.csvUnmatchedCount as number | undefined);
+      // メッセージ構築: 成功会員数 / 照合失敗会員数（内訳）+ CSV統計
+      let msgParts: string[] = [];
+      msgParts.push(`✅ CSVインポート完了`);
+      msgParts.push(`決済成功: ${data.paidCount as number} 件`);
+      if (matchFailCount > 0 || withdrawnFailCount > 0) {
+        const failDetail = matchFailCount > 0 && withdrawnFailCount > 0
+          ? `照合失敗 ${matchFailCount} 件 ／ 退会等 ${withdrawnFailCount} 件`
+          : matchFailCount > 0
+            ? `照合失敗 ${matchFailCount} 件`
+            : `退会等 ${withdrawnFailCount} 件`;
+        msgParts.push(`決済失敗: ${totalFailMemberCount} 件（${failDetail}）`);
+      } else {
+        msgParts.push(`決済失敗: 0 件`);
+      }
+      if (csvTotalRows !== undefined) {
+        const csvMatchedCount = (data.matchedCount as number | undefined);
+        const csvInfo = csvMatchedCount !== undefined
+          ? `CSV総行数 ${csvTotalRows} 件中 ${csvMatchedCount} 件照合済み${unmatchedCount ? ` / 未照合 ${unmatchedCount} 件` : ""}`
+          : `CSV総行数 ${csvTotalRows} 件`;
+        msgParts.push(csvInfo);
+      }
+      msgParts.push(`支払い方法: ${pmLabel}`);
       setMsg({
         type: "success",
-        text: `CSVインポート完了: 決済成功 ${data.paidCount} 件 / 決済失敗 ${failedMemberCount} 件。支払い方法: ${pmLabel}。`,
+        text: msgParts.join(" ／ "),
       });
       loadRuns();
     } catch (e: unknown) {
