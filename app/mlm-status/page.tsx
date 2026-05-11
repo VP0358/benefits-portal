@@ -268,69 +268,84 @@ export default function MlmStatusPage() {
               </div>
             </div>
 
-            {/* ── ポイント残高 ── */}
-            <div className="rounded-2xl overflow-hidden"
-              style={{ background: NAVY_CARD, border: `1px solid ${GOLD}18`, boxShadow: `0 8px 24px rgba(10,22,40,0.18)` }}>
-              <SectionTitle svgD="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" title="ポイント残高" accent={GOLD} />
-              <div>
-                {[
-                  { label: "自動ポイント", value: data.autoPoints,     svgD: "M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18",   color: "#a5b4fc" },
-                  { label: "手動ポイント", value: data.manualPoints,   svgD: "M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11", color: "#93c5fd" },
-                  { label: "外部ポイント", value: data.externalPoints, svgD: "M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14",    color: "#86efac" },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-center justify-between px-5 py-3.5"
-                    style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                    <div className="flex items-center gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                        style={{ color: item.color }}>
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.svgD} />
-                      </svg>
-                      <span className="text-base font-semibold font-jp" style={{ color: "rgba(255,255,255,0.70)" }}>{item.label}</span>
-                    </div>
-                    <span className="font-bold text-base" style={{ color: item.color }}>{item.value.toLocaleString()} <span className="text-sm" style={{ color: item.color }}>pt</span></span>
-                  </div>
-                ))}
-                <div className="flex items-center justify-between px-5 py-4"
-                  style={{ background: `${GOLD}12` }}>
-                  <div className="flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                      style={{ color: GOLD }}>
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="text-base font-bold font-jp" style={{ color: GOLD }}>利用可能ポイント</span>
-                  </div>
-                  <span className="font-display font-semibold text-2xl" style={{ color: GOLD_LIGHT }}>
-                    {data.availablePoints.toLocaleString()} <span className="text-sm font-normal font-jp" style={{ color: `${GOLD}65` }}>pt</span>
+            {/* ── ポイント残高 ＋ 貯金ボーナス（統合） ── */}
+            <div className="rounded-3xl overflow-hidden"
+              style={{
+                background: `linear-gradient(150deg,${NAVY} 0%,${NAVY_CARD} 45%,${NAVY_CARD2} 100%)`,
+                border: `1px solid ${GOLD}35`,
+                boxShadow: `0 16px 48px rgba(10,22,40,0.25),0 0 0 1px ${GOLD}12 inset`,
+              }}>
+              <div className="h-px" style={{ background: `linear-gradient(90deg,transparent,${GOLD}90 30%,${GOLD_LIGHT} 50%,${GOLD}90 70%,transparent)` }}/>
+              <div className="px-5 pt-5 pb-5">
+                {/* ヘッダーラベル */}
+                <p className="font-label text-[10px] tracking-[0.22em] font-bold mb-1" style={{ color: `${GOLD}80` }}>TOTAL AVAILABLE POINTS</p>
+                {/* 合計数字 */}
+                <div className="flex items-end gap-2 mb-5">
+                  <span className="font-display text-5xl font-bold text-white leading-none">
+                    {data.availablePoints.toLocaleString()}
                   </span>
+                  <span className="font-label text-sm mb-1.5" style={{ color: `${GOLD}80` }}>pt</span>
                 </div>
-              </div>
-            </div>
 
-            {/* ── 貯金ポイント ── */}
-            <div className="rounded-2xl p-5 flex items-center justify-between"
-              style={{ background: NAVY_CARD, border: `1px solid ${ORANGE}28`, boxShadow: `0 8px 24px rgba(10,22,40,0.18)` }}>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                {/* 内訳 3枠 */}
+                <div className="grid grid-cols-3 gap-2">
+                  {/* 1. 貯金ボーナス（SAV）合計付与pt */}
+                  <div className="rounded-xl p-2.5 flex flex-col gap-1"
+                    style={{ background: `${GOLD}12`, border: `1px solid ${GOLD}30` }}>
+                    <p className="font-jp text-[9px] leading-tight font-semibold" style={{ color: `${GOLD}75` }}>
+                      {"貯金ボーナス\n(SAV)"}
+                    </p>
+                    <div className="flex items-end gap-0.5 mt-auto">
+                      <span className="text-lg font-black text-white leading-none">
+                        {data.savingsPoints.toLocaleString()}
+                      </span>
+                      <span className="text-[9px] mb-0.5 font-label" style={{ color: `${GOLD}65` }}>pt</span>
+                    </div>
+                  </div>
+                  {/* 2. 手動ポイント（サービスポイント） */}
+                  <div className="rounded-xl p-2.5 flex flex-col gap-1"
+                    style={{ background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.28)" }}>
+                    <p className="font-jp text-[9px] leading-tight font-semibold" style={{ color: "rgba(165,180,252,0.85)" }}>
+                      {"サービス\nポイント"}
+                    </p>
+                    <div className="flex items-end gap-0.5 mt-auto">
+                      <span className="text-lg font-black text-white leading-none">
+                        {data.manualPoints.toLocaleString()}
+                      </span>
+                      <span className="text-[9px] mb-0.5" style={{ color: "rgba(165,180,252,0.65)" }}>pt</span>
+                    </div>
+                  </div>
+                  {/* 3. 外部ポイント */}
+                  <div className="rounded-xl p-2.5 flex flex-col gap-1"
+                    style={{ background: "rgba(52,211,153,0.10)", border: "1px solid rgba(52,211,153,0.25)" }}>
+                    <p className="font-jp text-[9px] leading-tight font-semibold" style={{ color: "rgba(110,231,183,0.85)" }}>
+                      {"外部\nポイント"}
+                    </p>
+                    <div className="flex items-end gap-0.5 mt-auto">
+                      <span className="text-lg font-black text-white leading-none">
+                        {data.externalPoints.toLocaleString()}
+                      </span>
+                      <span className="text-[9px] mb-0.5" style={{ color: "rgba(110,231,183,0.65)" }}>pt</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 換金目安（旧貯金ボーナスカードから移植） */}
+                <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl"
+                  style={{ background: `${ORANGE}12`, border: `1px solid ${ORANGE}25` }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                     style={{ color: ORANGE }}>
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
-                  <p className="text-base font-bold font-jp" style={{ color: ORANGE }}>貯金ボーナス（SAV）</p>
-                </div>
-                <div className="font-display font-bold text-3xl" style={{ color: GOLD_LIGHT }}>
-                  {data.savingsPoints.toLocaleString()}<span className="text-base font-semibold font-jp ml-1" style={{ color: GOLD }}>pt</span>
-                </div>
-                <div className="text-sm mt-1 font-jp font-semibold" style={{ color: "rgba(255,255,255,0.50)" }}>
-                  {Math.floor(data.savingsPoints / 10000)}万pt = 換金可能目安
+                  <p className="text-xs font-jp font-semibold" style={{ color: "rgba(255,255,255,0.65)" }}>
+                    貯金ボーナス（SAV）換金目安：
+                    <span className="font-black ml-1" style={{ color: GOLD_LIGHT }}>
+                      {Math.floor(data.savingsPoints / 10000)}万pt
+                    </span>
+                  </p>
                 </div>
               </div>
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                style={{ background: `${ORANGE}15`, border: `1px solid ${ORANGE}28` }}>
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                  style={{ color: ORANGE }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </div>
+              <div className="h-px" style={{ background: `linear-gradient(90deg,transparent,${GOLD}35,transparent)` }}/>
             </div>
 
             {/* ── 最新ボーナス ── */}
