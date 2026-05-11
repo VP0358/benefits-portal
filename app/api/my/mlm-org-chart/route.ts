@@ -14,6 +14,7 @@ const ACTIVE_REQUIRED_PRODUCTS = ["1000", "1001", "1002", "2000"];
 export type NodeData = {
   id: string;
   name: string;
+  companyName: string | null;
   memberCode: string;
   avatarUrl: string | null;
   mlmMemberCode: string;
@@ -27,6 +28,11 @@ export type NodeData = {
   nonPurchaseAlert: string;
   depth: number;          // ルートからの段数（1始まり）
   totalDescendants: number; // 自分を起点にした全配下人数
+  // 詳細ポップアップ用追加フィールド
+  contractDate: string | null;   // ISO date string
+  prefecture: string | null;
+  directReferralCount: number;
+  lastPointMonth: string | null; // 最終ポイント計上月 (YYYY-MM)
   children: NodeData[];
 };
 
@@ -43,6 +49,7 @@ const memberFields = {
   id: true, memberCode: true, memberType: true, status: true,
   currentLevel: true, titleLevel: true, contractDate: true, forceActive: true,
   companyName: true, uplineId: true, referrerId: true, matrixPosition: true,
+  prefecture: true,
 } as const;
 
 // ── 購入データ一括取得 ──────────────────────────────────────
@@ -60,6 +67,24 @@ async function fetchPurchasesForMembers(
     const key = `${p.mlmMemberId}-${p.purchaseMonth}`;
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push({ totalPoints: p.totalPoints, productCode: p.productCode });
+  }
+  return map;
+}
+
+// 全購入データ（最終ポイント月算出用）— memberIds に対して全期間取得
+async function fetchAllPurchasesForLastPoint(
+  memberIds: bigint[]
+): Promise<Map<string, string>> {
+  if (memberIds.length === 0) return new Map();
+  const purchases = await prisma.mlmPurchase.findMany({
+    where: { mlmMemberId: { in: memberIds } },
+    select: { mlmMemberId: true, purchaseMonth: true },
+    orderBy: { purchaseMonth: "desc" },
+  });
+  const map = new Map<string, string>(); // memberId → 最新purchaseMonth
+  for (const p of purchases) {
+    const key = p.mlmMemberId.toString();
+    if (!map.has(key)) map.set(key, p.purchaseMonth);
   }
   return map;
 }
@@ -97,13 +122,14 @@ function calcConsecutive(
 async function fetchAllDescendantsBFS(
   rootId: bigint,
   parentField: "uplineId" | "referrerId"
-): Promise<{ id: bigint; parentId: bigint | null; position: number; memberCode: string; memberType: string; status: string; currentLevel: number; titleLevel: number; contractDate: Date | null; forceActive: boolean; companyName: string | null; user: { id: bigint; name: string; memberCode: string; avatarUrl: string | null } }[]> {
+): Promise<{ id: bigint; parentId: bigint | null; position: number; memberCode: string; memberType: string; status: string; currentLevel: number; titleLevel: number; contractDate: Date | null; forceActive: boolean; companyName: string | null; prefecture: string | null; user: { id: bigint; name: string; memberCode: string; avatarUrl: string | null } }[]> {
   // 全MLM会員を一括取得してメモリでBFS（管理ページの fetchAllDescendants と同ロジック）
   const allMembers = await prisma.mlmMember.findMany({
     select: {
       id: true, memberCode: true, memberType: true, status: true,
       currentLevel: true, titleLevel: true, contractDate: true, forceActive: true,
       companyName: true, uplineId: true, referrerId: true, matrixPosition: true,
+      prefecture: true,
       user: { select: userSelect },
     },
     orderBy: parentField === "uplineId" ? { matrixPosition: "asc" } : { createdAt: "asc" },
@@ -138,6 +164,7 @@ async function fetchAllDescendantsBFS(
       contractDate: m.contractDate as Date | null,
       forceActive: m.forceActive as boolean,
       companyName: m.companyName as string | null,
+      prefecture: m.prefecture as string | null,
       user: {
         id: m.user.id as bigint,
         name: m.user.name as string,
@@ -148,8 +175,6 @@ async function fetchAllDescendantsBFS(
 }
 
 // ── フラットリスト → ツリー構築 ──────────────────────────────
-type FlatMember = ReturnType<Awaited<ReturnType<typeof fetchAllDescendantsBFS>>[number] extends infer T ? () => T : never>;
-
 function buildTree(
   rootId: bigint,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -157,7 +182,10 @@ function buildTree(
   depthLimit: number,
   currentMonth: string,
   months: string[],
-  purchaseMap: Map<string, { totalPoints: number; productCode: string }[]>
+  purchaseMap: Map<string, { totalPoints: number; productCode: string }[]>,
+  lastPointMap: Map<string, string>,
+  // referrerId → count map (直接紹介数)
+  directReferralCountMap: Map<string, number>
 ): NodeData {
   // id → member のマップ
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -218,6 +246,7 @@ function buildTree(
     return {
       id: m.user.id.toString(),
       name: m.companyName?.trim() || m.user.name,
+      companyName: m.companyName ?? null,
       memberCode: m.user.memberCode,
       avatarUrl: m.user.avatarUrl,
       mlmMemberCode: m.memberCode,
@@ -231,6 +260,10 @@ function buildTree(
       nonPurchaseAlert: alert,
       depth,
       totalDescendants,
+      contractDate: m.contractDate ? (m.contractDate as Date).toISOString().split("T")[0] : null,
+      prefecture: m.prefecture ?? null,
+      directReferralCount: directReferralCountMap.get(m.id.toString()) ?? 0,
+      lastPointMonth: lastPointMap.get(m.id.toString()) ?? null,
       children,
     };
   };
@@ -315,9 +348,19 @@ export async function GET() {
     const matrixFlat = await fetchAllDescendantsBFS(me.id, "uplineId");
     const matrixIds  = matrixFlat.map(m => m.id);
     const matrixPurchaseMap = await fetchPurchasesForMembers(matrixIds, months);
+    const matrixLastPointMap = await fetchAllPurchasesForLastPoint(matrixIds);
+
+    // 直接紹介数マップ（referrerId → count）— matrix向け（マトリックスは直上関係なので参照用）
+    const matrixDirectRefMap = new Map<string, number>();
+    for (const m of matrixFlat) {
+      const pid = m.parentId?.toString();
+      if (pid) {
+        matrixDirectRefMap.set(pid, (matrixDirectRefMap.get(pid) ?? 0) + 1);
+      }
+    }
 
     // マトリックスツリー（段数無制限で内部保持、表示は5段ずつFE側で制御）
-    const matrixRoot = buildTree(me.id, matrixFlat, 999, currentMonth, months, matrixPurchaseMap);
+    const matrixRoot = buildTree(me.id, matrixFlat, 999, currentMonth, months, matrixPurchaseMap, matrixLastPointMap, matrixDirectRefMap);
     const matrixDepthStats = calcDepthStats(matrixFlat, me.id, currentMonth, months, matrixPurchaseMap);
 
     // 自分の直接配下（children）だけをレスポンスに渡す
@@ -334,8 +377,17 @@ export async function GET() {
     const uniFlat = await fetchAllDescendantsBFS(me.id, "referrerId");
     const uniIds  = uniFlat.map(m => m.id);
     const uniPurchaseMap = await fetchPurchasesForMembers(uniIds, months);
+    const uniLastPointMap = await fetchAllPurchasesForLastPoint(uniIds);
 
-    const uniRoot = buildTree(me.id, uniFlat, 7, currentMonth, months, uniPurchaseMap);
+    const uniDirectRefMap = new Map<string, number>();
+    for (const m of uniFlat) {
+      const pid = m.parentId?.toString();
+      if (pid) {
+        uniDirectRefMap.set(pid, (uniDirectRefMap.get(pid) ?? 0) + 1);
+      }
+    }
+
+    const uniRoot = buildTree(me.id, uniFlat, 7, currentMonth, months, uniPurchaseMap, uniLastPointMap, uniDirectRefMap);
     const uniDownlines = uniRoot.children;
 
     const uniTotalCount  = uniFlat.filter(m => {
