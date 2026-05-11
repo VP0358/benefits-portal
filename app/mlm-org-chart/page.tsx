@@ -370,7 +370,8 @@ function VisualTreeNode({ node, depth, onNodeClick }: {
           onClick={() => setExpanded(v => !v)}
           className="flex flex-col items-center"
           style={{ background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: "2px" }}>
-          <div style={{ width: "1px", height: "12px", background: `${GOLD}40` }} />
+          {/* カードとボタン間の縦線 */}
+          <div style={{ width: LINE_V_W, height: "12px", background: LINE_COLOR }} />
           <div className="rounded-full px-2 py-0.5 font-bold transition-all"
             style={{
               fontSize: "11px",
@@ -381,7 +382,8 @@ function VisualTreeNode({ node, depth, onNodeClick }: {
             }}>
             {expanded ? "▲" : `▼ ${children.length}`}
           </div>
-          <div style={{ width: "1px", height: "8px", background: `${GOLD}40` }} />
+          {/* ボタンとChildrenRow間の縦線 */}
+          <div style={{ width: LINE_V_W, height: "8px", background: LINE_COLOR }} />
         </button>
       )}
 
@@ -397,28 +399,37 @@ function VisualTreeNode({ node, depth, onNodeClick }: {
 }
 
 // 子ノードを横並びに表示するコンポーネント
+// ② 接続線: 横2px・縦2px・色を濃く（GOLD 100% → opacity 0.7）
+const LINE_COLOR = `${GOLD}b3`;   // #c9a84c + b3 ≒ opacity 70%
+const LINE_H     = "2px";         // 横線の太さ
+const LINE_V_W   = "2px";         // 縦線の幅
+const LINE_V_H   = "10px";        // 縦線の長さ
+
 function ChildrenRow({ children, depth, onNodeClick }: {
   children: NodeData[];
   depth: number;
   onNodeClick: (n: NodeData) => void;
 }) {
+  const isOnly = children.length === 1;
   return (
     <div className="flex flex-row items-start" style={{ gap: "12px" }}>
       {children.map((child, idx) => (
         <div key={child.id} className="flex flex-col items-center" style={{ flexShrink: 0, position: "relative" }}>
-          {/* 水平接続線 */}
+          {/* 水平接続線（子が1人なら中央縦線のみ） */}
           <div style={{
             width: "100%",
-            height: "1px",
-            background:
-              idx === 0
-                ? `linear-gradient(to right, transparent 50%, ${GOLD}35 50%)`
-                : idx === children.length - 1
-                ? `linear-gradient(to right, ${GOLD}35 50%, transparent 50%)`
-                : `${GOLD}35`,
+            height: LINE_H,
+            background: isOnly
+              ? "transparent"
+              : idx === 0
+              ? `linear-gradient(to right, transparent 50%, ${LINE_COLOR} 50%)`
+              : idx === children.length - 1
+              ? `linear-gradient(to right, ${LINE_COLOR} 50%, transparent 50%)`
+              : LINE_COLOR,
             flexShrink: 0,
           }} />
-          <div style={{ width: "1px", height: "8px", background: `${GOLD}35` }} />
+          {/* 縦接続線 */}
+          <div style={{ width: LINE_V_W, height: LINE_V_H, background: LINE_COLOR }} />
           <VisualTreeNode node={child} depth={depth + 1} onNodeClick={onNodeClick} />
         </div>
       ))}
@@ -569,9 +580,28 @@ function DepthStatsModal({ depthStats, totalCount, activeCount, onClose }: {
 function TreeViewport({ zoom, children }: { zoom: number; children: React.ReactNode }) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const containerRef   = useRef<HTMLDivElement>(null);
+  const innerRef       = useRef<HTMLDivElement>(null);
   const isDragging     = useRef(false);
   const dragStart      = useRef({ x: 0, y: 0 });
   const panStart       = useRef({ x: 0, y: 0 });
+
+  // ① 初期表示: コンテンツ横幅の中央にスクロール位置を合わせる
+  useEffect(() => {
+    const container = containerRef.current;
+    const inner     = innerRef.current;
+    if (!container || !inner) return;
+    // DOM が描画された直後に実行
+    const timer = setTimeout(() => {
+      const contentW  = inner.scrollWidth;
+      const containerW = container.clientWidth;
+      if (contentW > containerW) {
+        container.scrollLeft = (contentW - containerW) / 2;
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  // children(ツリーデータ)が変わるたびに再センタリング
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [children]);
 
   // マウスドラッグ
   const onMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -593,7 +623,6 @@ function TreeViewport({ zoom, children }: { zoom: number; children: React.ReactN
   const onMouseUp = useCallback(() => { isDragging.current = false; }, []);
 
   // タッチ: passive:false のネイティブリスナーで preventDefault を確実に呼ぶ
-  // （React の合成イベントは passive なため e.preventDefault() が効かない）
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -608,7 +637,7 @@ function TreeViewport({ zoom, children }: { zoom: number; children: React.ReactN
 
     const handleTouchMove = (e: TouchEvent) => {
       if (!isDragging.current || e.touches.length !== 1) return;
-      e.preventDefault(); // passive:false なので有効
+      e.preventDefault();
       setPan({
         x: panStart.current.x + e.touches[0].clientX - dragStart.current.x,
         y: panStart.current.y + e.touches[0].clientY - dragStart.current.y,
@@ -628,12 +657,22 @@ function TreeViewport({ zoom, children }: { zoom: number; children: React.ReactN
       el.removeEventListener("touchend",    handleTouchEnd);
       el.removeEventListener("touchcancel", handleTouchEnd);
     };
-  // pan が変わるたびに panStart を最新にするため依存に含める
   }, [pan]);
 
-  // zoom 変化時にパンをリセット
+  // zoom 変化時にパンをリセット＆再センタリング
   useEffect(() => {
     setPan({ x: 0, y: 0 });
+    const container = containerRef.current;
+    const inner     = innerRef.current;
+    if (!container || !inner) return;
+    const timer = setTimeout(() => {
+      const contentW   = inner.scrollWidth;
+      const containerW = container.clientWidth;
+      if (contentW > containerW) {
+        container.scrollLeft = (contentW - containerW) / 2;
+      }
+    }, 50);
+    return () => clearTimeout(timer);
   }, [zoom]);
 
   return (
@@ -644,8 +683,6 @@ function TreeViewport({ zoom, children }: { zoom: number; children: React.ReactN
         overflow: "auto",
         cursor: isDragging.current ? "grabbing" : "grab",
         position: "relative",
-        // touchAction は設定しない → ブラウザのデフォルトスクロールを残しつつ
-        // passive:false の touchmove でドラッグ中のみ preventDefault
         background: "linear-gradient(180deg, rgba(245,240,232,0.5) 0%, rgba(245,240,232,0.95) 100%)",
         borderRadius: "1rem",
         border: `1px solid ${GOLD}20`,
@@ -656,6 +693,7 @@ function TreeViewport({ zoom, children }: { zoom: number; children: React.ReactN
       onMouseLeave={onMouseUp}
     >
       <div
+        ref={innerRef}
         style={{
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
           transformOrigin: "top center",
@@ -864,16 +902,17 @@ export default function MlmOrgChartPage() {
                     <div className="flex flex-row items-start" style={{ gap: "12px" }}>
                       {currentNodes.map((node, idx) => (
                         <div key={node.id} className="flex flex-col items-center" style={{ flexShrink: 0, position: "relative" }}>
-                          {/* 水平接続線 */}
+                          {/* 水平接続線（ルート直下） */}
                           <div style={{
-                            width: "100%", height: "1px",
+                            width: "100%", height: LINE_H,
                             background:
-                              currentNodes.length === 1 ? `${GOLD}35`
-                              : idx === 0 ? `linear-gradient(to right, transparent 50%, ${GOLD}35 50%)`
-                              : idx === currentNodes.length - 1 ? `linear-gradient(to right, ${GOLD}35 50%, transparent 50%)`
-                              : `${GOLD}35`,
+                              currentNodes.length === 1 ? "transparent"
+                              : idx === 0 ? `linear-gradient(to right, transparent 50%, ${LINE_COLOR} 50%)`
+                              : idx === currentNodes.length - 1 ? `linear-gradient(to right, ${LINE_COLOR} 50%, transparent 50%)`
+                              : LINE_COLOR,
                           }} />
-                          <div style={{ width: "1px", height: "8px", background: `${GOLD}35` }} />
+                          {/* 縦接続線 */}
+                          <div style={{ width: LINE_V_W, height: LINE_V_H, background: LINE_COLOR }} />
                           {/* ② VisualTreeNode: maxDepth prop なし → 全段で▼▲が同一動作 */}
                           <VisualTreeNode node={node} depth={1} onNodeClick={setSelectedNode} />
                         </div>
