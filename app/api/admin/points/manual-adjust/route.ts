@@ -36,8 +36,21 @@ export async function POST(req: NextRequest) {
   const user = await prisma.user.findUnique({ where: { id: userId }, include: { pointWallet: true } });
   if (!user) return NextResponse.json({ error: "user not found" }, { status: 404 });
 
-  const wallet = user.pointWallet;
-  if (!wallet) return NextResponse.json({ error: "point wallet not found" }, { status: 404 });
+  // PointWalletが存在しない場合は自動作成（初回ポイント操作時）
+  let wallet = user.pointWallet;
+  if (!wallet) {
+    wallet = await prisma.pointWallet.create({
+      data: {
+        userId,
+        autoPointsBalance:      0,
+        manualPointsBalance:    0,
+        externalPointsBalance:  0,
+        availablePointsBalance: 0,
+        usedPointsBalance:      0,
+        expiredPointsBalance:   0,
+      },
+    });
+  }
 
   const delta = parsed.data.mode === "add" ? parsed.data.points : -parsed.data.points;
 
