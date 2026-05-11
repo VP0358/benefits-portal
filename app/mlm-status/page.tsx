@@ -279,10 +279,10 @@ export default function MlmStatusPage() {
               <div className="px-5 pt-5 pb-5">
                 {/* ヘッダーラベル */}
                 <p className="font-label text-[10px] tracking-[0.22em] font-bold mb-1" style={{ color: `${GOLD}80` }}>TOTAL AVAILABLE POINTS</p>
-                {/* 合計数字 */}
+                {/* 合計数字 = 貯金ボーナス(SAV) + サービスポイント + 外部ポイント */}
                 <div className="flex items-end gap-2 mb-5">
                   <span className="font-display text-5xl font-bold text-white leading-none">
-                    {data.availablePoints.toLocaleString()}
+                    {(data.savingsPoints + data.manualPoints + data.externalPoints).toLocaleString()}
                   </span>
                   <span className="font-label text-sm mb-1.5" style={{ color: `${GOLD}80` }}>pt</span>
                 </div>
