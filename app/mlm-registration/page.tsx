@@ -84,10 +84,10 @@ function fmtDateTime(iso: string | null) {
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-3 py-3.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-      <span className="w-32 shrink-0 text-xs font-medium pt-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>{label}</span>
-      <span className="text-sm break-all flex-1 font-medium" style={{ color: "rgba(255,255,255,0.85)" }}>
-        {value ?? <span style={{ color: "rgba(255,255,255,0.2)" }}>—</span>}
+    <div className="flex items-start gap-3 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+      <span className="w-36 shrink-0 text-sm font-semibold pt-0.5" style={{ color: "rgba(255,255,255,0.60)" }}>{label}</span>
+      <span className="text-base break-all flex-1 font-semibold" style={{ color: "rgba(255,255,255,0.92)" }}>
+        {value ?? <span style={{ color: "rgba(255,255,255,0.25)" }}>—</span>}
       </span>
     </div>
   );
@@ -95,15 +95,15 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 
 function Section({ title, svgD, children }: { title: string; svgD: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: CARD_BG, border: `1px solid ${GOLD}18` }}>
-      <div className="flex items-center gap-2.5 px-5 py-4" style={{ borderBottom: `1px solid ${GOLD}10` }}>
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${GOLD}15` }}>
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+    <div className="rounded-2xl overflow-hidden" style={{ background: CARD_BG, border: `1px solid ${GOLD}22` }}>
+      <div className="flex items-center gap-2.5 px-5 py-4" style={{ borderBottom: `1px solid ${GOLD}14` }}>
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${GOLD}18` }}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
             style={{ color: GOLD }}>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={svgD} />
           </svg>
         </div>
-        <h2 className="text-sm font-bold" style={{ color: "rgba(255,255,255,0.85)" }}>{title}</h2>
+        <h2 className="text-base font-bold" style={{ color: "rgba(255,255,255,0.92)" }}>{title}</h2>
       </div>
       <div className="px-5 py-1">{children}</div>
     </div>
@@ -134,18 +134,18 @@ export default function MlmRegistrationPage() {
       <header className="sticky top-0 z-20"
         style={{ background: 'rgba(245,240,232,0.96)', backdropFilter: 'blur(20px) saturate(160%)', borderBottom: `1px solid rgba(201,168,76,0.22)`, boxShadow: `0 2px 16px rgba(10,22,40,0.08),0 1px 0 rgba(255,255,255,0.80) inset` }}>
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center gap-3">
-          <Link href="/dashboard" className="flex items-center gap-1.5 transition" style={{ color: "rgba(10,22,40,0.60)" }}>
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <Link href="/dashboard" className="flex items-center gap-1.5 transition" style={{ color: "rgba(10,22,40,0.75)" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            <span className="text-sm font-jp">戻る</span>
+            <span className="text-base font-semibold font-jp">戻る</span>
           </Link>
           <div className="flex items-center gap-2 ml-1">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
               style={{ color: GOLD }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
-            <h1 className="text-base font-semibold font-jp" style={{ color: NAVY }}>登録情報</h1>
+            <h1 className="text-lg font-bold font-jp" style={{ color: NAVY }}>登録情報</h1>
           </div>
         </div>
       </header>
@@ -166,21 +166,21 @@ export default function MlmRegistrationPage() {
           <>
             {/* ステータスバナー */}
             <div className="rounded-3xl overflow-hidden"
-              style={{ background: "linear-gradient(150deg, #0d1e45, #162a56)", border: `1px solid ${GOLD}30` }}>
+              style={{ background: "linear-gradient(150deg, #0d1e45, #162a56)", border: `1px solid ${GOLD}35` }}>
               <div className="h-0.5" style={{ background: `linear-gradient(90deg, transparent, ${GOLD}, ${ORANGE}, transparent)` }}></div>
-              <div className="p-5 flex items-center justify-between">
+              <div className="p-6 flex items-center justify-between">
                 <div>
-                  <p className="text-xs mb-1" style={{ color: `${GOLD}60` }}>ステータス</p>
+                  <p className="text-sm font-semibold mb-1.5" style={{ color: `${GOLD}80` }}>ステータス</p>
                   <div className="flex items-center gap-2.5">
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: statusTheme.dotColor }}></span>
-                    <p className="text-xl font-bold" style={{ color: statusTheme.textColor }}>
+                    <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: statusTheme.dotColor }}></span>
+                    <p className="text-2xl font-bold" style={{ color: statusTheme.textColor }}>
                       {STATUS_LABELS[data.business.status] ?? data.business.status}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs mb-1" style={{ color: `${GOLD}60` }}>会員ID</p>
-                  <p className="font-mono font-bold text-xl" style={{ color: GOLD_LIGHT }}>{data.registration.memberCode}</p>
+                  <p className="text-sm font-semibold mb-1.5" style={{ color: `${GOLD}80` }}>会員ID</p>
+                  <p className="font-mono font-bold text-2xl" style={{ color: GOLD_LIGHT }}>{data.registration.memberCode}</p>
                 </div>
               </div>
             </div>
@@ -237,8 +237,11 @@ export default function MlmRegistrationPage() {
               <Row label="契約日" value={fmtDate(data.business.contractDate)} />
               <Row label="登録日" value={fmtDate(data.business.createdAt)} />
               <Row label="最終ログイン" value={fmtDateTime(data.business.lastLoginAt)} />
-              <Row label="貯金ポイント" value={
-                <span className="font-bold" style={{ color: GOLD_LIGHT }}>{data.business.savingsPoints.toLocaleString()} <span className="text-xs font-normal" style={{ color: `${GOLD}50` }}>pt</span></span>
+              <Row label="貯金ボーナス（SAV）" value={
+                <span className="inline-flex items-baseline gap-1">
+                  <span className="text-xl font-extrabold" style={{ color: GOLD_LIGHT }}>{data.business.savingsPoints.toLocaleString()}</span>
+                  <span className="text-sm font-semibold" style={{ color: GOLD }}>pt</span>
+                </span>
               } />
               <Row label="支払方法" value={
                 data.business.paymentMethod === "credit_card" ? "クレジットカード"

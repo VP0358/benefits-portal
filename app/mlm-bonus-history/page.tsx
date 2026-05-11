@@ -74,14 +74,14 @@ function DataRow({ label, value, gold, highlight }: {
 }) {
   return (
     <div
-      className="flex items-center justify-between py-2.5 px-4 last:border-0 text-xs"
+      className="flex items-center justify-between py-2.5 px-4 last:border-0 text-sm"
       style={{
-        borderBottom: "1px solid rgba(255,255,255,0.04)",
+        borderBottom: "1px solid rgba(255,255,255,0.05)",
         background: gold ? `${GOLD}10` : highlight ? "rgba(255,255,255,0.02)" : "transparent",
       }}
     >
-      <span style={{ color: gold ? GOLD : "rgba(255,255,255,0.4)" }}>{label}</span>
-      <span className="font-bold" style={{ color: gold ? GOLD_LIGHT : "rgba(255,255,255,0.75)" }}>
+      <span style={{ color: gold ? GOLD : "rgba(255,255,255,0.55)" }}>{label}</span>
+      <span className="font-bold" style={{ color: gold ? GOLD_LIGHT : "rgba(255,255,255,0.88)" }}>
         {value}
       </span>
     </div>
@@ -91,7 +91,7 @@ function DataRow({ label, value, gold, highlight }: {
 function SubSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="px-4 pt-4 pb-1">
-      <div className="text-xs font-bold mb-2 tracking-wider" style={{ color: `${GOLD}60` }}>
+      <div className="text-sm font-bold mb-2 tracking-wider" style={{ color: `${GOLD}75` }}>
         {title}
       </div>
       <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${GOLD}12` }}>
@@ -126,7 +126,7 @@ function DownloadButton({ month, isCurrentMonth }: { month: string; isCurrentMon
     <button
       onClick={handleDownload}
       disabled={downloading}
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition disabled:opacity-50"
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition disabled:opacity-50"
       style={{
         background: isCurrentMonth
           ? `linear-gradient(135deg,${GOLD},${ORANGE})`
@@ -187,27 +187,27 @@ function BonusCard({
         >
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-white">{h.bonusMonth}</span>
+              <span className="text-base font-bold text-white">{h.bonusMonth}</span>
               {isCurrentMonth && (
                 <span
-                  className="text-[9px] px-2 py-0.5 rounded-full font-bold"
+                  className="text-xs px-2 py-0.5 rounded-full font-bold"
                   style={{ background: `${GOLD}25`, color: GOLD_LIGHT }}
                 >
                   当月
                 </span>
               )}
             </div>
-            <div className="text-xs mt-0.5 flex items-center gap-1.5">
+            <div className="text-sm mt-0.5 flex items-center gap-1.5">
               <span
                 className="w-1.5 h-1.5 rounded-full"
-                style={{ backgroundColor: h.isActive ? "#34d399" : "rgba(255,255,255,0.2)" }}
+                style={{ backgroundColor: h.isActive ? "#34d399" : "rgba(255,255,255,0.25)" }}
               />
-              <span style={{ color: h.isActive ? "#34d399" : "rgba(255,255,255,0.3)" }}>
+              <span style={{ color: h.isActive ? "#34d399" : "rgba(255,255,255,0.45)" }}>
                 {h.isActive ? "アクティブ" : "非アクティブ"}
               </span>
               {h.achievedLevel > 0 && (
                 <span
-                  className="rounded-full text-[10px] px-2 py-0.5 font-bold"
+                  className="rounded-full text-xs px-2 py-0.5 font-bold"
                   style={{ background: `${GOLD}15`, color: GOLD, border: `1px solid ${GOLD}30` }}
                 >
                   {LEVEL_LABELS[h.achievedLevel] ?? `LV.${h.achievedLevel}`}
@@ -222,7 +222,7 @@ function BonusCard({
             <div className="text-xl font-black" style={{ color: GOLD_LIGHT }}>
               {yen(h.paymentAmount)}
             </div>
-            <div className="text-[10px] mt-0.5" style={{ color: `${GOLD}50` }}>
+            <div className="text-xs mt-0.5" style={{ color: `${GOLD}65` }}>
               {open ? "▲ 閉じる" : "▼ 詳細"}
             </div>
           </div>
@@ -277,20 +277,20 @@ function BonusCard({
             <DataRow label="新称号レベル"  value={h.newTitleLevel > 0 ? `LV.${h.newTitleLevel}` : "—"} />
             <DataRow label="当月判定レベル" value={h.achievedLevel > 0 ? LEVEL_LABELS[h.achievedLevel] ?? `LV.${h.achievedLevel}` : "—"} />
             <DataRow label="条件達成"      value={h.conditions ?? "—"} />
-            <DataRow label="貯金pt（累計）" value={`${h.savingsPoints.toLocaleString()}pt`} />
+            <DataRow label="貯金ボーナス（SAV）累計" value={`${h.savingsPoints.toLocaleString()}pt`} />
             <DataRow label="貯金pt（今月追加）" value={h.savingsPointsAdded > 0 ? `+${h.savingsPointsAdded}pt` : "—"} />
           </SubSection>
 
           {/* ユニレベル段数内訳 */}
           {h.unilevelDetail.length > 0 && (
             <div className="px-4 pt-4 pb-5">
-              <div className="text-xs font-bold mb-2 tracking-wider" style={{ color: `${GOLD}60` }}>
+              <div className="text-sm font-bold mb-2 tracking-wider" style={{ color: `${GOLD}75` }}>
                 ユニレベル段数別
               </div>
               <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${GOLD}12` }}>
                 <div
-                  className="grid grid-cols-3 text-xs font-semibold px-4 py-2.5"
-                  style={{ background: `${GOLD}08`, color: `${GOLD}70`, borderBottom: `1px solid ${GOLD}12` }}
+                  className="grid grid-cols-3 text-sm font-semibold px-4 py-2.5"
+                  style={{ background: `${GOLD}08`, color: `${GOLD}80`, borderBottom: `1px solid ${GOLD}12` }}
                 >
                   <span>段</span>
                   <span className="text-right">算出率</span>
@@ -299,12 +299,12 @@ function BonusCard({
                 {h.unilevelDetail.map((d) => (
                   <div
                     key={d.depth}
-                    className="grid grid-cols-3 px-4 py-2.5 text-xs"
-                    style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                    className="grid grid-cols-3 px-4 py-2.5 text-sm"
+                    style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
                   >
-                    <span className="font-semibold" style={{ color: "rgba(255,255,255,0.6)" }}>{d.depth}段目</span>
-                    <span className="text-right" style={{ color: "rgba(255,255,255,0.4)" }}>{d.rate}%</span>
-                    <span className="text-right font-bold text-white/80">{yen(d.amount)}</span>
+                    <span className="font-semibold" style={{ color: "rgba(255,255,255,0.75)" }}>{d.depth}段目</span>
+                    <span className="text-right" style={{ color: "rgba(255,255,255,0.55)" }}>{d.rate}%</span>
+                    <span className="text-right font-bold" style={{ color: "rgba(255,255,255,0.90)" }}>{yen(d.amount)}</span>
                   </div>
                 ))}
               </div>
@@ -377,25 +377,25 @@ export default function MlmBonusHistoryPage() {
           <Link
             href="/dashboard"
             className="flex items-center gap-1.5 transition"
-            style={{ color: "rgba(10,22,40,0.60)" }}
+            style={{ color: "rgba(10,22,40,0.70)" }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            <span className="text-sm">戻る</span>
+            <span className="text-base font-semibold">戻る</span>
           </Link>
 
           <div className="flex items-center gap-2 ml-1 flex-1">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: GOLD }}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: GOLD }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <h1 className="text-base font-semibold" style={{ color: NAVY }}>ボーナス履歴</h1>
+            <h1 className="text-lg font-bold" style={{ color: NAVY }}>ボーナス履歴</h1>
           </div>
 
           <button
             onClick={fetchData}
             disabled={loading}
-            className="text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 transition disabled:opacity-40"
+            className="text-sm px-3 py-1.5 rounded-lg flex items-center gap-1 transition disabled:opacity-40"
             style={{ background: `${GOLD}18`, color: GOLD, border: `1px solid ${GOLD}30` }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -430,24 +430,24 @@ export default function MlmBonusHistoryPage() {
             <div className="grid grid-cols-3 gap-2.5">
               <div className="rounded-2xl p-3.5 text-center"
                 style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}25` }}>
-                <div className="text-xs mb-1" style={{ color: `${GOLD}70` }}>当月レベル</div>
-                <div className="text-xl font-black" style={{ color: GOLD }}>
+                <div className="text-xs font-semibold mb-1" style={{ color: `${GOLD}85` }}>当月レベル</div>
+                <div className="text-2xl font-black" style={{ color: GOLD }}>
                   {data.currentLevel > 0 ? `LV.${data.currentLevel}` : "—"}
                 </div>
               </div>
               <div className="rounded-2xl p-3.5 text-center"
                 style={{ background: `${ORANGE}10`, border: `1px solid ${ORANGE}25` }}>
-                <div className="text-xs mb-1" style={{ color: `${ORANGE}80` }}>称号</div>
-                <div className="text-xl font-black" style={{ color: ORANGE }}>
+                <div className="text-xs font-semibold mb-1" style={{ color: `${ORANGE}90` }}>称号</div>
+                <div className="text-2xl font-black" style={{ color: ORANGE }}>
                   {data.titleLevel > 0 ? `LV.${data.titleLevel}` : "—"}
                 </div>
               </div>
               <div className="rounded-2xl p-3.5 text-center"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                <div className="text-xs mb-1" style={{ color: "rgba(255,255,255,0.4)" }}>貯金pt</div>
-                <div className="text-sm font-black" style={{ color: "rgba(255,255,255,0.8)" }}>
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)" }}>
+                <div className="text-xs font-semibold mb-1" style={{ color: "rgba(255,255,255,0.60)" }}>貯金SAV</div>
+                <div className="text-sm font-black" style={{ color: "rgba(255,255,255,0.90)" }}>
                   {data.savingsPoints.toLocaleString()}
-                  <span className="text-xs font-normal ml-0.5" style={{ color: "rgba(255,255,255,0.3)" }}>pt</span>
+                  <span className="text-xs font-normal ml-0.5" style={{ color: "rgba(255,255,255,0.50)" }}>pt</span>
                 </div>
               </div>
             </div>
@@ -463,12 +463,12 @@ export default function MlmBonusHistoryPage() {
               <div className="h-0.5" style={{ background: `linear-gradient(90deg,transparent,${GOLD},${ORANGE},transparent)` }} />
               <div className="p-4 grid grid-cols-2 gap-4">
                 <div>
-                  <div className="text-xs mb-1" style={{ color: `${GOLD}70` }}>過去12ヶ月</div>
+                  <div className="text-xs font-semibold mb-1" style={{ color: `${GOLD}80` }}>過去12ヶ月</div>
                   <div className="text-2xl font-black" style={{ color: GOLD_LIGHT }}>{yen(totalPaid12)}</div>
                 </div>
                 <div>
-                  <div className="text-xs mb-1" style={{ color: "rgba(255,255,255,0.4)" }}>全期間累計</div>
-                  <div className="text-lg font-bold" style={{ color: "rgba(255,255,255,0.70)" }}>{yen(totalPaidAll)}</div>
+                  <div className="text-xs font-semibold mb-1" style={{ color: "rgba(255,255,255,0.60)" }}>全期間累計</div>
+                  <div className="text-xl font-bold" style={{ color: "rgba(255,255,255,0.85)" }}>{yen(totalPaidAll)}</div>
                 </div>
               </div>
             </div>
@@ -476,7 +476,7 @@ export default function MlmBonusHistoryPage() {
             {/* ── 当月明細 ── */}
             <div>
               <div className="flex items-center justify-between mb-2 px-1">
-                <h2 className="text-xs font-bold tracking-wide" style={{ color: `${GOLD}70` }}>
+                <h2 className="text-sm font-bold tracking-wide" style={{ color: `${GOLD}80` }}>
                   ▶ 当月ボーナス明細（{currentMonth}）
                 </h2>
               </div>
@@ -487,10 +487,10 @@ export default function MlmBonusHistoryPage() {
                   className="rounded-2xl p-6 text-center text-sm"
                   style={{ background: `${CARD_BG}99`, border: `1px dashed ${GOLD}20` }}
                 >
-                  <p style={{ color: "rgba(255,255,255,0.3)" }}>
+                  <p style={{ color: "rgba(255,255,255,0.45)" }}>
                     当月（{currentMonth}）のボーナスはまだ確定していません
                   </p>
-                  <p className="mt-1 text-xs" style={{ color: "rgba(255,255,255,0.2)" }}>
+                  <p className="mt-1 text-xs" style={{ color: "rgba(255,255,255,0.30)" }}>
                     月次バッチ処理後に表示されます
                   </p>
                 </div>
@@ -500,9 +500,9 @@ export default function MlmBonusHistoryPage() {
             {/* ── 過去1年の履歴 ── */}
             <div>
               <div className="flex items-center justify-between mb-2 px-1">
-                <h2 className="text-xs font-bold tracking-wide" style={{ color: "rgba(255,255,255,0.4)" }}>
+                <h2 className="text-sm font-bold tracking-wide" style={{ color: "rgba(255,255,255,0.60)" }}>
                   ▶ 過去の報酬明細
-                  <span className="ml-2 font-normal" style={{ color: "rgba(255,255,255,0.25)" }}>
+                  <span className="ml-2 font-normal" style={{ color: "rgba(255,255,255,0.35)" }}>
                     （{showAll ? "全期間" : "過去12ヶ月"}）
                   </span>
                 </h2>
@@ -511,8 +511,8 @@ export default function MlmBonusHistoryPage() {
                   className="text-xs px-2.5 py-1 rounded-lg transition"
                   style={{
                     background: showAll ? `${GOLD}18` : "rgba(255,255,255,0.05)",
-                    color: showAll ? GOLD : "rgba(255,255,255,0.4)",
-                    border: `1px solid ${showAll ? `${GOLD}30` : "rgba(255,255,255,0.10)"}`,
+                    color: showAll ? GOLD : "rgba(255,255,255,0.55)",
+                    border: `1px solid ${showAll ? `${GOLD}30` : "rgba(255,255,255,0.12)"}`,
                   }}
                 >
                   {showAll ? "12ヶ月に絞る" : "全期間表示"}
@@ -522,7 +522,7 @@ export default function MlmBonusHistoryPage() {
               {pastHistory.length === 0 ? (
                 <div
                   className="rounded-2xl p-8 text-center text-sm"
-                  style={{ background: `${CARD_BG}80`, color: "rgba(255,255,255,0.25)" }}
+                  style={{ background: `${CARD_BG}80`, color: "rgba(255,255,255,0.40)" }}
                 >
                   {showAll ? "ボーナス履歴がありません" : "過去12ヶ月のボーナス履歴がありません"}
                 </div>
@@ -540,8 +540,8 @@ export default function MlmBonusHistoryPage() {
               <div className="text-center">
                 <button
                   onClick={() => setShowAll(true)}
-                  className="text-xs underline transition"
-                  style={{ color: `${GOLD}60` }}
+                  className="text-sm underline transition"
+                  style={{ color: `${GOLD}75` }}
                 >
                   さらに古い明細を表示（全{data.history.length}件）
                 </button>
@@ -553,10 +553,10 @@ export default function MlmBonusHistoryPage() {
               className="rounded-2xl p-4"
               style={{ background: LINEN, border: "1px solid rgba(201,168,76,0.18)" }}
             >
-              <p className="text-xs font-bold mb-3" style={{ color: `${NAVY}70` }}>
+              <p className="text-sm font-bold mb-3" style={{ color: `${NAVY}90` }}>
                 📥 ダウンロードについて
               </p>
-              <p className="text-xs" style={{ color: `${NAVY}55` }}>
+              <p className="text-sm" style={{ color: `${NAVY}70` }}>
                 各月の「PDF」ボタンから、その月のボーナス明細書をPDFでダウンロードできます。
                 確定済み（バッチ処理完了）の月のみ対象です。
               </p>
@@ -577,9 +577,9 @@ export default function MlmBonusHistoryPage() {
                   style={{ background: `${GOLD}18` }}>
                   <span>🌐</span>
                 </div>
-                <span className="font-semibold text-sm text-white">組織図を見る</span>
+                <span className="font-semibold text-base" style={{ color: "rgba(255,255,255,0.90)" }}>組織図を見る</span>
               </div>
-              <span style={{ color: `${GOLD}55` }}>›</span>
+              <span style={{ color: `${GOLD}70` }}>›</span>
             </Link>
           </>
         )}

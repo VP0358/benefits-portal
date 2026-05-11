@@ -78,18 +78,18 @@ function fmtDateTime(iso: string | null) {
 
 function Row({ label, value, svgD }: { label: string; value: React.ReactNode; svgD?: string }) {
   return (
-    <div className="flex items-start gap-3 py-3.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-      <div className="w-32 shrink-0 flex items-center gap-1.5 pt-0.5">
+    <div className="flex items-start gap-3 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="w-36 shrink-0 flex items-center gap-1.5 pt-0.5">
         {svgD && (
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-            style={{ color: `${GOLD}60` }}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            style={{ color: `${GOLD}80` }}>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={svgD} />
           </svg>
         )}
-        <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.4)" }}>{label}</span>
+        <span className="text-sm font-semibold" style={{ color: "rgba(255,255,255,0.60)" }}>{label}</span>
       </div>
-      <span className="text-sm break-all flex-1 font-medium" style={{ color: "rgba(255,255,255,0.8)" }}>
-        {value ?? <span style={{ color: "rgba(255,255,255,0.2)" }}>—</span>}
+      <span className="text-base break-all flex-1 font-semibold" style={{ color: "rgba(255,255,255,0.92)" }}>
+        {value ?? <span style={{ color: "rgba(255,255,255,0.25)" }}>—</span>}
       </span>
     </div>
   );
@@ -97,15 +97,15 @@ function Row({ label, value, svgD }: { label: string; value: React.ReactNode; sv
 
 function Section({ title, svgD, children }: { title: string; svgD: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: CARD_BG, border: `1px solid ${GOLD}18` }}>
-      <div className="flex items-center gap-2.5 px-5 py-4" style={{ borderBottom: `1px solid ${GOLD}10` }}>
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${GOLD}15` }}>
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+    <div className="rounded-2xl overflow-hidden" style={{ background: CARD_BG, border: `1px solid ${GOLD}22` }}>
+      <div className="flex items-center gap-2.5 px-5 py-4" style={{ borderBottom: `1px solid ${GOLD}14` }}>
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${GOLD}18` }}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
             style={{ color: GOLD }}>
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={svgD} />
           </svg>
         </div>
-        <h2 className="text-sm font-bold" style={{ color: "rgba(255,255,255,0.85)" }}>{title}</h2>
+        <h2 className="text-base font-bold" style={{ color: "rgba(255,255,255,0.95)" }}>{title}</h2>
       </div>
       <div className="px-5 py-1">{children}</div>
     </div>
@@ -168,18 +168,18 @@ export default function MlmBusinessPage() {
       <header className="sticky top-0 z-20"
         style={{ background: 'rgba(245,240,232,0.96)', backdropFilter: 'blur(20px) saturate(160%)', borderBottom: `1px solid rgba(201,168,76,0.22)`, boxShadow: `0 2px 16px rgba(10,22,40,0.08),0 1px 0 rgba(255,255,255,0.80) inset` }}>
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center gap-3">
-          <Link href="/dashboard" className="flex items-center gap-1.5 transition" style={{ color: "rgba(10,22,40,0.60)" }}>
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <Link href="/dashboard" className="flex items-center gap-1.5 transition" style={{ color: `${NAVY}` }}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            <span className="text-sm font-jp">戻る</span>
+            <span className="text-base font-semibold font-jp">戻る</span>
           </Link>
           <div className="flex items-center gap-2 ml-1">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
               style={{ color: GOLD }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
-            <h1 className="text-base font-semibold font-jp" style={{ color: NAVY }}>業務情報</h1>
+            <h1 className="text-lg font-bold font-jp" style={{ color: NAVY }}>業務情報</h1>
           </div>
         </div>
       </header>
@@ -206,27 +206,27 @@ export default function MlmBusinessPage() {
                 <div className="grid grid-cols-3 gap-2.5">
                   <div className="rounded-2xl p-3.5 text-center"
                     style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}25` }}>
-                    <div className="text-[10px] mb-1" style={{ color: `${GOLD}70` }}>当月レベル</div>
-                    <div className="text-xl font-black" style={{ color: GOLD }}>
+                    <div className="text-xs font-semibold mb-1" style={{ color: `${GOLD}90` }}>当月レベル</div>
+                    <div className="text-2xl font-black" style={{ color: GOLD }}>
                       {data.business.currentLevel > 0 ? `LV.${data.business.currentLevel}` : "—"}
                     </div>
-                    <div className="text-[9px] mt-0.5 leading-tight" style={{ color: `${GOLD}50` }}>{LEVEL_LABELS[data.business.currentLevel] ?? "—"}</div>
+                    <div className="text-xs mt-0.5 leading-tight font-semibold" style={{ color: `${GOLD}75` }}>{LEVEL_LABELS[data.business.currentLevel] ?? "—"}</div>
                   </div>
                   <div className="rounded-2xl p-3.5 text-center"
                     style={{ background: `${ORANGE}10`, border: `1px solid ${ORANGE}25` }}>
-                    <div className="text-[10px] mb-1" style={{ color: `${ORANGE}80` }}>称号</div>
-                    <div className="text-xl font-black" style={{ color: ORANGE }}>
+                    <div className="text-xs font-semibold mb-1" style={{ color: ORANGE }}>称号</div>
+                    <div className="text-2xl font-black" style={{ color: ORANGE }}>
                       {data.business.titleLevel > 0 ? `LV.${data.business.titleLevel}` : "—"}
                     </div>
-                    <div className="text-[9px] mt-0.5 leading-tight" style={{ color: `${ORANGE}60` }}>{LEVEL_LABELS[data.business.titleLevel] ?? "—"}</div>
+                    <div className="text-xs mt-0.5 leading-tight font-semibold" style={{ color: `${ORANGE}80` }}>{LEVEL_LABELS[data.business.titleLevel] ?? "—"}</div>
                   </div>
                   <div className="rounded-2xl p-3.5 text-center"
                     style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                    <div className="text-[10px] mb-1" style={{ color: "rgba(255,255,255,0.4)" }}>ステータス</div>
-                    <div className="text-sm font-black" style={{ color: statusTheme.textColor }}>
+                    <div className="text-xs font-semibold mb-1" style={{ color: "rgba(255,255,255,0.65)" }}>ステータス</div>
+                    <div className="text-base font-black" style={{ color: statusTheme.textColor }}>
                       {STATUS_LABELS[data.business.status] ?? data.business.status}
                     </div>
-                    <div className="text-[9px] mt-0.5" style={{ color: "rgba(255,255,255,0.25)" }}>{MEMBER_TYPE_LABELS[data.business.memberType] ?? ""}</div>
+                    <div className="text-xs mt-0.5 font-semibold" style={{ color: "rgba(255,255,255,0.55)" }}>{MEMBER_TYPE_LABELS[data.business.memberType] ?? ""}</div>
                   </div>
                 </div>
               </div>
@@ -270,10 +270,13 @@ export default function MlmBusinessPage() {
                     {data.business.forceActive ? "有効" : "無効"}
                   </span>
                 } />
-              <Row label="貯金ポイント"
+              <Row label="貯金ボーナス（SAV）"
                 svgD="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
                 value={
-                  <span className="font-bold" style={{ color: GOLD_LIGHT }}>{data.business.savingsPoints.toLocaleString()} <span className="text-xs font-normal" style={{ color: `${GOLD}50` }}>pt</span></span>
+                  <span className="inline-flex items-baseline gap-1">
+                    <span className="text-xl font-extrabold" style={{ color: GOLD_LIGHT }}>{data.business.savingsPoints.toLocaleString()}</span>
+                    <span className="text-sm font-bold" style={{ color: GOLD }}>pt</span>
+                  </span>
                 } />
               <Row label="支払方法"
                 svgD="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"

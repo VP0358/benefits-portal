@@ -81,14 +81,14 @@ function SectionTitle({ svgD, title, accent }: { svgD: string; title: string; ac
   const color = accent ?? GOLD;
   return (
     <div className="flex items-center gap-2.5 px-5 py-4"
-      style={{ borderBottom: `1px solid rgba(201,168,76,0.12)` }}>
-      <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-        style={{ background: "rgba(255,255,255,0.07)", border: `1px solid ${color}28` }}>
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color }}>
+      style={{ borderBottom: `1px solid rgba(201,168,76,0.15)` }}>
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+        style={{ background: "rgba(255,255,255,0.09)", border: `1px solid ${color}30` }}>
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color }}>
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={svgD} />
         </svg>
       </div>
-      <h2 className="font-jp text-sm font-semibold tracking-wide text-white/88">{title}</h2>
+      <h2 className="font-jp text-base font-bold tracking-wide" style={{ color: "rgba(255,255,255,0.95)" }}>{title}</h2>
     </div>
   );
 }
@@ -125,18 +125,18 @@ export default function MlmStatusPage() {
         <div className="max-w-lg mx-auto px-4 py-4 flex items-center gap-3">
           <Link href="/dashboard"
             className="flex items-center gap-1.5 transition"
-            style={{ color: `${NAVY}70` }}>
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            style={{ color: `${NAVY}` }}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            <span className="text-sm font-jp">戻る</span>
+            <span className="text-base font-semibold font-jp">戻る</span>
           </Link>
           <div className="flex items-center gap-2 ml-1">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
               style={{ color: GOLD }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
-            <h1 className="text-base font-semibold font-jp" style={{ color: NAVY }}>MLM 状況</h1>
+            <h1 className="text-lg font-bold font-jp" style={{ color: NAVY }}>MLM 状況</h1>
           </div>
         </div>
       </header>
@@ -168,20 +168,20 @@ export default function MlmStatusPage() {
                 <div className="flex items-start justify-between mb-5">
                   <div>
                     <p className="font-label text-[9px] tracking-[0.22em] mb-0.5" style={{ color: `${GOLD}70` }}>MEMBER ID</p>
-                    <p className="font-label font-semibold text-sm tracking-widest" style={{ color: "rgba(255,255,255,0.55)" }}>{data.memberCode}</p>
-                    <p className="font-jp text-2xl font-semibold text-white mt-1">
+                    <p className="font-label font-semibold text-base tracking-widest" style={{ color: "rgba(255,255,255,0.70)" }}>{data.memberCode}</p>
+                    <p className="font-jp text-3xl font-bold text-white mt-1">
                       {data.name}
-                      <span className="font-display italic font-normal text-xl ml-1" style={{ color: GOLD_LIGHT }}>さん</span>
+                      <span className="font-display italic font-normal text-2xl ml-1" style={{ color: GOLD_LIGHT }}>さん</span>
                     </p>
                   </div>
                   <div className="text-right">
                     <div className="flex items-center gap-2 justify-end">
                       <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: theme.dotColor }}></span>
-                      <span className="text-sm font-semibold font-jp" style={{ color: theme.textColor }}>
+                      <span className="text-base font-bold font-jp" style={{ color: theme.textColor }}>
                         {STATUS_LABELS[data.status] ?? data.status}
                       </span>
                     </div>
-                    <p className="text-xs mt-1 font-jp" style={{ color: "rgba(255,255,255,0.30)" }}>
+                    <p className="text-sm mt-1 font-jp" style={{ color: "rgba(255,255,255,0.55)" }}>
                       {data.memberType === "business" ? "ビジネス会員" : "愛用会員"}
                     </p>
                     {data.forceActive && (
@@ -202,9 +202,9 @@ export default function MlmStatusPage() {
                   ].map((item) => (
                     <div key={item.label} className="rounded-xl p-3 text-center"
                       style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${item.color}22` }}>
-                      <div className="font-label text-[9px] mb-1" style={{ color: "rgba(255,255,255,0.35)" }}>{item.label}</div>
-                      <div className="font-display font-semibold text-xl" style={{ color: item.color }}>{item.value}</div>
-                      <div className="text-[10px] mt-0.5 font-jp leading-tight" style={{ color: "rgba(255,255,255,0.32)" }}>{item.sub}</div>
+                      <div className="text-xs mb-1 font-semibold" style={{ color: "rgba(255,255,255,0.55)" }}>{item.label}</div>
+                      <div className="font-display font-bold text-2xl" style={{ color: item.color }}>{item.value}</div>
+                      <div className="text-xs mt-0.5 font-jp leading-tight" style={{ color: "rgba(255,255,255,0.55)" }}>{item.sub}</div>
                     </div>
                   ))}
                 </div>
@@ -219,28 +219,28 @@ export default function MlmStatusPage() {
               <div className="p-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-xl p-4" style={{ background: `${ORANGE}12`, border: `1px solid ${ORANGE}28` }}>
-                    <div className="font-label text-[9px] font-semibold mb-3 tracking-[0.15em]" style={{ color: ORANGE }}>今月（{data.currentMonth}）</div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="font-jp" style={{ color: "rgba(255,255,255,0.40)" }}>購入回数</span>
-                        <span className="font-semibold text-white">{data.currentMonthCount}<span className="text-xs text-white/35 ml-0.5">件</span></span>
+                    <div className="text-sm font-bold mb-3" style={{ color: ORANGE }}>今月（{data.currentMonth}）</div>
+                    <div className="space-y-2.5">
+                      <div className="flex justify-between text-base">
+                        <span className="font-jp font-semibold" style={{ color: "rgba(255,255,255,0.65)" }}>購入回数</span>
+                        <span className="font-bold text-white">{data.currentMonthCount}<span className="text-sm text-white/60 ml-0.5">件</span></span>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="font-jp" style={{ color: "rgba(255,255,255,0.40)" }}>購入pt</span>
-                        <span className="font-semibold" style={{ color: ORANGE }}>{data.currentMonthPoints.toLocaleString()}<span className="text-xs ml-0.5" style={{ color: `${ORANGE}65` }}>pt</span></span>
+                      <div className="flex justify-between text-base">
+                        <span className="font-jp font-semibold" style={{ color: "rgba(255,255,255,0.65)" }}>購入pt</span>
+                        <span className="font-bold" style={{ color: ORANGE }}>{data.currentMonthPoints.toLocaleString()}<span className="text-sm ml-0.5" style={{ color: ORANGE }}>pt</span></span>
                       </div>
                     </div>
                   </div>
                   <div className="rounded-xl p-4" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                    <div className="font-label text-[9px] font-semibold mb-3 tracking-[0.15em]" style={{ color: "rgba(255,255,255,0.35)" }}>先月（{data.lastMonth}）</div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="font-jp" style={{ color: "rgba(255,255,255,0.40)" }}>購入回数</span>
-                        <span className="font-semibold" style={{ color: "rgba(255,255,255,0.55)" }}>{data.lastMonthCount}<span className="text-xs ml-0.5 opacity-55">件</span></span>
+                    <div className="text-sm font-bold mb-3" style={{ color: "rgba(255,255,255,0.60)" }}>先月（{data.lastMonth}）</div>
+                    <div className="space-y-2.5">
+                      <div className="flex justify-between text-base">
+                        <span className="font-jp font-semibold" style={{ color: "rgba(255,255,255,0.65)" }}>購入回数</span>
+                        <span className="font-bold" style={{ color: "rgba(255,255,255,0.85)" }}>{data.lastMonthCount}<span className="text-sm ml-0.5" style={{ color: "rgba(255,255,255,0.55)" }}>件</span></span>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="font-jp" style={{ color: "rgba(255,255,255,0.40)" }}>購入pt</span>
-                        <span className="font-semibold" style={{ color: "rgba(255,255,255,0.55)" }}>{data.lastMonthPoints.toLocaleString()}<span className="text-xs ml-0.5 opacity-55">pt</span></span>
+                      <div className="flex justify-between text-base">
+                        <span className="font-jp font-semibold" style={{ color: "rgba(255,255,255,0.65)" }}>購入pt</span>
+                        <span className="font-bold" style={{ color: "rgba(255,255,255,0.85)" }}>{data.lastMonthPoints.toLocaleString()}<span className="text-sm ml-0.5" style={{ color: "rgba(255,255,255,0.55)" }}>pt</span></span>
                       </div>
                     </div>
                   </div>
@@ -260,9 +260,9 @@ export default function MlmStatusPage() {
                 ].map((item) => (
                   <div key={item.label} className="rounded-xl p-3 text-center"
                     style={{ background: `${item.color}10`, border: `1px solid ${item.color}22` }}>
-                    <div className="font-label text-[9px] mb-1" style={{ color: "rgba(255,255,255,0.38)" }}>{item.label}</div>
-                    <div className="font-display font-semibold text-2xl" style={{ color: item.color }}>{item.value}</div>
-                    <div className="text-[10px] mt-0.5 font-jp" style={{ color: "rgba(255,255,255,0.30)" }}>{item.unit}</div>
+                    <div className="text-xs font-semibold mb-1" style={{ color: "rgba(255,255,255,0.60)" }}>{item.label}</div>
+                    <div className="font-display font-bold text-3xl" style={{ color: item.color }}>{item.value}</div>
+                    <div className="text-sm mt-0.5 font-jp font-semibold" style={{ color: "rgba(255,255,255,0.55)" }}>{item.unit}</div>
                   </div>
                 ))}
               </div>
@@ -285,9 +285,9 @@ export default function MlmStatusPage() {
                         style={{ color: item.color }}>
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.svgD} />
                       </svg>
-                      <span className="text-sm font-jp" style={{ color: "rgba(255,255,255,0.48)" }}>{item.label}</span>
+                      <span className="text-base font-semibold font-jp" style={{ color: "rgba(255,255,255,0.70)" }}>{item.label}</span>
                     </div>
-                    <span className="font-semibold text-sm" style={{ color: item.color }}>{item.value.toLocaleString()} <span className="text-xs opacity-55">pt</span></span>
+                    <span className="font-bold text-base" style={{ color: item.color }}>{item.value.toLocaleString()} <span className="text-sm" style={{ color: item.color }}>pt</span></span>
                   </div>
                 ))}
                 <div className="flex items-center justify-between px-5 py-4"
@@ -297,7 +297,7 @@ export default function MlmStatusPage() {
                       style={{ color: GOLD }}>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span className="text-sm font-semibold font-jp" style={{ color: GOLD }}>利用可能ポイント</span>
+                    <span className="text-base font-bold font-jp" style={{ color: GOLD }}>利用可能ポイント</span>
                   </div>
                   <span className="font-display font-semibold text-2xl" style={{ color: GOLD_LIGHT }}>
                     {data.availablePoints.toLocaleString()} <span className="text-sm font-normal font-jp" style={{ color: `${GOLD}65` }}>pt</span>
@@ -315,12 +315,12 @@ export default function MlmStatusPage() {
                     style={{ color: ORANGE }}>
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
-                  <p className="text-xs font-jp" style={{ color: ORANGE }}>貯金ポイント（SAV）</p>
+                  <p className="text-base font-bold font-jp" style={{ color: ORANGE }}>貯金ボーナス（SAV）</p>
                 </div>
-                <div className="font-display font-semibold text-2xl" style={{ color: GOLD_LIGHT }}>
-                  {data.savingsPoints.toLocaleString()}<span className="text-sm font-normal font-jp ml-1" style={{ color: `${GOLD}55` }}>pt</span>
+                <div className="font-display font-bold text-3xl" style={{ color: GOLD_LIGHT }}>
+                  {data.savingsPoints.toLocaleString()}<span className="text-base font-semibold font-jp ml-1" style={{ color: GOLD }}>pt</span>
                 </div>
-                <div className="text-xs mt-1 font-jp" style={{ color: "rgba(255,255,255,0.22)" }}>
+                <div className="text-sm mt-1 font-jp font-semibold" style={{ color: "rgba(255,255,255,0.50)" }}>
                   {Math.floor(data.savingsPoints / 10000)}万pt = 換金可能目安
                 </div>
               </div>
@@ -356,13 +356,13 @@ export default function MlmStatusPage() {
                   ].map((item) => (
                     <div key={item.label} className="flex items-center justify-between px-5 py-3.5"
                       style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                      <span className="text-sm font-jp" style={{ color: "rgba(255,255,255,0.45)" }}>{item.label}</span>
-                      <span className="font-semibold text-sm text-white/80 font-jp">{item.value}</span>
+                      <span className="text-base font-semibold font-jp" style={{ color: "rgba(255,255,255,0.65)" }}>{item.label}</span>
+                      <span className="font-bold text-base font-jp" style={{ color: "rgba(255,255,255,0.92)" }}>{item.value}</span>
                     </div>
                   ))}
                   <div className="flex items-center justify-between px-5 py-4"
                     style={{ background: `${GOLD}12` }}>
-                    <span className="text-sm font-semibold font-jp" style={{ color: GOLD }}>支払額</span>
+                    <span className="text-base font-bold font-jp" style={{ color: GOLD }}>支払額</span>
                     <span className="font-display font-semibold text-2xl" style={{ color: GOLD_LIGHT }}>
                       ¥{data.latestBonus.paymentAmount.toLocaleString()}
                     </span>
@@ -406,7 +406,7 @@ export default function MlmStatusPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={link.svgD} />
                       </svg>
                     </div>
-                    <span className="text-sm font-medium font-jp" style={{ color: "rgba(255,255,255,0.70)" }}>{link.label}</span>
+                    <span className="text-base font-semibold font-jp" style={{ color: "rgba(255,255,255,0.90)" }}>{link.label}</span>
                   </div>
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                     style={{ color: `${GOLD}45` }}>

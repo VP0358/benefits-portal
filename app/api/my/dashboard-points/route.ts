@@ -1,12 +1,11 @@
 /**
  * 会員ダッシュボード用ポイント情報API
  * GET /api/my/dashboard-points
- * 
+ *
  * 返却データ:
- * - mlmLastMonthPoints: MLM先月ポイント（VPpt）
- * - mlmCurrentMonthPoints: MLM今月昨日現在までのポイント（VPpt）
- * - savingsBonusPoints: 貯金ボーナスポイント（SAVpt）
- * - mobileReferralPoints: 携帯紹介ポイント（MPIpt）
+ * - mlmLastMonthPoints:    MLM先月ポイント（VPpt）
+ * - mlmCurrentMonthPoints: MLM今月ポイント（VPpt、リアルタイム）
+ * - savingsBonusPoints:    貯金ボーナス累計（会員DB MlmMember.savingsPoints と紐づけ）
  */
 
 import { NextResponse } from "next/server";
@@ -26,9 +25,10 @@ export async function GET() {
 
     const userId = BigInt(session.user.id);
 
-    // MLM会員情報取得
+    // MLM会員情報取得（savingsPoints を含む）
     const mlmMember = await prisma.mlmMember.findFirst({
-      where: { userId }
+      where: { userId },
+      select: { id: true, savingsPoints: true },
     });
 
     let mlmLastMonthPoints = 0;
@@ -38,53 +38,28 @@ export async function GET() {
     if (mlmMember) {
       const { currentMonth: currentMonthStr, lastMonth: lastMonthStr } = currentAndLastMonthJST();
 
-      // 先月のmlmPurchaseポイント集計
-      const lastMonthAgg = await prisma.mlmPurchase.aggregate({
-        where: {
-          mlmMemberId: mlmMember.id,
-          purchaseMonth: lastMonthStr
-        },
-        _sum: {
-          totalPoints: true
-        }
-      });
+      const [lastMonthAgg, currentMonthAgg] = await Promise.all([
+        prisma.mlmPurchase.aggregate({
+          where: { mlmMemberId: mlmMember.id, purchaseMonth: lastMonthStr },
+          _sum: { totalPoints: true },
+        }),
+        prisma.mlmPurchase.aggregate({
+          where: { mlmMemberId: mlmMember.id, purchaseMonth: currentMonthStr },
+          _sum: { totalPoints: true },
+        }),
+      ]);
 
-      // 今月のmlmPurchaseポイント集計
-      const currentMonthAgg = await prisma.mlmPurchase.aggregate({
-        where: {
-          mlmMemberId: mlmMember.id,
-          purchaseMonth: currentMonthStr
-        },
-        _sum: {
-          totalPoints: true
-        }
-      });
-
-      mlmLastMonthPoints = lastMonthAgg._sum.totalPoints ?? 0;
+      mlmLastMonthPoints    = lastMonthAgg._sum.totalPoints    ?? 0;
       mlmCurrentMonthPoints = currentMonthAgg._sum.totalPoints ?? 0;
     }
 
-    // 貯金ボーナスポイント（SAVpt）
-    // TODO: 実際のボーナス計算ロジックに置き換え
-    const savingsBonusPoints = 0;
-
-    // 携帯紹介ポイント（MPIpt）
-    // VpPhoneApplicationテーブルから自分が紹介した契約を集計
-    const mobileReferrals = await prisma.vpPhoneApplication.count({
-      where: {
-        referrerId: userId,
-        status: 'contracted' // 契約済みのみカウント
-      }
-    });
-
-    // 1契約につき1000ポイント（仮定）
-    const mobileReferralPoints = mobileReferrals * 1000;
+    // 貯金ボーナス累計 — MlmMember.savingsPoints と直結
+    const savingsBonusPoints = mlmMember?.savingsPoints ?? 0;
 
     return NextResponse.json({
       mlmLastMonthPoints,
       mlmCurrentMonthPoints,
       savingsBonusPoints,
-      mobileReferralPoints
     });
 
   } catch (error) {
