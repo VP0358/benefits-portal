@@ -180,35 +180,52 @@ function parseCsvDate(str: string): Date | null {
 }
 
 /**
- * 決済ID正規化（先頭0埋め違い廃止版）:
+ * 決済ID正規化（拡張版）:
  *
- *   目的: CSVとDB登録値で先頭ゼロの桁数が異なっていても必ず一致させる。
+ *   目的: CSVとDB登録値で先頭ゼロの桁数が異なっていても、また
+ *         WCプレフィックスの書き方が違っていても必ず一致させる。
  *
  *   処理手順:
- *     1. WCプレフィックスを除去（例: WC01485760 → 01485760）
- *     2. 先頭ゼロを全て除去（例: 01485760 → 1485760、001485760 → 1485760）
- *     3. 残った数字が1桁以上であれば有効
+ *     1. 全角スペース・タブ・改行を除去（全体trim）
+ *     2. WCプレフィックスを除去
+ *        - 厳密パターン: /^WC(\d+)$/i → そのまま
+ *        - 寛容パターン: /^WC[\s\-_](\d+)$/i → WC 1234567 / WC-1234567 等も対応
+ *        - 上記いずれにもマッチしない場合は raw 全体を数字として処理
+ *     3. 先頭ゼロを全て除去（例: 01485760 → 1485760）
+ *     4. 残った数字が1桁以上であれば有効
  *
- *   対応例:
- *     DB登録値  CSV値      → 正規化後（両方）→ 照合結果
- *     01485760  1485760   → 1485760         → ✅ 一致
- *     1485760   01485760  → 1485760         → ✅ 一致
- *     WC1485760 1485760   → 1485760         → ✅ 一致
- *     WC01485760 1485760  → 1485760         → ✅ 一致
- *     69823944  69823944  → 69823944        → ✅ 一致
- *     69823944  069823944 → 69823944        → ✅ 一致
+ *   対応例（修正前は ❌ だったものが ✅ に）:
+ *     DB登録値       CSV値      → 正規化後（両方）→ 照合結果
+ *     WC1485760      1485760   → 1485760         → ✅ 一致
+ *     WC 1485760     1485760   → 1485760         → ✅ 一致（修正①）
+ *     WC-1485760     1485760   → 1485760         → ✅ 一致（修正①）
+ *     WC_1485760     1485760   → 1485760         → ✅ 一致（修正①）
+ *     01485760       1485760   → 1485760         → ✅ 一致
+ *     WC01485760     1485760   → 1485760         → ✅ 一致
+ *     69823944       069823944 → 69823944        → ✅ 一致
  *
  *   無効とする値（空文字列を返す）:
- *     - 数字以外の文字を含む（WCプレフィックスを除く）
+ *     - WCプレフィックス除去後に数字以外の文字を含む
  *     - 空文字列 / "-"
  */
 function normalizeCardId(raw: string): string {
-  const s = raw.trim();
+  // Step0: 前後の空白・改行・タブ・全角スペースを除去
+  const s = raw.replace(/[\u3000\t\r\n]/g, " ").trim();
   if (!s || s === "-") return "";
 
   // Step1: WCプレフィックスを除去
-  const wcMatch = s.match(/^WC(\d+)$/i);
-  const digits = wcMatch ? wcMatch[1] : s;
+  //   厳密形式: "WC1485760"
+  //   寛容形式: "WC 1485760" / "WC-1485760" / "WC_1485760"（管理者の誤入力を救済）
+  let digits: string;
+  const wcStrict  = s.match(/^WC(\d+)$/i);
+  const wcTolerant = s.match(/^WC[\s\-_]+(\d+)$/i);
+  if (wcStrict) {
+    digits = wcStrict[1];
+  } else if (wcTolerant) {
+    digits = wcTolerant[1];
+  } else {
+    digits = s;
+  }
 
   // Step2: 数字のみで構成されているか確認
   if (!/^\d+$/.test(digits)) return "";
@@ -370,32 +387,53 @@ async function processCredixResultCsv(
   const INACTIVE_STATUSES = new Set(["lapsed", "suspended", "withdrawn", "midCancel"]);
 
   // ── 会員の決済ID → 会員マップを構築 ──
+  // ★バグ修正②: 同一normIdを複数会員が持つ場合の先着優先バグを修正
+  //   旧実装: Map<normId, 1会員> → 先に登録された会員のみ残り後続を無視
+  //   新実装: Map<normId, 会員[]> → 全会員を保持し、CSV照合時に全員にマッチ
   type MemberRow = typeof allMlmMembers[0];
-  const cardIdToMember = new Map<string, MemberRow>();
+  const cardIdToMembers = new Map<string, MemberRow[]>();  // normId → 複数会員対応
+  let normIdInvalidCount = 0;
   for (const m of allMlmMembers) {
     for (const cid of [m.creditCardId, m.creditCardId2, m.creditCardId3]) {
       if (!cid) continue;
       const normCid = normalizeCardId(cid);
-      if (!normCid) continue;
-      if (!cardIdToMember.has(normCid)) {
-        cardIdToMember.set(normCid, m);
+      if (!normCid) {
+        // ★バグ①: normalizeCardId が "" を返す場合（"WC 1234"等の誤入力）をログ出力
+        normIdInvalidCount++;
+        console.warn(`[import-direct] Credix: 会員(${m.memberCode}) の決済ID「${cid}」は正規化できません（照合スキップ）`);
+        continue;
+      }
+      if (!cardIdToMembers.has(normCid)) {
+        cardIdToMembers.set(normCid, []);
+      }
+      // 同一会員が creditCardId①②③ で同じIDを持つ場合の重複登録を防止
+      const list = cardIdToMembers.get(normCid)!;
+      if (!list.some(x => x.memberCode === m.memberCode)) {
+        list.push(m);
       }
     }
   }
-  console.log(`[import-direct] Credix: 決済ID→会員マップ ${cardIdToMember.size}件構築`);
+  if (normIdInvalidCount > 0) {
+    console.warn(`[import-direct] Credix: 正規化不可の決済ID ${normIdInvalidCount}件（"WC 数字" や "WC-数字" 等の誤入力の可能性）`);
+  }
+  console.log(`[import-direct] Credix: 決済ID→会員マップ ${cardIdToMembers.size}件構築（会員${allMlmMembers.length}件）`);
 
   // ── ① CSV全行を個別に照合 ──
   // 各CSVエントリ → 会員紐付け（同一行が重複しても全て個別行として扱う）
+  // ★バグ修正②: 同一normIdに複数会員がいる場合、全員にマッチ
   type MatchedCsvRow = CsvRow & { member: MemberRow };
   const matchedCsvRows: MatchedCsvRow[]    = [];  // 照合成功行（DB会員あり）
   const unmatchedCsvIds: { rawId: string; normId: string; rowIndex: number }[] = []; // 未照合行（DB会員なし）
 
   for (const row of csvRows) {
-    const member = cardIdToMember.get(row.normId);
-    if (!member) {
+    const members = cardIdToMembers.get(row.normId);
+    if (!members || members.length === 0) {
       unmatchedCsvIds.push({ rawId: row.rawId, normId: row.normId, rowIndex: row.rowIndex });
     } else {
-      matchedCsvRows.push({ ...row, member });
+      // 同一normIdに複数会員がいる場合、全員分のエントリを作成
+      for (const member of members) {
+        matchedCsvRows.push({ ...row, member });
+      }
     }
   }
 
@@ -419,6 +457,7 @@ async function processCredixResultCsv(
     memberStatus: string;
     creditIds: string[];
     normCreditIds: string[];
+    invalidCreditIds: string[];  // 正規化できなかったID（誤入力の可能性）
     isInactive: boolean; // true = 退会/停止/解約等
   };
   const failedMembers: FailedMemberEntry[] = [];
@@ -430,17 +469,20 @@ async function processCredixResultCsv(
     if (memberCids.length === 0) continue;
 
     const normCids = memberCids.map(cid => normalizeCardId(cid)).filter(Boolean);
+    // ★バグ修正①: 正規化できなかったID（誤入力）を別途追跡
+    const invalidCids = memberCids.filter(cid => !normalizeCardId(cid));
     const anyMatch = normCids.some(normCid => csvNormIdSet.has(normCid));
 
     if (!anyMatch) {
       failedMembers.push({
-        member:       m,
-        memberCode:   m.memberCode,
-        memberName:   getMlmDisplayName(m.user.name, m.companyName),
-        memberStatus: m.status,
-        creditIds:    memberCids,
-        normCreditIds: normCids,
-        isInactive:   INACTIVE_STATUSES.has(m.status),
+        member:          m,
+        memberCode:      m.memberCode,
+        memberName:      getMlmDisplayName(m.user.name, m.companyName),
+        memberStatus:    m.status,
+        creditIds:       memberCids,
+        normCreditIds:   normCids,
+        invalidCreditIds: invalidCids,
+        isInactive:      INACTIVE_STATUSES.has(m.status),
       });
     }
   }
@@ -448,6 +490,15 @@ async function processCredixResultCsv(
   // ③ 照合失敗を「アクティブ照合失敗」と「退会等照合失敗」に分離
   const activeFailMembers   = failedMembers.filter(m => !m.isInactive);
   const inactiveFailMembers = failedMembers.filter(m => m.isInactive);
+
+  // 誤入力IDを持つ会員を警告ログ
+  const membersWithInvalidIds = failedMembers.filter(m => m.invalidCreditIds.length > 0);
+  if (membersWithInvalidIds.length > 0) {
+    console.warn(`[import-direct] Credix: 正規化不可の決済IDを持つ会員 ${membersWithInvalidIds.length}件（照合に失敗している可能性）:`);
+    membersWithInvalidIds.slice(0, 10).forEach(m =>
+      console.warn(`  → ${m.memberCode} ${m.memberName}: 無効ID=[${m.invalidCreditIds.join(", ")}]`)
+    );
+  }
 
   console.log(`[import-direct] Credix: CSV照合 成功行=${matchedCsvRows.length}件 未照合行=${unmatchedCsvIds.length}件 / DB照合失敗: 活動中=${activeFailMembers.length}件 退会等=${inactiveFailMembers.length}件`);
 
@@ -459,6 +510,11 @@ async function processCredixResultCsv(
   if (memberMatchMap.size === 0) {
     warnings.push("⚠️ 照合が0件でした。MLM会員詳細の「クレジット①②③（クレディックス）」に登録された決済IDとCSVのK列（ID(sendid)）が一致する会員が見つかりませんでした。");
     warnings.push("💡 照合ルール: K列IDはWCプレフィックスを除去し先頭ゼロを除いた数字で比較します（両方向）。例: WC01485760→1485760、CSV側01485760も→1485760として一致します。");
+  }
+  // ★修正①: 正規化不可IDがある場合に警告追加
+  if (membersWithInvalidIds.length > 0) {
+    warnings.push(`⚠️ 照合に失敗している可能性のある会員が ${membersWithInvalidIds.length}件あります。決済ID欄に「WC 数字」（スペース区切り）や「WC-数字」（ハイフン区切り）が入力されていると照合できません。MLM会員詳細で正しい形式（例: WC1485760 または 1485760）に修正してください。`);
+    warnings.push(`対象会員: ${membersWithInvalidIds.slice(0, 5).map(m => `${m.memberCode}（無効ID: ${m.invalidCreditIds.join("/")}）`).join(", ")}${membersWithInvalidIds.length > 5 ? ` 他${membersWithInvalidIds.length - 5}件` : ""}`);
   }
 
   // ── ② 再インポート時は既存Runを削除して新規作成（最新のみ保持）──
@@ -602,22 +658,24 @@ async function processCredixResultCsv(
       rowIndex:   r.rowIndex,
     }));
 
-  // ③ アクティブ照合失敗者一覧
+  // ③ アクティブ照合失敗者一覧（invalidCreditIds = 正規化不可IDを追加）
   const matchFailMemberList = activeFailMembers.map(m => ({
-    memberCode:   m.memberCode,
-    memberName:   m.memberName,
-    memberStatus: m.memberStatus,
-    creditIds:    m.creditIds,
-    normCreditIds: m.normCreditIds,
+    memberCode:      m.memberCode,
+    memberName:      m.memberName,
+    memberStatus:    m.memberStatus,
+    creditIds:       m.creditIds,
+    normCreditIds:   m.normCreditIds,
+    invalidCreditIds: m.invalidCreditIds,  // ★追加: 誤入力の可能性があるID
   }));
 
   // ③ 退会/停止/解約等照合失敗者一覧
   const withdrawnFailMemberList = inactiveFailMembers.map(m => ({
-    memberCode:   m.memberCode,
-    memberName:   m.memberName,
-    memberStatus: m.memberStatus,
-    creditIds:    m.creditIds,
-    normCreditIds: m.normCreditIds,
+    memberCode:      m.memberCode,
+    memberName:      m.memberName,
+    memberStatus:    m.memberStatus,
+    creditIds:       m.creditIds,
+    normCreditIds:   m.normCreditIds,
+    invalidCreditIds: m.invalidCreditIds,  // ★追加: 誤入力の可能性があるID
   }));
 
   // ① 未照合ID一覧（個別行・重複あり）
@@ -646,7 +704,7 @@ async function processCredixResultCsv(
     _debug: {
       csvTotalRows,
       memberCount:            allMlmMembers.length,
-      cardIdMapSize:          cardIdToMember.size,
+      cardIdMapSize:          cardIdToMembers.size,
       matchedMemberCount:     memberMatchMap.size,
       matchedCsvRowCount:     matchedCsvRows.length,
       paidCount,

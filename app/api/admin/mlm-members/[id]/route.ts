@@ -7,6 +7,30 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { parseDateJST } from "@/lib/japan-time";
 
+/**
+ * クレディックス決済ID正規化（保存前クリーニング）
+ * - 入力値の前後スペース除去
+ * - 正規形式に統一（"WC 1234567" → "WC1234567"、"wc1234567" → "WC1234567"）
+ * - 空文字列 / "-" → null
+ * ★バグ③修正: 管理者が誤入力した場合でも自動修正してDBに保存
+ */
+function sanitizeCreditCardId(raw: string | undefined | null): string | null {
+  if (raw === undefined || raw === null) return undefined as unknown as null;
+  const s = raw.replace(/[\u3000\t\r\n]/g, " ").trim();
+  if (!s || s === "-") return null;
+
+  // WCプレフィックス正規化（大文字化、区切り文字除去）
+  // "WC 1234567" / "WC-1234567" / "wc1234567" → "WC1234567"
+  const wcTolerant = s.match(/^WC[\s\-_]*(\d+)$/i);
+  if (wcTolerant) {
+    return `WC${wcTolerant[1]}`;
+  }
+  // 数字のみの場合はそのまま
+  if (/^\d+$/.test(s)) return s;
+  // それ以外はそのまま返す（他の形式の場合は変更しない）
+  return s;
+}
+
 
 // DELETE: 会員削除（継続購入自動停止 + User含む全データ削除）
 export async function DELETE(
@@ -132,13 +156,15 @@ export async function PATCH(
         if (data.note            !== undefined) memberUpdate.note           = data.note || null;
         if (data.firstPayDate    !== undefined) memberUpdate.firstPayDate   = parseDateJST(data.firstPayDate);
         // クレジットカード情報（クレディックス）3枠
-        if (data.creditCardId    !== undefined) memberUpdate.creditCardId    = data.creditCardId    || null;
+        // ★バグ③修正: 保存前に sanitizeCreditCardId で自動正規化
+        //   "WC 1234567" → "WC1234567", "WC-1234567" → "WC1234567" 等を自動修正
+        if (data.creditCardId    !== undefined) memberUpdate.creditCardId    = sanitizeCreditCardId(data.creditCardId);
         if (data.creditCardExpiry  !== undefined) memberUpdate.creditCardExpiry  = data.creditCardExpiry  || null;
         if (data.creditCardLast4   !== undefined) memberUpdate.creditCardLast4   = data.creditCardLast4   || null;
-        if (data.creditCardId2   !== undefined) memberUpdate.creditCardId2   = data.creditCardId2   || null;
+        if (data.creditCardId2   !== undefined) memberUpdate.creditCardId2   = sanitizeCreditCardId(data.creditCardId2);
         if (data.creditCardExpiry2 !== undefined) memberUpdate.creditCardExpiry2 = data.creditCardExpiry2 || null;
         if (data.creditCardLast4_2 !== undefined) memberUpdate.creditCardLast4_2 = data.creditCardLast4_2 || null;
-        if (data.creditCardId3   !== undefined) memberUpdate.creditCardId3   = data.creditCardId3   || null;
+        if (data.creditCardId3   !== undefined) memberUpdate.creditCardId3   = sanitizeCreditCardId(data.creditCardId3);
         if (data.creditCardExpiry3 !== undefined) memberUpdate.creditCardExpiry3 = data.creditCardExpiry3 || null;
         if (data.creditCardLast4_3 !== undefined) memberUpdate.creditCardLast4_3 = data.creditCardLast4_3 || null;
         if (Object.keys(memberUpdate).length > 0) {

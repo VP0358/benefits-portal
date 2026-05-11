@@ -313,9 +313,9 @@ export default function AutoShipPanel() {
     // ① 照合成功者一覧（CSV個別行・重複あり）
     successMembers?: { memberCode: string; memberName: string; paidDate: string | null; amount: number; resultText: string; rawId?: string; rowIndex?: number }[];
     // ③ アクティブ照合失敗者（DBあり・CSV不在・活動中）
-    matchFailMembers?: { memberCode: string; memberName: string; memberStatus?: string; creditIds: string[]; normCreditIds?: string[] }[];
+    matchFailMembers?: { memberCode: string; memberName: string; memberStatus?: string; creditIds: string[]; normCreditIds?: string[]; invalidCreditIds?: string[] }[];
     // ③ 退会/停止/解約等照合失敗者
-    withdrawnFailMembers?: { memberCode: string; memberName: string; memberStatus?: string; creditIds: string[]; normCreditIds?: string[] }[];
+    withdrawnFailMembers?: { memberCode: string; memberName: string; memberStatus?: string; creditIds: string[]; normCreditIds?: string[]; invalidCreditIds?: string[] }[];
     // ① 未照合ID一覧（CSV個別行・重複あり）
     unmatchedCsvIds?: { rawId: string; normId: string; rowIndex?: number }[];
   } | null>(null);
@@ -1159,11 +1159,14 @@ export default function AutoShipPanel() {
                           <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">氏名</th>
                           <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">ステータス</th>
                           <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">登録決済ID①②③</th>
+                          <th className="px-3 py-2 text-left font-semibold whitespace-nowrap">問題</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-red-100 bg-white">
-                        {failList.map((m, i) => (
-                          <tr key={i} className="hover:bg-red-50">
+                        {failList.map((m, i) => {
+                          const hasInvalidId = m.invalidCreditIds && m.invalidCreditIds.length > 0;
+                          return (
+                          <tr key={i} className={`hover:bg-red-50 ${hasInvalidId ? "bg-amber-50" : ""}`}>
                             <td className="px-3 py-1.5 text-gray-400 text-[11px]" style={monoFont}>{i + 1}</td>
                             <td className="px-3 py-1.5">
                               <span className="font-bold text-red-700 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 text-[11px] select-all" style={monoFont}>{m.memberCode}</span>
@@ -1174,13 +1177,28 @@ export default function AutoShipPanel() {
                             </td>
                             <td className="px-3 py-1.5">
                               <div className="flex flex-wrap gap-1">
-                                {m.creditIds.map((id, j) => (
-                                  <span key={j} className="text-[11px] bg-gray-100 border border-gray-300 rounded px-1.5 py-0.5 text-gray-700 select-all" style={monoFont}>{id}</span>
-                                ))}
+                                {m.creditIds.map((id, j) => {
+                                  const isInvalid = m.invalidCreditIds?.includes(id);
+                                  return (
+                                    <span key={j} className={`text-[11px] rounded px-1.5 py-0.5 select-all border ${isInvalid ? "bg-red-100 border-red-400 text-red-700 font-bold" : "bg-gray-100 border-gray-300 text-gray-700"}`} style={monoFont}>
+                                      {id}{isInvalid && " ⚠️"}
+                                    </span>
+                                  );
+                                })}
                               </div>
                             </td>
+                            <td className="px-3 py-1.5">
+                              {hasInvalidId ? (
+                                <span className="text-[10px] text-amber-700 bg-amber-100 border border-amber-300 rounded px-1.5 py-0.5 font-bold whitespace-nowrap">
+                                  ⚠️ ID形式エラー→会員詳細で修正
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-gray-400">CSVに決済IDなし</span>
+                              )}
+                            </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
