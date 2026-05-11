@@ -35,11 +35,20 @@ const SHOP_TYPE_CONFIG: Record<string, { label:string; badge:string; color:strin
   agent:      { label:"代理店",     badge:"📍 代理店",     color:"#6b7280", bgColor:"rgba(107,114,128,0.12)", borderColor:"rgba(107,114,128,0.30)", sortOrder:4 },
 };
 
-// ── サブタブ：正規代理店 or 代理店 ──
-const SUB_TABS = [
-  { value: "authorized", label: "正規代理店" },
-  { value: "agent",      label: "代理店" },
+// ── エリア定義（都道府県 → エリア名のマッピング）──
+const AREA_GROUPS: { label: string; prefs: string[] }[] = [
+  { label: "北海道・東北エリア", prefs: ["北海道","青森県","岩手県","宮城県","秋田県","山形県","福島県"] },
+  { label: "関東エリア",         prefs: ["茨城県","栃木県","群馬県","埼玉県","千葉県","東京都","神奈川県"] },
+  { label: "北陸エリア",         prefs: ["新潟県","富山県","石川県","福井県","山梨県","長野県"] },
+  { label: "東海エリア",         prefs: ["岐阜県","静岡県","愛知県","三重県"] },
+  { label: "近畿エリア",         prefs: ["滋賀県","京都府","大阪府","兵庫県","奈良県","和歌山県"] },
+  { label: "中国エリア",         prefs: ["鳥取県","島根県","岡山県","広島県","山口県"] },
+  { label: "四国エリア",         prefs: ["徳島県","香川県","愛媛県","高知県"] },
+  { label: "九州・沖縄エリア",   prefs: ["福岡県","佐賀県","長崎県","熊本県","大分県","宮崎県","鹿児島県","沖縄県"] },
 ];
+function getPrefArea(pref: string): string {
+  return AREA_GROUPS.find(a => a.prefs.includes(pref))?.label ?? "その他";
+}
 
 // ── デザイントークン（参考画像：ライトベージュ×深紺ゴールドサロンUI） ──
 const GOLD       = "#c9a84c";
@@ -751,10 +760,17 @@ export default function MemberDashboard({
   // 肌診断モーダル状態
   const [skinModal, setSkinModal] = useState<{ menuId:string; title:string; shops:SkinShop[] } | null>(null);
   const [skinPhotoViewer, setSkinPhotoViewer] = useState<{ photos:string[]; index:number } | null>(null);
-  // 肌診断サブタブ（正規代理店 or 代理店）
-  const [skinSubTab, setSkinSubTab] = useState<"authorized"|"agent">("authorized");
-  // 選択中の都道府県フィルター
-  const [skinPrefFilter, setSkinPrefFilter] = useState<string|null>(null);
+  // 肌診断エリアジャンプ用ref
+  const skinAreaRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const skinScrollRef = useRef<HTMLDivElement | null>(null);
+  function jumpToArea(label: string) {
+    const el = skinAreaRefs.current[label];
+    const container = skinScrollRef.current;
+    if (el && container) {
+      const top = el.offsetTop - 8;
+      container.scrollTo({ top, behavior: "smooth" });
+    }
+  }
 
   useEffect(()=>{
     fetch("/api/my/dashboard-points").then(r=>r.json()).then(d=>{if(!d.error)setDashboardPoints(d);}).catch(()=>{});
@@ -1183,7 +1199,7 @@ export default function MemberDashboard({
         {skinModal&&(
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
             style={{background:"rgba(10,22,40,0.92)",backdropFilter:"blur(8px)"}}
-            onClick={()=>{setSkinModal(null);setSkinPrefFilter(null);}}>
+            onClick={()=>{setSkinModal(null);}}>
             <div className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl flex flex-col overflow-hidden"
               style={{
                 background:`linear-gradient(160deg,${NAVY} 0%,${NAVY_CARD} 30%,${NAVY_CARD2} 70%,${NAVY_CARD3} 100%)`,
@@ -1212,161 +1228,168 @@ export default function MemberDashboard({
                     <h2 className="font-jp font-bold text-white text-sm leading-tight">{skinModal.title} — 全国代理店</h2>
                   </div>
                 </div>
-                <button onClick={()=>{setSkinModal(null);setSkinPrefFilter(null);}}
+                <button onClick={()=>{setSkinModal(null);}}
                   className="w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold transition"
                   style={{background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.10)",color:"rgba(255,255,255,0.45)"}}>✕</button>
               </div>
 
-              {/* ── 特別カテゴリ（本部・直営・全国）固定表示 ── */}
-              {["hq","direct","nationwide"].map(typeKey=>{
-                const typeCfg = SHOP_TYPE_CONFIG[typeKey];
-                const typeShops = skinModal.shops.filter(s=>(s.shopType??"agent")===typeKey);
-                if(typeShops.length===0) return null;
-                return (
-                  <div key={typeKey} className="px-4 pt-3 flex-shrink-0"
-                    style={{borderBottom:`1px solid rgba(255,255,255,0.06)`}}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full"
-                        style={{background:typeCfg.bgColor,color:typeCfg.color,border:`1px solid ${typeCfg.borderColor}`}}>
-                        {typeCfg.badge}
-                      </span>
-                      <span className="text-[10px]" style={{color:"rgba(255,255,255,0.30)"}}>{typeShops.length}件</span>
-                    </div>
-                    <div className="space-y-2 pb-3">
-                      {typeShops.map((shop,si)=>(
-                        <SkinShopCard key={si} shop={shop} gold={GOLD} goldLight={GOLD_LIGHT} navyCard2={NAVY_CARD2}
-                          onPhotoClick={(photos,idx)=>setSkinPhotoViewer({photos,index:idx})}/>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* ── サブタブ（正規代理店 / 代理店）── */}
               {(()=>{
-                const hasAuth  = skinModal.shops.some(s=>(s.shopType??"agent")==="authorized");
-                const hasAgent = skinModal.shops.some(s=>(s.shopType??"agent")==="agent");
-                if(!hasAuth && !hasAgent) return null;
-                // 現在のタブのshops
-                const tabShops = skinModal.shops.filter(s=>(s.shopType??"agent")===skinSubTab);
-                // 使用中の都道府県一覧
-                const usedPrefs = PREFECTURES.filter(p=>tabShops.some(s=>(s.prefecture??s.area??"")=== p));
-                // 都道府県フィルタ後のshops
-                const filteredShops = skinPrefFilter
-                  ? tabShops.filter(s=>(s.prefecture??s.area??"")=== skinPrefFilter)
-                  : tabShops;
-                return (
-                  <div className="flex flex-col flex-1 overflow-hidden">
-                    {/* タブバー */}
-                    <div className="flex gap-1 px-4 pt-3 flex-shrink-0"
-                      style={{borderTop:`1px solid rgba(255,255,255,0.06)`}}>
-                      {SUB_TABS.filter(tab=>{
-                        if(tab.value==="authorized") return hasAuth;
-                        if(tab.value==="agent") return hasAgent;
-                        return false;
-                      }).map(tab=>(
-                        <button key={tab.value} type="button"
-                          onClick={()=>{setSkinSubTab(tab.value as "authorized"|"agent");setSkinPrefFilter(null);}}
-                          className="flex-1 rounded-xl py-2 text-xs font-bold font-jp transition-all"
-                          style={skinSubTab===tab.value
-                            ?{background:`linear-gradient(135deg,${GOLD},${GOLD_LIGHT})`,color:NAVY,boxShadow:`0 4px 12px ${GOLD}40`}
-                            :{background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.45)",border:"1px solid rgba(255,255,255,0.10)"}
-                          }>
-                          {tab.value==="authorized"?"✅ 正規代理店":"📍 代理店"}
-                          <span className="ml-1.5 text-[10px] opacity-70">({skinModal.shops.filter(s=>(s.shopType??"agent")===tab.value).length})</span>
-                        </button>
-                      ))}
+                // ── 固定3種（本部・直営・全国）をスクロール外に表示 ──
+                const fixedTypes = ["hq","direct","nationwide"] as const;
+                const fixedBlocks = fixedTypes.map(typeKey=>{
+                  const typeCfg = SHOP_TYPE_CONFIG[typeKey];
+                  const typeShops = skinModal.shops.filter(s=>(s.shopType??"agent")===typeKey);
+                  if(typeShops.length===0) return null;
+                  return (
+                    <div key={typeKey} className="px-4 pt-3 flex-shrink-0"
+                      style={{borderBottom:`1px solid rgba(255,255,255,0.06)`}}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full"
+                          style={{background:typeCfg.bgColor,color:typeCfg.color,border:`1px solid ${typeCfg.borderColor}`}}>
+                          {typeCfg.badge}
+                        </span>
+                        <span className="text-[10px]" style={{color:"rgba(255,255,255,0.30)"}}>{typeShops.length}件</span>
+                      </div>
+                      <div className="space-y-2 pb-3">
+                        {typeShops.map((shop,si)=>(
+                          <SkinShopCard key={si} shop={shop} gold={GOLD} goldLight={GOLD_LIGHT} navyCard2={NAVY_CARD2}
+                            onPhotoClick={(photos,idx)=>setSkinPhotoViewer({photos,index:idx})}/>
+                        ))}
+                      </div>
                     </div>
+                  );
+                });
 
-                    {/* 都道府県フィルターバー */}
-                    {usedPrefs.length > 0 && (
-                      <div className="px-4 pt-2 flex-shrink-0">
-                        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
-                          <button type="button"
-                            onClick={()=>setSkinPrefFilter(null)}
-                            className="flex-shrink-0 rounded-full px-3 py-1 text-[10px] font-bold transition-all"
-                            style={!skinPrefFilter
-                              ?{background:GOLD,color:NAVY}
-                              :{background:"rgba(255,255,255,0.07)",color:"rgba(255,255,255,0.45)",border:"1px solid rgba(255,255,255,0.10)"}
-                            }>
-                            すべて
-                          </button>
-                          {usedPrefs.map(pref=>(
-                            <button key={pref} type="button"
-                              onClick={()=>setSkinPrefFilter(skinPrefFilter===pref?null:pref)}
-                              className="flex-shrink-0 rounded-full px-3 py-1 text-[10px] font-bold transition-all"
-                              style={skinPrefFilter===pref
-                                ?{background:GOLD,color:NAVY}
-                                :{background:"rgba(255,255,255,0.07)",color:"rgba(255,255,255,0.55)",border:"1px solid rgba(255,255,255,0.10)"}
-                              }>
-                              {pref}
+                // ── 正規代理店・代理店をエリアごとにまとめる ──
+                const localShops = skinModal.shops.filter(s=>{
+                  const t = s.shopType??"agent";
+                  return t==="authorized" || t==="agent";
+                });
+                const hasLocal = localShops.length > 0;
+
+                // エリアごとのグループ構築
+                // 各エリアに該当する都道府県のshopsを収集し、都道府県順→種別（正規→代理店）順でソート
+                const areaBlocks = !hasLocal ? null : AREA_GROUPS.map(area=>{
+                  const areaShops = localShops.filter(s=>{
+                    const pref = s.prefecture??s.area??"";
+                    return area.prefs.includes(pref);
+                  }).sort((a,b)=>{
+                    // 都道府県順
+                    const ap = area.prefs.indexOf(a.prefecture??a.area??"");
+                    const bp = area.prefs.indexOf(b.prefecture??b.area??"");
+                    if(ap!==bp) return ap-bp;
+                    // 種別順：authorized(0) < agent(1)
+                    const at = (a.shopType??"agent")==="authorized" ? 0 : 1;
+                    const bt = (b.shopType??"agent")==="authorized" ? 0 : 1;
+                    return at-bt;
+                  });
+                  if(areaShops.length===0) return null;
+
+                  // 都道府県ごとにさらにグループ化
+                  const prefGroups: {pref:string; shops:SkinShop[]}[] = [];
+                  areaShops.forEach(shop=>{
+                    const pref = shop.prefecture??shop.area??"";
+                    const g = prefGroups.find(g=>g.pref===pref);
+                    if(g) g.shops.push(shop);
+                    else prefGroups.push({pref,shops:[shop]});
+                  });
+
+                  return {area, prefGroups, count: areaShops.length};
+                }).filter(Boolean) as {area:{label:string;prefs:string[]};prefGroups:{pref:string;shops:SkinShop[]}[];count:number}[];
+
+                // エリアジャンプボタン表示用（店舗が存在するエリアのみ）
+                const activeAreaLabels = areaBlocks ? areaBlocks.map(b=>b.area.label) : [];
+
+                return (
+                  <>
+                    {/* 固定表示（本部・直営・全国） */}
+                    {fixedBlocks}
+
+                    {/* ── エリアジャンプボタン ── */}
+                    {activeAreaLabels.length > 0 && (
+                      <div className="px-4 pt-3 pb-2 flex-shrink-0"
+                        style={{borderTop:`1px solid rgba(255,255,255,0.06)`}}>
+                        <p className="text-[9px] font-bold mb-2 tracking-widest" style={{color:`${GOLD}80`}}>▼ エリアから探す</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {activeAreaLabels.map(label=>(
+                            <button key={label} type="button"
+                              onClick={()=>jumpToArea(label)}
+                              className="rounded-full px-2.5 py-1 text-[10px] font-bold transition-all active:scale-95"
+                              style={{background:`${GOLD}18`,color:GOLD_LIGHT,border:`1px solid ${GOLD}35`}}>
+                              {label.replace("エリア","")}
                             </button>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {/* 代理店リスト */}
-                    <div className="overflow-y-auto flex-1 px-4 py-3 pb-8">
-                      {filteredShops.length===0?(
-                        <div className="text-center py-10">
-                          <p className="text-sm font-jp" style={{color:"rgba(255,255,255,0.35)"}}>
-                            {skinPrefFilter ? `${skinPrefFilter}の代理店はありません` : "代理店情報がありません"}
-                          </p>
-                        </div>
-                      ):(
-                        <div className="space-y-3">
-                          {/* 都道府県グループ別 */}
-                          {(()=>{
-                            if(skinPrefFilter) {
-                              // フィルター選択時はグループなし
-                              return filteredShops.map((shop,si)=>(
-                                <SkinShopCard key={si} shop={shop} gold={GOLD} goldLight={GOLD_LIGHT} navyCard2={NAVY_CARD2}
-                                  onPhotoClick={(photos,idx)=>setSkinPhotoViewer({photos,index:idx})}/>
-                              ));
-                            }
-                            // 都道府県グループ
-                            const groups: {pref:string; shops:SkinShop[]}[] = [];
-                            const noPrefShops: SkinShop[] = [];
-                            filteredShops.forEach(shop=>{
-                              const pref = shop.prefecture??shop.area??"";
-                              if(!pref) { noPrefShops.push(shop); return; }
-                              const g = groups.find(g=>g.pref===pref);
-                              if(g) g.shops.push(shop);
-                              else groups.push({pref,shops:[shop]});
-                            });
-                            // PREFECTURES順に並べ替え
-                            groups.sort((a,b)=>{
-                              const ai=PREFECTURES.indexOf(a.pref);
-                              const bi=PREFECTURES.indexOf(b.pref);
-                              return (ai===-1?999:ai)-(bi===-1?999:bi);
-                            });
-                            if(noPrefShops.length>0) groups.push({pref:"",shops:noPrefShops});
-                            return groups.map((group,gi)=>(
-                              <div key={gi}>
-                                {group.pref && (
-                                  <div className="flex items-center gap-2 mb-1.5 mt-2">
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                                      style={{background:`${GOLD}18`,color:GOLD_LIGHT,border:`1px solid ${GOLD}30`}}>
-                                      📍 {group.pref}
-                                    </span>
-                                    <span className="text-[9px]" style={{color:"rgba(255,255,255,0.25)"}}>{group.shops.length}件</span>
-                                    <div className="flex-1 h-px" style={{background:`linear-gradient(90deg,${GOLD}25,transparent)`}}/>
+                    {/* ── エリア別代理店リスト（スクロール領域） ── */}
+                    {hasLocal && (
+                      <div ref={skinScrollRef} className="overflow-y-auto flex-1 px-4 py-2 pb-8 space-y-1">
+                        {areaBlocks!.map(({area, prefGroups, count})=>(
+                          <div key={area.label}
+                            ref={el=>{ skinAreaRefs.current[area.label]=el; }}>
+                            {/* エリアバー */}
+                            <div className="flex items-center gap-2 py-2 mt-1 mb-1 sticky top-0 z-10"
+                              style={{background:`linear-gradient(90deg,rgba(10,22,40,0.98),rgba(13,30,56,0.95))`,borderBottom:`1px solid ${GOLD}25`}}>
+                              <div className="h-3 w-0.5 rounded-full" style={{background:GOLD}}/>
+                              <span className="text-[11px] font-bold font-jp tracking-wide" style={{color:GOLD_LIGHT}}>{area.label}</span>
+                              <span className="text-[9px]" style={{color:"rgba(255,255,255,0.30)"}}>{count}件</span>
+                              <div className="flex-1 h-px" style={{background:`linear-gradient(90deg,${GOLD}30,transparent)`}}/>
+                            </div>
+                            {/* 都道府県グループ */}
+                            <div className="space-y-3 pt-1">
+                              {prefGroups.map(({pref, shops})=>(
+                                <div key={pref}>
+                                  {pref && (
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                        style={{background:`${GOLD}14`,color:GOLD_LIGHT,border:`1px solid ${GOLD}28`}}>
+                                        📍 {pref}
+                                      </span>
+                                      <span className="text-[9px]" style={{color:"rgba(255,255,255,0.25)"}}>{shops.length}件</span>
+                                      <div className="flex-1 h-px" style={{background:`linear-gradient(90deg,${GOLD}20,transparent)`}}/>
+                                    </div>
+                                  )}
+                                  <div className="space-y-2">
+                                    {shops.map((shop,si)=>(
+                                      <SkinShopCard key={si} shop={shop} gold={GOLD} goldLight={GOLD_LIGHT} navyCard2={NAVY_CARD2}
+                                        onPhotoClick={(photos,idx)=>setSkinPhotoViewer({photos,index:idx})}/>
+                                    ))}
                                   </div>
-                                )}
-                                <div className="space-y-2">
-                                  {group.shops.map((shop,si)=>(
-                                    <SkinShopCard key={si} shop={shop} gold={GOLD} goldLight={GOLD_LIGHT} navyCard2={NAVY_CARD2}
-                                      onPhotoClick={(photos,idx)=>setSkinPhotoViewer({photos,index:idx})}/>
-                                  ))}
                                 </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        {/* 都道府県未設定の代理店 */}
+                        {(()=>{
+                          const noPref = localShops.filter(s=>!(s.prefecture??s.area??""));
+                          if(noPref.length===0) return null;
+                          return (
+                            <div>
+                              <div className="flex items-center gap-2 py-2 mt-1 mb-1"
+                                style={{borderBottom:`1px solid rgba(255,255,255,0.08)`}}>
+                                <span className="text-[10px] font-bold" style={{color:"rgba(255,255,255,0.40)"}}>エリア未設定</span>
+                                <span className="text-[9px]" style={{color:"rgba(255,255,255,0.25)"}}>{noPref.length}件</span>
                               </div>
-                            ));
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                              <div className="space-y-2 pt-1">
+                                {noPref.map((shop,si)=>(
+                                  <SkinShopCard key={si} shop={shop} gold={GOLD} goldLight={GOLD_LIGHT} navyCard2={NAVY_CARD2}
+                                    onPhotoClick={(photos,idx)=>setSkinPhotoViewer({photos,index:idx})}/>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                    {!hasLocal && (
+                      <div className="flex-1 flex items-center justify-center py-10">
+                        <p className="text-sm font-jp" style={{color:"rgba(255,255,255,0.35)"}}>代理店情報がありません</p>
+                      </div>
+                    )}
+                  </>
                 );
               })()}
 
