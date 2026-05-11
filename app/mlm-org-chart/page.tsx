@@ -89,20 +89,26 @@ function getLevelColor(level: number) {
 // ── ④ ステータス設定
 // DBの MlmMemberStatus enum 値: active / autoship / lapsed / suspended / withdrawn / midCancel
 type StatusConfig = {
-  icon: string;   // SVGアイコンキー
+  icon: string;      // SVGアイコンキー
   label: string; borderColor: string; bgColor: string;
   textColor: string; badgeBg: string; badgeText: string;
-  iconColor: string;  // アイコンの塗り色
+  iconColor: string; // アイコンの塗り色
 };
 const STATUS_CONFIG: Record<string, StatusConfig> = {
-  //           icon          label           borderColor   bgColor                         textColor   badgeBg                         badgeText   iconColor
-  active:    { icon: "check-circle", label: "活動中",      borderColor: "#22c55e", bgColor: "rgba(34,197,94,0.07)",   textColor: "#16a34a", badgeBg: "rgba(34,197,94,0.14)",   badgeText: "#16a34a", iconColor: "#22c55e" },
+  // DB enum値（6種）
+  active:    { icon: "face-smile",   label: "活動中",      borderColor: "#22c55e", bgColor: "rgba(34,197,94,0.07)",   textColor: "#16a34a", badgeBg: "rgba(34,197,94,0.14)",   badgeText: "#16a34a", iconColor: "#eab308" },
   autoship:  { icon: "robot",        label: "オートシップ", borderColor: "#6366f1", bgColor: "rgba(99,102,241,0.07)",  textColor: "#4f46e5", badgeBg: "rgba(99,102,241,0.14)",  badgeText: "#6366f1", iconColor: "#818cf8" },
-  lapsed:    { icon: "x-circle",     label: "失効",        borderColor: "#ef4444", bgColor: "rgba(239,68,68,0.07)",   textColor: "#b91c1c", badgeBg: "rgba(239,68,68,0.14)",   badgeText: "#b91c1c", iconColor: "#ef4444" },
-  suspended: { icon: "pause-circle", label: "停止",        borderColor: "#dc2626", bgColor: "rgba(220,38,38,0.08)",   textColor: "#991b1b", badgeBg: "rgba(220,38,38,0.14)",   badgeText: "#991b1b", iconColor: "#f87171" },
-  withdrawn: { icon: "logout",       label: "退会",        borderColor: "#9ca3af", bgColor: "rgba(156,163,175,0.07)", textColor: "#6b7280", badgeBg: "rgba(156,163,175,0.12)", badgeText: "#6b7280", iconColor: "#9ca3af" },
-  midCancel: { icon: "clock",        label: "中途解約",    borderColor: "#3b82f6", bgColor: "rgba(59,130,246,0.07)",  textColor: "#1d4ed8", badgeBg: "rgba(59,130,246,0.14)",  badgeText: "#1d4ed8", iconColor: "#60a5fa" },
+  lapsed:    { icon: "face-dizzy",   label: "失効",        borderColor: "#ef4444", bgColor: "rgba(239,68,68,0.07)",   textColor: "#b91c1c", badgeBg: "rgba(239,68,68,0.14)",   badgeText: "#b91c1c", iconColor: "#ef4444" },
+  suspended: { icon: "face-xeyes",   label: "停止",        borderColor: "#f97316", bgColor: "rgba(249,115,22,0.07)",  textColor: "#c2410c", badgeBg: "rgba(249,115,22,0.14)",  badgeText: "#c2410c", iconColor: "#f97316" },
+  withdrawn: { icon: "face-tear",    label: "退会",        borderColor: "#9ca3af", bgColor: "rgba(156,163,175,0.07)", textColor: "#6b7280", badgeBg: "rgba(156,163,175,0.12)", badgeText: "#6b7280", iconColor: "#9ca3af" },
+  midCancel: { icon: "face-wavy",    label: "中途解約",    borderColor: "#9ca3af", bgColor: "rgba(156,163,175,0.07)", textColor: "#6b7280", badgeBg: "rgba(156,163,175,0.12)", badgeText: "#6b7280", iconColor: "#9ca3af" },
 };
+// 凡例表示用追加エントリ（DBには存在しないが凡例に説明として表示）
+const LEGEND_EXTRA: StatusConfig[] = [
+  { icon: "sprout",    label: "登録中",      borderColor: "#4ade80", bgColor: "rgba(74,222,128,0.07)",  textColor: "#15803d", badgeBg: "rgba(74,222,128,0.14)",  badgeText: "#15803d", iconColor: "#4ade80" },
+  { icon: "hourglass", label: "入金待ち",    borderColor: "#fbbf24", bgColor: "rgba(251,191,36,0.07)",  textColor: "#92400e", badgeBg: "rgba(251,191,36,0.14)",  badgeText: "#92400e", iconColor: "#fbbf24" },
+  { icon: "face-wavy", label: "クーリングオフ", borderColor: "#9ca3af", bgColor: "rgba(156,163,175,0.07)", textColor: "#6b7280", badgeBg: "rgba(156,163,175,0.12)", badgeText: "#6b7280", iconColor: "#9ca3af" },
+];
 const DEFAULT_STATUS: StatusConfig = {
   icon: "question", label: "不明", borderColor: "#9ca3af", bgColor: "rgba(156,163,175,0.06)",
   textColor: "#6b7280", badgeBg: "rgba(156,163,175,0.10)", badgeText: "#6b7280", iconColor: "#9ca3af",
@@ -112,33 +118,134 @@ function getStatusConfig(status: string): StatusConfig {
 }
 
 // ── SVGステータスアイコン ────────────────────────────────────
-// 絵文字と違い color props で自由に色を変更できる
+// カラー指定で色が変わる顔型 SVG アイコン
 function StatusIcon({ iconKey, color, size = 20 }: { iconKey: string; color: string; size?: number }) {
   const s = size;
-  const props = { width: s, height: s, viewBox: "0 0 24 24", fill: "none",
-    stroke: color, strokeWidth: 2.2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  // 顔パーツ（目・口）は fill で塗りつぶす
+  const base = { width: s, height: s, viewBox: "0 0 24 24" };
+  const sw = Math.max(1.4, s * 0.1);  // strokeWidth を size に比例
   switch (iconKey) {
-    // active: チェックマーク付き丸 → 緑でアクティブ感
-    case "check-circle":
-      return <svg {...props}><circle cx="12" cy="12" r="10"/><polyline points="9 12 11.5 14.5 15.5 9.5"/></svg>;
-    // autoship: ロボット/歯車 → 自動処理感
+
+    // active: 黄色のニコニコ顔
+    case "face-smile":
+      return (
+        <svg {...base} fill="none">
+          <circle cx="12" cy="12" r="10" stroke={color} strokeWidth={sw} fill={color+"22"}/>
+          {/* 目 */}
+          <circle cx="9"  cy="10" r="1.3" fill={color}/>
+          <circle cx="15" cy="10" r="1.3" fill={color}/>
+          {/* ニコニコ口 */}
+          <path d="M8 14 Q12 18 16 14" stroke={color} strokeWidth={sw} fill="none" strokeLinecap="round"/>
+        </svg>
+      );
+
+    // autoship: ロボット顔
     case "robot":
-      return <svg {...props}><rect x="5" y="8" width="14" height="10" rx="2"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/><circle cx="9" cy="13" r="1" fill={color} stroke="none"/><circle cx="15" cy="13" r="1" fill={color} stroke="none"/><path d="M9 17h6"/></svg>;
-    // lapsed: ×印丸 → 失効/無効
-    case "x-circle":
-      return <svg {...props}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>;
-    // suspended: 一時停止 → 停止中
-    case "pause-circle":
-      return <svg {...props}><circle cx="12" cy="12" r="10"/><line x1="10" y1="8" x2="10" y2="16"/><line x1="14" y1="8" x2="14" y2="16"/></svg>;
-    // withdrawn: 出口矢印 → 退会/離脱
-    case "logout":
-      return <svg {...props}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
-    // midCancel: 時計 → 処理中/途中
-    case "clock":
-      return <svg {...props}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+      return (
+        <svg {...base} fill="none">
+          <rect x="4" y="7" width="16" height="12" rx="3" stroke={color} strokeWidth={sw}/>
+          <path d="M9 7V5.5a3 3 0 0 1 6 0V7" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+          {/* 目(円型) */}
+          <circle cx="9"  cy="13" r="1.5" fill={color}/>
+          <circle cx="15" cy="13" r="1.5" fill={color}/>
+          {/* 口(ストレート) */}
+          <line x1="9" y1="17" x2="15" y2="17" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+          {/* アンテナ */}
+          <line x1="12" y1="4" x2="12" y2="7" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+          <circle cx="12" cy="3.5" r="1" fill={color}/>
+        </svg>
+      );
+
+    // lapsed: 赤いビックリ顔（目が×）
+    case "face-dizzy":
+      return (
+        <svg {...base} fill="none">
+          <circle cx="12" cy="12" r="10" stroke={color} strokeWidth={sw} fill={color+"15"}/>
+          {/* 目: ×印 */}
+          <line x1="7.5" y1="8.5" x2="9.5"  y2="10.5" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+          <line x1="9.5" y1="8.5" x2="7.5"  y2="10.5" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+          <line x1="14.5" y1="8.5" x2="16.5" y2="10.5" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+          <line x1="16.5" y1="8.5" x2="14.5" y2="10.5" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+          {/* 口: 驚き形 */}
+          <ellipse cx="12" cy="16" rx="2.5" ry="1.8" stroke={color} strokeWidth={sw} fill="none"/>
+        </svg>
+      );
+
+    // suspended: オレンジの目が×顔
+    case "face-xeyes":
+      return (
+        <svg {...base} fill="none">
+          <circle cx="12" cy="12" r="10" stroke={color} strokeWidth={sw} fill={color+"15"}/>
+          {/* 目: ×印 */}
+          <line x1="7.5" y1="8.5" x2="9.5"  y2="10.5" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+          <line x1="9.5" y1="8.5" x2="7.5"  y2="10.5" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+          <line x1="14.5" y1="8.5" x2="16.5" y2="10.5" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+          <line x1="16.5" y1="8.5" x2="14.5" y2="10.5" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+          {/* 口: 平坦 */}
+          <line x1="8.5" y1="16" x2="15.5" y2="16" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+        </svg>
+      );
+
+    // withdrawn: グレーの涙顔
+    case "face-tear":
+      return (
+        <svg {...base} fill="none">
+          <circle cx="12" cy="12" r="10" stroke={color} strokeWidth={sw} fill={color+"15"}/>
+          {/* 目 */}
+          <circle cx="9"  cy="10" r="1.2" fill={color}/>
+          <circle cx="15" cy="10" r="1.2" fill={color}/>
+          {/* 涙 */}
+          <path d="M15 10.5 Q16 13 15 14.5 Q14 16 15 14.5" stroke={color} strokeWidth={sw*0.9} fill="none" strokeLinecap="round"/>
+          {/* 下向き口 */}
+          <path d="M8.5 16.5 Q12 14 15.5 16.5" stroke={color} strokeWidth={sw} fill="none" strokeLinecap="round"/>
+        </svg>
+      );
+
+    // midCancel / cooling-off: グレーの口がなみなみ顔
+    case "face-wavy":
+      return (
+        <svg {...base} fill="none">
+          <circle cx="12" cy="12" r="10" stroke={color} strokeWidth={sw} fill={color+"15"}/>
+          {/* 目 */}
+          <circle cx="9"  cy="10" r="1.2" fill={color}/>
+          <circle cx="15" cy="10" r="1.2" fill={color}/>
+          {/* なみなみ口 */}
+          <path d="M8 15.5 Q9.5 14 11 15.5 Q12.5 17 14 15.5 Q15.5 14 16 15.5"
+            stroke={color} strokeWidth={sw} fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      );
+
+    // 登録中: 新芽
+    case "sprout":
+      return (
+        <svg {...base} fill="none">
+          <path d="M12 21V10" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+          <path d="M12 10 C12 10 7 9 6 4 C9 4 12 7 12 10Z" stroke={color} strokeWidth={sw} fill={color+"30"} strokeLinejoin="round"/>
+          <path d="M12 13 C12 13 16 11 18 7 C15 6 12 9 12 13Z" stroke={color} strokeWidth={sw} fill={color+"30"} strokeLinejoin="round"/>
+        </svg>
+      );
+
+    // 入金待ち: 砂時計
+    case "hourglass":
+      return (
+        <svg {...base} fill="none">
+          <path d="M6 3h12M6 21h12" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+          <path d="M6 3 Q6 12 12 12 Q18 12 18 21 M18 3 Q18 12 12 12 Q6 12 6 21"
+            stroke={color} strokeWidth={sw} fill="none" strokeLinejoin="round"/>
+          {/* 流れ落ちる砂 */}
+          <path d="M9 18.5 Q12 16 15 18.5" stroke={color} strokeWidth={sw*0.8} fill={color+"40"} strokeLinecap="round"/>
+        </svg>
+      );
+
     // fallback
     default:
-      return <svg {...props}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
+      return (
+        <svg {...base} fill="none">
+          <circle cx="12" cy="12" r="10" stroke={color} strokeWidth={sw}/>
+          <line x1="12" y1="8" x2="12" y2="12" stroke={color} strokeWidth={sw} strokeLinecap="round"/>
+          <circle cx="12" cy="16" r="0.8" fill={color}/>
+        </svg>
+      );
   }
 }
 
@@ -345,12 +452,16 @@ function MeCard({ me, orgType }: { me: MeData; orgType: OrgType }) {
 
 // ── ③ 凡例パネル ────────────────────────────────────────────
 function LegendPanel() {
+  const allLegend = [
+    ...Object.values(STATUS_CONFIG),
+    ...LEGEND_EXTRA,
+  ];
   return (
     <div className="mx-4 rounded-2xl px-4 py-4" style={{ background: LINEN, border: "1px solid rgba(201,168,76,0.20)" }}>
       <p className="font-black mb-2" style={{ fontSize: "13px", color: NAVY }}>凡例 — ステータス</p>
       <div className="flex flex-wrap gap-2">
-        {Object.entries(STATUS_CONFIG).map(([key, sc]) => (
-          <span key={key} className="inline-flex items-center gap-1.5 font-bold rounded-lg px-2.5 py-1.5"
+        {allLegend.map((sc, i) => (
+          <span key={i} className="inline-flex items-center gap-1.5 font-bold rounded-lg px-2.5 py-1.5"
             style={{ fontSize: "12px", background: sc.badgeBg, color: sc.badgeText,
               border: `1.5px solid ${sc.borderColor}70`, lineHeight: 1.4 }}>
             <StatusIcon iconKey={sc.icon} color={sc.iconColor} size={16} />
