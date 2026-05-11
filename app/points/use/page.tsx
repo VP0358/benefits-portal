@@ -18,17 +18,18 @@ const LINEN      = "#f5f0e8";
 //  SAVpt = external + manual … 貯金ボーナス
 //            external: オートシップ決済時に自動付与
 //            manual  : 管理者が手動で付与・調整
-//          → この2つを合算して「SAVpt」として表示・利用
 //
 // 利用時の消費順序: externalPointsBalance を先に消費、
 //                  足りなければ manualPointsBalance から補充
 //
 type Wallet = {
   savingsPoints:         number; // MlmMember.savingsPoints（SAV合計付与pt）
+  monthlyManualPt:       number; // 今月1日以降の手動付与合計（表示用・毎月リセット）
+  monthlyExternalPt:     number; // 今月1日以降の外部付与合計（表示用・毎月リセット）
   availablePointsBalance: number;
   autoPointsBalance:     number;
-  manualPointsBalance:   number; // SAVpt の一部（手動付与分）
-  externalPointsBalance: number; // SAVpt の一部（オートシップ自動付与分）
+  manualPointsBalance:   number;
+  externalPointsBalance: number;
 };
 
 export default function UsePointsPage() {
@@ -43,10 +44,10 @@ export default function UsePointsPage() {
     fetch("/api/member/wallet").then(r => r.json()).then(d => setWallet(d)).catch(() => {});
   }, []);
 
-  // SAVpt = external + manual の合算（フォーム残高・利用可能量の基準）
-  const savPt   = (wallet?.externalPointsBalance ?? 0) + (wallet?.manualPointsBalance ?? 0);
-  // 利用可能ポイント = SAV合計付与pt + 手動追加pt + 外部追加pt（管理ページと同一計算式）
-  const totalPt = (wallet?.savingsPoints ?? 0) + (wallet?.manualPointsBalance ?? 0) + (wallet?.externalPointsBalance ?? 0);
+  // 利用可能ポイント = SAV合計付与pt + 手動pt + 外部pt（管理ページと同一計算式）
+  const totalPt  = (wallet?.savingsPoints ?? 0) + (wallet?.manualPointsBalance ?? 0) + (wallet?.externalPointsBalance ?? 0);
+  // フォームの残高上限・残高表示も totalPt を基準にする
+  const savPt    = totalPt;
   const inputAmt = parseInt(amount) || 0;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -140,12 +141,16 @@ export default function UsePointsPage() {
               <span className="font-label text-sm mb-2" style={{ color: `${GOLD}80` }}>pt</span>
             </div>
 
-            {/* 内訳 3枠 */}
+            {/* 内訳 3枠
+                サービスポイント・外部ポイントは今月1日以降の付与分のみ表示（毎月リセット）
+                貯金ボーナス合計付与ptは累計値をそのまま表示                              */}
             <div className="grid grid-cols-3 gap-2">
               {/* 1. 貯金ボーナス合計付与pt */}
               <div className="rounded-xl p-2.5 flex flex-col gap-1"
                 style={{ background: `${GOLD}12`, border: `1px solid ${GOLD}30` }}>
-                <p className="font-jp text-[9px] leading-tight font-semibold" style={{ color: `${GOLD}75` }}>貯金ボーナス{"\n"}合計付与pt</p>
+                <p className="font-jp text-[9px] leading-tight font-semibold" style={{ color: `${GOLD}75` }}>
+                  貯金ボーナス{"\n"}合計付与pt
+                </p>
                 <div className="flex items-end gap-0.5 mt-auto">
                   <span className="text-lg font-black text-white leading-none">
                     {wallet === null ? "—" : (wallet.savingsPoints ?? 0).toLocaleString()}
@@ -153,24 +158,28 @@ export default function UsePointsPage() {
                   <span className="text-[9px] mb-0.5 font-label" style={{ color: `${GOLD}65` }}>pt</span>
                 </div>
               </div>
-              {/* 2. サービスポイント（手動） */}
+              {/* 2. サービスポイント（今月分の手動付与 — 毎月1日リセット） */}
               <div className="rounded-xl p-2.5 flex flex-col gap-1"
                 style={{ background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.28)" }}>
-                <p className="font-jp text-[9px] leading-tight font-semibold" style={{ color: "rgba(165,180,252,0.85)" }}>サービス{"\n"}ポイント</p>
+                <p className="font-jp text-[9px] leading-tight font-semibold" style={{ color: "rgba(165,180,252,0.85)" }}>
+                  サービス{"\n"}ポイント
+                </p>
                 <div className="flex items-end gap-0.5 mt-auto">
                   <span className="text-lg font-black text-white leading-none">
-                    {wallet === null ? "—" : (wallet.manualPointsBalance ?? 0).toLocaleString()}
+                    {wallet === null ? "—" : (wallet.monthlyManualPt ?? 0).toLocaleString()}
                   </span>
                   <span className="text-[9px] mb-0.5" style={{ color: "rgba(165,180,252,0.65)" }}>pt</span>
                 </div>
               </div>
-              {/* 3. 外部ポイント（自動） */}
+              {/* 3. 外部ポイント（今月分の外部付与 — 毎月1日リセット） */}
               <div className="rounded-xl p-2.5 flex flex-col gap-1"
                 style={{ background: "rgba(52,211,153,0.10)", border: "1px solid rgba(52,211,153,0.25)" }}>
-                <p className="font-jp text-[9px] leading-tight font-semibold" style={{ color: "rgba(110,231,183,0.85)" }}>外部{"\n"}ポイント</p>
+                <p className="font-jp text-[9px] leading-tight font-semibold" style={{ color: "rgba(110,231,183,0.85)" }}>
+                  外部{"\n"}ポイント
+                </p>
                 <div className="flex items-end gap-0.5 mt-auto">
                   <span className="text-lg font-black text-white leading-none">
-                    {wallet === null ? "—" : (wallet.externalPointsBalance ?? 0).toLocaleString()}
+                    {wallet === null ? "—" : (wallet.monthlyExternalPt ?? 0).toLocaleString()}
                   </span>
                   <span className="text-[9px] mb-0.5" style={{ color: "rgba(110,231,183,0.65)" }}>pt</span>
                 </div>
@@ -193,7 +202,7 @@ export default function UsePointsPage() {
                 SAVpt（貯金ボーナス）を利用する
               </h2>
               <p className="text-xs font-jp mt-0.5" style={{ color: `${NAVY}60` }}>
-                残高: <span className="font-bold" style={{ color: NAVY }}>{savPt.toLocaleString()}pt</span>
+                残高: <span className="font-bold" style={{ color: NAVY }}>{totalPt.toLocaleString()}pt</span>
               </p>
             </div>
           </div>
