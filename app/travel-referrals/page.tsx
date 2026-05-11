@@ -199,8 +199,8 @@ export default function TravelStatusPage() {
                 {/* ステータス大バッジ */}
                 <div className="flex items-center justify-between mb-5">
                   <div>
-                    <p className="text-[9px] font-label tracking-[0.28em] mb-1" style={{ color: `${GOLD}60` }}>TRAVEL SERVICE STATUS</p>
-                    <h2 className="text-2xl font-bold font-jp text-white leading-none">{sub.planName}</h2>
+                    <p style={{ fontSize: "11px", letterSpacing: "0.18em", fontWeight: 800, color: GOLD_LIGHT }}>TRAVEL SERVICE STATUS</p>
+                    <h2 className="font-black text-white mt-1" style={{ fontSize: "17px" }}>{sub.planName}</h2>
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <span className="text-3xl">{statusCfg.icon}</span>
