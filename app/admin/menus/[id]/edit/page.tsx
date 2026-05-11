@@ -39,10 +39,11 @@ const PREFECTURES = [
   "福岡県","佐賀県","長崎県","熊本県","大分県","宮崎県","鹿児島県","沖縄県",
 ];
 
-// ── 店舗種別（管理画面フォーム用：全国対応は除外）──
+// ── 店舗種別 ──
 const SHOP_TYPES = [
   { value: "hq",         label: "本部",       badge: "🏢 本部",       color: "#7c3aed", sortOrder: 0 },
   { value: "direct",     label: "直営",       badge: "🏪 直営",       color: "#2563eb", sortOrder: 1 },
+  { value: "nationwide", label: "全国",       badge: "🗾 全国対応",   color: "#059669", sortOrder: 2 },
   { value: "authorized", label: "正規代理店", badge: "✅ 正規代理店", color: "#d97706", sortOrder: 3 },
   { value: "agent",      label: "代理店",     badge: "📍 代理店",     color: "#6b7280", sortOrder: 4 },
 ];
