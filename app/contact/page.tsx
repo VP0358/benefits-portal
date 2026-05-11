@@ -346,7 +346,7 @@ export default function ContactPage() {
           </form>
         </div>
 
-        <p className="text-center text-xs pb-4" style={{ color: `${NAVY}45` }}>
+        <p className="text-center font-medium pb-4" style={{ fontSize: "14px", color: `${NAVY}60` }}>
           通常1〜3営業日以内にご返答いたします
         </p>
       </main>

@@ -204,9 +204,9 @@ export default function UsedCarsPage() {
 
   // ── スタイル定数 ──────────────────────────────────
   const inputClass =
-    "w-full px-4 py-3 text-sm font-medium focus:outline-none transition placeholder-gray-400 " +
+    "w-full px-4 py-3 font-medium focus:outline-none transition placeholder-gray-400 " +
     "bg-white rounded-xl border border-gray-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100";
-  const labelClass = "block text-xs font-bold mb-1.5";
+  const labelClass = "block font-bold mb-1.5";
   const requiredBadge = <span className="text-red-500 ml-0.5">*</span>;
 
   const RadioGroup = ({
@@ -216,7 +216,7 @@ export default function UsedCarsPage() {
     value: string; onChange: (v: string) => void; required?: boolean;
   }) => (
     <div>
-      <label className={labelClass} style={{ color: `${NAVY}80` }}>
+      <label className={labelClass} style={{ fontSize: "14px", color: `${NAVY}90` }}>
         {label}{required && requiredBadge}
       </label>
       <div className="flex flex-wrap gap-2">
@@ -225,11 +225,11 @@ export default function UsedCarsPage() {
             key={opt}
             type="button"
             onClick={() => onChange(opt)}
-            className="px-4 py-2 rounded-xl text-sm font-medium transition border"
+            className="px-4 py-2.5 rounded-xl font-bold transition border"
             style={
               value === opt
-                ? { background: `linear-gradient(135deg,${GOLD},${ORANGE})`, color: "white", border: "transparent" }
-                : { background: "white", color: `${NAVY}90`, borderColor: "#e5e7eb" }
+                ? { fontSize: "14px", background: `linear-gradient(135deg,${GOLD},${ORANGE})`, color: "white", border: "transparent" }
+                : { fontSize: "14px", background: "white", color: `${NAVY}90`, borderColor: "#e5e7eb" }
             }
           >
             {opt}
@@ -295,9 +295,9 @@ export default function UsedCarsPage() {
                 🚗
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[9px] tracking-[0.20em] mb-0.5 uppercase" style={{ color: `${GOLD}80` }}>USED CAR SALES</p>
-                <h2 className="text-white text-lg font-semibold leading-tight">{carHeadline}</h2>
-                <p className="text-xs mt-1.5 leading-relaxed whitespace-pre-line" style={{ color: "rgba(255,255,255,0.60)" }}>
+                <p style={{ fontSize: "11px", letterSpacing: "0.18em", fontWeight: 800, color: GOLD_LIGHT }}>USED CAR SALES</p>
+                <h2 className="text-white font-black mt-1 leading-tight" style={{ fontSize: "18px" }}>{carHeadline}</h2>
+                <p className="mt-2 leading-relaxed whitespace-pre-line" style={{ fontSize: "14px", color: "rgba(255,255,255,0.80)" }}>
                   {carDescription}
                 </p>
               </div>
@@ -306,8 +306,8 @@ export default function UsedCarsPage() {
             {carBadges.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {carBadges.map((item, i) => (
-                  <span key={i} className="text-[10px] px-2.5 py-1 rounded-full"
-                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.65)" }}>
+                  <span key={i} className="font-bold px-3 py-1 rounded-full"
+                    style={{ fontSize: "13px", background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.20)", color: "rgba(255,255,255,0.90)" }}>
                     {item}
                   </span>
                 ))}
@@ -327,14 +327,14 @@ export default function UsedCarsPage() {
           <div className="h-0.5" style={{ background: `linear-gradient(90deg,transparent,${GOLD}50,${GOLD}70,${GOLD}50,transparent)` }}/>
 
           {/* カードヘッダー */}
-          <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: `1px solid ${GOLD}18` }}>
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
+          <div className="px-5 py-4 flex items-center gap-2" style={{ borderBottom: `1px solid ${GOLD}22` }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base"
               style={{ background: `linear-gradient(135deg,${GOLD},${ORANGE})` }}>
               📋
             </div>
             <div>
-              <p className="font-semibold text-sm" style={{ color: NAVY }}>お申し込みフォーム</p>
-              <p className="text-[10px]" style={{ color: `${NAVY}55` }}>
+              <p className="font-black" style={{ fontSize: "16px", color: NAVY }}>お申し込みフォーム</p>
+              <p className="font-medium mt-0.5" style={{ fontSize: "12px", color: `${NAVY}70` }}>
                 <span className="text-red-500">*</span> は必須項目です
               </p>
             </div>
@@ -352,14 +352,14 @@ export default function UsedCarsPage() {
 
             {/* ══ セクション①：お客様情報 ══ */}
             <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${GOLD}20` }}>
-              <div className="px-3 py-2 text-xs font-bold" style={{ background: `${GOLD}15`, color: GOLD_DARK }}>
+              <div className="px-4 py-2.5 font-black" style={{ fontSize: "14px", background: `${GOLD}18`, color: GOLD_DARK }}>
                 👤 お客様情報
               </div>
               <div className="p-3 space-y-3 bg-white/60">
 
                 {/* お名前 */}
                 <div>
-                  <label className={labelClass} style={{ color: `${NAVY}80` }}>
+                  <label className={labelClass} style={{ fontSize: "14px", color: `${NAVY}90` }}>
                     お名前{requiredBadge}
                   </label>
                   <input
@@ -373,7 +373,7 @@ export default function UsedCarsPage() {
 
                 {/* 電話番号 */}
                 <div>
-                  <label className={labelClass} style={{ color: `${NAVY}80` }}>
+                  <label className={labelClass} style={{ fontSize: "14px", color: `${NAVY}90` }}>
                     電話番号{requiredBadge}
                   </label>
                   <input
@@ -387,7 +387,7 @@ export default function UsedCarsPage() {
 
                 {/* メールアドレス */}
                 <div>
-                  <label className={labelClass} style={{ color: `${NAVY}80` }}>
+                  <label className={labelClass} style={{ fontSize: "14px", color: `${NAVY}90` }}>
                     メールアドレス{requiredBadge}
                   </label>
                   <input
@@ -407,14 +407,14 @@ export default function UsedCarsPage() {
 
             {/* ══ セクション②：ご希望条件 ══ */}
             <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${GOLD}20` }}>
-              <div className="px-3 py-2 text-xs font-bold" style={{ background: `${GOLD}15`, color: GOLD_DARK }}>
+              <div className="px-4 py-2.5 font-black" style={{ fontSize: "14px", background: `${GOLD}18`, color: GOLD_DARK }}>
                 🚘 ご希望条件
               </div>
               <div className="p-3 space-y-3 bg-white/60">
 
                 {/* 希望車種 */}
                 <div>
-                  <label className={labelClass} style={{ color: `${NAVY}80` }}>
+                  <label className={labelClass} style={{ fontSize: "14px", color: `${NAVY}90` }}>
                     希望車種{requiredBadge}
                   </label>
                   <input
@@ -428,7 +428,7 @@ export default function UsedCarsPage() {
 
                 {/* 希望グレード */}
                 <div>
-                  <label className={labelClass} style={{ color: `${NAVY}80` }}>
+                  <label className={labelClass} style={{ fontSize: "14px", color: `${NAVY}90` }}>
                     希望グレード{requiredBadge}
                   </label>
                   <input
@@ -442,7 +442,7 @@ export default function UsedCarsPage() {
 
                 {/* 希望年式 */}
                 <div>
-                  <label className={labelClass} style={{ color: `${NAVY}80` }}>
+                  <label className={labelClass} style={{ fontSize: "14px", color: `${NAVY}90` }}>
                     希望年式{requiredBadge}
                   </label>
                   <input
@@ -456,7 +456,7 @@ export default function UsedCarsPage() {
 
                 {/* 希望距離数 */}
                 <div>
-                  <label className={labelClass} style={{ color: `${NAVY}80` }}>
+                  <label className={labelClass} style={{ fontSize: "14px", color: `${NAVY}90` }}>
                     希望距離数{requiredBadge}
                   </label>
                   <input
@@ -470,7 +470,7 @@ export default function UsedCarsPage() {
 
                 {/* 希望色（3色程） */}
                 <div>
-                  <label className={labelClass} style={{ color: `${NAVY}80` }}>
+                  <label className={labelClass} style={{ fontSize: "14px", color: `${NAVY}90` }}>
                     希望色（3色程）{requiredBadge}
                   </label>
                   <input
@@ -490,14 +490,14 @@ export default function UsedCarsPage() {
 
             {/* ══ セクション③：ご予算・支払い ══ */}
             <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${GOLD}20` }}>
-              <div className="px-3 py-2 text-xs font-bold" style={{ background: `${GOLD}15`, color: GOLD_DARK }}>
+              <div className="px-4 py-2.5 font-black" style={{ fontSize: "14px", background: `${GOLD}18`, color: GOLD_DARK }}>
                 💴 ご予算・お支払い
               </div>
               <div className="p-3 space-y-3 bg-white/60">
 
                 {/* 予算 */}
                 <div>
-                  <label className={labelClass} style={{ color: `${NAVY}80` }}>
+                  <label className={labelClass} style={{ fontSize: "14px", color: `${NAVY}90` }}>
                     予算{requiredBadge}
                   </label>
                   <input
@@ -527,7 +527,7 @@ export default function UsedCarsPage() {
 
             {/* ══ セクション④：オプション条件 ══ */}
             <div className="rounded-xl overflow-hidden" style={{ border: `1px solid rgba(148,163,184,0.25)` }}>
-              <div className="px-3 py-2 text-xs font-bold" style={{ background: "rgba(148,163,184,0.08)", color: `${NAVY}70` }}>
+              <div className="px-4 py-2.5 font-black" style={{ fontSize: "14px", background: "rgba(148,163,184,0.10)", color: `${NAVY}80` }}>
                 ⚙️ オプション条件（任意）
               </div>
               <div className="p-3 space-y-3 bg-white/40">
@@ -560,7 +560,7 @@ export default function UsedCarsPage() {
 
             {/* ══ セクション⑤：その他ご要望 ══ */}
             <div>
-              <label className={labelClass} style={{ color: `${NAVY}80` }}>
+              <label className={labelClass} style={{ fontSize: "14px", color: `${NAVY}90` }}>
                 その他ご要望・ご質問（任意）
               </label>
               <textarea
@@ -575,7 +575,7 @@ export default function UsedCarsPage() {
             {/* 注意書き */}
             <div className="rounded-xl px-4 py-3"
               style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}25` }}>
-              <p className="text-xs leading-relaxed" style={{ color: GOLD_DARK }}>
+              <p className="leading-relaxed" style={{ fontSize: "14px", color: GOLD_DARK }}>
                 ⚠️ ご記入いただいた情報は中古車販売のご相談にのみ使用いたします。<br />
                 担当者より確認後、記載のメールアドレスへご連絡いたします。
               </p>

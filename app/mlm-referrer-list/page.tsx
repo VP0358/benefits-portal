@@ -42,10 +42,10 @@ const STATUS_LABELS: Record<string, string> = {
 };
 type StatusTheme = { dotColor: string; textColor: string };
 const STATUS_THEME: Record<string, StatusTheme> = {
-  active:    { dotColor: "#34d399", textColor: "#6ee7b7" },
-  inactive:  { dotColor: "#6b7280", textColor: "#9ca3af" },
-  suspended: { dotColor: "#f97316", textColor: "#f97316" },
-  canceled:  { dotColor: "#f87171", textColor: "#f87171" },
+  active:    { dotColor: "#34d399", textColor: "#34d399" },
+  inactive:  { dotColor: "#9ca3af", textColor: "#d1d5db" },
+  suspended: { dotColor: "#f97316", textColor: "#fb923c" },
+  canceled:  { dotColor: "#f87171", textColor: "#fca5a5" },
   pending:   { dotColor: GOLD, textColor: GOLD_LIGHT },
 };
 const TYPE_LABELS: Record<string, string> = {
@@ -111,7 +111,7 @@ export default function MlmReferrerListPage() {
           <div className="rounded-2xl p-10 text-center" style={{ background: CARD_BG }}>
             <div className="w-8 h-8 border-2 rounded-full animate-spin mx-auto mb-3"
               style={{ borderColor: `${GOLD}30`, borderTopColor: GOLD }}></div>
-            <p className="text-sm" style={{ color: `${GOLD}70` }}>読み込み中...</p>
+            <p className="text-sm" style={{ color: `${GOLD}90` }}>読み込み中...</p>
           </div>
         )}
         {error && (
@@ -120,17 +120,17 @@ export default function MlmReferrerListPage() {
 
         {data && (
           <>
-            {/* サマリー */}
+            {/* ── サマリーカード（数字・ラベルを大きく・濃く） */}
             <div className="grid grid-cols-3 gap-3">
               {[
-                { label: "直紹介数",   value: data.totalCount,    color: GOLD },
-                { label: "ACT",        value: data.activeCount,   color: "#34d399" },
-                { label: "愛用会員",   value: data.favoriteCount, color: ORANGE },
+                { label: "直紹介数",   value: data.totalCount,    color: GOLD_LIGHT,  bg: `${GOLD}18`,   border: `${GOLD}40` },
+                { label: "ACT",        value: data.activeCount,   color: "#4ade80",   bg: "rgba(74,222,128,0.12)", border: "rgba(74,222,128,0.30)" },
+                { label: "愛用会員",   value: data.favoriteCount, color: "#fb923c",   bg: "rgba(251,146,60,0.12)", border: "rgba(251,146,60,0.30)" },
               ].map((s) => (
-                <div key={s.label} className="rounded-2xl p-3.5 text-center"
-                  style={{ background: `${s.color}10`, border: `1px solid ${s.color}25` }}>
-                  <div className="font-display font-semibold text-2xl" style={{ color: s.color }}>{s.value}</div>
-                  <div className="text-[11px] mt-0.5 font-label tracking-wider" style={{ color: "rgba(255,255,255,0.40)" }}>{s.label}</div>
+                <div key={s.label} className="rounded-2xl p-4 text-center"
+                  style={{ background: s.bg, border: `1px solid ${s.border}` }}>
+                  <div className="font-black leading-none" style={{ fontSize: "32px", color: s.color }}>{s.value}</div>
+                  <div className="font-bold mt-1.5" style={{ fontSize: "13px", color: "rgba(255,255,255,0.80)" }}>{s.label}</div>
                 </div>
               ))}
             </div>
@@ -141,7 +141,7 @@ export default function MlmReferrerListPage() {
                 <div className="space-y-2.5">
                   <div className="relative">
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                      style={{ color: `${GOLD}50` }}>
+                      style={{ color: `${GOLD}70` }}>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                     <input
@@ -149,20 +149,17 @@ export default function MlmReferrerListPage() {
                       placeholder="名前・会員IDで検索..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      className="w-full rounded-2xl pl-10 pr-4 py-3 text-sm text-white/90 placeholder-white/20 outline-none transition font-jp"
-                      style={{
-                        background: CARD_BG,
-                        border: `1px solid ${GOLD}20`,
-                      }}
+                      className="w-full rounded-2xl pl-10 pr-4 py-3 text-sm text-white placeholder-white/30 outline-none transition font-jp"
+                      style={{ background: CARD_BG, border: `1px solid ${GOLD}30` }}
                     />
                   </div>
                   <div className="flex gap-2">
                     {(["all", "active", "inactive"] as const).map((f) => (
                       <button key={f} onClick={() => setFilter(f)}
-                        className="rounded-full px-3.5 py-1.5 text-xs font-semibold transition"
+                        className="rounded-full px-4 py-1.5 text-sm font-bold transition"
                         style={filter === f
                           ? { background: `linear-gradient(135deg, ${GOLD}, ${ORANGE})`, color: "white" }
-                          : { background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.55)", border: `1px solid ${GOLD}22` }
+                          : { background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.70)", border: `1px solid ${GOLD}30` }
                         }>
                         {f === "all" ? "すべて" : f === "active" ? "ACTのみ" : "非アクティブ"}
                       </button>
@@ -171,10 +168,10 @@ export default function MlmReferrerListPage() {
                 </div>
 
                 {/* 件数表示 */}
-                <div className="text-xs font-semibold tracking-wide px-1" style={{ color: `${GOLD}60` }}>{filtered.length}件表示</div>
+                <div className="text-sm font-bold tracking-wide px-1" style={{ color: GOLD_LIGHT }}>{filtered.length}件表示</div>
 
                 {filtered.length === 0 ? (
-                  <div className="rounded-2xl p-8 text-center text-sm" style={{ background: CARD_BG, color: "rgba(255,255,255,0.25)" }}>
+                  <div className="rounded-2xl p-8 text-center text-sm" style={{ background: CARD_BG, color: "rgba(255,255,255,0.40)" }}>
                     該当する会員がいません
                   </div>
                 ) : (
@@ -183,31 +180,31 @@ export default function MlmReferrerListPage() {
                       const st = STATUS_THEME[m.status] ?? STATUS_THEME.inactive;
                       return (
                         <div key={m.id} className="rounded-2xl overflow-hidden"
-                          style={{ background: CARD_BG, border: `1px solid ${GOLD}18` }}>
+                          style={{ background: CARD_BG, border: `1px solid ${GOLD}25` }}>
                           <div className="px-5 py-4">
                             {/* 上段：名前＋バッジ */}
                             <div className="flex items-start justify-between gap-2 mb-3">
                               <div>
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-jp font-semibold text-base text-white">{m.name}</span>
+                                  <span className="font-jp font-bold text-lg text-white">{m.name}</span>
                                   {m.isActive && (
-                                    <span className="rounded-full text-xs px-2 py-0.5 font-bold border"
-                                      style={{ background: "rgba(52,211,153,0.15)", color: "#34d399", borderColor: "rgba(52,211,153,0.25)" }}>
+                                    <span className="rounded-full text-xs px-2.5 py-0.5 font-black border"
+                                      style={{ background: "rgba(52,211,153,0.18)", color: "#4ade80", borderColor: "rgba(74,222,128,0.40)" }}>
                                       ACT
                                     </span>
                                   )}
                                 </div>
-                                <div className="text-xs font-mono mt-0.5" style={{ color: "rgba(255,255,255,0.3)" }}>{m.memberCode}</div>
+                                <div className="text-xs font-mono mt-0.5" style={{ color: "rgba(255,255,255,0.55)" }}>{m.memberCode}</div>
                               </div>
                               <div className="flex flex-col items-end gap-1.5">
-                                <span className="flex items-center gap-1 text-xs font-medium">
-                                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: st.dotColor }}></span>
+                                <span className="flex items-center gap-1.5 text-sm font-bold">
+                                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: st.dotColor }}></span>
                                   <span style={{ color: st.textColor }}>{STATUS_LABELS[m.status] ?? m.status}</span>
                                 </span>
-                                <span className="text-xs px-2 py-0.5 rounded-full font-medium border"
+                                <span className="text-xs px-2.5 py-0.5 rounded-full font-bold border"
                                   style={m.memberType === "business"
-                                    ? { background: "rgba(96,165,250,0.12)", color: "#93c5fd", borderColor: "rgba(147,197,253,0.2)" }
-                                    : { background: `${GOLD}12`, color: GOLD, borderColor: `${GOLD}25` }
+                                    ? { background: "rgba(96,165,250,0.18)", color: "#93c5fd", borderColor: "rgba(147,197,253,0.35)" }
+                                    : { background: `${GOLD}18`, color: GOLD_LIGHT, borderColor: `${GOLD}40` }
                                   }>
                                   {TYPE_LABELS[m.memberType] ?? m.memberType}
                                 </span>
@@ -216,40 +213,40 @@ export default function MlmReferrerListPage() {
 
                             {/* 購入情報 */}
                             <div className="grid grid-cols-2 gap-2">
-                              <div className="rounded-xl p-2.5 border"
-                                style={{ background: `${ORANGE}10`, borderColor: `${ORANGE}20` }}>
-                                <div className="text-[10px] font-semibold mb-1" style={{ color: `${ORANGE}80` }}>今月購入</div>
+                              <div className="rounded-xl p-3 border"
+                                style={{ background: "rgba(251,146,60,0.12)", borderColor: "rgba(251,146,60,0.30)" }}>
+                                <div className="text-xs font-bold mb-1.5" style={{ color: "#fb923c" }}>今月購入</div>
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs font-bold" style={{ color: ORANGE }}>
+                                  <span className="text-sm font-black" style={{ color: "#fed7aa" }}>
                                     {m.currentMonthPoints > 0 ? `${m.currentMonthPoints.toLocaleString()}pt` : "—"}
                                   </span>
                                   {m.currentMonthAmount > 0 && (
-                                    <span className="text-[10px]" style={{ color: `${ORANGE}60` }}>¥{m.currentMonthAmount.toLocaleString()}</span>
+                                    <span className="text-xs font-bold" style={{ color: "#fb923c" }}>¥{m.currentMonthAmount.toLocaleString()}</span>
                                   )}
                                 </div>
                               </div>
-                              <div className="rounded-xl p-2.5 border"
-                                style={{ background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.06)" }}>
-                                <div className="text-[10px] font-semibold mb-1" style={{ color: "rgba(255,255,255,0.3)" }}>先月購入</div>
+                              <div className="rounded-xl p-3 border"
+                                style={{ background: "rgba(255,255,255,0.06)", borderColor: "rgba(255,255,255,0.12)" }}>
+                                <div className="text-xs font-bold mb-1.5" style={{ color: "rgba(255,255,255,0.60)" }}>先月購入</div>
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs font-bold" style={{ color: "rgba(10,22,40,0.60)" }}>
+                                  <span className="text-sm font-black" style={{ color: "rgba(255,255,255,0.85)" }}>
                                     {m.lastMonthPoints > 0 ? `${m.lastMonthPoints.toLocaleString()}pt` : "—"}
                                   </span>
                                   {m.lastMonthAmount > 0 && (
-                                    <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.25)" }}>¥{m.lastMonthAmount.toLocaleString()}</span>
+                                    <span className="text-xs font-bold" style={{ color: "rgba(255,255,255,0.50)" }}>¥{m.lastMonthAmount.toLocaleString()}</span>
                                   )}
                                 </div>
                               </div>
                             </div>
 
                             {/* 契約日・レベル */}
-                            <div className="mt-2 flex items-center gap-3 text-[11px]" style={{ color: "rgba(255,255,255,0.25)" }}>
+                            <div className="mt-2.5 flex items-center gap-3" style={{ fontSize: "12px" }}>
                               {fmtDate(m.contractDate ?? m.registeredAt) && (
-                                <span>契約: {fmtDate(m.contractDate ?? m.registeredAt)}</span>
+                                <span style={{ color: "rgba(255,255,255,0.50)" }}>契約: {fmtDate(m.contractDate ?? m.registeredAt)}</span>
                               )}
                               {m.currentLevel > 0 && (
-                                <span className="rounded-full px-1.5 py-0.5 text-[10px]"
-                                  style={{ background: `${GOLD}12`, color: `${GOLD}80` }}>LV.{m.currentLevel}</span>
+                                <span className="rounded-full px-2 py-0.5 font-bold"
+                                  style={{ background: `${GOLD}18`, color: GOLD_LIGHT, fontSize: "12px" }}>LV.{m.currentLevel}</span>
                               )}
                             </div>
                           </div>
@@ -264,15 +261,15 @@ export default function MlmReferrerListPage() {
             {data.members.length === 0 && !loading && (
               <div className="rounded-2xl p-10 text-center" style={{ background: CARD_BG }}>
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
-                  style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}20` }}>
+                  style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}25` }}>
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                    style={{ color: `${GOLD}50` }}>
+                    style={{ color: `${GOLD}70` }}>
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                 </div>
-                <div className="text-sm mb-4" style={{ color: "rgba(255,255,255,0.3)" }}>直紹介の会員がいません</div>
+                <div className="text-sm mb-4" style={{ color: "rgba(255,255,255,0.45)" }}>直紹介の会員がいません</div>
                 <Link href="/referral"
-                  className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl text-white transition"
+                  className="inline-flex items-center gap-2 text-sm font-bold px-5 py-2.5 rounded-xl text-white transition"
                   style={{ background: `linear-gradient(135deg, ${GOLD}, ${ORANGE})` }}>
                   友達を紹介する
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
