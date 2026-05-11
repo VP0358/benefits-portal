@@ -308,36 +308,36 @@ function MeCard({ me, orgType }: { me: MeData; orgType: OrgType }) {
   );
 }
 
-// ── ③ 凡例パネル（大型フォント） ─────────────────────────────
+// ── ③ 凡例パネル ────────────────────────────────────────────
 function LegendPanel() {
   return (
-    <div className="mx-4 rounded-2xl px-5 py-5" style={{ background: LINEN, border: "1px solid rgba(201,168,76,0.20)" }}>
-      <p className="font-black mb-3" style={{ fontSize: "20px", color: NAVY }}>凡例 — ステータス</p>
-      <div className="flex flex-wrap gap-3">
+    <div className="mx-4 rounded-2xl px-4 py-4" style={{ background: LINEN, border: "1px solid rgba(201,168,76,0.20)" }}>
+      <p className="font-black mb-2" style={{ fontSize: "13px", color: NAVY }}>凡例 — ステータス</p>
+      <div className="flex flex-wrap gap-2">
         {Object.entries(STATUS_CONFIG).map(([key, sc]) => (
-          <span key={key} className="inline-flex items-center gap-2 font-bold rounded-xl px-4 py-2.5"
-            style={{ fontSize: "18px", background: sc.badgeBg, color: sc.badgeText,
-              border: `2px solid ${sc.borderColor}70`, lineHeight: 1.4 }}>
-            <span style={{ fontSize: "22px", lineHeight: 1 }}>{sc.emoji}</span>
+          <span key={key} className="inline-flex items-center gap-1.5 font-bold rounded-lg px-2.5 py-1.5"
+            style={{ fontSize: "12px", background: sc.badgeBg, color: sc.badgeText,
+              border: `1.5px solid ${sc.borderColor}70`, lineHeight: 1.4 }}>
+            <span style={{ fontSize: "15px", lineHeight: 1 }}>{sc.emoji}</span>
             {sc.label}
           </span>
         ))}
       </div>
-      <p className="font-black mt-5 mb-3" style={{ fontSize: "20px", color: NAVY }}>レベル</p>
-      <div className="flex flex-wrap gap-3">
+      <p className="font-black mt-4 mb-2" style={{ fontSize: "13px", color: NAVY }}>レベル</p>
+      <div className="flex flex-wrap gap-2">
         {[0, 1, 2, 3, 4, 5].map(lv => {
           const lc = getLevelColor(lv);
           return (
-            <span key={lv} className="font-black rounded-xl px-5 py-2.5"
-              style={{ fontSize: "18px", background: lc.bg, color: lc.text,
-                border: `2px solid ${lc.border}`, boxShadow: "0 2px 6px rgba(0,0,0,0.18)" }}>
+            <span key={lv} className="font-black rounded-lg px-3 py-1.5"
+              style={{ fontSize: "12px", background: lc.bg, color: lc.text,
+                border: `1.5px solid ${lc.border}`, boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>
               LV.{lv}
             </span>
           );
         })}
       </div>
-      <div className="mt-4 flex items-center gap-2" style={{ fontSize: "15px" }}>
-        <span style={{ fontSize: "20px" }}>⚠️</span>
+      <div className="mt-3 flex items-center gap-1.5" style={{ fontSize: "11px" }}>
+        <span style={{ fontSize: "14px" }}>⚠️</span>
         <span className="font-bold" style={{ color: "#b45309" }}>要注意（4ヶ月）/ 失効（5ヶ月）</span>
         <span style={{ color: `${NAVY}55` }}>— 連続未購入</span>
       </div>
@@ -568,11 +568,10 @@ function DepthStatsModal({ depthStats, totalCount, activeCount, onClose }: {
 //   - ドラッグ（マウス/タッチ）でパン、ボタンでズーム
 function TreeViewport({ zoom, children }: { zoom: number; children: React.ReactNode }) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const isDragging  = useRef(false);
-  const dragStart   = useRef({ x: 0, y: 0 });
-  const panStart    = useRef({ x: 0, y: 0 });
-  const lastTouchDist  = useRef<number | null>(null);
-  const lastTouchScale = useRef(1);
+  const containerRef   = useRef<HTMLDivElement>(null);
+  const isDragging     = useRef(false);
+  const dragStart      = useRef({ x: 0, y: 0 });
+  const panStart       = useRef({ x: 0, y: 0 });
 
   // マウスドラッグ
   const onMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -585,36 +584,52 @@ function TreeViewport({ zoom, children }: { zoom: number; children: React.ReactN
 
   const onMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!isDragging.current) return;
-    setPan({ x: panStart.current.x + e.clientX - dragStart.current.x, y: panStart.current.y + e.clientY - dragStart.current.y });
+    setPan({
+      x: panStart.current.x + e.clientX - dragStart.current.x,
+      y: panStart.current.y + e.clientY - dragStart.current.y,
+    });
   }, []);
 
   const onMouseUp = useCallback(() => { isDragging.current = false; }, []);
 
-  // タッチ（パン＋ピンチ）
-  const onTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
-    if (e.touches.length === 1) {
-      isDragging.current    = true;
-      dragStart.current     = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      panStart.current      = { ...pan };
-      lastTouchDist.current = null;
-    }
-  }, [pan]);
+  // タッチ: passive:false のネイティブリスナーで preventDefault を確実に呼ぶ
+  // （React の合成イベントは passive なため e.preventDefault() が効かない）
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
 
-  const onTouchMove = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (e.touches.length === 1 && isDragging.current) {
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        isDragging.current = true;
+        dragStart.current  = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        panStart.current   = { x: pan.x, y: pan.y };
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isDragging.current || e.touches.length !== 1) return;
+      e.preventDefault(); // passive:false なので有効
       setPan({
         x: panStart.current.x + e.touches[0].clientX - dragStart.current.x,
         y: panStart.current.y + e.touches[0].clientY - dragStart.current.y,
       });
-    }
-  }, []);
+    };
 
-  const onTouchEnd = useCallback(() => {
-    isDragging.current    = false;
-    lastTouchDist.current = null;
-    lastTouchScale.current = 1;
-  }, []);
+    const handleTouchEnd = () => { isDragging.current = false; };
+
+    el.addEventListener("touchstart",  handleTouchStart, { passive: true });
+    el.addEventListener("touchmove",   handleTouchMove,  { passive: false });
+    el.addEventListener("touchend",    handleTouchEnd,   { passive: true });
+    el.addEventListener("touchcancel", handleTouchEnd,   { passive: true });
+
+    return () => {
+      el.removeEventListener("touchstart",  handleTouchStart);
+      el.removeEventListener("touchmove",   handleTouchMove);
+      el.removeEventListener("touchend",    handleTouchEnd);
+      el.removeEventListener("touchcancel", handleTouchEnd);
+    };
+  // pan が変わるたびに panStart を最新にするため依存に含める
+  }, [pan]);
 
   // zoom 変化時にパンをリセット
   useEffect(() => {
@@ -623,12 +638,14 @@ function TreeViewport({ zoom, children }: { zoom: number; children: React.ReactN
 
   return (
     <div
+      ref={containerRef}
       style={{
         height: "70vh",
         overflow: "auto",
         cursor: isDragging.current ? "grabbing" : "grab",
         position: "relative",
-        touchAction: "none",
+        // touchAction は設定しない → ブラウザのデフォルトスクロールを残しつつ
+        // passive:false の touchmove でドラッグ中のみ preventDefault
         background: "linear-gradient(180deg, rgba(245,240,232,0.5) 0%, rgba(245,240,232,0.95) 100%)",
         borderRadius: "1rem",
         border: `1px solid ${GOLD}20`,
@@ -637,9 +654,6 @@ function TreeViewport({ zoom, children }: { zoom: number; children: React.ReactN
       onMouseMove={onMouseMove}
       onMouseUp={onMouseUp}
       onMouseLeave={onMouseUp}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
     >
       <div
         style={{
