@@ -16,17 +16,49 @@ const iconOptions = [
 ];
 
 const menuTypes = [
-  { value: "url",        label: "🔗 外部URLリンク",   desc: "管理ページで設定したURLを開く（肌診断・細胞浴・ショッピングなど）" },
-  { value: "vp_phone",   label: "📱 VPphone",          desc: "VP未来phone申込ページへ遷移（内容を管理で変更可）" },
-  { value: "travel_sub", label: "✈️ 格安旅行",          desc: "格安旅行申込モーダルを表示" },
-  { value: "used_car",   label: "🚗 中古車販売",        desc: "中古車専用問い合わせページへ遷移（内容を管理で変更可）" },
-  { value: "contact",          label: "📞 相談窓口",          desc: "相談窓口フォームへ遷移" },
-  { value: "skin",             label: "💆 肌診断",            desc: "外部URLリンクで設定（linkUrlにURLを入力）" },
-  { value: "life_insurance",   label: "🛡️ 生命保険相談",       desc: "生命保険相談申込ページへ遷移（内容を管理で変更可）" },
-  { value: "non_life_insurance", label: "🚗 損害保険相談",     desc: "損害保険相談申込ページへ遷移（内容を管理で変更可）" },
+  { value: "url",                label: "🔗 外部URLリンク",   desc: "管理ページで設定したURLを開く（肌診断・細胞浴・ショッピングなど）" },
+  { value: "vp_phone",           label: "📱 VPphone",          desc: "VP未来phone申込ページへ遷移（内容を管理で変更可）" },
+  { value: "travel_sub",         label: "✈️ 格安旅行",          desc: "格安旅行申込モーダルを表示" },
+  { value: "used_car",           label: "🚗 中古車販売",        desc: "中古車専用問い合わせページへ遷移（内容を管理で変更可）" },
+  { value: "contact",            label: "📞 相談窓口",          desc: "相談窓口フォームへ遷移" },
+  { value: "skin",               label: "💆 肌診断",            desc: "全国代理店リストを表示（都道府県別・種別管理）" },
+  { value: "life_insurance",     label: "🛡️ 生命保険相談",       desc: "生命保険相談申込ページへ遷移（内容を管理で変更可）" },
+  { value: "non_life_insurance", label: "🚗 損害保険相談",       desc: "損害保険相談申込ページへ遷移（内容を管理で変更可）" },
 ];
 
-type SkinShop = { name: string; area: string; address: string; phone: string; url?: string; websiteUrl?: string; photos?: string[] };
+// ── 都道府県リスト（北海道→沖縄順）──
+const PREFECTURES = [
+  "北海道",
+  "青森県","岩手県","宮城県","秋田県","山形県","福島県",
+  "茨城県","栃木県","群馬県","埼玉県","千葉県","東京都","神奈川県",
+  "新潟県","富山県","石川県","福井県","山梨県","長野県",
+  "岐阜県","静岡県","愛知県","三重県",
+  "滋賀県","京都府","大阪府","兵庫県","奈良県","和歌山県",
+  "鳥取県","島根県","岡山県","広島県","山口県",
+  "徳島県","香川県","愛媛県","高知県",
+  "福岡県","佐賀県","長崎県","熊本県","大分県","宮崎県","鹿児島県","沖縄県",
+];
+
+// ── 店舗種別 ──
+const SHOP_TYPES = [
+  { value: "hq",         label: "本部",       badge: "🏢 本部",       color: "#7c3aed", sortOrder: 0 },
+  { value: "direct",     label: "直営",       badge: "🏪 直営",       color: "#2563eb", sortOrder: 1 },
+  { value: "nationwide", label: "全国",       badge: "🗾 全国対応",   color: "#059669", sortOrder: 2 },
+  { value: "authorized", label: "正規代理店", badge: "✅ 正規代理店", color: "#d97706", sortOrder: 3 },
+  { value: "agent",      label: "代理店",     badge: "📍 代理店",     color: "#6b7280", sortOrder: 4 },
+];
+
+type SkinShop = {
+  name: string;
+  area: string;
+  address: string;
+  phone: string;
+  url?: string;
+  websiteUrl?: string;
+  photos?: string[];
+  prefecture?: string;
+  shopType?: string;
+};
 
 type MenuForm = {
   title: string;
@@ -37,12 +69,10 @@ type MenuForm = {
   linkUrl: string;
   skinShops: SkinShop[];
   contactNote: string;
-  // VPphone設定
   vpHeadline: string;
   vpDescription: string;
   vpBadges: string;
   vpNote: string;
-  // 中古車設定
   carHeadline: string;
   carDescription: string;
   carBadges: string;
@@ -52,7 +82,24 @@ type MenuForm = {
   sortOrder: number;
 };
 
-const defaultShop: SkinShop = { name: "", area: "", address: "", phone: "", url: "", websiteUrl: "", photos: [] };
+const defaultShop: SkinShop = {
+  name: "", area: "", address: "", phone: "", url: "", websiteUrl: "",
+  prefecture: "", shopType: "agent",
+};
+
+// 表示順でshopsをソート
+function sortShops(shops: SkinShop[]): SkinShop[] {
+  return [...shops].sort((a, b) => {
+    const aTypeOrder = SHOP_TYPES.find(t => t.value === a.shopType)?.sortOrder ?? 99;
+    const bTypeOrder = SHOP_TYPES.find(t => t.value === b.shopType)?.sortOrder ?? 99;
+    if (aTypeOrder !== bTypeOrder) return aTypeOrder - bTypeOrder;
+    const aPrefOrder = PREFECTURES.indexOf(a.prefecture ?? "");
+    const bPrefOrder = PREFECTURES.indexOf(b.prefecture ?? "");
+    const aP = aPrefOrder === -1 ? 999 : aPrefOrder;
+    const bP = bPrefOrder === -1 ? 999 : bPrefOrder;
+    return aP - bP;
+  });
+}
 
 export default function AdminMenuEditPage() {
   const params = useParams<{ id: string }>();
@@ -95,7 +142,14 @@ export default function AdminMenuEditPage() {
         if (data.contentData) {
           try {
             const parsed = JSON.parse(data.contentData);
-            if (menuType === "skin" && Array.isArray(parsed.shops)) skinShops = parsed.shops;
+            if (menuType === "skin" && Array.isArray(parsed.shops)) {
+              skinShops = parsed.shops.map((s: SkinShop) => ({
+                ...defaultShop,
+                ...s,
+                shopType: s.shopType ?? "agent",
+                prefecture: s.prefecture ?? s.area ?? "",
+              }));
+            }
             if (menuType === "contact" && parsed.note) contactNote = parsed.note;
             if (menuType === "vp_phone") {
               if (parsed.headline)    vpHeadline    = parsed.headline;
@@ -164,7 +218,10 @@ export default function AdminMenuEditPage() {
   }
 
   function buildContentData() {
-    if (form.menuType === "skin")    return JSON.stringify({ shops: form.skinShops.filter(s => s.name) });
+    if (form.menuType === "skin") {
+      const sorted = sortShops(form.skinShops.filter(s => s.name));
+      return JSON.stringify({ shops: sorted });
+    }
     if (form.menuType === "contact") return JSON.stringify({ note: form.contactNote });
     if (form.menuType === "vp_phone") return JSON.stringify({
       headline:    form.vpHeadline,
@@ -371,92 +428,16 @@ export default function AdminMenuEditPage() {
 
           {/* 肌診断：代理店リスト */}
           {form.menuType === "skin" && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-700">全国代理店リスト</span>
-                <button type="button" onClick={addShop}
-                  className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs text-white hover:bg-emerald-700">
-                  ＋ 代理店を追加
-                </button>
-              </div>
-              {form.skinShops.map((shop, idx) => (
-                <div key={idx} className="rounded-2xl border border-slate-400 p-4 bg-slate-50 space-y-3">
-                  {/* ヘッダー行: 番号 + 並び替え + 削除 */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-700 flex-1">代理店 {idx + 1}</span>
-                    <button type="button"
-                      onClick={() => moveShop(idx, -1)}
-                      disabled={idx === 0}
-                      className="px-2 py-1 rounded-lg border border-slate-300 text-xs text-slate-600 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed"
-                      title="上へ">▲</button>
-                    <button type="button"
-                      onClick={() => moveShop(idx, 1)}
-                      disabled={idx === form.skinShops.length - 1}
-                      className="px-2 py-1 rounded-lg border border-slate-300 text-xs text-slate-600 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed"
-                      title="下へ">▼</button>
-                    {form.skinShops.length > 1 && (
-                      <button type="button" onClick={() => removeShop(idx)}
-                        className="px-2 py-1 rounded-lg border border-red-200 text-xs text-red-500 hover:bg-red-50">削除</button>
-                    )}
-                  </div>
-
-                  {/* 基本フィールド */}
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { field: "name"       as const, label: "店舗名 *",            placeholder: "○○美容院" },
-                      { field: "area"       as const, label: "エリア",               placeholder: "東京都" },
-                      { field: "address"    as const, label: "住所",                 placeholder: "渋谷区○○1-2-3", span: true },
-                      { field: "phone"      as const, label: "電話番号",             placeholder: "03-1234-5678" },
-                      { field: "url"        as const, label: "予約URL（任意）",       placeholder: "https://..." },
-                      { field: "websiteUrl" as const, label: "ウェブサイトURL（任意）", placeholder: "https://..." },
-                    ].map(({ field, label, placeholder, span }) => (
-                      <div key={field} className={span ? "col-span-2" : ""}>
-                        <label className="mb-1 block text-xs text-slate-700">{label}</label>
-                        <input className="w-full rounded-xl border px-3 py-2 text-sm font-medium text-slate-800 focus:outline-none focus:border-slate-400 bg-white"
-                          placeholder={placeholder}
-                          value={shop[field] ?? ""}
-                          onChange={e => updateShop(idx, field, e.target.value)} />
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* 写真アップロード（最大5枚） */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-semibold text-slate-700">📷 写真（最大5枚）</label>
-                      {(shop.photos ?? []).length < 5 && (
-                        <button type="button" onClick={() => addShopPhoto(idx)}
-                          className="rounded-lg bg-slate-700 px-2.5 py-1 text-xs text-white hover:bg-slate-800">
-                          ＋ 写真を追加
-                        </button>
-                      )}
-                    </div>
-                    {(shop.photos ?? []).length === 0 && (
-                      <p className="text-xs text-slate-400">写真はまだ登録されていません。「＋ 写真を追加」から追加できます。</p>
-                    )}
-                    {(shop.photos ?? []).map((photoUrl, pi) => (
-                      <div key={`${idx}-${pi}-${photoUrl}`} className="flex items-start gap-2 rounded-xl border border-slate-200 bg-white p-2">
-                        <div className="text-xs text-slate-500 font-medium mt-2 w-5 shrink-0">{pi + 1}</div>
-                        {photoUrl && (
-                          <img src={photoUrl} alt={`写真${pi + 1}`}
-                            className="h-14 w-14 rounded-lg object-cover shrink-0 border border-slate-200" />
-                        )}
-                        <div className="flex-1 space-y-1.5">
-                          <ImageUpload
-                            value={photoUrl}
-                            onChange={url => updateShopPhoto(idx, pi, url)}
-                          />
-                        </div>
-                        <button type="button" onClick={() => removeShopPhoto(idx, pi)}
-                          className="mt-1 rounded-lg border border-red-200 px-2 py-1 text-xs text-red-500 hover:bg-red-50 shrink-0">
-                          削除
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <SkinShopEditor
+              shops={form.skinShops}
+              onUpdate={(idx, field, val) => updateShop(idx, field, val)}
+              onAdd={addShop}
+              onRemove={removeShop}
+              onMove={moveShop}
+              onAddPhoto={addShopPhoto}
+              onRemovePhoto={removeShopPhoto}
+              onUpdatePhoto={updateShopPhoto}
+            />
           )}
 
           {/* 相談窓口 */}
@@ -536,12 +517,185 @@ export default function AdminMenuEditPage() {
             🗑 削除する
           </button>
           <button type="submit" disabled={saving}
-            className="flex-1 max-w-xs rounded-2xl bg-slate-900 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50 transition-colors shadow-sm">
-            {saving ? "更新中..." : "✓ 更新する"}
+            className="flex-1 max-w-xs rounded-2xl bg-slate-900 px-8 py-3 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50 transition-colors shadow-sm ml-auto">
+            {saving ? "更新中..." : "✅ 更新する"}
           </button>
         </div>
 
       </form>
+    </div>
+  );
+}
+
+// ── 肌診断 代理店エディター ──────────────────────────────────────────
+type SkinShopEditorProps = {
+  shops: SkinShop[];
+  onUpdate: (idx: number, field: keyof SkinShop, val: string) => void;
+  onAdd: () => void;
+  onRemove: (idx: number) => void;
+  onMove: (idx: number, dir: -1 | 1) => void;
+  onAddPhoto: (shopIdx: number) => void;
+  onRemovePhoto: (shopIdx: number, photoIdx: number) => void;
+  onUpdatePhoto: (shopIdx: number, photoIdx: number, url: string) => void;
+};
+
+function SkinShopEditor({ shops, onUpdate, onAdd, onRemove, onMove, onAddPhoto, onRemovePhoto, onUpdatePhoto }: SkinShopEditorProps) {
+  return (
+    <div className="space-y-3">
+      {/* ヘッダー */}
+      <div className="flex items-center justify-between">
+        <div>
+          <span className="text-sm font-bold text-slate-700">代理店リスト</span>
+          <p className="text-xs text-slate-500 mt-0.5">保存時に「種別 → 都道府県」の順に自動並び替えされます</p>
+        </div>
+        <button type="button" onClick={onAdd}
+          className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs text-white hover:bg-emerald-700">
+          ＋ 代理店を追加
+        </button>
+      </div>
+
+      {shops.map((shop, idx) => {
+        const typeInfo = SHOP_TYPES.find(t => t.value === shop.shopType);
+        return (
+          <div key={idx} className="rounded-2xl border border-slate-300 p-4 bg-slate-50 space-y-4">
+
+            {/* ── ヘッダー行：番号・種別バッジ・移動・削除 ── */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-700 flex-1">
+                代理店 {idx + 1}
+                {typeInfo && (
+                  <span className="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+                    style={{ background: typeInfo.color }}>
+                    {typeInfo.label}
+                  </span>
+                )}
+                {shop.prefecture && (
+                  <span className="ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-slate-200 text-slate-700">
+                    {shop.prefecture}
+                  </span>
+                )}
+              </span>
+              <button type="button" onClick={() => onMove(idx, -1)} disabled={idx === 0}
+                className="px-2 py-1 rounded-lg border border-slate-300 text-xs text-slate-600 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                title="上へ">▲</button>
+              <button type="button" onClick={() => onMove(idx, 1)} disabled={idx === shops.length - 1}
+                className="px-2 py-1 rounded-lg border border-slate-300 text-xs text-slate-600 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                title="下へ">▼</button>
+              {shops.length > 1 && (
+                <button type="button" onClick={() => onRemove(idx)}
+                  className="px-2 py-1 rounded-lg border border-red-200 text-xs text-red-500 hover:bg-red-50">削除</button>
+              )}
+            </div>
+
+            {/* ── ① 店舗名 ── */}
+            <div>
+              <label className="mb-1 block text-xs font-bold text-slate-700">
+                店舗名 <span className="text-red-500">*</span>
+              </label>
+              <input
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:border-slate-400 bg-white"
+                placeholder="例：○○美容院"
+                value={shop.name}
+                onChange={e => onUpdate(idx, "name", e.target.value)}
+              />
+            </div>
+
+            {/* ── ② 種別ボタン ── */}
+            <div>
+              <label className="mb-1.5 block text-xs font-bold text-slate-700">種別 <span className="text-red-500">*</span></label>
+              <div className="flex flex-wrap gap-1.5">
+                {SHOP_TYPES.map(t => (
+                  <button key={t.value} type="button"
+                    onClick={() => onUpdate(idx, "shopType", t.value)}
+                    className={`rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${
+                      shop.shopType === t.value
+                        ? "text-white border-transparent"
+                        : "border-slate-200 text-slate-600 hover:border-slate-400 bg-white"
+                    }`}
+                    style={shop.shopType === t.value ? { background: t.color, borderColor: t.color } : {}}>
+                    {t.badge}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ── ③ 都道府県ピッカー（正規代理店・代理店のみ） ── */}
+            {(shop.shopType === "authorized" || shop.shopType === "agent") && (
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-slate-700">都道府県</label>
+                <div className="flex flex-wrap gap-1 max-h-44 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
+                  {PREFECTURES.map(pref => (
+                    <button key={pref} type="button"
+                      onClick={() => onUpdate(idx, "prefecture", shop.prefecture === pref ? "" : pref)}
+                      className={`rounded-lg px-2 py-1 text-xs transition-colors ${
+                        shop.prefecture === pref
+                          ? "bg-slate-900 text-white font-bold"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      }`}>
+                      {pref}
+                    </button>
+                  ))}
+                </div>
+                {shop.prefecture && (
+                  <p className="mt-1 text-xs text-slate-500">選択中: <strong>{shop.prefecture}</strong></p>
+                )}
+              </div>
+            )}
+
+            {/* ── ④⑤⑥ 電話番号・予約URL・ウェブサイトURL ── */}
+            <div className="grid grid-cols-1 gap-3">
+              {[
+                { field: "phone"      as const, label: "電話番号",       placeholder: "03-1234-5678" },
+                { field: "url"        as const, label: "予約URL",        placeholder: "https://..." },
+                { field: "websiteUrl" as const, label: "ウェブサイトURL", placeholder: "https://..." },
+              ].map(({ field, label, placeholder }) => (
+                <div key={field}>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">{label}</label>
+                  <input
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:border-slate-400 bg-white"
+                    placeholder={placeholder}
+                    value={shop[field] ?? ""}
+                    onChange={e => onUpdate(idx, field, e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* ── ⑦ 写真アップロード（最大5枚） ── */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700">📷 写真（最大5枚）</label>
+                {(shop.photos ?? []).length < 5 && (
+                  <button type="button" onClick={() => onAddPhoto(idx)}
+                    className="rounded-lg bg-slate-700 px-2.5 py-1 text-xs text-white hover:bg-slate-800">
+                    ＋ 写真を追加
+                  </button>
+                )}
+              </div>
+              {(shop.photos ?? []).length === 0 && (
+                <p className="text-xs text-slate-400">写真はまだ登録されていません。「＋ 写真を追加」から追加できます。</p>
+              )}
+              {(shop.photos ?? []).map((photoUrl, pi) => (
+                <div key={`${idx}-${pi}-${photoUrl}`} className="flex items-start gap-2 rounded-xl border border-slate-200 bg-white p-2">
+                  <div className="text-xs text-slate-500 font-medium mt-2 w-5 shrink-0">{pi + 1}</div>
+                  {photoUrl && (
+                    <img src={photoUrl} alt={`写真${pi + 1}`}
+                      className="h-14 w-14 rounded-lg object-cover shrink-0 border border-slate-200" />
+                  )}
+                  <div className="flex-1 space-y-1.5">
+                    <ImageUpload value={photoUrl} onChange={url => onUpdatePhoto(idx, pi, url)} />
+                  </div>
+                  <button type="button" onClick={() => onRemovePhoto(idx, pi)}
+                    className="mt-1 rounded-lg border border-red-200 px-2 py-1 text-xs text-red-500 hover:bg-red-50 shrink-0">
+                    削除
+                  </button>
+                </div>
+              ))}
+            </div>
+
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -575,8 +729,6 @@ function WelfareContentEditor({ color, headline, description, badges, note, onCh
         </span>
         <span className="text-xs text-slate-500">（会員が見るページに反映されます）</span>
       </div>
-
-      {/* 見出し */}
       <div>
         <label className={`block text-xs font-bold mb-1 ${colors.label}`}>ページ見出し</label>
         <input
@@ -586,8 +738,6 @@ function WelfareContentEditor({ color, headline, description, badges, note, onCh
           onChange={e => onChange("Headline", e.target.value)}
         />
       </div>
-
-      {/* 説明文 */}
       <div>
         <label className={`block text-xs font-bold mb-1 ${colors.label}`}>説明文（ページ上部に表示）</label>
         <textarea rows={3}
@@ -597,8 +747,6 @@ function WelfareContentEditor({ color, headline, description, badges, note, onCh
           onChange={e => onChange("Description", e.target.value)}
         />
       </div>
-
-      {/* 特徴バッジ */}
       <div>
         <label className={`block text-xs font-bold mb-1 ${colors.label}`}>特徴バッジ（カンマ区切りで入力）</label>
         <input
@@ -614,10 +762,7 @@ function WelfareContentEditor({ color, headline, description, badges, note, onCh
             ))}
           </div>
         )}
-        <p className="text-xs text-slate-500 mt-1">例: 💰 お得な料金,📶 安定した通信,🛡️ 安心サポート</p>
       </div>
-
-      {/* 注意書き */}
       <div>
         <label className={`block text-xs font-bold mb-1 ${colors.label}`}>注意書き・フッター文（ページ下部に表示）</label>
         <input
