@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 import { NextResponse } from "next/server";
-
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getNonPurchaseAlert } from "@/lib/mlm-bonus";
@@ -11,6 +10,7 @@ import { currentMonthJST, monthOffsetJST } from "@/lib/japan-time";
 
 const ACTIVE_REQUIRED_PRODUCTS = ["1000", "1001", "1002", "2000"];
 
+// ── 型定義 ──────────────────────────────────────────────────
 export type NodeData = {
   id: string;
   name: string;
@@ -25,42 +25,36 @@ export type NodeData = {
   selfPoints: number;
   consecutiveNonPurchase: number;
   nonPurchaseAlert: string;
+  depth: number;          // ルートからの段数（1始まり）
+  totalDescendants: number; // 自分を起点にした全配下人数
   children: NodeData[];
 };
 
-// Prismaのネストselect用フィールド定義
+/** 段別アクティブ統計 */
+export type DepthStat = {
+  depth: number;
+  total: number;
+  active: number;
+};
+
+// ── Prisma select 定義 ──────────────────────────────────────
 const userSelect = { id: true, name: true, memberCode: true, avatarUrl: true } as const;
 const memberFields = {
   id: true, memberCode: true, memberType: true, status: true,
   currentLevel: true, titleLevel: true, contractDate: true, forceActive: true,
-  companyName: true,
+  companyName: true, uplineId: true, referrerId: true, matrixPosition: true,
 } as const;
 
-// ────────────────────────────────────────────────────────────
-// 購入データを一括取得してMapに変換するユーティリティ
-// ────────────────────────────────────────────────────────────
-
-/** 対象メンバーIDリストの当月購入データを一括取得 */
+// ── 購入データ一括取得 ──────────────────────────────────────
 async function fetchPurchasesForMembers(
   memberIds: bigint[],
-  months: string[] // ["2026-05", "2026-04", ...] 直近6ヶ月
+  months: string[]
 ): Promise<Map<string, { totalPoints: number; productCode: string }[]>> {
   if (memberIds.length === 0) return new Map();
-
   const purchases = await prisma.mlmPurchase.findMany({
-    where: {
-      mlmMemberId: { in: memberIds },
-      purchaseMonth: { in: months },
-    },
-    select: {
-      mlmMemberId: true,
-      purchaseMonth: true,
-      totalPoints: true,
-      productCode: true,
-    },
+    where: { mlmMemberId: { in: memberIds }, purchaseMonth: { in: months } },
+    select: { mlmMemberId: true, purchaseMonth: true, totalPoints: true, productCode: true },
   });
-
-  // Map key: `${mlmMemberId}-${purchaseMonth}`
   const map = new Map<string, { totalPoints: number; productCode: string }[]>();
   for (const p of purchases) {
     const key = `${p.mlmMemberId}-${p.purchaseMonth}`;
@@ -70,245 +64,316 @@ async function fetchPurchasesForMembers(
   return map;
 }
 
-/** 購入Mapからアクティブ判定とポイントを計算 */
 function calcStats(
-  mlmMemberId: bigint,
-  currentMonth: string,
-  memberType: string,
-  contractDate: Date | null,
-  forceActive: boolean,
+  mlmMemberId: bigint, currentMonth: string, memberType: string,
+  contractDate: Date | null, forceActive: boolean,
   purchaseMap: Map<string, { totalPoints: number; productCode: string }[]>
 ): { selfPoints: number; isActive: boolean } {
   const key = `${mlmMemberId}-${currentMonth}`;
   const purchases = purchaseMap.get(key) ?? [];
   const selfPoints = purchases.reduce((s, p) => s + p.totalPoints, 0);
-  const hasRequired = purchases.some((p) => ACTIVE_REQUIRED_PRODUCTS.includes(p.productCode));
-  const isActive =
-    forceActive ||
+  const hasRequired = purchases.some(p => ACTIVE_REQUIRED_PRODUCTS.includes(p.productCode));
+  const isActive = forceActive ||
     (memberType === "business" && contractDate != null && selfPoints >= 150 && hasRequired);
   return { selfPoints, isActive };
 }
 
-/** 購入Mapから連続未購入月数を計算（当月から過去に向かって連続チェック） */
 function calcConsecutive(
-  mlmMemberId: bigint,
-  _currentMonth: string,
-  months: string[], // [currentMonth, 1ヶ月前, 2ヶ月前, ...]
+  mlmMemberId: bigint, months: string[],
   purchaseMap: Map<string, { totalPoints: number; productCode: string }[]>
 ): number {
   let cnt = 0;
   for (const ym of months) {
     const key = `${mlmMemberId}-${ym}`;
     const purchases = purchaseMap.get(key) ?? [];
-    const hasRequired = purchases.some((p) => ACTIVE_REQUIRED_PRODUCTS.includes(p.productCode));
-    if (hasRequired) break;
+    if (purchases.some(p => ACTIVE_REQUIRED_PRODUCTS.includes(p.productCode))) break;
     cnt++;
   }
   return cnt;
 }
 
-// ────────────────────────────────────────────────────────────
-// ツリー再帰構築（全購入データはキャッシュ済み）
-// ────────────────────────────────────────────────────────────
-
+// ── BFS で全配下メンバーをフラットに取得 ─────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildMatrixNode(
+async function fetchAllDescendantsBFS(
+  rootId: bigint,
+  parentField: "uplineId" | "referrerId"
+): Promise<{ id: bigint; parentId: bigint | null; position: number; memberCode: string; memberType: string; status: string; currentLevel: number; titleLevel: number; contractDate: Date | null; forceActive: boolean; companyName: string | null; user: { id: bigint; name: string; memberCode: string; avatarUrl: string | null } }[]> {
+  // 全MLM会員を一括取得してメモリでBFS（管理ページの fetchAllDescendants と同ロジック）
+  const allMembers = await prisma.mlmMember.findMany({
+    select: {
+      id: true, memberCode: true, memberType: true, status: true,
+      currentLevel: true, titleLevel: true, contractDate: true, forceActive: true,
+      companyName: true, uplineId: true, referrerId: true, matrixPosition: true,
+      user: { select: userSelect },
+    },
+    orderBy: parentField === "uplineId" ? { matrixPosition: "asc" } : { createdAt: "asc" },
+  });
+
+  // BFS: rootId 配下のみ抽出
+  const idSet = new Set<string>([rootId.toString()]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const m of allMembers) {
+      const pid = (parentField === "uplineId" ? m.uplineId : m.referrerId);
+      if (pid && idSet.has(pid.toString()) && !idSet.has(m.id.toString())) {
+        idSet.add(m.id.toString());
+        changed = true;
+      }
+    }
+  }
+
+  return allMembers
+    .filter(m => idSet.has(m.id.toString()))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((m: any) => ({
+      id: m.id as bigint,
+      parentId: (parentField === "uplineId" ? m.uplineId : m.referrerId) as bigint | null,
+      position: m.matrixPosition as number,
+      memberCode: m.memberCode as string,
+      memberType: m.memberType as string,
+      status: m.status as string,
+      currentLevel: m.currentLevel as number,
+      titleLevel: m.titleLevel as number,
+      contractDate: m.contractDate as Date | null,
+      forceActive: m.forceActive as boolean,
+      companyName: m.companyName as string | null,
+      user: {
+        id: m.user.id as bigint,
+        name: m.user.name as string,
+        memberCode: m.user.memberCode as string,
+        avatarUrl: m.user.avatarUrl as string | null,
+      },
+    }));
+}
+
+// ── フラットリスト → ツリー構築 ──────────────────────────────
+type FlatMember = ReturnType<Awaited<ReturnType<typeof fetchAllDescendantsBFS>>[number] extends infer T ? () => T : never>;
+
+function buildTree(
+  rootId: bigint,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  m: any,
-  depth: number,
+  flatMembers: any[],
+  depthLimit: number,
   currentMonth: string,
   months: string[],
   purchaseMap: Map<string, { totalPoints: number; productCode: string }[]>
 ): NodeData {
-  const { selfPoints, isActive } = calcStats(
-    m.id, currentMonth, m.memberType, m.contractDate, m.forceActive, purchaseMap
-  );
-  const consecutive = calcConsecutive(m.id, currentMonth, months, purchaseMap);
-  const alert = getNonPurchaseAlert(consecutive);
+  // id → member のマップ
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const map = new Map<string, any>();
+  for (const m of flatMembers) map.set(m.id.toString(), m);
 
-  let children: NodeData[] = [];
-  if (depth < 5 && m.downlines && m.downlines.length > 0) {
-    children = m.downlines.map((child: any) =>
-      buildMatrixNode(child, depth + 1, currentMonth, months, purchaseMap)
-    );
+  // 親子関係マップ（parentId → children[]）
+  const childrenMap = new Map<string, string[]>();
+  for (const m of flatMembers) {
+    const pid = m.parentId?.toString();
+    if (pid) {
+      if (!childrenMap.has(pid)) childrenMap.set(pid, []);
+      childrenMap.get(pid)!.push(m.id.toString());
+    }
   }
 
-  return {
-    id: m.user.id.toString(),
-    name: m.companyName || m.user.name,
-    memberCode: m.user.memberCode,
-    avatarUrl: m.user.avatarUrl,
-    mlmMemberCode: m.memberCode,
-    memberType: m.memberType,
-    status: m.status,
-    currentLevel: m.currentLevel,
-    titleLevel: m.titleLevel,
-    isActive,
-    selfPoints,
-    consecutiveNonPurchase: consecutive,
-    nonPurchaseAlert: alert,
-    children,
+  // 子リストをpositionでソート
+  for (const [, children] of childrenMap) {
+    children.sort((a, b) => {
+      const ma = map.get(a), mb = map.get(b);
+      return (ma?.position ?? 0) - (mb?.position ?? 0) || (ma?.memberCode ?? "").localeCompare(mb?.memberCode ?? "");
+    });
+  }
+
+  // BFSで depth を設定
+  const depthMap = new Map<string, number>();
+  const queue: { id: string; depth: number }[] = [{ id: rootId.toString(), depth: 0 }];
+  while (queue.length > 0) {
+    const { id, depth } = queue.shift()!;
+    depthMap.set(id, depth);
+    for (const cid of (childrenMap.get(id) ?? [])) {
+      queue.push({ id: cid, depth: depth + 1 });
+    }
+  }
+
+  // 再帰でNodeData構築
+  const buildNode = (id: string, depth: number): NodeData => {
+    const m = map.get(id)!;
+    const { selfPoints, isActive } = calcStats(
+      m.id, currentMonth, m.memberType, m.contractDate, m.forceActive, purchaseMap
+    );
+    const consecutive = calcConsecutive(m.id, months, purchaseMap);
+    const alert = getNonPurchaseAlert(consecutive);
+
+    const rawChildren = childrenMap.get(id) ?? [];
+    const children: NodeData[] =
+      depth < depthLimit
+        ? rawChildren.map(cid => buildNode(cid, depth + 1))
+        : [];
+
+    // 全配下人数（depthLimit関係なく全て数える）
+    const countAll = (nid: string): number => {
+      const cs = childrenMap.get(nid) ?? [];
+      return cs.reduce((sum, cid) => sum + 1 + countAll(cid), 0);
+    };
+    const totalDescendants = countAll(id);
+
+    return {
+      id: m.user.id.toString(),
+      name: m.companyName?.trim() || m.user.name,
+      memberCode: m.user.memberCode,
+      avatarUrl: m.user.avatarUrl,
+      mlmMemberCode: m.memberCode,
+      memberType: m.memberType,
+      status: m.status,
+      currentLevel: m.currentLevel,
+      titleLevel: m.titleLevel,
+      isActive,
+      selfPoints,
+      consecutiveNonPurchase: consecutive,
+      nonPurchaseAlert: alert,
+      depth,
+      totalDescendants,
+      children,
+    };
   };
+
+  return buildNode(rootId.toString(), 0);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildUniNode(
+// ── 段別統計計算 ─────────────────────────────────────────────
+function calcDepthStats(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  m: any,
-  depth: number,
+  flatMembers: any[],
+  rootId: bigint,
   currentMonth: string,
   months: string[],
   purchaseMap: Map<string, { totalPoints: number; productCode: string }[]>
-): NodeData {
-  const { selfPoints, isActive } = calcStats(
-    m.id, currentMonth, m.memberType, m.contractDate, m.forceActive, purchaseMap
-  );
-  const consecutive = calcConsecutive(m.id, currentMonth, months, purchaseMap);
-  const alert = getNonPurchaseAlert(consecutive);
-
-  let children: NodeData[] = [];
-  if (depth < 5 && m.referrals && m.referrals.length > 0) {
-    children = m.referrals.map((child: any) =>
-      buildUniNode(child, depth + 1, currentMonth, months, purchaseMap)
-    );
+): DepthStat[] {
+  // BFSで depth を設定
+  const childrenMap = new Map<string, string[]>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const map = new Map<string, any>();
+  for (const m of flatMembers) {
+    map.set(m.id.toString(), m);
+    const pid = m.parentId?.toString();
+    if (pid) {
+      if (!childrenMap.has(pid)) childrenMap.set(pid, []);
+      childrenMap.get(pid)!.push(m.id.toString());
+    }
+  }
+  const depthMap = new Map<string, number>();
+  const q: { id: string; depth: number }[] = [{ id: rootId.toString(), depth: 0 }];
+  while (q.length > 0) {
+    const { id, depth } = q.shift()!;
+    depthMap.set(id, depth);
+    for (const cid of (childrenMap.get(id) ?? [])) q.push({ id: cid, depth: depth + 1 });
   }
 
-  return {
-    id: m.user.id.toString(),
-    name: m.companyName || m.user.name,
-    memberCode: m.user.memberCode,
-    avatarUrl: m.user.avatarUrl,
-    mlmMemberCode: m.memberCode,
-    memberType: m.memberType,
-    status: m.status,
-    currentLevel: m.currentLevel,
-    titleLevel: m.titleLevel,
-    isActive,
-    selfPoints,
-    consecutiveNonPurchase: consecutive,
-    nonPurchaseAlert: alert,
-    children,
-  };
-}
-
-/** ツリーから全メンバーのIDを収集 */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function collectIds(nodes: any[], relation: "downlines" | "referrals", depth: number): bigint[] {
-  if (depth <= 0) return [];
-  const ids: bigint[] = [];
-  for (const n of nodes) {
-    ids.push(n.id);
-    const children = n[relation] ?? [];
-    ids.push(...collectIds(children, relation, depth - 1));
+  // 段別集計（rootは除く、depth >= 1）
+  const statsMap = new Map<number, { total: number; active: number }>();
+  for (const m of flatMembers) {
+    const id = m.id.toString();
+    if (id === rootId.toString()) continue;
+    const depth = depthMap.get(id) ?? 0;
+    if (!statsMap.has(depth)) statsMap.set(depth, { total: 0, active: 0 });
+    const { isActive } = calcStats(m.id, currentMonth, m.memberType, m.contractDate, m.forceActive, purchaseMap);
+    statsMap.get(depth)!.total++;
+    if (isActive) statsMap.get(depth)!.active++;
   }
-  return ids;
+
+  const result: DepthStat[] = [];
+  const maxDepth = Math.max(...Array.from(statsMap.keys()), 0);
+  for (let d = 1; d <= maxDepth; d++) {
+    const s = statsMap.get(d) ?? { total: 0, active: 0 };
+    result.push({ depth: d, total: s.total, active: s.active });
+  }
+  return result;
 }
 
+// ── GET ─────────────────────────────────────────────────────
 export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const userId = BigInt(session.user.id ?? "0");
   const currentMonth = currentMonthJST();
-
-  // 直近6ヶ月リスト（連続未購入判定用）
   const months = Array.from({ length: 6 }, (_, i) => monthOffsetJST(currentMonth, -i));
 
   try {
-    // ── 1. 自分のMLM会員情報（ツリー構造を一括取得）
+    // 自分のMLM会員情報
     const me = await prisma.mlmMember.findUnique({
       where: { userId },
       select: {
         ...memberFields,
         user: { select: userSelect },
-        upline: {
-          select: { ...memberFields, user: { select: userSelect } },
-        },
-        referrer: {
-          select: { ...memberFields, user: { select: userSelect } },
-        },
-        // マトリックス配下（5段）
-        downlines: {
-          select: {
-            ...memberFields, user: { select: userSelect },
-            downlines: {
-              select: {
-                ...memberFields, user: { select: userSelect },
-                downlines: {
-                  select: {
-                    ...memberFields, user: { select: userSelect },
-                    downlines: {
-                      select: {
-                        ...memberFields, user: { select: userSelect },
-                        downlines: {
-                          select: { ...memberFields, user: { select: userSelect } },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        // ユニレベル配下（5段）
-        referrals: {
-          select: {
-            ...memberFields, user: { select: userSelect },
-            referrals: {
-              select: {
-                ...memberFields, user: { select: userSelect },
-                referrals: {
-                  select: {
-                    ...memberFields, user: { select: userSelect },
-                    referrals: {
-                      select: {
-                        ...memberFields, user: { select: userSelect },
-                        referrals: {
-                          select: { ...memberFields, user: { select: userSelect } },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+        upline:   { select: { ...memberFields, user: { select: userSelect } } },
+        referrer: { select: { ...memberFields, user: { select: userSelect } } },
       },
     });
 
-    if (!me) {
-      return NextResponse.json({ error: "MLM会員情報がありません" }, { status: 404 });
-    }
+    if (!me) return NextResponse.json({ error: "MLM会員情報がありません" }, { status: 404 });
 
-    // ── 2. 全メンバーIDを収集して購入データを一括取得
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const matrixIds = collectIds(me.downlines as any[], "downlines", 5);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const uniIds    = collectIds(me.referrals as any[], "referrals", 5);
-    const allIds    = [me.id, ...new Set([...matrixIds, ...uniIds])];
+    // ── マトリックス: BFSで全段取得 ──
+    const matrixFlat = await fetchAllDescendantsBFS(me.id, "uplineId");
+    const matrixIds  = matrixFlat.map(m => m.id);
+    const matrixPurchaseMap = await fetchPurchasesForMembers(matrixIds, months);
 
-    const purchaseMap = await fetchPurchasesForMembers(allIds, months);
+    // マトリックスツリー（段数無制限で内部保持、表示は5段ずつFE側で制御）
+    const matrixRoot = buildTree(me.id, matrixFlat, 999, currentMonth, months, matrixPurchaseMap);
+    const matrixDepthStats = calcDepthStats(matrixFlat, me.id, currentMonth, months, matrixPurchaseMap);
 
-    // ── 3. 自分のアクティブ・ポイント
+    // 自分の直接配下（children）だけをレスポンスに渡す
+    const matrixDownlines = matrixRoot.children;
+
+    // 合計・アクティブ（全段）
+    const matrixTotalCount  = matrixFlat.length - 1; // 自分を除く
+    const matrixActiveCount = matrixFlat.filter(m => {
+      if (m.id.toString() === me.id.toString()) return false;
+      return calcStats(m.id, currentMonth, m.memberType, m.contractDate, m.forceActive, matrixPurchaseMap).isActive;
+    }).length;
+
+    // ── ユニレベル: 7段まで ──
+    const uniFlat = await fetchAllDescendantsBFS(me.id, "referrerId");
+    const uniIds  = uniFlat.map(m => m.id);
+    const uniPurchaseMap = await fetchPurchasesForMembers(uniIds, months);
+
+    const uniRoot = buildTree(me.id, uniFlat, 7, currentMonth, months, uniPurchaseMap);
+    const uniDownlines = uniRoot.children;
+
+    const uniTotalCount  = uniFlat.filter(m => {
+      // 7段以内のみカウント
+      const childrenMap2 = new Map<string, string[]>();
+      for (const mm of uniFlat) {
+        const pid = mm.parentId?.toString();
+        if (pid) {
+          if (!childrenMap2.has(pid)) childrenMap2.set(pid, []);
+          childrenMap2.get(pid)!.push(mm.id.toString());
+        }
+      }
+      // BFSで depth 計算
+      const depthMap2 = new Map<string, number>();
+      const q2: { id: string; depth: number }[] = [{ id: me.id.toString(), depth: 0 }];
+      while (q2.length > 0) {
+        const { id, depth } = q2.shift()!;
+        depthMap2.set(id, depth);
+        for (const cid of (childrenMap2.get(id) ?? [])) q2.push({ id: cid, depth: depth + 1 });
+      }
+      const d = depthMap2.get(m.id.toString()) ?? 0;
+      return d >= 1 && d <= 7;
+    }).length;
+
+    const uniActiveCount = uniFlat.filter(m => {
+      if (m.id.toString() === me.id.toString()) return false;
+      return calcStats(m.id, currentMonth, m.memberType, m.contractDate, m.forceActive, uniPurchaseMap).isActive;
+    }).length;
+
+    // 自分のアクティブ判定
     const { selfPoints: mySelfPoints, isActive: myIsActive } = calcStats(
-      me.id, currentMonth, me.memberType, me.contractDate, me.forceActive, purchaseMap
-    );
-
-    // ── 4. ツリー構築（同期処理・DBクエリ不要）
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const matrixDownlines = (me.downlines as any[]).map((d) =>
-      buildMatrixNode(d, 1, currentMonth, months, purchaseMap)
-    );
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const uniDownlines = (me.referrals as any[]).map((d) =>
-      buildUniNode(d, 1, currentMonth, months, purchaseMap)
+      me.id, currentMonth, me.memberType, me.contractDate, me.forceActive,
+      matrixPurchaseMap
     );
 
     const meInfo = {
       id: me.user.id.toString(),
-      name: me.companyName || me.user.name,
+      name: me.companyName?.trim() || me.user.name,
       memberCode: me.user.memberCode,
       avatarUrl: me.user.avatarUrl,
       mlmMemberCode: me.memberCode,
@@ -318,11 +383,11 @@ export async function GET() {
       isActive: myIsActive,
       selfPoints: mySelfPoints,
       upline: me.upline ? {
-        name: (me.upline as { companyName?: string | null; user: { name: string }; memberCode: string }).companyName || me.upline.user.name,
+        name: (me.upline as { companyName?: string | null; user: { name: string }; memberCode: string }).companyName?.trim() || me.upline.user.name,
         memberCode: me.upline.memberCode,
       } : null,
       referrer: me.referrer ? {
-        name: (me.referrer as { companyName?: string | null; user: { name: string }; memberCode: string }).companyName || me.referrer.user.name,
+        name: (me.referrer as { companyName?: string | null; user: { name: string }; memberCode: string }).companyName?.trim() || me.referrer.user.name,
         memberCode: me.referrer.memberCode,
       } : null,
     };
@@ -331,7 +396,12 @@ export async function GET() {
       month: currentMonth,
       me: meInfo,
       matrixDownlines,
+      matrixTotalCount,
+      matrixActiveCount,
+      matrixDepthStats,
       uniDownlines,
+      uniTotalCount,
+      uniActiveCount,
       downlines: matrixDownlines, // 後方互換
     });
 
