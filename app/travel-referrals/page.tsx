@@ -203,10 +203,10 @@ export default function TravelStatusPage() {
                     <h2 className="font-black text-white mt-1" style={{ fontSize: "17px" }}>{sub.planName}</h2>
                   </div>
                   <div className="flex flex-col items-end gap-2">
-                    <span className="text-3xl">{statusCfg.icon}</span>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold font-jp"
-                      style={{ background: statusCfg.bg, color: statusCfg.text, border: `1px solid ${statusCfg.border}` }}>
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: statusCfg.dot }}/>
+                    <span className="text-4xl">{statusCfg.icon}</span>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold font-jp"
+                      style={{ fontSize: "14px", background: statusCfg.bg, color: statusCfg.text, border: `1px solid ${statusCfg.border}` }}>
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: statusCfg.dot }}/>
                       {statusCfg.label}
                     </span>
                   </div>
@@ -214,8 +214,8 @@ export default function TravelStatusPage() {
 
                 {/* ステータス説明 */}
                 <div className="rounded-2xl p-4 mb-5"
-                  style={{ background: `${statusCfg.text}08`, border: `1px solid ${statusCfg.border}` }}>
-                  <p className="text-sm font-jp leading-relaxed" style={{ color: `${statusCfg.text}CC` }}>
+                  style={{ background: `${statusCfg.text}10`, border: `1px solid ${statusCfg.border}` }}>
+                  <p className="font-jp leading-relaxed" style={{ fontSize: "15px", color: statusCfg.text }}>
                     {statusCfg.desc}
                   </p>
                 </div>
@@ -228,26 +228,26 @@ export default function TravelStatusPage() {
                     { label: "プランタイプ", value: sub.pricingTier === "early" ? "早期特別料金" : "標準料金" },
                     { label: "確認日", value: fmtDate(sub.confirmedAt) },
                   ].map(item => (
-                    <div key={item.label} className="rounded-xl p-3"
-                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                      <p className="text-[10px] font-label tracking-wider mb-1" style={{ color: `${GOLD}55` }}>
+                    <div key={item.label} className="rounded-xl p-3.5"
+                      style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
+                      <p className="font-bold mb-1" style={{ fontSize: "12px", color: GOLD_LIGHT }}>
                         {item.label}
                       </p>
-                      <p className="text-sm font-bold text-white">{item.value}</p>
+                      <p className="font-black text-white" style={{ fontSize: "15px" }}>{item.value}</p>
                     </div>
                   ))}
                 </div>
 
                 {/* 開始日 */}
                 {sub.startedAt && (
-                  <div className="mt-3 rounded-xl p-3 flex items-center gap-3"
-                    style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: `${GOLD}60` }}>
+                  <div className="mt-3 rounded-xl p-4 flex items-center gap-3"
+                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)" }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: GOLD_LIGHT }}>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                     </svg>
                     <div>
-                      <p className="text-[10px] font-label" style={{ color: `${GOLD}55` }}>サービス開始日</p>
-                      <p className="text-sm font-bold text-white">{fmtDate(sub.startedAt)}</p>
+                      <p className="font-bold" style={{ fontSize: "12px", color: GOLD_LIGHT }}>サービス開始日</p>
+                      <p className="font-black text-white" style={{ fontSize: "16px" }}>{fmtDate(sub.startedAt)}</p>
                     </div>
                   </div>
                 )}
@@ -256,32 +256,29 @@ export default function TravelStatusPage() {
 
             {/* ステータス一覧カード（説明） */}
             <div className="rounded-2xl overflow-hidden"
-              style={{ background: LINEN, border: "1px solid rgba(201,168,76,0.20)" }}>
-              <div className="px-5 py-4" style={{ borderBottom: "1px solid rgba(201,168,76,0.14)" }}>
-                <p className="text-[9px] font-label tracking-[0.26em] mb-0.5" style={{ color: `${GOLD_DARK}80` }}>STATUS GUIDE</p>
-                <p className="text-sm font-semibold font-jp" style={{ color: NAVY }}>ステータスについて</p>
+              style={{ background: LINEN, border: "1px solid rgba(201,168,76,0.25)" }}>
+              <div className="px-5 py-4" style={{ borderBottom: "1px solid rgba(201,168,76,0.18)" }}>
+                <p style={{ fontSize: "11px", letterSpacing: "0.18em", fontWeight: 800, color: GOLD_DARK }}>STATUS GUIDE</p>
+                <p className="font-black font-jp mt-1" style={{ fontSize: "16px", color: NAVY }}>ステータスについて</p>
               </div>
-              <div className="divide-y" style={{ borderColor: "rgba(201,168,76,0.10)" }}>
+              <div className="divide-y" style={{ borderColor: "rgba(201,168,76,0.12)" }}>
                 {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
                   <div key={key}
                     className="px-5 py-4 flex items-start gap-3"
-                    style={{
-                      background: key === effectiveStatus ? `${cfg.text}06` : "transparent",
-                    }}>
-                    <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: cfg.dot }}/>
+                    style={{ background: key === effectiveStatus ? `${cfg.text}08` : "transparent" }}>
+                    <div className="w-3 h-3 rounded-full mt-1 flex-shrink-0" style={{ background: cfg.dot }}/>
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-bold font-jp" style={{ color: cfg.text }}>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="font-black font-jp" style={{ fontSize: "15px", color: cfg.text }}>
                           {cfg.icon} {cfg.label}
                         </span>
                         {key === effectiveStatus && (
-                          <span className="text-[9px] font-label px-2 py-0.5 rounded-full"
-                            style={{ background: `${cfg.text}18`, color: cfg.text, border: `1px solid ${cfg.border}` }}>
+                          <span className="font-bold px-2 py-0.5 rounded-full" style={{ fontSize: "11px", background: `${cfg.text}20`, color: cfg.text, border: `1px solid ${cfg.border}` }}>
                             現在のステータス
                           </span>
                         )}
                       </div>
-                      <p className="text-xs font-jp leading-relaxed" style={{ color: "rgba(10,22,40,0.55)" }}>
+                      <p className="font-jp leading-relaxed" style={{ fontSize: "13px", color: "rgba(10,22,40,0.70)" }}>
                         {cfg.desc}
                       </p>
                     </div>
@@ -291,20 +288,20 @@ export default function TravelStatusPage() {
             </div>
 
             {/* お問い合わせ案内 */}
-            <div className="rounded-2xl p-4 flex items-start gap-3"
+            <div className="rounded-2xl p-5 flex items-start gap-3"
               style={{
                 background: `linear-gradient(145deg,${NAVY_CARD} 0%,${NAVY_CARD2} 100%)`,
-                border: `1px solid ${GOLD}20`,
+                border: `1px solid ${GOLD}30`,
               }}>
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: `${GOLD}15`, border: `1px solid ${GOLD}30` }}>
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: GOLD }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: `${GOLD}20`, border: `1px solid ${GOLD}40` }}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: GOLD_LIGHT }}>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-bold font-jp text-white mb-1">お問い合わせ</p>
-                <p className="text-xs font-jp leading-relaxed" style={{ color: "rgba(255,255,255,0.45)" }}>
+                <p className="font-black font-jp text-white mb-1.5" style={{ fontSize: "15px" }}>お問い合わせ</p>
+                <p className="font-jp leading-relaxed" style={{ fontSize: "13px", color: "rgba(255,255,255,0.70)" }}>
                   ステータス変更や解約のご希望は担当者にお問い合わせください。<br/>
                   入金確認後のステータス変更は管理側で手動対応いたします。
                 </p>

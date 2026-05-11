@@ -121,11 +121,11 @@ function NavyCard({ children, className = "", accent = GOLD }: { children: React
 // ── セクションヘッダー
 function SectionLabel({ en, ja }: { en: string; ja: string }) {
   return (
-    <div className="flex items-center gap-3 mb-3">
+    <div className="flex items-center gap-3 mb-4">
       <div className="h-px flex-1" style={{ background: `linear-gradient(90deg,${GOLD}50,transparent)` }}/>
       <div className="text-center">
-        <p className="font-label text-[8px] tracking-[0.22em] font-bold" style={{ color: `${GOLD}70` }}>{en}</p>
-        <p className="font-jp text-xs font-semibold" style={{ color: GOLD_LIGHT }}>{ja}</p>
+        <p style={{ fontSize: "10px", letterSpacing: "0.20em", fontWeight: 800, color: GOLD_LIGHT }}>{en}</p>
+        <p className="font-jp font-black mt-0.5" style={{ fontSize: "15px", color: GOLD_LIGHT }}>{ja}</p>
       </div>
       <div className="h-px flex-1" style={{ background: `linear-gradient(90deg,transparent,${GOLD}50)` }}/>
     </div>
@@ -229,12 +229,12 @@ function ApplicationStatusView({ app }: { app: ApplicationData }) {
       <NavyCard accent={info.border}>
         <div className="p-5">
           <div className="flex items-center gap-3 mb-4">
-            <span className="text-3xl">{info.icon}</span>
+            <span className="text-4xl">{info.icon}</span>
             <div className="flex-1">
-              <p className="text-[10px] font-label tracking-widest mb-0.5" style={{ color: `${GOLD}70` }}>APPLICATION STATUS</p>
-              <p className="font-jp font-bold text-lg text-white">{info.label}</p>
+              <p style={{ fontSize: "11px", letterSpacing: "0.18em", fontWeight: 800, color: GOLD_LIGHT }}>APPLICATION STATUS</p>
+              <p className="font-jp font-black text-white mt-0.5" style={{ fontSize: "18px" }}>{info.label}</p>
             </div>
-            <span className="rounded-full px-3 py-1 text-xs font-bold" style={{ background: info.badgeBg, color: info.badgeText }}>
+            <span className="rounded-full px-3 py-1.5 font-bold" style={{ fontSize: "13px", background: info.badgeBg, color: info.badgeText }}>
               {info.label}
             </span>
           </div>
@@ -253,8 +253,8 @@ function ApplicationStatusView({ app }: { app: ApplicationData }) {
           )}
 
           {/* 申込内容 */}
-          <div className="rounded-xl p-4 space-y-2" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            <p className="text-[10px] font-label tracking-widest mb-2" style={{ color: `${GOLD}65` }}>📋 申込内容</p>
+          <div className="rounded-xl p-4 space-y-2.5" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}>
+            <p style={{ fontSize: "12px", letterSpacing: "0.12em", fontWeight: 700, color: GOLD_LIGHT }}>📋 申込内容</p>
             {[
               { label: "申込日",   value: new Date(app.createdAt).toLocaleDateString("ja-JP") },
               { label: "お名前",   value: app.nameKanji },
@@ -263,37 +263,37 @@ function ApplicationStatusView({ app }: { app: ApplicationData }) {
               { label: "契約種別", value: contractTypeLabel || "—" },
             ].map(row => (
               <div key={row.label} className="flex justify-between items-start gap-2">
-                <span className="text-xs whitespace-nowrap" style={{ color: "rgba(255,255,255,0.45)" }}>{row.label}</span>
-                <span className="text-xs font-semibold text-right break-all text-white">{row.value}</span>
+                <span className="font-bold whitespace-nowrap" style={{ fontSize: "13px", color: "rgba(255,255,255,0.60)" }}>{row.label}</span>
+                <span className="font-bold text-right break-all text-white" style={{ fontSize: "13px" }}>{row.value}</span>
               </div>
             ))}
             {app.desiredPlan && (
-              <div className="pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-                <p className="text-[10px] mb-1" style={{ color: "rgba(255,255,255,0.40)" }}>希望プラン</p>
-                <p className="text-xs font-semibold text-white break-all">{app.desiredPlan}</p>
+              <div className="pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.10)" }}>
+                <p className="font-bold mb-1" style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)" }}>希望プラン</p>
+                <p className="font-semibold text-white break-all" style={{ fontSize: "13px" }}>{app.desiredPlan}</p>
               </div>
             )}
             {app.contractedAt && (
-              <div className="flex justify-between pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-                <span className="text-xs" style={{ color: "rgba(255,255,255,0.45)" }}>契約完了日</span>
-                <span className="text-xs font-bold" style={{ color: "#6ee7b7" }}>{new Date(app.contractedAt).toLocaleDateString("ja-JP")}</span>
+              <div className="flex justify-between pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.10)" }}>
+                <span className="font-bold" style={{ fontSize: "13px", color: "rgba(255,255,255,0.60)" }}>契約完了日</span>
+                <span className="font-black" style={{ fontSize: "14px", color: "#6ee7b7" }}>{new Date(app.contractedAt).toLocaleDateString("ja-JP")}</span>
               </div>
             )}
           </div>
 
           {/* 担当者メモ */}
           {app.adminNote && (
-            <div className="mt-3 rounded-xl p-3" style={{ background: `${GOLD}10`, border: `1px solid ${GOLD}30` }}>
-              <p className="text-xs font-bold mb-1" style={{ color: GOLD_LIGHT }}>📝 担当者からのメモ</p>
-              <p className="text-xs text-white/70">{app.adminNote}</p>
+            <div className="mt-3 rounded-xl p-4" style={{ background: `${GOLD}12`, border: `1px solid ${GOLD}35` }}>
+              <p className="font-black mb-1.5" style={{ fontSize: "13px", color: GOLD_LIGHT }}>📝 担当者からのメモ</p>
+              <p className="font-medium text-white/80" style={{ fontSize: "14px" }}>{app.adminNote}</p>
             </div>
           )}
 
           {/* 契約完了メッセージ */}
           {isActive && (
-            <div className="mt-3 rounded-xl p-3 text-center" style={{ background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.25)" }}>
-              <p className="text-xs font-bold" style={{ color: "#6ee7b7" }}>🎉 VP未来phone の契約が完了しています！</p>
-              <p className="text-[10px] mt-0.5" style={{ color: "rgba(52,211,153,0.65)" }}>ご契約ありがとうございます。</p>
+            <div className="mt-3 rounded-xl p-4 text-center" style={{ background: "rgba(52,211,153,0.10)", border: "1px solid rgba(52,211,153,0.30)" }}>
+              <p className="font-black" style={{ fontSize: "15px", color: "#4ade80" }}>🎉 VP未来phone の契約が完了しています！</p>
+              <p className="mt-1" style={{ fontSize: "13px", color: "rgba(74,222,128,0.80)" }}>ご契約ありがとうございます。</p>
             </div>
           )}
         </div>
