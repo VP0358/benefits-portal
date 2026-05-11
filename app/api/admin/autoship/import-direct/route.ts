@@ -419,34 +419,52 @@ async function processCredixResultCsv(
   console.log(`[import-direct] Credix: 決済ID→会員マップ ${cardIdToMembers.size}件構築（会員${allMlmMembers.length}件）`);
 
   // ── ① CSV全行を個別に照合 ──
-  // 各CSVエントリ → 会員紐付け（同一行が重複しても全て個別行として扱う）
-  // ★バグ修正②: 同一normIdに複数会員がいる場合、全員にマッチ
+  //
+  // 設計方針（PR #25のクロス積バグを根本修正）:
+  //
+  //   【旧設計の問題】
+  //     cardIdToMembers = Map<normId, 会員[]> でCSV行×会員のクロス積を生成していた
+  //     → 1会員がcreditCardId①②③で複数CSV行にマッチすると matchedCsvRows が膨張
+  //     → 例: 会員AがID①でCSV3行目・ID②でCSV7行目にマッチ → matchedCsvRowsに2エントリ
+  //     → successMemberList/paidCountが正しく会員単位でも137件になっていた
+  //
+  //   【新設計】
+  //     Step1: memberMatchMap を先に構築（会員コード → 代表CSV行、1:1、重複なし）
+  //            CSV行をスキャンし、各normIdにマッチした会員の「最良の行」を選択:
+  //            - 同一会員が複数CSV行にマッチ → 成功行優先、なければ最初の行
+  //            - 同一normIdに複数会員（稀）→ 全員を登録
+  //     Step2: matchedCsvRows = memberMatchMap.values()（会員単位・重複なし）
+  //            → CSV総行数を超えることは絶対にない
+  //     Step3: unmatchedCsvIds = cardIdToMembers にマッチしなかったCSV行
+
   type MatchedCsvRow = CsvRow & { member: MemberRow };
-  const matchedCsvRows: MatchedCsvRow[]    = [];  // 照合成功行（DB会員あり）
-  const unmatchedCsvIds: { rawId: string; normId: string; rowIndex: number }[] = []; // 未照合行（DB会員なし）
+
+  // Step1: まず「会員単位の代表行マップ」を直接構築
+  //        CSV行を1件ずつスキャンし、各会員の最良行（成功優先）を選択
+  const memberMatchMap = new Map<string, MatchedCsvRow>(); // memberCode → 代表CSV行
+  const unmatchedCsvIds: { rawId: string; normId: string; rowIndex: number }[] = [];
 
   for (const row of csvRows) {
     const members = cardIdToMembers.get(row.normId);
     if (!members || members.length === 0) {
+      // このCSV行はDB側に対応する会員なし → 未照合
       unmatchedCsvIds.push({ rawId: row.rawId, normId: row.normId, rowIndex: row.rowIndex });
     } else {
-      // 同一normIdに複数会員がいる場合、全員分のエントリを作成
+      // マッチした会員（通常1人、稀に複数）について memberMatchMap を更新
       for (const member of members) {
-        matchedCsvRows.push({ ...row, member });
+        const code = member.memberCode;
+        const existing = memberMatchMap.get(code);
+        // 成功行優先、なければ最初の行（同一会員の複数CSV行マッチを1行に集約）
+        if (!existing || (row.isOk && !existing.isOk)) {
+          memberMatchMap.set(code, { ...row, member });
+        }
       }
     }
   }
 
-  // ── 会員単位での照合成功マップ（AutoShipOrder upsert用）──
-  // 同一会員の複数行は「成功優先、なければ最初の行」を代表とする
-  const memberMatchMap = new Map<string, MatchedCsvRow>();
-  for (const row of matchedCsvRows) {
-    const code = row.member.memberCode;
-    const existing = memberMatchMap.get(code);
-    if (!existing || (row.isOk && !existing.isOk)) {
-      memberMatchMap.set(code, row);
-    }
-  }
+  // Step2: matchedCsvRows = memberMatchMap の値一覧（会員単位・重複なし）
+  //        これで CSV総行数を超えることは絶対にない
+  const matchedCsvRows: MatchedCsvRow[] = Array.from(memberMatchMap.values());
 
   // ── 照合失敗者: DB登録あり・CSV未記載（活動中会員） ──
   // ③ ステータス別に分類
@@ -463,28 +481,29 @@ async function processCredixResultCsv(
   const failedMembers: FailedMemberEntry[] = [];
 
   for (const m of allMlmMembers) {
+    // ★バグ②修正: memberMatchMap（実際に照合成功した会員コード）で判定
+    // 旧実装: csvNormIdSet.has(normCid) → CSV側normIdとDB側normIdの比較
+    //   問題: 同じIDが正規化後に一致するはずなのに漏れるケースあり
+    // 新実装: memberMatchMap.has(memberCode) → 実際にマッチした会員コードで完全判定
     if (memberMatchMap.has(m.memberCode)) continue; // 照合成功済みはスキップ
 
     const memberCids = [m.creditCardId, m.creditCardId2, m.creditCardId3].filter(Boolean) as string[];
     if (memberCids.length === 0) continue;
 
     const normCids = memberCids.map(cid => normalizeCardId(cid)).filter(Boolean);
-    // ★バグ修正①: 正規化できなかったID（誤入力）を別途追跡
+    // 正規化できなかったID（誤入力の可能性）を追跡
     const invalidCids = memberCids.filter(cid => !normalizeCardId(cid));
-    const anyMatch = normCids.some(normCid => csvNormIdSet.has(normCid));
 
-    if (!anyMatch) {
-      failedMembers.push({
-        member:          m,
-        memberCode:      m.memberCode,
-        memberName:      getMlmDisplayName(m.user.name, m.companyName),
-        memberStatus:    m.status,
-        creditIds:       memberCids,
-        normCreditIds:   normCids,
-        invalidCreditIds: invalidCids,
-        isInactive:      INACTIVE_STATUSES.has(m.status),
-      });
-    }
+    failedMembers.push({
+      member:           m,
+      memberCode:       m.memberCode,
+      memberName:       getMlmDisplayName(m.user.name, m.companyName),
+      memberStatus:     m.status,
+      creditIds:        memberCids,
+      normCreditIds:    normCids,
+      invalidCreditIds: invalidCids,
+      isInactive:       INACTIVE_STATUSES.has(m.status),
+    });
   }
 
   // ③ 照合失敗を「アクティブ照合失敗」と「退会等照合失敗」に分離
@@ -533,21 +552,28 @@ async function processCredixResultCsv(
   const paidEntries     = matchedEntries.filter(e => e.isOk);
   const csvFailEntries  = matchedEntries.filter(e => !e.isOk);
 
-  // ① CSV行単位のカウント・金額（重複IDも個別にカウント）
-  const csvPaidRows   = matchedCsvRows.filter(r => r.isOk);
-  const csvPaidCount  = csvPaidRows.length;
-  const csvTotalPaidAmount = csvPaidRows.reduce((sum, r) => sum + (r.amount > 0 ? r.amount : 16500), 0);
+  // ★バグ①修正: 件数カウントを「会員単位」に統一
+  // 旧: matchedCsvRows（CSV行×会員クロス積）を使用 → 1会員が複数CSV行にマッチすると膨張
+  // 新: memberMatchMap（会員単位・重複なし）を使用 → 正確な会員数
+  const memberPaidCount        = paidEntries.length;                      // 決済成功者数（会員単位）
+  const memberPaidTotalAmount  = paidEntries.reduce(
+    (sum, e) => sum + (e.amount > 0 ? e.amount : 16500), 0
+  );                                                                       // 決済成功者合計金額（会員単位）
 
-  // ② 新規Runを作成
+  // CSV行単位カウント（参考値として保持・デバッグ用）
+  const csvPaidRows   = matchedCsvRows.filter(r => r.isOk);
+  const csvPaidCount  = csvPaidRows.length;  // CSV行単位（重複あり・参考のみ）
+
+  // ② 新規Runを作成（会員単位の件数・金額で保存）
   const autoShipRun = await prisma.autoShipRun.create({
     data: {
       targetMonth,
       paymentMethod: "credit_card",
       status:        "completed",
-      totalCount:    csvPaidCount,                                       // CSV行単位の成功件数
-      paidCount:     csvPaidCount,                                       // CSV行単位の成功件数
+      totalCount:    memberPaidCount,   // 決済成功者数（会員単位）
+      paidCount:     memberPaidCount,   // 決済成功者数（会員単位）
       failedCount:   csvFailEntries.length + failedMembers.length,
-      totalAmount:   csvTotalPaidAmount,                                 // CSV行単位の成功金額
+      totalAmount:   memberPaidTotalAmount,  // 決済成功者合計金額（会員単位）
       importedAt:    now,
       completedAt:   now,
     },
@@ -619,20 +645,23 @@ async function processCredixResultCsv(
     }
   }
 
-  // ── AutoShipRun カウント・金額を再計算（CSV行単位）──
-  // paidCount/totalCount = CSV行単位の成功件数（重複IDも個別カウント）
-  // totalAmount = CSV行単位の成功金額
+  // ── AutoShipRun カウント・金額を再計算（会員単位で確定値に上書き）──
   const failedAgg = await prisma.autoShipOrder.aggregate({
     where: { autoShipRunId: autoShipRun.id, status: "failed" },
     _count: { id: true },
   });
+  const paidAgg = await prisma.autoShipOrder.aggregate({
+    where: { autoShipRunId: autoShipRun.id, status: "paid" },
+    _count: { id: true },
+    _sum:   { totalAmount: true },
+  });
   await prisma.autoShipRun.update({
     where: { id: autoShipRun.id },
     data: {
-      totalCount:  csvPaidCount,           // CSV行単位の成功件数（重複ID個別カウント）
-      paidCount:   csvPaidCount,           // 同上
+      totalCount:  paidAgg._count.id,                          // 会員単位の実際の成功件数
+      paidCount:   paidAgg._count.id,                          // 同上
       failedCount: failedAgg._count.id,
-      totalAmount: csvTotalPaidAmount,     // CSV行単位の成功金額
+      totalAmount: paidAgg._sum.totalAmount ?? memberPaidTotalAmount,
     },
   });
 
@@ -645,8 +674,10 @@ async function processCredixResultCsv(
 
   // ── レスポンス用データ組み立て ──
 
-  // 照合成功者一覧（個別行・重複あり）
-  const successMemberList = matchedCsvRows
+  // ★バグ①修正: 照合成功者一覧を memberMatchMap（会員単位・重複なし）から生成
+  // 旧: matchedCsvRows（クロス積）使用 → 1会員が複数CSV行にマッチすると重複表示
+  // 新: memberMatchMap.values()（会員単位）使用 → 正確な会員数で表示
+  const successMemberList = Array.from(memberMatchMap.values())
     .filter(r => r.isOk)
     .map(r => ({
       memberCode: r.member.memberCode,
@@ -685,10 +716,10 @@ async function processCredixResultCsv(
     rowIndex: u.rowIndex,
   }));
 
-  console.log(`[import-direct] Credix: 完了 CSV総行数=${csvTotalRows}件 paid=${paidCount}件 failed=${failedCount}件 活動中失敗=${activeFailMembers.length}件 退会等失敗=${inactiveFailMembers.length}件 CSVunmatched=${unmatchedCsvIds.length}件`);
+  console.log(`[import-direct] Credix: 完了 CSV総行数=${csvTotalRows}件 CSV行単位paid=${csvPaidCount}件 会員単位paid=${memberPaidCount}件(=${paidCount}件DB保存) failed=${failedCount}件 活動中失敗=${activeFailMembers.length}件 退会等失敗=${inactiveFailMembers.length}件 CSVunmatched=${unmatchedCsvIds.length}件`);
 
   return NextResponse.json({
-    paidCount,
+    paidCount,            // 会員単位・DB保存済み成功件数
     failedCount,
     csvTotalRows,
     matchedCount:            memberMatchMap.size,
