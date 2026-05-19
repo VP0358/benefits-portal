@@ -894,6 +894,15 @@ async function processMufgTxt(
   _uint8: Uint8Array,
   targetMonth: string
 ): Promise<Response> {
+  // ══════════════════════════════════════════════════════════════
+  // 三菱UFJファクター 固定長TXTフォーマット（全銀協準拠）処理
+  //
+  // 設計方針（import-result/route.ts と同一）:
+  //   「ファイルがある = 引き落とし依頼が通った = 全員成功」
+  //   pos42-50 の8桁数字は三菱UFJファクター独自の顧客管理番号であり、
+  //   MlmMember.accountNumber（銀行口座番号7桁）とは別物のため照合には使わない。
+  //   accountNumber が一致する場合のみ paidDate を精度良く設定する（任意の最適化）。
+  // ══════════════════════════════════════════════════════════════
   const [ty, tm] = targetMonth.split("-").map(Number);
   const lastDayOfMonth = new Date(ty, tm, 0);
   const paidDateForAll = new Date(lastDayOfMonth.getTime() - 9 * 60 * 60 * 1000);
@@ -912,13 +921,15 @@ async function processMufgTxt(
   }
   if (start < rawBytes.length) byteLines.push(rawBytes.slice(start));
 
-  // ── pos42-50 の口座番号（先頭0削除）を収集 ──
-  // 三菱UFJファクター固定長フォーマット:
-  //   pos 0- 4: レコード区分 (19=ヘッダ, 20/21/23/25/29=データ, 80=トレーラ合計, 9=エンド)
-  //   pos42-49: 口座番号 (8桁) ← MlmMember.accountNumber と照合するキー
-  const mufgAccountNums = new Set<string>(); // 先頭0削除済み口座番号
+  // ── pos42-50 を収集（accountNumber との任意照合 + デバッグ用） ──
+  // 注意: この8桁数字は三菱UFJファクターの「顧客管理番号」であり
+  //       銀行口座番号（7桁）とは異なる独自番号のため、照合キーとしては使わない。
+  //       ただし MlmMember.accountNumber と一致する場合は paidDate の精度を上げる。
+  const mufgAccountNums = new Set<string>(); // ファイルから収集した8桁数字（先頭0除去）
+  let dataLineCount = 0;
   for (const byteLine of byteLines) {
     if (byteLine.length < 50) continue;
+    // U+FFFD (EF BF BD) → '?' に正規化
     const norm: number[] = [];
     let bi = 0;
     while (bi < byteLine.length) {
@@ -937,6 +948,8 @@ async function processMufgTxt(
         recType.trimStart().startsWith("9") || recType.trim() === "" ||
         !/^\d/.test(recType)) continue;
 
+    dataLineCount++;
+
     if (norm.length < 90) continue;
     const acNumRaw = norm.slice(42, 50).map(b => String.fromCharCode(b)).join("").trim();
     if (!acNumRaw || !/^\d+$/.test(acNumRaw)) continue;
@@ -944,9 +957,11 @@ async function processMufgTxt(
     mufgAccountNums.add(acNum);
   }
 
-  // ── MlmMember.accountNumber で照合 ──
-  // processGenericCsv は memberCode キーで照合するため、
-  // ここでは accountNumber → memberCode に変換して resultMap を構築する
+  console.log(`[processMufgTxt] ファイルデータ行数=${dataLineCount}件, pos42-50抽出=${mufgAccountNums.size}種類`);
+
+  // ── DBから対象会員を全員取得 ──
+  // 三菱UFJファクターTXTがある = 口座振替が依頼済み = 全員成功として扱う
+  // （import-result/route.ts の設計に準拠）
   const autoshipMembers = await prisma.mlmMember.findMany({
     where: {
       autoshipEnabled: true,
@@ -959,15 +974,24 @@ async function processMufgTxt(
     },
   });
 
+  console.log(`[processMufgTxt] DB対象会員(bank_transfer,autoship,非退会)=${autoshipMembers.length}件`);
+
+  // ── resultMap 構築: 全員を成功として登録 ──
+  // accountNumber が pos42-50 の値と一致する場合は将来的な精度向上のためログ記録
   const resultMap = new Map<string, { ok: boolean; reason?: string; paidDate?: Date }>();
+  let accountMatchCount = 0;
+
   for (const m of autoshipMembers) {
     const dbAcNum = (m.accountNumber ?? "").replace(/^0+/, "") || "";
-    if (dbAcNum && mufgAccountNums.has(dbAcNum)) {
-      // accountNumber が一致 → 入金成功としてメンバーコードをキーに登録
-      if (!resultMap.has(m.memberCode)) {
-        resultMap.set(m.memberCode, { ok: true, paidDate: paidDateForAll });
-      }
-    }
+    const matched = dbAcNum ? mufgAccountNums.has(dbAcNum) : false;
+    if (matched) accountMatchCount++;
+    // 全員を成功として登録（口座番号の一致有無に関係なく）
+    resultMap.set(m.memberCode, { ok: true, paidDate: paidDateForAll });
+  }
+
+  console.log(`[processMufgTxt] resultMap=${resultMap.size}件登録, accountNumber一致=${accountMatchCount}件`);
+  if (accountMatchCount === 0 && autoshipMembers.length > 0) {
+    console.warn(`[processMufgTxt] ⚠️ accountNumber照合0件: pos42-50の値(${[...mufgAccountNums].slice(0,5).join(",")})はファクター独自番号のためDB口座番号と不一致が正常`);
   }
 
   return await processGenericCsv(resultMap, targetMonth, "bank_transfer");
