@@ -323,7 +323,7 @@ export const MEMBER_TYPE_LABELS: Record<string, string> = {
  * 商品マスタ（仕様書準拠）
  */
 export const MLM_PRODUCTS = [
-  { code: "s1000", name: "登録料",                                      price: 3300,  points: 150 },
+  { code: "s1000", name: "登録料",                                      price: 3300,  points: 0   },
   { code: "1000",  name: "[新規]VIOLA Pure 翠彩-SUMISAI-",               price: 16500, points: 150 },
   { code: "1001",  name: "【使用不可】[翌月分]VIOLA Pure 翠彩-SUMISAI-",  price: 16500, points: 0   },
   { code: "1002",  name: "[新規・追加分]VIOLA Pure 翠彩-SUMISAI-",        price: 16500, points: 150 },
