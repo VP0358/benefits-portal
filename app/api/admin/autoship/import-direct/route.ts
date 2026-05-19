@@ -899,8 +899,8 @@ async function processMufgTxt(
   const paidDateForAll = new Date(lastDayOfMonth.getTime() - 9 * 60 * 60 * 1000);
 
   const rawBytes = new Uint8Array(arrayBuffer);
-  const resultMap = new Map<string, { ok: boolean; reason?: string; paidDate?: Date }>();
 
+  // ── 行分割 ──
   const byteLines: Uint8Array[] = [];
   let start = 0;
   for (let i = 0; i < rawBytes.length; i++) {
@@ -912,6 +912,11 @@ async function processMufgTxt(
   }
   if (start < rawBytes.length) byteLines.push(rawBytes.slice(start));
 
+  // ── pos42-50 の口座番号（先頭0削除）を収集 ──
+  // 三菱UFJファクター固定長フォーマット:
+  //   pos 0- 4: レコード区分 (19=ヘッダ, 20/21/23/25/29=データ, 80=トレーラ合計, 9=エンド)
+  //   pos42-49: 口座番号 (8桁) ← MlmMember.accountNumber と照合するキー
+  const mufgAccountNums = new Set<string>(); // 先頭0削除済み口座番号
   for (const byteLine of byteLines) {
     if (byteLine.length < 50) continue;
     const norm: number[] = [];
@@ -927,6 +932,7 @@ async function processMufgTxt(
     if (norm.length < 50) continue;
 
     const recType = norm.slice(0, 5).map(b => String.fromCharCode(b)).join("").trim();
+    // ヘッダ(19)・トレーラ(80/9)・空行・非数字先頭 はスキップ
     if (recType.startsWith("19") || recType.startsWith("80") ||
         recType.trimStart().startsWith("9") || recType.trim() === "" ||
         !/^\d/.test(recType)) continue;
@@ -935,9 +941,32 @@ async function processMufgTxt(
     const acNumRaw = norm.slice(42, 50).map(b => String.fromCharCode(b)).join("").trim();
     if (!acNumRaw || !/^\d+$/.test(acNumRaw)) continue;
     const acNum = acNumRaw.replace(/^0+/, "") || "0";
+    mufgAccountNums.add(acNum);
+  }
 
-    if (!resultMap.has(acNum)) {
-      resultMap.set(acNum, { ok: true, paidDate: paidDateForAll });
+  // ── MlmMember.accountNumber で照合 ──
+  // processGenericCsv は memberCode キーで照合するため、
+  // ここでは accountNumber → memberCode に変換して resultMap を構築する
+  const autoshipMembers = await prisma.mlmMember.findMany({
+    where: {
+      autoshipEnabled: true,
+      status: { not: "withdrawn" },
+      paymentMethod: "bank_transfer",
+    },
+    select: {
+      memberCode: true,
+      accountNumber: true,
+    },
+  });
+
+  const resultMap = new Map<string, { ok: boolean; reason?: string; paidDate?: Date }>();
+  for (const m of autoshipMembers) {
+    const dbAcNum = (m.accountNumber ?? "").replace(/^0+/, "") || "";
+    if (dbAcNum && mufgAccountNums.has(dbAcNum)) {
+      // accountNumber が一致 → 入金成功としてメンバーコードをキーに登録
+      if (!resultMap.has(m.memberCode)) {
+        resultMap.set(m.memberCode, { ok: true, paidDate: paidDateForAll });
+      }
     }
   }
 
