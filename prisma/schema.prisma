@@ -877,7 +877,8 @@ model BonusResult {
   savingsPoints       Int         @default(0)       // 貯金ポイント累計
   // ユニレベルボーナス段数内訳（JSON）
   unilevelDetail      Json?                         // { "1": pt, "2": pt, ... }
-  savingsPointsAdded  Int         @default(0)       // 今月追加貯金pt
+  savingsPointsAdded          Int         @default(0)       // 今月追加貯金pt（×10整数保存）
+  savingsPtAFromRegistration  Boolean     @default(false)   // 登録月A仮付与フラグ（翌月autoshipでなければ消滅）
   // 公開管理
   isPublished         Boolean     @default(false)   // 会員マイページへの公開フラグ
   publishedAt         DateTime?                     // 公開日時

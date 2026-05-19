@@ -129,6 +129,46 @@ export async function executeBonusCalculation(
     },
   });
 
+  // 貯金ボーナスA（初回）判定用：
+  // 「商品1000を今月より前に一度も購入したことがない会員ID」セットを作成
+  const [bonusMonthYear, bonusMonthMonth] = bonusMonth.split("-").map(Number);
+  // bonusMonth の月初（JST → UTC: -9h）
+  const bonusMonthStart = new Date(Date.UTC(bonusMonthYear, bonusMonthMonth - 1, 1) - 9 * 60 * 60 * 1000);
+
+  // 今月より前に商品1000を購入済みの会員IDセット
+  const pastProduct1000Purchases = await prisma.mlmPurchase.findMany({
+    where: {
+      productCode: "1000",
+      purchaseMonth: { lt: bonusMonth }, // bonusMonth より前の月
+    },
+    select: { mlmMemberId: true },
+    distinct: ["mlmMemberId"],
+  });
+  const hasPastProduct1000 = new Set(pastProduct1000Purchases.map((p: { mlmMemberId: bigint }) => p.mlmMemberId.toString()));
+
+  // 前月BonusResultを取得（翌月チェック：A仮付与の消滅判定用）
+  const prevMonthTotal = bonusMonthYear * 12 + (bonusMonthMonth - 1) - 1;
+  const prevYear = Math.floor(prevMonthTotal / 12);
+  const prevMonth = (prevMonthTotal % 12) + 1;
+  const prevBonusMonth = `${prevYear}-${String(prevMonth).padStart(2, "0")}`;
+
+  // 前月BonusResultを取得（savingsPointsAdded, savingsPtAFromRegistration フラグ確認用）
+  const prevBonusResults = await prisma.bonusResult.findMany({
+    where: { bonusMonth: prevBonusMonth },
+    select: {
+      mlmMemberId: true,
+      savingsPtAFromRegistration: true, // A仮付与フラグ
+      savingsPointsAdded: true,
+    },
+  });
+  type PrevBonusResultItem = { mlmMemberId: bigint; savingsPtAFromRegistration: boolean; savingsPointsAdded: number };
+  // 前月A仮付与があった会員ID → 前月にsavingsPointsAdded(×10整数)のマップ
+  const prevHadRegistrationA = new Map<string, number>(
+    prevBonusResults
+      .filter((r: PrevBonusResultItem) => r.savingsPtAFromRegistration)
+      .map((r: PrevBonusResultItem) => [r.mlmMemberId.toString(), r.savingsPointsAdded] as [string, number])
+  );
+
   // 源泉徴収税の閾値
   const WITHHOLDING_THRESHOLD = 120000; // 12万円
   const WITHHOLDING_RATE = 0.1021;      // 10.21%
@@ -378,67 +418,98 @@ export async function executeBonusCalculation(
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // ④貯金ボーナス（SAVpt）計算
-    // 【条件】01ポジション かつ ステータスが「autoship」のみ（activeは対象外）
-    //         かつ 当月アクティブ（isActive=true）であること
-    //         → 当月アクティブでない場合（商品未受取・返送等）は累計ポイント全消滅
-    // 以下3パターンの合算（小数点第2位切り捨て → 第1位まで表示）
-    // A: 自己が商品1000を1個以上購入 → 自己購入pt × registrationRate(20%)
-    // B: オートシップ伝票（当月・入金あり）1件以上 → AS伝票合計pt × autoshipRate(5%)
-    // C: 当月ボーナス実際に発生（①〜③の合計 > 0） → グループポイント × bonusRate(3%)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 【全消滅条件】
+    //   ステータスが autoship 以外、または 当月 isActive=false
+    //   → 累計ポイント全消滅（0リセット）
+    //
+    // 【A: 初回登録月のみ・仮付与】
+    //   条件: 01ポジション かつ 登録月=bonusMonth かつ 過去に商品1000購入なし
+    //   計算: 自己購入pt × registrationRate(20%)
+    //   ※ ステータス判定なし（登録時点で仮付与）
+    //   ※ 翌月に autoship でなければ消滅
+    //
+    // 【B: 2回目以降・毎月】
+    //   条件: autoship かつ isActive=true かつ AS伝票（入金済）≥1件
+    //   計算: AS伝票合計pt × autoshipRate(5%)
+    //
+    // 【C: 毎月・ボーナス発生者のみ】
+    //   条件: autoship かつ isActive=true かつ 当月ボーナス実際発生（>0）
+    //   計算: GP × bonusRate(3%)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     let savingsPointsAdded = 0;
+    let savingsPtAFromRegistration = false; // A仮付与フラグ（翌月消滅チェック用）
     const memberStatus = member.status;
-    // autoshipのみ対象（activeは対象外）、かつ当月アクティブであること
-    const isEligibleForSavings = isFirstPos &&
-      memberStatus === "autoship" &&
-      isActive;
+    const memberIdStr = member.id.toString();
 
-    if (isEligibleForSavings) {
-      // A. 商品1000を1個以上購入していること
+    // 登録月判定: MlmMember.createdAt の年月 === bonusMonth
+    const memberCreatedAt: Date = (member as any).createdAt;
+    // JSTで年月を比較（createdAt はUTC保存なので+9h）
+    const createdAtJST = new Date(memberCreatedAt.getTime() + 9 * 60 * 60 * 1000);
+    const createdMonthStr = `${createdAtJST.getUTCFullYear()}-${String(createdAtJST.getUTCMonth() + 1).padStart(2, "0")}`;
+    const isRegistrationMonth = createdMonthStr === bonusMonth;
+
+    // 【翌月チェック】前月にA仮付与があった場合、今月 autoship でなければ消滅
+    // → 前月の savingsPointsAdded から A分を差し引く（累計から引く）
+    let prevAConsumptionPt = 0; // 前月A分消滅額（× 10 整数）
+    if (prevHadRegistrationA.has(memberIdStr) && memberStatus !== "autoship") {
+      // 前月にA仮付与があり、今月 autoship でない → A分消滅
+      const prevAddedInt = prevHadRegistrationA.get(memberIdStr) ?? 0;
+      prevAConsumptionPt = prevAddedInt; // 前月A付与分（×10整数）を消滅
+      console.log(`  🔥 貯金A消滅: ${memberCodeStr} 前月A仮付与分 ${prevAddedInt / 10}pt 消滅`);
+    }
+
+    // 【A: 初回登録月・仮付与】ステータス不問
+    if (isFirstPos && isRegistrationMonth && !hasPastProduct1000.has(memberIdStr)) {
       if (purchaseData.directBonusProductCount >= 1) {
         const ptA = Math.floor(purchaseData.selfPurchasePoints * (savingsRegistrationRate / 100) * 10) / 10;
         savingsPointsAdded += ptA;
-        console.log(
-          `  💰 貯金B-A: ${memberCodeStr} 自己購入${purchaseData.selfPurchasePoints}pt × ${savingsRegistrationRate}% = ${ptA}pt`
-        );
+        savingsPtAFromRegistration = true; // 翌月消滅チェック用フラグ
+        console.log(`  💰 貯金A（初回仮付与）: ${memberCodeStr} 自己購入${purchaseData.selfPurchasePoints}pt × ${savingsRegistrationRate}% = ${ptA}pt`);
       }
+    }
 
-      // B. オートシップ伝票（当月・入金あり）が1件以上
+    // 【B・C: autoship かつ 当月アクティブのみ】
+    if (isFirstPos && memberStatus === "autoship" && isActive) {
+      // B. AS伝票（入金済）が1件以上
       if (purchaseData.hasAutoshipInvoice && purchaseData.autoshipInvoicePoints > 0) {
         const ptB = Math.floor(purchaseData.autoshipInvoicePoints * (savingsAutoshipRate / 100) * 10) / 10;
         savingsPointsAdded += ptB;
-        console.log(
-          `  💰 貯金B-B: ${memberCodeStr} AS伝票${purchaseData.autoshipInvoicePoints}pt × ${savingsAutoshipRate}% = ${ptB}pt`
-        );
+        console.log(`  💰 貯金B: ${memberCodeStr} AS伝票${purchaseData.autoshipInvoicePoints}pt × ${savingsAutoshipRate}% = ${ptB}pt`);
       }
 
-      // C. 当月ボーナスが実際に発生した（①〜③の合計 > 0）かつGP > 0
-      //    ※ eligibleだけでは不十分。実際にボーナス金額が発生していること
+      // C. 当月ボーナスが実際に発生（①〜③合計 > 0）かつ GP > 0
       const hasBonusThisMonth = (directBonus + unilevelResult.total + structureBonus) > 0;
       if (hasBonusThisMonth && groupPoints > 0) {
         const ptC = Math.floor(groupPoints * (savingsBonusRate / 100) * 10) / 10;
         savingsPointsAdded += ptC;
-        console.log(
-          `  💰 貯金B-C: ${memberCodeStr} GP=${groupPoints}pt × ${savingsBonusRate}% = ${ptC}pt`
-        );
-      }
-
-      // 小数点第1位まで（第2位切り捨て）
-      savingsPointsAdded = Math.floor(savingsPointsAdded * 10) / 10;
-
-      if (savingsPointsAdded > 0) {
-        console.log(
-          `  💎 貯金B合計: ${memberCodeStr} 今月+${savingsPointsAdded}pt`
-        );
+        console.log(`  💰 貯金C: ${memberCodeStr} GP=${groupPoints}pt × ${savingsBonusRate}% = ${ptC}pt`);
       }
     }
 
-    // 貯金ポイント累計（前月までの累計 + 今月追加）
-    // autoship以外 または 当月非アクティブ（商品未受取・返送等）→ 累計全消滅（0リセット）
+    // 小数点第1位まで（第2位切り捨て）
+    savingsPointsAdded = Math.floor(savingsPointsAdded * 10) / 10;
+    if (savingsPointsAdded > 0) {
+      console.log(`  💎 貯金合計: ${memberCodeStr} 今月+${savingsPointsAdded}pt`);
+    }
+
+    // 貯金ポイント累計計算
+    // 【全消滅】autoship以外 または 当月非アクティブ（ただしA初回月はステータス不問で加算）
     const previousSavingsPoints = member.savingsPoints || 0;
-    const newSavingsPoints = isEligibleForSavings
-      ? Math.floor((previousSavingsPoints + savingsPointsAdded) * 10) / 10
-      : 0; // リセット（全消滅）
+    let newSavingsPoints: number;
+
+    if (isRegistrationMonth && savingsPtAFromRegistration) {
+      // 登録月：A仮付与のみ（累計に加算、ステータス不問）
+      newSavingsPoints = Math.floor((previousSavingsPoints + savingsPointsAdded) * 10) / 10;
+    } else if (memberStatus === "autoship" && isActive) {
+      // 通常月：autoship かつ アクティブ → B・C分加算
+      // 前月A消滅分を差し引き（prevAConsumptionPt は × 10 整数）
+      const prevAConsumptionReal = prevAConsumptionPt / 10;
+      newSavingsPoints = Math.max(0, Math.floor((previousSavingsPoints - prevAConsumptionReal + savingsPointsAdded) * 10) / 10);
+    } else {
+      // 全消滅（autoship以外、または当月非アクティブ）
+      newSavingsPoints = 0;
+    }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // ⑤合計ボーナス・支払い計算
@@ -503,8 +574,9 @@ export async function executeBonusCalculation(
       serviceFee,
       paymentAmount,
       unilevelDetail: unilevelResult.detail,
-      savingsPointsAdded: Math.round(savingsPointsAdded * 10), // × 10して整数保存
-      savingsPoints: Math.round(newSavingsPoints * 10),        // 累計も × 10
+      savingsPointsAdded: Math.round(savingsPointsAdded * 10),       // × 10して整数保存
+      savingsPoints: Math.round(newSavingsPoints * 10),               // 累計も × 10
+      savingsPtAFromRegistration,                                      // A仮付与フラグ
       // 組織データ（BonusResult保存用）
       minLinePoints: minSeriesPoints,
       lineCount: seriesCount,
@@ -554,6 +626,7 @@ export async function executeBonusCalculation(
       unilevelDetail: r.unilevelDetail,
       savingsPointsAdded: r.savingsPointsAdded,
       savingsPoints: r.savingsPoints,
+      savingsPtAFromRegistration: r.savingsPtAFromRegistration,
       minLinePoints: r.minLinePoints,
       lineCount: r.lineCount,
     })),
