@@ -82,23 +82,36 @@ export async function GET(req: NextRequest) {
   });
 
   type MemberRow = (typeof members)[number];
-  const rows = members.map((m: MemberRow) => ({
-    id: m.id.toString(),
-    memberCode: m.memberCode,
-    memberType: m.memberType,
-    status: m.status,
-    currentLevel: m.currentLevel,
-    titleLevel: m.titleLevel,
-    forceActive: m.forceActive,
-    forceLevel: m.forceLevel,
-    contractDate: m.contractDate?.toISOString().slice(0, 10) ?? null,
-    companyName: m.companyName ?? null,
-    prefecture: m.prefecture ?? null,
-    userName: m.user.name,
-    userEmail: m.user.email,
-    uplineMemberCode: m.upline?.memberCode ?? null,
-    uplineName: m.upline?.user.name ?? null,
-  }));
+  const rows = members.map((m: MemberRow) => {
+    // 法人登録の場合: 法人名を主表示・氏名をサブ表示として返す
+    const hasCompany = !!m.companyName;
+    const displayName = hasCompany
+      ? `${m.companyName}` // 法人名をメイン表示名に
+      : m.user.name;
+    const subName = hasCompany
+      ? m.user.name        // 個人名をサブに
+      : null;
+
+    return {
+      id: m.id.toString(),
+      memberCode: m.memberCode,
+      memberType: m.memberType,
+      status: m.status,
+      currentLevel: m.currentLevel,
+      titleLevel: m.titleLevel,
+      forceActive: m.forceActive,
+      forceLevel: m.forceLevel,
+      contractDate: m.contractDate?.toISOString().slice(0, 10) ?? null,
+      companyName: m.companyName ?? null,
+      prefecture: m.prefecture ?? null,
+      displayName,  // 法人名 or 氏名（メイン表示）
+      subName,      // 法人の場合は個人名（サブ表示）
+      userName: m.user.name,
+      userEmail: m.user.email,
+      uplineMemberCode: m.upline?.memberCode ?? null,
+      uplineName: m.upline?.user.name ?? null,
+    };
+  });
 
   return NextResponse.json({ rows, total: rows.length });
 }

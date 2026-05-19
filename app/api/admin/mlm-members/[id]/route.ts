@@ -247,11 +247,21 @@ export async function PATCH(
     } else if (section === "level") {
       // レベル情報
       const lvUpdate: Record<string, unknown> = {};
-      if (data.currentLevel     !== undefined) lvUpdate.currentLevel     = Number(data.currentLevel);
-      if (data.titleLevel       !== undefined) lvUpdate.titleLevel       = Number(data.titleLevel);
+      if (data.currentLevel      !== undefined) lvUpdate.currentLevel      = Number(data.currentLevel);
+      if (data.titleLevel        !== undefined) lvUpdate.titleLevel        = Number(data.titleLevel);
       if (data.conditionAchieved !== undefined) lvUpdate.conditionAchieved = Boolean(data.conditionAchieved);
-      if (data.forceActive      !== undefined) lvUpdate.forceActive      = Boolean(data.forceActive);
-      if (data.forceLevel       !== undefined) lvUpdate.forceLevel       = data.forceLevel !== null ? Number(data.forceLevel) : null;
+      if (data.forceLevel        !== undefined) lvUpdate.forceLevel        = data.forceLevel !== null ? Number(data.forceLevel) : null;
+
+      // 強制アクティブを ON にする場合 → ステータスを自動で autoship に変更
+      if (data.forceActive !== undefined) {
+        const newForceActive = Boolean(data.forceActive);
+        lvUpdate.forceActive = newForceActive;
+        if (newForceActive) {
+          // forceActive=true にした瞬間、lapsed/suspended 等に関わらず autoship へ昇格
+          lvUpdate.status = "autoship";
+        }
+      }
+
       await prisma.mlmMember.update({ where: { id: memberId }, data: lvUpdate });
 
     } else if (section === "autoship") {

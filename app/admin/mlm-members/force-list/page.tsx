@@ -17,6 +17,8 @@ type ForceRow = {
   contractDate: string | null;
   companyName: string | null;
   prefecture: string | null;
+  displayName: string;   // 法人名 or 氏名（メイン表示）
+  subName: string | null; // 法人の場合は個人名（サブ表示）
   userName: string;
   userEmail: string;
   uplineMemberCode: string | null;
@@ -82,8 +84,10 @@ export default function ForceMemberListPage() {
     const q = search.toLowerCase();
     return (
       r.memberCode.toLowerCase().includes(q) ||
+      r.displayName.toLowerCase().includes(q) ||
       r.userName.toLowerCase().includes(q) ||
       (r.companyName ?? "").toLowerCase().includes(q) ||
+      (r.subName ?? "").toLowerCase().includes(q) ||
       (r.userEmail ?? "").toLowerCase().includes(q)
     );
   });
@@ -97,8 +101,8 @@ export default function ForceMemberListPage() {
     ];
     const csvRows = filtered.map((r) => [
       r.memberCode,
-      r.userName,
-      r.companyName ?? "",
+      r.displayName,
+      r.subName ?? r.companyName ?? "",
       r.prefecture ?? "",
       r.userEmail,
       STATUS_LABELS[r.status] ?? r.status,
@@ -278,11 +282,11 @@ export default function ForceMemberListPage() {
                         {r.memberCode}
                       </td>
 
-                      {/* 氏名 */}
+                      {/* 氏名 / 法人名 */}
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="font-medium text-gray-800">{r.userName}</div>
-                        {r.companyName && (
-                          <div className="text-xs text-gray-400">{r.companyName}</div>
+                        <div className="font-medium text-gray-800">{r.displayName}</div>
+                        {r.subName && (
+                          <div className="text-xs text-gray-500">({r.subName})</div>
                         )}
                         {r.prefecture && (
                           <div className="text-xs text-gray-400">{r.prefecture}</div>
