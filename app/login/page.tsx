@@ -1,12 +1,18 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useEffect } from "react";
 import ViolaLogo from "@/app/components/viola-logo";
 import { loginAction } from "./actions";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [lapseNotice, setLapseNotice] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("reason") === "lapsed") setLapseNotice(true);
+  }, []);
   const [form, setForm] = useState({ memberCode: "", password: "" });
 
   async function onSubmit(e: FormEvent) {
@@ -148,6 +154,17 @@ export default function LoginPage() {
                 }}
               />
             </div>
+
+            {lapseNotice && (
+              <div
+                className="rounded-xl px-4 py-3 text-sm"
+                style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)", color: "#dc2626" }}
+              >
+                <strong>会員資格が失効しています。</strong><br />
+                スミサイの購入が6か月間確認できなかったため、会員資格が失効しました。<br />
+                お心当たりの方はサポートまでお問い合わせください。
+              </div>
+            )}
 
             {error && (
               <div

@@ -68,6 +68,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             // 停止中（suspended）もログイン不可
             if (user.status === "suspended") return null;
 
+            // 失効済み会員（lapsed）もログイン不可
+            // ※ MlmMember.status が lapsed の場合はアクセスさせない
+            const mlmMember = await prisma.mlmMember.findUnique({
+              where: { userId: user.id },
+              select: { status: true },
+            });
+            if (mlmMember?.status === "lapsed") return null;
+
             // invited（未アクティベート）はそのままログイン可
             // active のみ通常ログイン可
             await prisma.user.update({
