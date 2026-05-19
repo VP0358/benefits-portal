@@ -341,9 +341,9 @@ function SectionHeader({ title, icon, onEdit }: { title: string; icon: string; o
 }
 
 // ─── 編集モーダル共通 ────────────────────────────────
-function EditModal({ title, onClose, onSave, saving, children }: {
+function EditModal({ title, onClose, onSave, saving, saveDisabled, saveDisabledReason, children }: {
   title: string; onClose: () => void; onSave: () => void;
-  saving: boolean; children: React.ReactNode;
+  saving: boolean; saveDisabled?: boolean; saveDisabledReason?: string; children: React.ReactNode;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6 overflow-auto"
@@ -356,10 +356,17 @@ function EditModal({ title, onClose, onSave, saving, children }: {
         </div>
         <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">{children}</div>
         <div className="flex gap-3 px-5 py-4 border-t border-slate-100">
-          <button onClick={onSave} disabled={saving}
-            className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 disabled:opacity-50 transition">
-            {saving ? "保存中..." : "保存する"}
-          </button>
+          <div className="flex-1 flex flex-col gap-1">
+            <button onClick={onSave} disabled={saving || saveDisabled}
+              className="w-full rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition">
+              {saving ? "保存中..." : "保存する"}
+            </button>
+            {saveDisabled && saveDisabledReason && (
+              <p className="text-[11px] text-red-600 font-semibold text-center">
+                ⛔ {saveDisabledReason}
+              </p>
+            )}
+          </div>
           <button onClick={onClose}
             className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm text-slate-600 hover:bg-slate-50 transition">
             キャンセル
@@ -1641,8 +1648,18 @@ export default function MlmMemberDetailPage() {
       ═══════════════════════════════════════════════ */}
 
       {/* 基本情報 編集 */}
-      {editSection === "basic" && (
-        <EditModal title="基本情報を編集" onClose={() => setEditSection(null)} onSave={handleSave} saving={saving}>
+      {editSection === "basic" && (() => {
+        // クレジットカードIDの全角チェック（①②③すべて）
+        const cardIdKeys = ["creditCardId", "creditCardId2", "creditCardId3"] as const;
+        const hasAnyFullWidth = cardIdKeys.some(k => /[\uff10-\uff19\uff37\uff23\uff57\uff43]/.test(String(editData[k] ?? "")));
+        return (
+        <EditModal
+          title="\u57fa\u672c\u60c5\u5831\u3092\u7de8\u96c6"
+          onClose={() => setEditSection(null)}
+          onSave={handleSave}
+          saving={saving}
+          saveDisabled={hasAnyFullWidth}
+          saveDisabledReason="\u6c7a\u6e08ID\u306b\u5168\u89d2\u6587\u5b57\u304c\u542b\u307e\u308c\u3066\u3044\u307e\u3059\u3002\u534a\u89d2\u6570\u5b57\u306b\u76f4\u3057\u3066\u304b\u3089\u4fdd\u5b58\u3057\u3066\u304f\u3060\u3055\u3044">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <FormField label="氏名" required><input className={inputCls} value={String(editData.name ?? "")} onChange={e => set("name", e.target.value)} /></FormField>
             <FormField label="フリガナ"><input className={inputCls} value={String(editData.nameKana ?? "")} onChange={e => set("nameKana", e.target.value)} /></FormField>
@@ -1715,35 +1732,51 @@ export default function MlmMemberDetailPage() {
               ] as const).map((card) => {
                 // ★修正③: プレビュー正規化（入力中に照合形式をリアルタイム表示）
                 const rawId = String(editData[card.idKey] ?? "");
+                // 全角数字チェック: ０-９（U+FF10–FF19）が含まれているか
+                const hasFullWidthDigits = /[０-９]/.test(rawId);
+                // 全角WCチェック: ＷＣｗｃ が含まれているか
+                const hasFullWidthWC = /[ＷＣｗｃ]/.test(rawId);
+                // 全角文字が入っているかどうか（数字またはWC）
+                const hasFullWidth = hasFullWidthDigits || hasFullWidthWC;
                 const previewNorm = (() => {
-                  const s = rawId.replace(/[\u3000\t\r\n]/g, " ").trim();
+                  // 全角数字・全角WC → 半角変換（修正②: 全角入力対応）
+                  const half = rawId
+                    .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFF10 + 0x30))
+                    .replace(/[ＷＣｗｃ]/g, (ch) => ({ "Ｗ": "W", "Ｃ": "C", "ｗ": "w", "ｃ": "c" }[ch] ?? ch));
+                  const s = half.replace(/[\u3000\t\r\n]/g, " ").trim();
                   if (!s || s === "-") return null;
                   const wcT = s.match(/^WC[\s\-_]*(\d+)$/i);
                   if (wcT) return `WC${wcT[1]}`;
                   if (/^\d+$/.test(s)) return s;
                   return null;
                 })();
-                const hasFormatIssue = rawId.trim() !== "" && previewNorm === null;
-                const willBeAutoFixed = rawId.trim() !== previewNorm && previewNorm !== null && rawId.trim() !== "";
+                const hasFormatIssue = rawId.trim() !== "" && previewNorm === null && !hasFullWidth;
+                const willBeAutoFixed = rawId.trim() !== previewNorm && previewNorm !== null && rawId.trim() !== "" && !hasFullWidth;
                 return (
                   <div key={card.label} className="rounded-xl border border-slate-200 p-3 space-y-2">
                     <p className="text-xs font-semibold text-slate-500">カード {card.label}</p>
                     <div className="grid grid-cols-3 gap-2">
                       <FormField label="決済ID（照合キー）">
                         <input
-                          className={`${inputCls} ${hasFormatIssue ? "border-red-400 bg-red-50" : willBeAutoFixed ? "border-amber-400 bg-amber-50" : ""}`}
+                          className={`${inputCls} ${hasFullWidth ? "border-red-500 bg-red-50 ring-2 ring-red-300" : hasFormatIssue ? "border-red-400 bg-red-50" : willBeAutoFixed ? "border-amber-400 bg-amber-50" : ""}`}
                           value={rawId}
                           onChange={e => set(card.idKey, e.target.value)}
                           placeholder="例: WC1234567 または 1234567"
                         />
-                        {/* ★修正③: 照合形式プレビュー */}
-                        {previewNorm && willBeAutoFixed && (
+                        {/* 全角数字エラー（最優先表示） */}
+                        {hasFullWidth && (
+                          <p className="text-[11px] text-red-600 font-semibold mt-1">
+                            ⛔ 全角文字が含まれています。<strong>半角</strong>で入力してください（例: <code className="bg-red-100 px-1 rounded font-mono">WC1234567</code> または <code className="bg-red-100 px-1 rounded font-mono">12345678</code>）
+                          </p>
+                        )}
+                        {/* 照合形式プレビュー（全角なしの場合のみ） */}
+                        {!hasFullWidth && previewNorm && willBeAutoFixed && (
                           <p className="text-[10px] text-amber-600 mt-0.5">保存時に自動修正 → <code className="font-mono bg-amber-100 px-1 rounded">{previewNorm}</code></p>
                         )}
-                        {hasFormatIssue && (
+                        {!hasFullWidth && hasFormatIssue && (
                           <p className="text-[10px] text-red-600 mt-0.5">⚠️ 照合できない形式です。WC＋数字 or 数字のみで入力してください</p>
                         )}
-                        {previewNorm && !willBeAutoFixed && (
+                        {!hasFullWidth && previewNorm && !willBeAutoFixed && (
                           <p className="text-[10px] text-green-600 mt-0.5">✅ 照合キー: <code className="font-mono bg-green-50 px-1 rounded">{previewNorm}</code></p>
                         )}
                       </FormField>
@@ -1775,7 +1808,8 @@ export default function MlmMemberDetailPage() {
             <textarea className={inputCls} rows={3} value={String(editData.note ?? "")} onChange={e => set("note", e.target.value)} />
           </FormField>
         </EditModal>
-      )}
+        );
+      })()}
 
       {/* 配送先住所 編集 */}
       {editSection === "registration" && (

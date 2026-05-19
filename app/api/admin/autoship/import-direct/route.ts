@@ -203,14 +203,27 @@ function parseCsvDate(str: string): Date | null {
  *     01485760       1485760   → 1485760         → ✅ 一致
  *     WC01485760     1485760   → 1485760         → ✅ 一致
  *     69823944       069823944 → 69823944        → ✅ 一致
+ *     ２３３３５４７１  23335471  → 23335471        → ✅ 一致（修正②: 全角→半角）
+ *     WC２３３３５４７１ 23335471 → 23335471        → ✅ 一致（修正②: 全角→半角）
  *
  *   無効とする値（空文字列を返す）:
  *     - WCプレフィックス除去後に数字以外の文字を含む
  *     - 空文字列 / "-"
  */
+
+/** 全角数字・全角WC → 半角に変換するヘルパー（修正②） */
+function toHalfWidth(s: string): string {
+  return s
+    .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFF10 + 0x30))
+    .replace(/Ｗ/g, "W")
+    .replace(/Ｃ/g, "C")
+    .replace(/ｗ/g, "w")
+    .replace(/ｃ/g, "c");
+}
+
 function normalizeCardId(raw: string): string {
-  // Step0: 前後の空白・改行・タブ・全角スペースを除去
-  const s = raw.replace(/[\u3000\t\r\n]/g, " ").trim();
+  // Step0: 前後の空白・改行・タブ・全角スペースを除去 + 全角数字/WC → 半角変換
+  const s = toHalfWidth(raw.replace(/[\u3000\t\r\n]/g, " ").trim());
   if (!s || s === "-") return "";
 
   // Step1: WCプレフィックスを除去
@@ -420,7 +433,7 @@ async function processCredixResultCsv(
 
   // ── ① CSV全行を個別に照合 ──
   //
-  // 設計方針（PR #25のクロス積バグを根本修正）:
+  // 設計方針（PR #25のクロス積バグを根本修正 + 同一ID複数ポジション対応）:
   //
   //   【旧設計の問題】
   //     cardIdToMembers = Map<normId, 会員[]> でCSV行×会員のクロス積を生成していた
@@ -429,36 +442,78 @@ async function processCredixResultCsv(
   //     → successMemberList/paidCountが正しく会員単位でも137件になっていた
   //
   //   【新設計】
+  //     Step0: normIdごとのCSV出現行を事前に集約（normId → CSV行リスト）
   //     Step1: memberMatchMap を先に構築（会員コード → 代表CSV行、1:1、重複なし）
-  //            CSV行をスキャンし、各normIdにマッチした会員の「最良の行」を選択:
-  //            - 同一会員が複数CSV行にマッチ → 成功行優先、なければ最初の行
-  //            - 同一normIdに複数会員（稀）→ 全員を登録
+  //            同一normIdに複数会員がいる場合（同一人物の複数ポジション等）:
+  //              → CSV出現回数分だけ memberCode昇順で決済扱い（残りは照合失敗扱い）
+  //              → 例: normId=65466501, DB側会員=[65466501, 65466502], CSV行=1件
+  //                   → 65466501 のみ決済 ✅、65466502 は照合失敗扱い ✅
+  //            同一normIdがCSVに複数行ある場合（複数ポジション分申請済み）:
+  //              → DB側会員数分まで決済扱い（成功行優先でCSV行を割り当て）
   //     Step2: matchedCsvRows = memberMatchMap.values()（会員単位・重複なし）
   //            → CSV総行数を超えることは絶対にない
   //     Step3: unmatchedCsvIds = cardIdToMembers にマッチしなかったCSV行
 
   type MatchedCsvRow = CsvRow & { member: MemberRow };
 
+  // Step0: normIdごとのCSV行リストを事前集約
+  //   normId → そのIDが登場したCSV行の配列（成功行優先でソート）
+  const csvRowsByNormId = new Map<string, CsvRow[]>();
+  for (const row of csvRows) {
+    if (!csvRowsByNormId.has(row.normId)) {
+      csvRowsByNormId.set(row.normId, []);
+    }
+    csvRowsByNormId.get(row.normId)!.push(row);
+  }
+  // 各normIdのCSV行を「成功行優先、同じなら行番号昇順」でソート
+  for (const rows of csvRowsByNormId.values()) {
+    rows.sort((a, b) => {
+      if (a.isOk !== b.isOk) return a.isOk ? -1 : 1; // 成功行を先に
+      return a.rowIndex - b.rowIndex;
+    });
+  }
+
   // Step1: まず「会員単位の代表行マップ」を直接構築
-  //        CSV行を1件ずつスキャンし、各会員の最良行（成功優先）を選択
+  //        normIdごとに「CSV出現回数」と「DB会員数」を比較し、少ない方の数だけ決済扱い
   const memberMatchMap = new Map<string, MatchedCsvRow>(); // memberCode → 代表CSV行
   const unmatchedCsvIds: { rawId: string; normId: string; rowIndex: number }[] = [];
 
-  for (const row of csvRows) {
-    const members = cardIdToMembers.get(row.normId);
+  // まず全normIdに対してDB側会員とCSV行の対応付けを行う
+  for (const [normId, csvRowList] of csvRowsByNormId) {
+    const members = cardIdToMembers.get(normId);
     if (!members || members.length === 0) {
-      // このCSV行はDB側に対応する会員なし → 未照合
-      unmatchedCsvIds.push({ rawId: row.rawId, normId: row.normId, rowIndex: row.rowIndex });
-    } else {
-      // マッチした会員（通常1人、稀に複数）について memberMatchMap を更新
-      for (const member of members) {
-        const code = member.memberCode;
-        const existing = memberMatchMap.get(code);
-        // 成功行優先、なければ最初の行（同一会員の複数CSV行マッチを1行に集約）
-        if (!existing || (row.isOk && !existing.isOk)) {
-          memberMatchMap.set(code, { ...row, member });
-        }
+      // DB側に対応する会員なし → 全行を未照合として記録
+      for (const row of csvRowList) {
+        unmatchedCsvIds.push({ rawId: row.rawId, normId: row.normId, rowIndex: row.rowIndex });
       }
+      continue;
+    }
+
+    // DB側会員をmemberCode昇順（＝ポジション番号昇順: 01→02→03...）で並べる
+    const sortedMembers = [...members].sort((a, b) =>
+      a.memberCode.localeCompare(b.memberCode)
+    );
+
+    // CSV出現回数（csvRowList.length）分だけ決済扱い
+    // DB側会員が多い場合: CSV行数を上限として memberCode昇順で割り当て
+    // CSV行が多い場合: DB側会員数を上限として割り当て（余剰CSV行は未照合）
+    const matchCount = Math.min(csvRowList.length, sortedMembers.length);
+
+    for (let i = 0; i < matchCount; i++) {
+      const member = sortedMembers[i];
+      const row    = csvRowList[i];
+      const code   = member.memberCode;
+      const existing = memberMatchMap.get(code);
+      // 既にマッチ済みの場合は成功行優先で上書き
+      if (!existing || (row.isOk && !existing.isOk)) {
+        memberMatchMap.set(code, { ...row, member });
+      }
+    }
+
+    // CSV行がDB側会員数を超えた場合（余剰行は未照合）
+    for (let i = sortedMembers.length; i < csvRowList.length; i++) {
+      const row = csvRowList[i];
+      unmatchedCsvIds.push({ rawId: row.rawId, normId: row.normId, rowIndex: row.rowIndex });
     }
   }
 
