@@ -101,6 +101,16 @@ export default function BonusUtilitiesPage() {
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [error, setError]                     = useState<string | null>(null);
 
+  // 貯金ボーナス再計算
+  const [recalcMode, setRecalcMode]         = useState<"month" | "all">("month");
+  const [recalcLoading, setRecalcLoading]   = useState(false);
+  const [recalcResult, setRecalcResult]     = useState<{
+    success: boolean;
+    message: string;
+    detail?: { targetMonths: string[]; totalBonusResultsUpdated: number; memberSavingsUpdated: number; rates: { registrationRate: number; autoshipRate: number; bonusRate: number }; log: string[] };
+    error?: string;
+  } | null>(null);
+
   // タブ切り替えとデータ取得
   const fetchTabData = useCallback(async (tab: string, month: string) => {
     setLoading(true);
@@ -233,6 +243,36 @@ export default function BonusUtilitiesPage() {
     link.href = url;
     link.download = `purchase_list_${selectedMonth}.csv`;
     link.click();
+  };
+
+  // 貯金ボーナス再計算実行
+  const handleRecalcSavings = async () => {
+    const isAll = recalcMode === "all";
+    const confirmMsg = isAll
+      ? "⚠️ 全月分の貯金ボーナスを現在の設定値で再計算します。\n\n既存のデータは上書きされます。続行しますか？"
+      : `⚠️ ${selectedMonth}の貯金ボーナスを現在の設定値で再計算します。\n\n既存のデータは上書きされます。続行しますか？`;
+    if (!confirm(confirmMsg)) return;
+
+    setRecalcLoading(true);
+    setRecalcResult(null);
+    try {
+      const body = isAll ? {} : { bonusMonth: selectedMonth };
+      const res = await fetch("/api/admin/bonus-utilities/recalc-savings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      setRecalcResult(data);
+      if (res.ok) {
+        // 再計算後にテーブルを自動リフレッシュ
+        await fetchTabData("savingsInput", selectedMonth);
+      }
+    } catch {
+      setRecalcResult({ success: false, message: "通信エラーが発生しました", error: "network error" });
+    } finally {
+      setRecalcLoading(false);
+    }
   };
 
   // ボーナス備考保存
@@ -562,10 +602,97 @@ export default function BonusUtilitiesPage() {
           {/* ============== 貯金ポイント一覧タブ ============== */}
           {!loading && activeTab === "savingsInput" && (
             <div className="space-y-4">
-              <h3 className="text-base font-bold text-gray-800">
-                <i className="fas fa-piggy-bank mr-2 text-pink-600"></i>
-                貯金ポイント（SAVpt）一覧 — {selectedMonth.replace("-", "年")}月度
-              </h3>
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <h3 className="text-base font-bold text-gray-800">
+                  <i className="fas fa-piggy-bank mr-2 text-pink-600"></i>
+                  貯金ポイント（SAVpt）一覧 — {selectedMonth.replace("-", "年")}月度
+                </h3>
+              </div>
+
+              {/* ── 再計算パネル ── */}
+              <div className="rounded-xl border-2 border-orange-200 bg-orange-50 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <i className="fas fa-sync-alt text-orange-500"></i>
+                  <span className="font-bold text-orange-800 text-sm">貯金ボーナス 再計算</span>
+                  <span className="text-xs text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full">
+                    現在の設定値（登録{recalcResult?.detail?.rates.registrationRate ?? "?"}% / AS{recalcResult?.detail?.rates.autoshipRate ?? "?"}% / ボーナス{recalcResult?.detail?.rates.bonusRate ?? "?"}%）で上書き
+                  </span>
+                </div>
+                <p className="text-xs text-orange-700 mb-3">
+                  既存のBonusResultの貯金ポイント値をゼロクリアし、<strong>現在のボーナス設定</strong>に従って再計算・上書き保存します。
+                  MlmMemberの貯金ポイント累計も更新されます。
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* 対象選択 */}
+                  <div className="flex gap-2">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="recalcMode"
+                        value="month"
+                        checked={recalcMode === "month"}
+                        onChange={() => setRecalcMode("month")}
+                        className="accent-orange-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700">{selectedMonth} のみ</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="recalcMode"
+                        value="all"
+                        checked={recalcMode === "all"}
+                        onChange={() => setRecalcMode("all")}
+                        className="accent-orange-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700">全月（累計を再構築）</span>
+                    </label>
+                  </div>
+                  <button
+                    onClick={handleRecalcSavings}
+                    disabled={recalcLoading}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition disabled:opacity-50"
+                    style={{ background: "#ea580c", color: "#fff" }}
+                  >
+                    <i className={`fas ${recalcLoading ? "fa-spinner fa-spin" : "fa-sync-alt"}`}></i>
+                    {recalcLoading ? "再計算中..." : "再計算を実行"}
+                  </button>
+                </div>
+
+                {/* 結果表示 */}
+                {recalcResult && (
+                  <div className={`mt-3 rounded-lg px-4 py-3 text-sm ${recalcResult.success ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
+                    {recalcResult.success ? (
+                      <>
+                        <p className="font-bold text-green-800 mb-1">
+                          <i className="fas fa-check-circle mr-1"></i>
+                          {recalcResult.message}
+                        </p>
+                        {recalcResult.detail && (
+                          <div className="text-green-700 space-y-0.5 text-xs">
+                            <p>適用レート: 登録 {recalcResult.detail.rates.registrationRate}% / AS {recalcResult.detail.rates.autoshipRate}% / ボーナス {recalcResult.detail.rates.bonusRate}%</p>
+                            <p>BonusResult更新: {recalcResult.detail.totalBonusResultsUpdated}件 / 会員累計更新: {recalcResult.detail.memberSavingsUpdated}名</p>
+                            <p>対象月: {recalcResult.detail.targetMonths.join(", ")}</p>
+                            {recalcResult.detail.log.length > 0 && (
+                              <details className="mt-1">
+                                <summary className="cursor-pointer text-green-600 hover:underline">月別詳細</summary>
+                                <ul className="mt-1 ml-3 list-disc space-y-0.5">
+                                  {recalcResult.detail.log.map((l, i) => <li key={i}>{l}</li>)}
+                                </ul>
+                              </details>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="font-bold text-red-800">
+                        <i className="fas fa-exclamation-circle mr-1"></i>
+                        {recalcResult.error ?? recalcResult.message}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {savingsRecords.length === 0 ? (
                 <div className="text-center text-gray-400 py-10">
