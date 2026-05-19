@@ -71,7 +71,18 @@ export async function GET(req: NextRequest) {
  * POST /api/admin/bonus-results/publish-all
  * 指定月の全会員ボーナス明細を一括公開（または一括非公開）
  * body: { bonusMonth: "2026-03", isPublished: true }
- * 公開時：各会員に savingsBonusRate(3%)分の貯金ポイントを付与
+ *
+ * 公開時の貯金ポイント付与ロジック（修正済み）:
+ *   ボーナス計算エンジンが計算した savingsPointsAdded（×10で整数保存）を使用。
+ *   savingsPointsAdded ÷ 10 = 実際のポイント数（小数第1位まで）。
+ *
+ *   計算エンジンの内訳:
+ *     A: 自己購入pt × 20%（商品1000を1個以上購入の場合）
+ *     B: AS伝票合計pt × 5%（当月AS伝票・入金あり1件以上の場合）
+ *     C: グループポイント × 3%（当月ボーナス取得者の場合）
+ *
+ *   ❌ 旧実装（誤り）: paymentAmount（支払金額・円）× 3% → 円をポイントに換算していた
+ *   ✅ 新実装（正しい）: savingsPointsAdded ÷ 10 をそのままポイントとしてPointWalletに付与
  */
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -93,19 +104,15 @@ export async function POST(req: NextRequest) {
 
     // 公開する場合：まだ非公開の確定済みボーナス結果を取得して貯金ポイントを付与
     if (willPublish) {
-      // 貯金ボーナス設定を取得（デフォルト3%）
-      const savingsConfig = await prisma.savingsBonusConfig.findFirst();
-      const bonusRate = savingsConfig?.bonusRate ?? 3.0;
-
       // 未公開の確定済みボーナス結果を Raw SQL で取得（isPublished カラムを直接参照）
-      type RawBonusRow = { id: string; mlmMemberId: string; paymentAmount: number };
+      // savingsPointsAdded（計算エンジン算出値・×10整数保存）も取得する
+      type RawBonusRow = { id: string; mlmMemberId: string; savingsPointsAdded: number };
       const unpublishedRows = await prisma.$queryRawUnsafe<RawBonusRow[]>(`
-        SELECT br.id, br."mlmMemberId", br."paymentAmount"
+        SELECT br.id, br."mlmMemberId", br."savingsPointsAdded"
         FROM "bonus_results" br
         INNER JOIN "bonus_runs" brun ON brun.id = br."bonusRunId"
         WHERE br."bonusMonth" = $1
           AND brun.status = 'confirmed'
-          AND br."paymentAmount" > 0
           AND br."isPublished" = false
       `, bonusMonth);
 
@@ -113,8 +120,11 @@ export async function POST(req: NextRequest) {
       let totalSavingsPoints = 0;
       for (const row of unpublishedRows) {
         const mlmMemberId = BigInt(row.mlmMemberId);
-        const paymentAmount = Number(row.paymentAmount ?? 0);
-        const savingsPoints = Math.floor(paymentAmount * (bonusRate / 100));
+
+        // 計算エンジンの savingsPointsAdded（×10整数）÷ 10 = 実ポイント数
+        // PointWalletへの加算は整数のみ対応のため Math.floor で切り捨て
+        const savingsPointsRaw = Number(row.savingsPointsAdded ?? 0); // ×10整数
+        const savingsPoints = Math.floor(savingsPointsRaw / 10);      // 実ポイント（整数部）
 
         if (savingsPoints > 0) {
           // mlmMember の userId を取得
@@ -143,15 +153,10 @@ export async function POST(req: NextRequest) {
             data: { savingsPoints: { increment: savingsPoints } },
           });
 
-          // ボーナス結果に貯金ポイント付与数を記録
-          await prisma.$executeRawUnsafe(
-            `UPDATE "bonus_results" SET "savingsPointsAdded" = $1 WHERE id = $2`,
-            savingsPoints,
-            BigInt(row.id)
-          );
+          // savingsPointsAdded は計算エンジンの値をそのまま保持（上書きしない）
 
           totalSavingsPoints += savingsPoints;
-          console.log(`💰 貯金ポイント付与: ${member.memberCode} +${savingsPoints}pt`);
+          console.log(`💰 貯金ポイント付与: ${member.memberCode} +${savingsPoints}pt (計算エンジン算出: ${savingsPointsRaw / 10}pt)`);
         }
       }
 
