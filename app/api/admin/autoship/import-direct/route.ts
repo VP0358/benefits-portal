@@ -1018,6 +1018,7 @@ async function processGenericCsv(
       id: true,
       userId: true,
       memberCode: true,
+      status: true,
       companyName: true,
       mobile: true,
       autoshipStartDate: true,
@@ -1161,11 +1162,36 @@ async function processGenericCsv(
     })
   );
 
+  // ── フロントエンド用レスポンスデータ構築 ──
+  // autoship-panel.tsx が期待するフィールド:
+  //   successMembers: 決済成功者一覧（サマリー「決済成功者」タブに表示）
+  //   matchFailMembers: アクティブ照合失敗者（サマリー「照合失敗者」タブに表示）
+  //   withdrawnFailMembers: 退会等照合失敗者（サマリー「退会照合失敗者」タブに表示）
+  //   unmatchedCsvIds: 未照合ID（サマリー「未照合ID」タブに表示）
+  const successMembersPayload = paidMembers.map((m: GenericMember) => ({
+    memberCode: m.memberCode,
+    memberName: getMlmDisplayName(m.user.name, m.companyName),
+    paidDate:   (paidDates.get(m.memberCode) ?? now).toISOString(),
+    amount:     16500,
+    resultText: "成功",
+  }));
+  const matchFailMembersPayload = failedMembers.map((m: GenericMember) => ({
+    memberCode: m.memberCode,
+    memberName: getMlmDisplayName(m.user.name, m.companyName),
+    memberStatus: m.status ?? undefined,
+    creditIds:  [],
+  }));
+
   return NextResponse.json({
-    paidCount:             paidMembers.length,
-    failedCount:           failedMembers.length,
+    paidCount:              paidMembers.length,
+    failedCount:            failedMembers.length,
     effectivePaymentMethod: paymentMethod,
-    runId:                 autoShipRun?.id.toString(),
+    runId:                  autoShipRun?.id.toString(),
+    // サマリー表示用
+    successMembers:         successMembersPayload,
+    matchFailMembers:       matchFailMembersPayload,
+    withdrawnFailMembers:   [],
+    unmatchedCsvIds:        [],
   }, { status: 200 });
 }
 
