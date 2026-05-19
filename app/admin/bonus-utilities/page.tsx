@@ -249,8 +249,8 @@ export default function BonusUtilitiesPage() {
   const handleRecalcSavings = async () => {
     const isAll = recalcMode === "all";
     const confirmMsg = isAll
-      ? "⚠️ 全月分の貯金ボーナスを現在の設定値で再計算します。\n\n既存のデータは上書きされます。続行しますか？"
-      : `⚠️ ${selectedMonth}の貯金ボーナスを現在の設定値で再計算します。\n\n既存のデータは上書きされます。続行しますか？`;
+      ? "⚠️ 【全会員・全月】貯金ボーナスを完全削除し、新条件（autoshipのみ・当月アクティブ必須・pt×%）で再計算します。\n\n既存の貯金ポイントはすべてリセットされます。続行しますか？"
+      : `⚠️ 【${selectedMonth}分】貯金ボーナスを完全削除し、新条件（autoshipのみ・当月アクティブ必須・pt×%）で再計算します。\n\n既存の貯金ポイントはリセットされます。続行しますか？`;
     if (!confirm(confirmMsg)) return;
 
     setRecalcLoading(true);
@@ -619,8 +619,8 @@ export default function BonusUtilitiesPage() {
                   </span>
                 </div>
                 <p className="text-xs text-orange-700 mb-3">
-                  既存のBonusResultの貯金ポイント値をゼロクリアし、<strong>現在のボーナス設定</strong>に従って再計算・上書き保存します。
-                  MlmMemberの貯金ポイント累計も更新されます。
+                  全会員の貯金ポイントを<strong>完全削除</strong>し、新条件（<strong>autoshipステータスのみ・当月アクティブ必須・pt×%</strong>）で再計算・上書き保存します。
+                  当月アクティブでなかった月（商品未受取・返送等）は累計ゼロにリセットされます。MlmMemberの貯金ポイント累計も更新されます。
                 </p>
                 <div className="flex flex-wrap items-center gap-3">
                   {/* 対象選択 */}

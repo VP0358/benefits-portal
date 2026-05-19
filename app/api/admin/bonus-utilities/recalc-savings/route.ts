@@ -1,19 +1,25 @@
 /**
  * POST /api/admin/bonus-utilities/recalc-savings
  *
- * 指定月（または全月）のBonusResultに対して
- * 貯金ボーナス（savingsPointsAdded / savingsPoints）を
- * 現在のSavingsBonusConfig設定値で再計算して上書き更新する。
+ * 全会員の貯金ボーナスポイントを一旦全削除し、
+ * 現在のSavingsBonusConfig設定値 × 新計算方式（pt × %）で全月再計算する。
+ *
+ * 【付与条件】
+ *   - 01ポジション会員のみ
+ *   - MlmMember.status === "autoship" のみ（active は対象外）
+ *   - 当月 BonusResult.isActive === true であること
+ *     （商品を受け取らなかった月・返送された月はアクティブにならず全消滅）
+ *
+ * 【計算式】（pt × %）
+ *   A. 商品1000を1個以上購入 → 自己購入pt × registrationRate
+ *   B. オートシップ伝票（当月・入金あり）1件以上 → AS伝票合計pt × autoshipRate
+ *   C. 当月ボーナス実際発生（directBonus+unilevelBonus+structureBonus > 0） → GP × bonusRate
+ *
+ * 【累計リセット】
+ *   当月 isActive=false の場合 → savingsPoints（累計）を 0 にリセット（全消滅）
  *
  * Body:
  *   { bonusMonth?: "YYYY-MM" }   省略時は全BonusRunが対象
- *
- * 処理フロー:
- *   1. SavingsBonusConfig（最新）を取得
- *   2. 対象月のBonusRunを取得
- *   3. BonusResultごとに購入データを参照して貯金ptを再計算
- *   4. BonusResult.savingsPointsAdded / savingsPoints を更新
- *   5. MlmMember.savingsPoints（累計）も最終月の結果で更新
  */
 
 export const dynamic = "force-dynamic";
@@ -38,7 +44,31 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({})) as { bonusMonth?: string };
   const targetMonth = body.bonusMonth ?? null; // nullなら全月対象
 
-  // ── 1. 貯金ボーナス設定を取得 ──
+  // ── STEP 1: 全会員の貯金ボーナスを全削除 ──
+  // BonusResult.savingsPointsAdded / savingsPoints をすべて 0 にリセット
+  const resetResult = await prisma.bonusResult.updateMany({
+    where: targetMonth ? {
+      bonusRunId: {
+        in: (await prisma.bonusRun.findMany({
+          where: { bonusMonth: targetMonth },
+          select: { id: true },
+        })).map((r: { id: bigint }) => r.id),
+      },
+    } : undefined,
+    data: {
+      savingsPointsAdded: 0,
+      savingsPoints: 0,
+    },
+  });
+
+  // MlmMember.savingsPoints も全員 0 にリセット
+  await prisma.mlmMember.updateMany({
+    data: { savingsPoints: 0 },
+  });
+
+  console.log(`🗑️ 貯金ボーナス全削除完了: BonusResult ${resetResult.count}件リセット`);
+
+  // ── STEP 2: 貯金ボーナス設定を取得 ──
   const savingsConfig = await prisma.savingsBonusConfig.findFirst({
     orderBy: { id: "desc" },
   });
@@ -46,7 +76,7 @@ export async function POST(req: NextRequest) {
   const autoshipRate     = savingsConfig?.autoshipRate     ?? 5.0;
   const bonusRate        = savingsConfig?.bonusRate        ?? 3.0;
 
-  // ── 2. 対象BonusRunを取得 ──
+  // ── STEP 3: 対象BonusRunを取得（古い順） ──
   const bonusRuns = await prisma.bonusRun.findMany({
     where: targetMonth ? { bonusMonth: targetMonth } : undefined,
     orderBy: { bonusMonth: "asc" },
@@ -63,11 +93,11 @@ export async function POST(req: NextRequest) {
   const log: string[] = [];
   let totalUpdated = 0;
 
-  // ── 3. 月ごとに再計算 ──
+  // ── STEP 4: 月ごとに新条件・新計算式で再計算 ──
   for (const run of bonusRuns) {
     const { bonusMonth } = run;
 
-    // 対象月の全BonusResultを取得（メンバーコード・ステータス含む）
+    // 対象月の全BonusResultを取得
     const bonusResults = await prisma.bonusResult.findMany({
       where: { bonusRunId: run.id },
       select: {
@@ -88,7 +118,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 対象月の購入データを取得（オートシップ伝票判定含む）
+    // 対象月の購入データを取得
     const purchases = await prisma.mlmPurchase.findMany({
       where: { purchaseMonth: bonusMonth },
       select: {
@@ -101,7 +131,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 会員ごとのオートシップ伝票pt集計
+    // 会員ごとの購入集計
     type PurchaseAgg = {
       autoshipInvoicePoints: number;
       hasAutoshipInvoice: boolean;
@@ -141,17 +171,19 @@ export async function POST(req: NextRequest) {
     let monthUpdated = 0;
 
     for (const br of bonusResults) {
-      const memberCode = br.mlmMember.memberCode;
+      const memberCode   = br.mlmMember.memberCode;
       const memberStatus = br.mlmMember.status;
 
-      // 01ポジション & ステータスがactiveまたはautoshipのみ対象
-      const isFirstPos = isFirstPosition(memberCode);
-      const isEligible = isFirstPos &&
-        (memberStatus === "active" || memberStatus === "autoship");
+      // 付与条件:
+      //   01ポジション かつ ステータスが autoship（active は対象外） かつ 当月isActive=true
+      const isFirstPos  = isFirstPosition(memberCode);
+      const isEligible  = isFirstPos &&
+        memberStatus === "autoship" &&
+        br.isActive;
 
       let savingsPointsAdded = 0;
 
-      if (isEligible && br.isActive) {
+      if (isEligible) {
         const agg = purchaseAggMap.get(br.mlmMemberId) ?? {
           autoshipInvoicePoints: 0,
           hasAutoshipInvoice: false,
@@ -170,9 +202,10 @@ export async function POST(req: NextRequest) {
           savingsPointsAdded += ptB;
         }
 
-        // C. 当月ボーナスを取得（ダイレクト+ユニレベル+組織構築のいずれか > 0）→ GP × bonusRate
-        const hasBonus = (br.directBonus + br.unilevelBonus + br.structureBonus) > 0;
-        if (hasBonus && br.groupPoints > 0) {
+        // C. 当月ボーナスが実際に発生（合計 > 0） → GP × bonusRate
+        //    ※ eligibleだけでは不十分。実際のボーナス金額 > 0 であること
+        const hasBonusThisMonth = (br.directBonus + br.unilevelBonus + br.structureBonus) > 0;
+        if (hasBonusThisMonth && br.groupPoints > 0) {
           const ptC = Math.floor(br.groupPoints * (bonusRate / 100) * 10) / 10;
           savingsPointsAdded += ptC;
         }
@@ -181,7 +214,7 @@ export async function POST(req: NextRequest) {
         savingsPointsAdded = Math.floor(savingsPointsAdded * 10) / 10;
       }
 
-      // ×10して整数で保存（既存の保存形式を踏襲）
+      // × 10して整数で保存
       const savingsPointsAddedInt = Math.round(savingsPointsAdded * 10);
 
       await prisma.bonusResult.update({
@@ -191,62 +224,53 @@ export async function POST(req: NextRequest) {
       monthUpdated++;
     }
 
-    // ── savingsPoints（累計）を月順に積み上げ再計算 ──
-    // 01ポジション会員の累計を時系列で再構築
-    type BrItem = (typeof bonusResults)[number];
-    const firstPosMemberIds = bonusResults
-      .filter((br: BrItem) => isFirstPosition(br.mlmMember.memberCode))
-      .map((br: BrItem) => br.mlmMemberId);
-
-    // 全月のBonusResultを取得して累計を再計算
-    // (この月のresultのsavingsPointsを「前月累計 + 今月追加」で更新)
-    for (const memberId of firstPosMemberIds) {
-      // この会員の全月のBonusResultを古い順に取得
-      const allResults = await prisma.bonusResult.findMany({
-        where: { mlmMemberId: memberId },
-        orderBy: { bonusMonth: "asc" },
-        select: { id: true, bonusMonth: true, savingsPointsAdded: true, savingsPoints: true },
-      });
-
-      type AllResultItem = (typeof allResults)[number];
-      let cumulative = 0;
-      for (const r of allResults as AllResultItem[]) {
-        const added = r.savingsPointsAdded ?? 0;
-        // activeまたはautoshipの月のみ積算（ステータスはBonusResult.isActiveで代替）
-        cumulative = Math.round((cumulative + added) * 10) / 10;
-        if (r.savingsPoints !== cumulative) {
-          await prisma.bonusResult.update({
-            where: { id: r.id },
-            data: { savingsPoints: cumulative },
-          });
-        }
-      }
-    }
-
     log.push(`${bonusMonth}: ${monthUpdated}件更新`);
     totalUpdated += monthUpdated;
   }
 
-  // ── 4. MlmMember.savingsPoints（累計）を最終月で更新 ──
-  // 01ポジション全会員の最新BonusResultのsavingsPointsで上書き
-  const allFirstPosMembers = await prisma.mlmMember.findMany({
-    select: { id: true, memberCode: true },
+  // ── STEP 5: savingsPoints（累計）を月順に積み上げ再計算 ──
+  // 01ポジション かつ autoship 会員の累計を時系列で再構築
+  // 当月 isActive=false の月は累計を 0 にリセット（全消滅仕様）
+  const allMembers = await prisma.mlmMember.findMany({
+    select: { id: true, memberCode: true, status: true },
   });
 
   let memberUpdated = 0;
-  for (const m of allFirstPosMembers) {
+  for (const m of allMembers) {
     if (!isFirstPosition(m.memberCode)) continue;
+    // autoship でない会員は累計 0 のまま（既にリセット済み）
+    if (m.status !== "autoship") continue;
 
-    const latestResult = await prisma.bonusResult.findFirst({
+    // この会員の全月のBonusResultを古い順に取得
+    const allResults = await prisma.bonusResult.findMany({
       where: { mlmMemberId: m.id },
-      orderBy: { bonusMonth: "desc" },
-      select: { savingsPoints: true },
+      orderBy: { bonusMonth: "asc" },
+      select: { id: true, bonusMonth: true, isActive: true, savingsPointsAdded: true },
     });
 
-    if (latestResult) {
+    let cumulative = 0;
+    for (const r of allResults) {
+      if (!r.isActive) {
+        // 当月アクティブでない → 累計全消滅
+        cumulative = 0;
+      } else {
+        const added = (r.savingsPointsAdded ?? 0) / 10; // 整数保存 × 10 なので戻す
+        cumulative = Math.round((cumulative + added) * 10) / 10;
+      }
+      // × 10して整数で保存
+      const cumulativeInt = Math.round(cumulative * 10);
+      await prisma.bonusResult.update({
+        where: { id: r.id },
+        data: { savingsPoints: cumulativeInt },
+      });
+    }
+
+    // MlmMember.savingsPoints を最新月の累計で更新
+    if (allResults.length > 0) {
+      const latestCumulativeInt = Math.round(cumulative * 10);
       await prisma.mlmMember.update({
         where: { id: m.id },
-        data: { savingsPoints: latestResult.savingsPoints },
+        data: { savingsPoints: latestCumulativeInt },
       });
       memberUpdated++;
     }
@@ -254,12 +278,18 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    message: `貯金ボーナスの再計算が完了しました`,
+    message: `貯金ボーナスを全削除し、新条件（autoshipのみ・isActive必須・pt×%）で再計算しました`,
     detail: {
+      resetBonusResults: resetResult.count,
       targetMonths: bonusRuns.map((r: { id: bigint; bonusMonth: string }) => r.bonusMonth),
       totalBonusResultsUpdated: totalUpdated,
       memberSavingsUpdated: memberUpdated,
       rates: { registrationRate, autoshipRate, bonusRate },
+      conditions: {
+        statusRequired: "autoship のみ（active は対象外）",
+        isActiveRequired: "当月 isActive=true 必須（商品未受取・返送 → 全消滅）",
+        bonusCRequired: "実際のボーナス金額 > 0 であること",
+      },
       log,
     },
   });

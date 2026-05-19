@@ -182,10 +182,11 @@ export default function BonusSettingsPage() {
             💰 貯金ポイント（SAVpt）設定
           </h2>
           <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
-            ⚠️ 貯金ポイントはボーナス計算とは分離され、ポイントとして別途付与されます。
-            「登録時：登録料¥15,000の{savingsConfig.registrationRate}% = {Math.floor(15000 * savingsConfig.registrationRate / 100)}pt」
-            「オートシップ支払完了時：¥15,000の{savingsConfig.autoshipRate}% = {Math.floor(15000 * savingsConfig.autoshipRate / 100)}pt」
-            「報酬公開時：支払報酬額の{savingsConfig.bonusRate}%」
+            ⚠️ 貯金ポイントは<strong>オートシップステータスの会員のみ</strong>（activeは対象外）、かつ<strong>当月アクティブ</strong>（商品受取済）の場合のみ付与されます。
+            当月アクティブでない場合（商品未受取・返送等）は累計ポイントが<strong>全消滅</strong>します。<br />
+            【A】商品1000を1個以上購入した月 → 自己購入pt × {savingsConfig.registrationRate}%<br />
+            【B】オートシップ伝票（入金あり）1件以上の月 → AS伝票合計pt × {savingsConfig.autoshipRate}%<br />
+            【C】当月ボーナス実際発生（報酬合計 &gt; 0）の月 → グループpt × {savingsConfig.bonusRate}%
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -207,7 +208,7 @@ export default function BonusSettingsPage() {
                 max="100"
               />
               <p className="text-xs text-gray-500 mt-1">
-                新規登録時に付与される貯金ポイント割合（デフォルト: 20%）
+                当月に商品1000を1個以上購入した場合、自己購入pt × この率を貯金ptとして付与（デフォルト: 20%）
               </p>
             </div>
 
@@ -230,7 +231,7 @@ export default function BonusSettingsPage() {
                 max="100"
               />
               <p className="text-xs text-gray-500 mt-1">
-                オートシップ決済完了時に付与される貯金ポイント率（デフォルト: 5%）
+                当月オートシップ伝票（入金あり）が1件以上の場合、AS伝票合計pt × この率を貯金ptとして付与（デフォルト: 5%）
               </p>
             </div>
 
@@ -253,7 +254,7 @@ export default function BonusSettingsPage() {
                 max="100"
               />
               <p className="text-xs text-gray-500 mt-1">
-                報酬公開時に支払報酬額の{savingsConfig.bonusRate}%を貯金ポイントとして付与（デフォルト: 3%）
+                当月ボーナス実際発生（報酬合計 &gt; 0）の場合、グループpt × この率を貯金ptとして付与（デフォルト: 3%）
               </p>
             </div>
           </div>

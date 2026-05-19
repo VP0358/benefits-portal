@@ -378,16 +378,20 @@ export async function executeBonusCalculation(
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // ④貯金ボーナス（SAVpt）計算
-    // 01ポジションのみ対象。累積ポイントをMlmMember.savingsPointsで管理。
+    // 【条件】01ポジション かつ ステータスが「autoship」のみ（activeは対象外）
+    //         かつ 当月アクティブ（isActive=true）であること
+    //         → 当月アクティブでない場合（商品未受取・返送等）は累計ポイント全消滅
     // 以下3パターンの合算（小数点第2位切り捨て → 第1位まで表示）
     // A: 自己が商品1000を1個以上購入 → 自己購入pt × registrationRate(20%)
     // B: オートシップ伝票（当月・入金あり）1件以上 → AS伝票合計pt × autoshipRate(5%)
-    // C: 当月ボーナス取得者 → グループポイント × bonusRate(3%)
+    // C: 当月ボーナス実際に発生（①〜③の合計 > 0） → グループポイント × bonusRate(3%)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     let savingsPointsAdded = 0;
     const memberStatus = member.status;
+    // autoshipのみ対象（activeは対象外）、かつ当月アクティブであること
     const isEligibleForSavings = isFirstPos &&
-      (memberStatus === "active" || memberStatus === "autoship");
+      memberStatus === "autoship" &&
+      isActive;
 
     if (isEligibleForSavings) {
       // A. 商品1000を1個以上購入していること
@@ -408,8 +412,9 @@ export async function executeBonusCalculation(
         );
       }
 
-      // C. 当月ボーナス取得者（①〜③のいずれかを取得、支払いボーダー未満含む）
-      const hasBonusThisMonth = (directBonus + unilevelResult.total + structureBonus) > 0 || eligible;
+      // C. 当月ボーナスが実際に発生した（①〜③の合計 > 0）かつGP > 0
+      //    ※ eligibleだけでは不十分。実際にボーナス金額が発生していること
+      const hasBonusThisMonth = (directBonus + unilevelResult.total + structureBonus) > 0;
       if (hasBonusThisMonth && groupPoints > 0) {
         const ptC = Math.floor(groupPoints * (savingsBonusRate / 100) * 10) / 10;
         savingsPointsAdded += ptC;
@@ -429,11 +434,11 @@ export async function executeBonusCalculation(
     }
 
     // 貯金ポイント累計（前月までの累計 + 今月追加）
-    // ステータスが活動中・オートシップ以外の場合はリセット
+    // autoship以外 または 当月非アクティブ（商品未受取・返送等）→ 累計全消滅（0リセット）
     const previousSavingsPoints = member.savingsPoints || 0;
     const newSavingsPoints = isEligibleForSavings
       ? Math.floor((previousSavingsPoints + savingsPointsAdded) * 10) / 10
-      : 0; // リセット
+      : 0; // リセット（全消滅）
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // ⑤合計ボーナス・支払い計算
