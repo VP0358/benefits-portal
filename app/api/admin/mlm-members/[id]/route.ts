@@ -8,14 +8,38 @@ import bcrypt from "bcryptjs";
 import { parseDateJST } from "@/lib/japan-time";
 
 /**
+ * 全角数字・全角WC → 半角に変換するヘルパー
+ * 例: "２３３３５４７１" → "23335471"、"ＷＣ１２３４５６７" → "WC1234567"
+ */
+function toHalfWidth(s: string): string {
+  return s
+    .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFF10 + 0x30))
+    .replace(/Ｗ/g, "W")
+    .replace(/Ｃ/g, "C")
+    .replace(/ｗ/g, "w")
+    .replace(/ｃ/g, "c");
+}
+
+/**
+ * 全角文字（数字・WC）が含まれるか判定
+ * DB保存前バリデーションに使用: 全角が含まれる場合は 400 エラーを返す
+ */
+function containsFullWidthChars(s: string): boolean {
+  // 全角数字 U+FF10–FF19、全角W/C/w/c U+FF37/FF23/FF57/FF43
+  return /[\uff10-\uff19\uff37\uff23\uff57\uff43]/.test(s);
+}
+
+/**
  * クレディックス決済ID正規化（保存前クリーニング）
  * - 入力値の前後スペース除去
  * - 正規形式に統一（"WC 1234567" → "WC1234567"、"wc1234567" → "WC1234567"）
  * - 空文字列 / "-" → null
  * ★バグ③修正: 管理者が誤入力した場合でも自動修正してDBに保存
+ * ★全角チェックは呼び出し元で事前に行うこと（全角が含まれる場合は 400 エラーを返すこと）
  */
 function sanitizeCreditCardId(raw: string | undefined | null): string | null {
   if (raw === undefined || raw === null) return undefined as unknown as null;
+  // trim（全角はここに到達しないこと前提: 呼び出し元でバリデーション済み）
   const s = raw.replace(/[\u3000\t\r\n]/g, " ").trim();
   if (!s || s === "-") return null;
 
@@ -121,6 +145,19 @@ export async function PATCH(
     }
 
     if (section === "basic") {
+      // クレジットカードIDの全角チェック（サーバーサイドバリデーション）
+      // フロントエンドで弾いているが、直接APIコールされた場合のセーフティネット
+      const cardIdFields = ["creditCardId", "creditCardId2", "creditCardId3"] as const;
+      for (const field of cardIdFields) {
+        const val = data[field];
+        if (typeof val === "string" && val.trim() !== "" && containsFullWidthChars(val)) {
+          return NextResponse.json(
+            { error: `${field} に全角文字が含まれています。半角数字（例: WC1234567 または 12345678）で入力してください。` },
+            { status: 400 }
+          );
+        }
+      }
+
       // 基本情報（User + MlmMember の一部）
       await prisma.$transaction(async (tx) => {
         // User テーブル更新
