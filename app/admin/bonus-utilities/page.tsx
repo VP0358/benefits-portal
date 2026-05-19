@@ -49,7 +49,6 @@ type SavingsRecord = {
   companyName: string | null;
   savingsPoints: number;
   savingsPointsAdded: number;
-  savingsBonus: number;
 };
 
 type HistoryItem = {
@@ -583,7 +582,6 @@ export default function BonusUtilitiesPage() {
                         <th className="px-4 py-3 text-left font-semibold text-gray-700">会員名</th>
                         <th className="px-4 py-3 text-right font-semibold text-gray-700">貯金pt累計</th>
                         <th className="px-4 py-3 text-right font-semibold text-gray-700">今月追加pt</th>
-                        <th className="px-4 py-3 text-right font-semibold text-gray-700">貯金ボーナス</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -594,7 +592,7 @@ export default function BonusUtilitiesPage() {
                           <td className="px-4 py-3 font-medium">{s.memberName}</td>
                           <td className="px-4 py-3 text-right font-semibold text-pink-700">{s.savingsPoints.toLocaleString()}pt</td>
                           <td className="px-4 py-3 text-right text-emerald-700">+{s.savingsPointsAdded.toLocaleString()}pt</td>
-                          <td className="px-4 py-3 text-right font-bold">¥{s.savingsBonus.toLocaleString()}</td>
+
                         </tr>
                       ))}
                       <tr className="bg-stone-100 font-bold">
@@ -605,9 +603,7 @@ export default function BonusUtilitiesPage() {
                         <td className="px-4 py-3 text-right text-emerald-700">
                           +{savingsRecords.reduce((s, r) => s + r.savingsPointsAdded, 0).toLocaleString()}pt
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          ¥{savingsRecords.reduce((s, r) => s + r.savingsBonus, 0).toLocaleString()}
-                        </td>
+
                       </tr>
                     </tbody>
                   </table>

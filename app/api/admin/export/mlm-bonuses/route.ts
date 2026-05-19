@@ -76,7 +76,6 @@ export async function GET(req: NextRequest) {
     directBonus: number;
     unilevelBonus: number;
     structureBonus: number;
-    savingsBonus: number;
     totalBonus: number;        // = amountBeforeAdjustment（調整前合計ボーナス）
     positionCount: number; // 合算したポジション数
   };
@@ -100,7 +99,6 @@ export async function GET(req: NextRequest) {
       existing.directBonus += result.directBonus;
       existing.unilevelBonus += result.unilevelBonus;
       existing.structureBonus += result.structureBonus;
-      existing.savingsBonus += result.savingsBonus;
       existing.totalBonus += result.amountBeforeAdjustment;
       existing.positionCount += 1;
       // レベルは最高値を採用
@@ -133,7 +131,6 @@ export async function GET(req: NextRequest) {
         directBonus: result.directBonus,
         unilevelBonus: result.unilevelBonus,
         structureBonus: result.structureBonus,
-        savingsBonus: result.savingsBonus,
         totalBonus: result.amountBeforeAdjustment,
         positionCount: 1,
       });
@@ -181,7 +178,6 @@ export async function GET(req: NextRequest) {
     "ダイレクトボーナス",
     "ユニレベルボーナス",
     "組織構築ボーナス",
-    "貯金ボーナス",
     "合計ボーナス",
     "ポジション数",
   ];
@@ -207,7 +203,6 @@ export async function GET(req: NextRequest) {
       entry.directBonus,
       entry.unilevelBonus,
       entry.structureBonus,
-      entry.savingsBonus,
       entry.totalBonus,
       entry.positionCount,
     ]);

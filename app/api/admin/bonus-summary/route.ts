@@ -35,7 +35,6 @@ export async function GET() {
             rankUpBonus: true,
             shareBonus: true,
             structureBonus: true,
-            savingsBonus: true,
             carryoverAmount: true,
             adjustmentAmount: true,
             otherPositionAmount: true,
@@ -59,8 +58,7 @@ export async function GET() {
         const rankUpBonus      = s.rankUpBonus      ?? 0;
         const shareBonus       = s.shareBonus       ?? 0;
         const structureBonus   = s.structureBonus   ?? 0;
-        const savingsBonus     = s.savingsBonus     ?? 0;
-        const bonusTotal       = directBonus + unilevelBonus + rankUpBonus + shareBonus + structureBonus + savingsBonus;
+        const bonusTotal       = directBonus + unilevelBonus + rankUpBonus + shareBonus + structureBonus;
         const carryover        = s.carryoverAmount  ?? 0;
         const adjustment       = s.adjustmentAmount ?? 0;
         const otherPosition    = s.otherPositionAmount ?? 0;
@@ -107,7 +105,6 @@ export async function GET() {
           rankUpBonus,
           shareBonus,
           structureBonus,
-          savingsBonus,
           bonusTotal,
           // 調整
           carryover,

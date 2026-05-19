@@ -65,7 +65,6 @@ type PositionRow = {
   rankUpBonus: number;
   shareBonus: number;
   structureBonus: number;
-  savingsBonus: number;
   savingsPointsAdded: number;
   bonusTotal: number;
   carryoverAmount: number;
@@ -245,7 +244,7 @@ function BonusDetailModal({ row, onClose }: { row: BonusResultDetail; onClose: (
                   {(displayData.savingsPointsAdded > 0) && (
                     <tr className="hover:bg-gray-50">
                       <td className="px-4 py-2.5 text-gray-600">貯金ボーナス (今月追加: {(displayData.savingsPointsAdded / 10).toFixed(1)}pt)</td>
-                      <td className="px-4 py-2.5 text-right font-semibold text-emerald-600">{yen(displayData.savingsBonus)}</td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-emerald-600">+{(displayData.savingsPointsAdded / 10).toFixed(1)}pt</td>
                     </tr>
                   )}
                   {displayData.carryoverAmount !== 0 && (

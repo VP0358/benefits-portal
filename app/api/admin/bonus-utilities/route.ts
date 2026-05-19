@@ -172,7 +172,6 @@ export async function GET(req: NextRequest) {
         select: {
           savingsPoints: true,
           savingsPointsAdded: true,
-          savingsBonus: true,
           mlmMember: {
             select: {
               memberCode: true,
@@ -192,7 +191,6 @@ export async function GET(req: NextRequest) {
         companyName: r.mlmMember.companyName ?? null,
         savingsPoints: r.savingsPoints,
         savingsPointsAdded: r.savingsPointsAdded,
-        savingsBonus: r.savingsBonus,
       }));
 
       return NextResponse.json({ records });

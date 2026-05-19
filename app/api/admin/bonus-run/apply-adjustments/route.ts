@@ -65,7 +65,6 @@ export async function POST(req: NextRequest) {
       const pureBonus = (result.directBonus ?? 0)
         + (result.unilevelBonus ?? 0)
         + (result.structureBonus ?? 0)
-        + (result.savingsBonus ?? 0)
         + (result.carryoverAmount ?? 0)
         + (result.otherPositionAmount ?? 0);
 

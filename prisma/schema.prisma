@@ -851,7 +851,6 @@ model BonusResult {
   rankUpBonus         Int         @default(0)       // ランクアップボーナス
   shareBonus          Int         @default(0)       // シェアボーナス
   structureBonus      Int         @default(0)       // 組織構築ボーナス
-  savingsBonus        Int         @default(0)       // 貯金ボーナス
   carryoverAmount     Int         @default(0)       // 繰越金
   adjustmentAmount    Int         @default(0)       // 調整金
   otherPositionAmount Int         @default(0)       // 他ポジション

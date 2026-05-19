@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
       pdf.text(`ダイレクト: ¥${result.directBonus.toLocaleString()}`, x + 15, y + 94);
       pdf.text(`ユニレベル: ¥${result.unilevelBonus.toLocaleString()}`, x + 15, y + 100);
       pdf.text(`組織構築: ¥${result.structureBonus.toLocaleString()}`, x + 15, y + 106);
-      pdf.text(`貯金: ¥${result.savingsBonus.toLocaleString()}`, x + 15, y + 112);
+      pdf.text(`貯金pt: +${((result.savingsPointsAdded ?? 0) / 10).toFixed(1)}pt`, x + 15, y + 112);
 
       // 会社情報
       pdf.setFontSize(7);

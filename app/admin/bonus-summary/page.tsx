@@ -12,7 +12,6 @@ type MonthSummary = {
   rankUpBonus: number;
   shareBonus: number;
   structureBonus: number;
-  savingsBonus: number;
   bonusTotal: number;
   carryover: number;
   adjustment: number;
@@ -86,7 +85,6 @@ export default function BonusSummaryPage() {
       "ランクアップB",
       "シェアB",
       "組織構築B",
-      "貯金B",
       "ボーナス合計[a]",
       "繰越金[b]",
       "調整金[c]",
@@ -120,7 +118,6 @@ export default function BonusSummaryPage() {
       row.rankUpBonus,
       row.shareBonus,
       row.structureBonus,
-      row.savingsBonus,
       row.bonusTotal,
       row.carryover,
       row.adjustment,
@@ -288,12 +285,6 @@ export default function BonusSummaryPage() {
                   <td className="px-3 py-2 font-semibold text-gray-700 sticky left-0 bg-white pl-5">組織構築B</td>
                   {data.map((item) => (
                     <td key={item.month} className="px-3 py-2 text-right">¥{item.structureBonus.toLocaleString()}</td>
-                  ))}
-                </tr>
-                <tr className="hover:bg-gray-50">
-                  <td className="px-3 py-2 font-semibold text-gray-700 sticky left-0 bg-white pl-5">貯金B</td>
-                  {data.map((item) => (
-                    <td key={item.month} className="px-3 py-2 text-right">¥{item.savingsBonus.toLocaleString()}</td>
                   ))}
                 </tr>
                 <tr className="bg-blue-50 font-bold">

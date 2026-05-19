@@ -67,7 +67,6 @@ export async function GET(req: NextRequest) {
       rankUpBonus: number;
       shareBonus: number;
       structureBonus: number;
-      savingsBonus: number;
       savingsPointsAdded: number;
       bonusTotal: number;
       carryoverAmount: number;
@@ -117,7 +116,6 @@ export async function GET(req: NextRequest) {
       rankUpBonus: r.rankUpBonus || 0,
       shareBonus: r.shareBonus || 0,
       structureBonus: r.structureBonus,
-      savingsBonus: r.savingsBonus || 0,
       savingsPointsAdded: r.savingsPointsAdded || 0,
       bonusTotal: r.amountBeforeAdjustment,
       carryoverAmount: r.carryoverAmount || 0,
@@ -178,7 +176,6 @@ export async function GET(req: NextRequest) {
         merged.rankUpBonus             += pos.rankUpBonus;
         merged.shareBonus              += pos.shareBonus;
         merged.structureBonus          += pos.structureBonus;
-        merged.savingsBonus            += pos.savingsBonus;
         merged.savingsPointsAdded      += pos.savingsPointsAdded;
         merged.bonusTotal              += pos.bonusTotal;
         merged.carryoverAmount         += pos.carryoverAmount;

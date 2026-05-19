@@ -38,7 +38,6 @@ type PositionRow = {
   rankUpBonus: number;
   shareBonus: number;
   structureBonus: number;
-  savingsBonus: number;
   bonusTotal: number;
   carryoverAmount: number;
   adjustmentAmount: number;
