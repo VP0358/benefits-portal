@@ -1,9 +1,22 @@
+/**
+ * middleware.ts
+ *
+ * Edge Runtime で動作する軽量ミドルウェア。
+ * ─ Prisma / auth() は import しない（1MB 制限対策）
+ *
+ * 処理:
+ *   1. x-pathname ヘッダーを付与（layout.tsx で利用）
+ *   2. 会員ページへのアクセス時、lapsed 会員をブロック
+ *      - JWT Cookie から userId を取得（jose で軽量デコード）
+ *      - /api/my/lapse-check を内部 fetch で確認
+ *      - lapsed なら /login?reason=lapsed へリダイレクト
+ */
+
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { auth } from "@/auth";
+import { jwtVerify } from "jose";
 
 // 失効会員がアクセスできない会員ページのプレフィックス
-// （/login・/register・/api は除外）
 const MEMBER_PATHS = [
   "/dashboard",
   "/announcements",
@@ -31,6 +44,10 @@ const MEMBER_PATHS = [
   "/vp-phone-referrals",
 ];
 
+/** NextAuth の JWT Cookie 名（デフォルト） */
+const SESSION_COOKIE = "authjs.session-token";
+const SESSION_COOKIE_SECURE = "__Secure-authjs.session-token";
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -39,19 +56,37 @@ export async function middleware(request: NextRequest) {
   response.headers.set("x-pathname", pathname);
 
   // 会員ページへのアクセス時のみ lapsed チェックを行う
-  const isMemberPage = MEMBER_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  const isMemberPage = MEMBER_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(p + "/")
+  );
   if (!isMemberPage) return response;
 
-  // セッション取得
-  const session = await auth();
-  if (!session?.user?.id) return response; // 未ログインは通常リダイレクト（NextAuthに任せる）
+  // ── JWT Cookie から role を取得（Edge 対応・軽量） ──────────────
+  const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+  if (!secret) return response; // secret 未設定時は通過
 
-  // 管理者はチェック不要
-  if ((session.user as { role?: string }).role === "admin") return response;
+  const cookieValue =
+    request.cookies.get(SESSION_COOKIE_SECURE)?.value ??
+    request.cookies.get(SESSION_COOKIE)?.value;
 
-  // MlmMember の status を DB で確認
-  // ※ middleware はエッジで動くが、prisma を直接使えないため
-  //   内部 API エンドポイントで確認する
+  if (!cookieValue) return response; // 未ログインは通過（NextAuth のリダイレクトに任せる）
+
+  try {
+    const secretKey = new TextEncoder().encode(secret);
+    const { payload } = await jwtVerify(cookieValue, secretKey);
+
+    // 管理者はチェック不要
+    if ((payload as { role?: string }).role === "admin") return response;
+
+    // user.id がなければスキップ
+    if (!(payload as { id?: string }).id) return response;
+
+  } catch {
+    // JWT デコード失敗（期限切れ等）は通過させる
+    return response;
+  }
+
+  // ── /api/my/lapse-check を内部 fetch で確認 ─────────────────────
   try {
     const baseUrl = request.nextUrl.origin;
     const checkRes = await fetch(`${baseUrl}/api/my/lapse-check`, {
@@ -60,9 +95,8 @@ export async function middleware(request: NextRequest) {
       },
     });
     if (checkRes.ok) {
-      const data = await checkRes.json() as { lapsed?: boolean };
+      const data = (await checkRes.json()) as { lapsed?: boolean };
       if (data.lapsed) {
-        // 失効済み → ログアウトページへリダイレクト
         return NextResponse.redirect(new URL("/login?reason=lapsed", request.url));
       }
     }
