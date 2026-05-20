@@ -640,139 +640,57 @@ export async function executeBonusCalculation(
   onProgress(`BonusRun作成完了 (ID: ${bonusRun.id}) / BonusResult書き込み開始 [${results.length}件]`);
 
   // ────────────────────────────────────────────────────
-  // BonusResult を Promise.allSettled で並列 INSERT
+  // BonusResult を createMany で一括 INSERT
   //
-  // ※ $transaction（array形式）は PrismaPg Driver Adapter 環境で
-  //   timeout オプションが無効になり、デフォルト5秒タイムアウトで
-  //   50件バッチが全て失敗する問題がある。
-  // ※ 個別 prisma.bonusResult.create() は成功することが確認済み。
-  // ※ Promise.allSettled で並列実行することで:
-  //   - $transaction タイムアウト問題を完全回避
-  //   - 逐次 INSERT より高速
-  //   - 失敗したレコードのみ個別フォールバック可能
+  // ★ 根本方針: f9ba06a（最後の動作確認済みバージョン）と同じ createMany を使用。
+  //
+  // ❌ 廃止した方式とその理由:
+  //   - $transaction（array形式）: PrismaPg Driver Adapter 環境でタイムアウト
+  //     オプションが無効になり、デフォルト5秒で全バッチ失敗（PR #57 で導入したバグ）
+  //   - Promise.allSettled(30件並列): 接続プール max:5 に対して 30 接続を
+  //     同時に奪い合い、デッドロック・タイムアウトが発生（PR #59 でも失敗）
+  //
+  // ✅ createMany を使う理由:
+  //   - 1本の SQL（INSERT INTO ... VALUES (...), (...), ...）で全件を処理
+  //   - DB接続を1本しか使わないため接続プール枯渇が起きない
+  //   - $transaction のタイムアウト問題と無関係
+  //   - f9ba06a で動作確認済みの唯一信頼できる方式
   // ────────────────────────────────────────────────────
-  const BATCH_SIZE = 30; // 並列数を絞って DB 接続を節約（pool max: 5）
-  let savedCount   = 0;
+  await prisma.bonusResult.createMany({
+    data: results.map((r) => ({
+      bonusRunId:                bonusRun.id,
+      mlmMemberId:               r.mlmMemberId,
+      bonusMonth:                r.bonusMonth,
+      isActive:                  r.isActive,
+      selfPurchasePoints:        r.selfPurchasePoints,
+      groupPoints:               r.groupPoints,
+      directActiveCount:         r.directActiveCount,
+      achievedLevel:             r.achievedLevel,
+      forcedLevel:               r.forcedLevel,
+      previousTitleLevel:        r.previousTitleLevel,
+      newTitleLevel:             r.newTitleLevel,
+      directBonus:               r.directBonus,
+      unilevelBonus:             r.unilevelBonus,
+      structureBonus:            r.structureBonus,
+      adjustmentAmount:          r.adjustmentAmount,
+      amountBeforeAdjustment:    r.amountBeforeAdjustment,
+      paymentAdjustmentRate:     r.paymentAdjustmentRate,
+      paymentAdjustmentAmount:   r.paymentAdjustmentAmount,
+      finalAmount:               r.finalAmount,
+      withholdingTax:            r.withholdingTax,
+      serviceFee:                r.serviceFee,
+      paymentAmount:             r.paymentAmount,
+      unilevelDetail:            r.unilevelDetail,
+      minLinePoints:             r.minLinePoints,
+      lineCount:                 r.lineCount,
+      savingsPointsAdded:        r.savingsPointsAdded,
+      savingsPoints:             r.savingsPoints,
+      savingsPtAFromRegistration: r.savingsPtAFromRegistration,
+    })),
+  });
 
-  for (let i = 0; i < results.length; i += BATCH_SIZE) {
-    const batch = results.slice(i, i + BATCH_SIZE);
-    const batchNum = Math.floor(i / BATCH_SIZE) + 1;
-
-    // フルデータで並列 INSERT
-    const batchInsertResults = await Promise.allSettled(
-      batch.map((r) =>
-        prisma.bonusResult.create({
-          data: {
-            bonusRunId:                bonusRun.id,
-            mlmMemberId:               r.mlmMemberId,
-            bonusMonth:                r.bonusMonth,
-            isActive:                  r.isActive,
-            selfPurchasePoints:        r.selfPurchasePoints,
-            groupPoints:               r.groupPoints,
-            directActiveCount:         r.directActiveCount,
-            achievedLevel:             r.achievedLevel,
-            forcedLevel:               r.forcedLevel,
-            previousTitleLevel:        r.previousTitleLevel,
-            newTitleLevel:             r.newTitleLevel,
-            directBonus:               r.directBonus,
-            unilevelBonus:             r.unilevelBonus,
-            structureBonus:            r.structureBonus,
-            adjustmentAmount:          r.adjustmentAmount,
-            amountBeforeAdjustment:    r.amountBeforeAdjustment,
-            paymentAdjustmentRate:     r.paymentAdjustmentRate,
-            paymentAdjustmentAmount:   r.paymentAdjustmentAmount,
-            finalAmount:               r.finalAmount,
-            withholdingTax:            r.withholdingTax,
-            serviceFee:                r.serviceFee,
-            paymentAmount:             r.paymentAmount,
-            unilevelDetail:            r.unilevelDetail,
-            minLinePoints:             r.minLinePoints,
-            lineCount:                 r.lineCount,
-            savingsPointsAdded:        r.savingsPointsAdded,
-            savingsPoints:             r.savingsPoints,
-            savingsPtAFromRegistration: r.savingsPtAFromRegistration,
-          },
-        })
-      )
-    );
-
-    // 成功・失敗を集計
-    const failed: typeof results = [];
-    let firstErrMsg = "";
-    for (let j = 0; j < batchInsertResults.length; j++) {
-      const res = batchInsertResults[j];
-      if (res.status === "fulfilled") {
-        savedCount++;
-      } else {
-        const errMsg = res.reason instanceof Error ? res.reason.message : String(res.reason);
-        if (!firstErrMsg) firstErrMsg = errMsg;
-        console.warn(`⚠️ バッチ${batchNum} [${j}] INSERT失敗: ${errMsg}`);
-        failed.push(batch[j]);
-      }
-    }
-
-    // 失敗分は貯金カラム除外で個別リトライ
-    if (failed.length > 0) {
-      // エラー内容をSSEに送信（根本原因の特定に使用）
-      onProgress(`⚠️ バッチ${batchNum}: ${failed.length}件失敗 [ERR: ${firstErrMsg.substring(0, 180)}] → 貯金カラム除外で再試行`);
-      const retryResults = await Promise.allSettled(
-        failed.map((r) =>
-          prisma.bonusResult.create({
-            data: {
-              bonusRunId:              bonusRun.id,
-              mlmMemberId:             r.mlmMemberId,
-              bonusMonth:              r.bonusMonth,
-              isActive:                r.isActive,
-              selfPurchasePoints:      r.selfPurchasePoints,
-              groupPoints:             r.groupPoints,
-              directActiveCount:       r.directActiveCount,
-              achievedLevel:           r.achievedLevel,
-              forcedLevel:             r.forcedLevel,
-              previousTitleLevel:      r.previousTitleLevel,
-              newTitleLevel:           r.newTitleLevel,
-              directBonus:             r.directBonus,
-              unilevelBonus:           r.unilevelBonus,
-              structureBonus:          r.structureBonus,
-              adjustmentAmount:        r.adjustmentAmount,
-              amountBeforeAdjustment:  r.amountBeforeAdjustment,
-              paymentAdjustmentRate:   r.paymentAdjustmentRate,
-              paymentAdjustmentAmount: r.paymentAdjustmentAmount,
-              finalAmount:             r.finalAmount,
-              withholdingTax:          r.withholdingTax,
-              serviceFee:              r.serviceFee,
-              paymentAmount:           r.paymentAmount,
-              unilevelDetail:          r.unilevelDetail,
-              minLinePoints:           r.minLinePoints,
-              lineCount:               r.lineCount,
-            },
-          })
-        )
-      );
-
-      let retryFailCount = 0;
-      let retryFirstErr = "";
-      for (let j = 0; j < retryResults.length; j++) {
-        const res = retryResults[j];
-        if (res.status === "fulfilled") {
-          savedCount++;
-        } else {
-          const errMsg = res.reason instanceof Error ? res.reason.message : String(res.reason);
-          if (!retryFirstErr) retryFirstErr = errMsg;
-          retryFailCount++;
-          console.error(`❌ バッチ${batchNum} 再試行[${j}]も失敗 (mlmMemberId=${failed[j].mlmMemberId}): ${errMsg}`);
-        }
-      }
-      if (retryFailCount > 0) {
-        onProgress(`❌ バッチ${batchNum} 再試行${retryFailCount}件も失敗 [ERR: ${retryFirstErr.substring(0, 180)}]`);
-      }
-    }
-
-    const done = Math.min(i + BATCH_SIZE, results.length);
-    onProgress(`BonusResult保存中: ${done}/${results.length}件完了`);
-  }
-
-  console.log(`✅ BonusResult保存完了: ${savedCount}/${results.length}件`);
-  onProgress(`DB書き込み処理完了 (${savedCount}/${results.length}件保存)`);
+  console.log(`✅ BonusResult保存完了: ${results.length}件`);
+  onProgress(`DB書き込み処理完了 (${results.length}件保存)`);
 
   // ────────────────────────────────────────────────────
   // 調整金にbonusRunIdを紐付け
@@ -824,19 +742,15 @@ export async function executeBonusCalculation(
     }
   }
 
-  // Promise.allSettled で並列更新（$transaction を使わない）
+  // シーケンシャルに update（f9ba06a と同じ方式）
+  // $transaction / Promise.allSettled は使わない（接続プール枯渇・タイムアウトのため）
   let memberUpdateCount = 0;
-  for (let i = 0; i < memberUpdates.length; i += BATCH_SIZE) {
-    const batch = memberUpdates.slice(i, i + BATCH_SIZE);
-    const updateResults = await Promise.allSettled(
-      batch.map((u) => prisma.mlmMember.update({ where: { id: u.id }, data: u.data }))
-    );
-    for (const res of updateResults) {
-      if (res.status === "fulfilled") memberUpdateCount++;
-      else console.warn(`⚠️ 会員情報更新失敗:`, res.reason instanceof Error ? res.reason.message : res.reason);
-    }
-    const done = Math.min(i + BATCH_SIZE, memberUpdates.length);
-    onProgress(`会員情報更新: ${done}/${memberUpdates.length}件`);
+  for (const u of memberUpdates) {
+    await prisma.mlmMember.update({ where: { id: u.id }, data: u.data });
+    memberUpdateCount++;
+  }
+  if (memberUpdates.length > 0) {
+    onProgress(`会員情報更新: ${memberUpdateCount}/${memberUpdates.length}件完了`);
   }
 
   console.log(`✅ ボーナス計算完了: ${bonusMonth}`);
