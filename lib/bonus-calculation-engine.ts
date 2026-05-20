@@ -588,8 +588,7 @@ export async function executeBonusCalculation(
     data: {
       bonusMonth,
       closingDate: new Date(),
-      status: "confirmed",
-      confirmedAt: new Date(),
+      status: "draft",
       paymentAdjustmentRate: paymentAdjustmentRate != null ? paymentAdjustmentRate * 100 : 0,
       totalMembers: members.length,
       totalActiveMembers,
