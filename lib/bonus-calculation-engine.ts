@@ -265,9 +265,22 @@ export async function executeBonusCalculation(
   }
 
   // 6. 調整金を取得
-  const adjustments = await prisma.bonusAdjustment.findMany({
-    where: { bonusMonth },
-  });
+  // ※ bonus_adjustments テーブルが本番DBに存在しない / カラム名不一致の場合も try/catch で安全に処理
+  let adjustments: { mlmMemberId: bigint; amount: number; comment: string | null; adjustmentType: string }[] = [];
+  try {
+    adjustments = await prisma.bonusAdjustment.findMany({
+      where: { bonusMonth },
+      select: {
+        mlmMemberId: true,
+        amount: true,
+        comment: true,
+        adjustmentType: true,
+      },
+    });
+  } catch (e) {
+    console.warn("⚠️ bonus_adjustmentsテーブル取得失敗（テーブル未作成またはカラム不一致の可能性）。調整金なしで続行します:", e);
+    adjustments = [];
+  }
 
   const adjustmentMap = new Map<bigint, {
     total: number;
@@ -621,6 +634,8 @@ export async function executeBonusCalculation(
   });
 
   // BonusResultを一括作成
+  // ※ createMany は @updatedAt を自動セットしないため、明示的に updatedAt を指定する
+  const now = new Date();
   await prisma.bonusResult.createMany({
     data: results.map((r) => ({
       bonusRunId: bonusRun.id,
@@ -651,16 +666,21 @@ export async function executeBonusCalculation(
       savingsPtAFromRegistration: r.savingsPtAFromRegistration,
       minLinePoints: r.minLinePoints,
       lineCount: r.lineCount,
+      updatedAt: now, // createMany は @updatedAt を自動セットしないため明示指定
     })),
   });
 
   // 調整金にbonusRunIdを紐付け
   if (adjustments.length > 0) {
-    await prisma.bonusAdjustment.updateMany({
-      where: { bonusMonth, bonusRunId: null },
-      data: { bonusRunId: bonusRun.id },
-    });
-    console.log(`🔗 調整金 ${adjustments.length}件をBonusRunに紐付けました`);
+    try {
+      await prisma.bonusAdjustment.updateMany({
+        where: { bonusMonth, bonusRunId: null },
+        data: { bonusRunId: bonusRun.id },
+      });
+      console.log(`🔗 調整金 ${adjustments.length}件をBonusRunに紐付けました`);
+    } catch (e) {
+      console.warn("⚠️ 調整金BonusRun紐付け失敗（スキップ）:", e);
+    }
   }
 
   // 9. 会員レベル・貯金ポイントを自動更新
