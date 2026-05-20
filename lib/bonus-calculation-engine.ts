@@ -94,9 +94,27 @@ function isFirstPosition(memberCode: string): boolean {
  * @param bonusMonth "YYYY-MM"
  * @param paymentAdjustmentRate 支払調整率（0.0〜1.0）、nullの場合は調整なし
  */
+/**
+ * 進捗コールバック付きボーナス計算（SSEストリーミング用）
+ * executeBonusCalculation の内部で onProgress を呼び出す
+ */
+export async function executeBonusCalculationWithProgress(
+  bonusMonth: string,
+  paymentAdjustmentRate: number | null = null,
+  onProgress: (step: string) => void = () => {}
+): Promise<{
+  bonusRunId: bigint;
+  totalMembers: number;
+  totalActiveMembers: number;
+  totalBonusAmount: number;
+}> {
+  return executeBonusCalculation(bonusMonth, paymentAdjustmentRate, onProgress);
+}
+
 export async function executeBonusCalculation(
   bonusMonth: string,
-  paymentAdjustmentRate: number | null = null
+  paymentAdjustmentRate: number | null = null,
+  onProgress: (step: string) => void = () => {}
 ): Promise<{
   bonusRunId: bigint;
   totalMembers: number;
@@ -104,7 +122,9 @@ export async function executeBonusCalculation(
   totalBonusAmount: number;
 }> {
   console.log(`🚀 ボーナス計算開始: ${bonusMonth}`);
+  onProgress("ボーナス計算を開始しました");
 
+  onProgress("設定データ読み込み中...");
   // 1. ボーナス設定・貯金ボーナス設定を取得
   // ※ テーブルが存在しない場合やレコードが0件の場合もデフォルト値で動作するように防御
   let bonusSettings: {
@@ -135,6 +155,8 @@ export async function executeBonusCalculation(
   const savingsAutoshipRate     = savingsConfig?.autoshipRate     ?? 5.0;
   const savingsBonusRate        = savingsConfig?.bonusRate        ?? 3.0;
 
+  onProgress("設定データ読み込み完了");
+  onProgress("会員データ読み込み中...");
   // 2. 全MLM会員を取得（退会者以外）
   const members = await prisma.mlmMember.findMany({
     where: {
@@ -217,6 +239,8 @@ export async function executeBonusCalculation(
   const WITHHOLDING_RATE = 0.1021;      // 10.21%
 
   console.log(`📊 対象会員数: ${members.length}名`);
+  onProgress(`会員データロード完了（対象: ${members.length}名）`);
+  onProgress("購入データ読み込み中...");
 
   // 3. 対象月の購入データを取得（Orderリレーション含む：オートシップ伝票判定用）
   const purchases = await prisma.mlmPurchase.findMany({
@@ -228,6 +252,8 @@ export async function executeBonusCalculation(
   });
 
   console.log(`💳 対象月購入件数: ${purchases.length}件`);
+  onProgress(`売上データロード完了（${purchases.length}件）`);
+  onProgress("自己購入データ集計中...");
 
   // 4. 会員ごとの購入データを集計
   const memberPurchaseMap = new Map<bigint, MemberPurchaseData>();
@@ -269,6 +295,8 @@ export async function executeBonusCalculation(
     }
   }
 
+  onProgress("自己購入データ保存完了");
+  onProgress("組織データ構築中...");
   // 5. 組織構造マップを構築
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const memberMap = new Map<bigint, any>(members.map((m: any) => [m.id, m]));
@@ -321,6 +349,8 @@ export async function executeBonusCalculation(
   }
 
   console.log(`💰 調整金対象会員: ${adjustmentMap.size}名（合計件数: ${adjustments.length}件）`);
+  onProgress(`組織データ構築完了 / 調整金 ${adjustments.length}件読み込み完了`);
+  onProgress("アクティブ判定・グループ集計中...");
 
   // 7. 各会員のボーナス計算
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -639,6 +669,9 @@ export async function executeBonusCalculation(
     });
   }
 
+  onProgress(`ボーナス計算完了（対象: ${members.length}名 / アクティブ: ${totalActiveMembers}名）`);
+  onProgress("DBへの保存中...");
+
   // 8. データベースに保存
   const bonusRun = await prisma.bonusRun.create({
     data: {
@@ -756,6 +789,8 @@ export async function executeBonusCalculation(
   }
 
   // 調整金にbonusRunIdを紐付け
+  onProgress("DB書き込み処理完了");
+
   if (adjustments.length > 0) {
     try {
       await prisma.bonusAdjustment.updateMany({
@@ -767,6 +802,8 @@ export async function executeBonusCalculation(
       console.warn("⚠️ 調整金BonusRun紐付け失敗（スキップ）:", e);
     }
   }
+
+  onProgress("終月処理中...");
 
   // 9. 会員レベル・貯金ポイントを自動更新
   let upgradedCount = 0;
@@ -808,6 +845,8 @@ export async function executeBonusCalculation(
   console.log(`   アクティブ: ${totalActiveMembers}名`);
   console.log(`   総支払額: ¥${totalBonusAmount.toLocaleString()}`);
   console.log(`   レベルアップ: ${upgradedCount}名 / レベルダウン: ${downgradedCount}名`);
+  onProgress(`最終処理完了（レベルアップ: ${upgradedCount}名）`);
+  onProgress(`✅ 全処理完了: 対象 ${members.length}名 / アクティブ ${totalActiveMembers}名 / 総支払額 ¥${Math.floor(totalBonusAmount).toLocaleString()}`);
 
   return {
     bonusRunId: bonusRun.id,
