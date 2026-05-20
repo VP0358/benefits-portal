@@ -637,8 +637,8 @@ export async function executeBonusCalculation(
       serviceFee,
       paymentAmount,
       unilevelDetail:            unilevelResult.detail,
-      savingsPointsAdded:        Math.round(savingsPointsAdded * 10),  // ×10して整数保存
-      savingsPoints:             Math.round(newSavingsPoints * 10),    // 累計も×10
+      savingsPointsAdded:        Math.min(2147483647, Math.max(0, Math.round(savingsPointsAdded * 10))),
+      savingsPoints:             Math.min(2147483647, Math.max(0, Math.round(newSavingsPoints * 10))),
       savingsPtAFromRegistration,
       minLinePoints:             minSeriesPoints,
       lineCount:                 seriesCount,
