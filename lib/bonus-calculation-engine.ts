@@ -35,9 +35,10 @@
  *
  * ④貯金ボーナス（SAVpt）
  *   01ポジションのみ累積可。以下3パターンの合計
- *   A. 01が商品1000を1個以上購入 → 自己購入pt × 20%
- *   B. オートシップ伝票（当月・入金あり）が1件以上 → AS伝票合計pt × 5%
- *   C. 当月ボーナスを取得（支払いボーダー未満含む） → グループポイント × 3%
+ *   A. 初回登録月のみ・01が商品1000を初購入 → 自己購入pt × 20%（仮付与。翌月autoshipでなければ消滅）
+ *   B. 当月アクティブ かつ オートシップ伝票（当月・入金あり）が1件以上 → AS伝票合計pt × 5%（ステータス不問）
+ *   C. 当月アクティブ かつ 当月ボーナスを取得（支払いボーダー未満含む）→ グループポイント × 3%（ステータス不問）
+ *   ※ 非アクティブ月は累計をそのまま保持（全消滅ルールなし）
  *
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  * ■ レベル達成条件
@@ -562,13 +563,16 @@ export async function executeBonusCalculation(
       }
     }
 
-    // B・C: autoship かつ 当月アクティブのみ
-    if (isFirstPos && memberStatus === "autoship" && isActive) {
+    // B: 当月アクティブ かつ AS伝票（入金済）1件以上（ステータス不問）
+    // 仕様: 「オートシップ伝票（当月・入金あり）が1件以上 → AS伝票合計pt × 5%」
+    if (isFirstPos && isActive) {
       if (purchaseData.hasAutoshipInvoice && purchaseData.autoshipInvoicePoints > 0) {
         const ptB = Math.floor(purchaseData.autoshipInvoicePoints * (savingsAutoshipRate / 100) * 10) / 10;
         savingsPointsAdded += ptB;
         console.log(`  💰 貯金B: ${memberCodeStr} AS伝票${purchaseData.autoshipInvoicePoints}pt × ${savingsAutoshipRate}% = ${ptB}pt`);
       }
+      // C: 当月ボーナスを取得（支払いボーダー未満含む）かつ GP > 0（ステータス不問）
+      // 仕様: 「当月ボーナスを取得（支払いボーダー未満含む） → グループポイント × 3%」
       const hasBonusThisMonth = (directBonus + unilevelResult.total + structureBonus) > 0;
       if (hasBonusThisMonth && groupPoints > 0) {
         const ptC = Math.floor(groupPoints * (savingsBonusRate / 100) * 10) / 10;
@@ -581,15 +585,25 @@ export async function executeBonusCalculation(
     if (savingsPointsAdded > 0) console.log(`  💎 貯金合計: ${memberCodeStr} 今月+${savingsPointsAdded}pt`);
 
     // 貯金ポイント累計
+    // 仕様: アクティブ月はB/C分を加算。非アクティブ月は加算なし（累計はそのまま保持）
+    // ※ 全消滅ルールは廃止（仕様コメント通り、ステータス制限なし）
     const previousSavingsPoints = member.savingsPoints || 0;
     let newSavingsPoints: number;
     if (isRegistrationMonth && savingsPtAFromRegistration) {
+      // 登録月: A仮付与を加算
       newSavingsPoints = Math.floor((previousSavingsPoints + savingsPointsAdded) * 10) / 10;
-    } else if (memberStatus === "autoship" && isActive) {
+    } else if (isActive) {
+      // アクティブ月: B/C分を加算（前月A仮付与消滅分を差し引き）
       const prevAConsumptionReal = prevAConsumptionPt / 10;
       newSavingsPoints = Math.max(0, Math.floor((previousSavingsPoints - prevAConsumptionReal + savingsPointsAdded) * 10) / 10);
     } else {
-      newSavingsPoints = 0;
+      // 非アクティブ月: 前月A仮付与があった場合のみ消滅、それ以外は累計保持
+      if (prevAConsumptionPt > 0) {
+        const prevAConsumptionReal = prevAConsumptionPt / 10;
+        newSavingsPoints = Math.max(0, Math.floor((previousSavingsPoints - prevAConsumptionReal) * 10) / 10);
+      } else {
+        newSavingsPoints = previousSavingsPoints; // 累計をそのまま保持
+      }
     }
 
     // ━━━ ⑤合計ボーナス・支払い計算 ━━━
