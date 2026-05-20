@@ -1,7 +1,10 @@
 // 動的レンダリングを強制（ビルド時にこのルートを実行しない）
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
-// Vercelのmax実行時間をストリーミングで回避（maxDurationはServerActionsのみ有効だがSSEで代替）
+// Vercel Route Handler の最大実行時間を300秒に設定
+// ※ maxDuration は ServerActions だけでなく Route Handlers でも有効
+// ※ 設定しないとVercelのデフォルト(10〜60秒)で強制終了されボーナス計算が途中で止まる
+export const maxDuration = 300
 
 import { NextRequest } from "next/server";
 import { auth } from "@/auth";

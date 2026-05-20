@@ -581,6 +581,7 @@ export async function executeBonusCalculation(
     const batch = results.slice(i, i + BATCH_SIZE);
 
     // $transaction でバッチ内を一括コミット（失敗時はそのバッチだけロールバック）
+    // timeout: 30秒（デフォルト5秒だと50件INSERTで超過する場合がある）
     try {
       await prisma.$transaction(
         batch.map((r) =>
@@ -616,7 +617,8 @@ export async function executeBonusCalculation(
               savingsPtAFromRegistration: r.savingsPtAFromRegistration,
             },
           })
-        )
+        ),
+        { timeout: 30000 } // 30秒（Prismaデフォルト5秒だと不足する場合がある）
       );
       savedCount += batch.length;
     } catch (err) {
@@ -658,7 +660,8 @@ export async function executeBonusCalculation(
                 lineCount:               r.lineCount,
               },
             })
-          )
+          ),
+          { timeout: 30000 }
         );
         savedCount += batch.length;
         console.log(`✅ バッチ再試行成功（貯金カラム除外）: ${batch.length}件`);
@@ -764,11 +767,12 @@ export async function executeBonusCalculation(
     }
   }
 
-  // 50件ずつ $transaction でバッチ更新
+  // 50件ずつ $transaction でバッチ更新（timeout: 30秒）
   for (let i = 0; i < memberUpdates.length; i += BATCH_SIZE) {
     const batch = memberUpdates.slice(i, i + BATCH_SIZE);
     await prisma.$transaction(
-      batch.map((u) => prisma.mlmMember.update({ where: { id: u.id }, data: u.data }))
+      batch.map((u) => prisma.mlmMember.update({ where: { id: u.id }, data: u.data })),
+      { timeout: 30000 }
     );
     const done = Math.min(i + BATCH_SIZE, memberUpdates.length);
     onProgress(`会員情報更新: ${done}/${memberUpdates.length}件`);

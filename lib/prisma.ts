@@ -13,6 +13,11 @@ const pool =
   globalForPrisma.pool ??
   new Pool({
     connectionString: process.env.DATABASE_URL,
+    // Vercelサーバーレス環境向け接続プール設定
+    // サーバーレス関数は同時多数起動するため接続数を制限する
+    max: 5,                // 最大接続数（デフォルト10は多すぎる）
+    idleTimeoutMillis: 30000,  // アイドル接続を30秒で破棄
+    connectionTimeoutMillis: 10000, // 接続タイムアウト10秒
   });
 
 if (process.env.NODE_ENV !== "production") {
