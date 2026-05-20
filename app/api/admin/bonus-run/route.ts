@@ -109,8 +109,16 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error executing bonus calculation:", error);
+    // エラーの詳細をログに記録（スタックトレース含む）
+    if (error instanceof Error) {
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+    }
     return NextResponse.json(
-      { error: "Failed to execute bonus calculation" },
+      {
+        error: "Failed to execute bonus calculation",
+        detail: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
