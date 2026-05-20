@@ -106,15 +106,31 @@ export async function executeBonusCalculation(
   console.log(`🚀 ボーナス計算開始: ${bonusMonth}`);
 
   // 1. ボーナス設定・貯金ボーナス設定を取得
-  const bonusSettings = await prisma.bonusSettings.findFirst();
-  if (!bonusSettings) {
-    throw new Error("ボーナス設定が見つかりません");
+  // ※ テーブルが存在しない場合やレコードが0件の場合もデフォルト値で動作するように防御
+  let bonusSettings: {
+    serviceFeeAmount: number;
+    minPayoutAmount: number;
+  } | null = null;
+  try {
+    bonusSettings = await prisma.bonusSettings.findFirst();
+  } catch (e) {
+    console.warn("⚠️ bonus_settingsテーブルが見つかりません。デフォルト値を使用します:", e);
   }
+  // デフォルト値フォールバック（テーブル未作成・レコード0件の場合）
+  const resolvedSettings = {
+    serviceFeeAmount: bonusSettings?.serviceFeeAmount ?? 440,
+    minPayoutAmount:  bonusSettings?.minPayoutAmount  ?? 2560,
+  };
 
   // 貯金ボーナス設定（最新レコードを使用）
-  const savingsConfig = await prisma.savingsBonusConfig.findFirst({
-    orderBy: { id: "desc" },
-  });
+  let savingsConfig: { registrationRate: number; autoshipRate: number; bonusRate: number } | null = null;
+  try {
+    savingsConfig = await prisma.savingsBonusConfig.findFirst({
+      orderBy: { id: "desc" },
+    });
+  } catch (e) {
+    console.warn("⚠️ savings_bonus_configテーブルが見つかりません。デフォルト値を使用します:", e);
+  }
   const savingsRegistrationRate = savingsConfig?.registrationRate ?? 20.0;
   const savingsAutoshipRate     = savingsConfig?.autoshipRate     ?? 5.0;
   const savingsBonusRate        = savingsConfig?.bonusRate        ?? 3.0;
@@ -132,8 +148,6 @@ export async function executeBonusCalculation(
   // 貯金ボーナスA（初回）判定用：
   // 「商品1000を今月より前に一度も購入したことがない会員ID」セットを作成
   const [bonusMonthYear, bonusMonthMonth] = bonusMonth.split("-").map(Number);
-  // bonusMonth の月初（JST → UTC: -9h）
-  const bonusMonthStart = new Date(Date.UTC(bonusMonthYear, bonusMonthMonth - 1, 1) - 9 * 60 * 60 * 1000);
 
   // 今月より前に商品1000を購入済みの会員IDセット
   const pastProduct1000Purchases = await prisma.mlmPurchase.findMany({
@@ -153,19 +167,28 @@ export async function executeBonusCalculation(
   const prevBonusMonth = `${prevYear}-${String(prevMonth).padStart(2, "0")}`;
 
   // 前月BonusResultを取得（savingsPointsAdded, savingsPtAFromRegistration フラグ確認用）
-  const prevBonusResults = await prisma.bonusResult.findMany({
-    where: { bonusMonth: prevBonusMonth },
-    select: {
-      mlmMemberId: true,
-      savingsPtAFromRegistration: true, // A仮付与フラグ
-      savingsPointsAdded: true,
-    },
-  });
-  type PrevBonusResultItem = { mlmMemberId: bigint; savingsPtAFromRegistration: boolean; savingsPointsAdded: number };
+  // ※ savingsPtAFromRegistration カラムが本番DBに未適用の場合も try/catch で安全に処理
+  type PrevBonusResultItem = { mlmMemberId: bigint; savingsPtAFromRegistration: boolean | null; savingsPointsAdded: number };
+  let prevBonusResults: PrevBonusResultItem[] = [];
+  try {
+    prevBonusResults = await prisma.bonusResult.findMany({
+      where: { bonusMonth: prevBonusMonth },
+      select: {
+        mlmMemberId: true,
+        savingsPtAFromRegistration: true, // A仮付与フラグ（カラム追加済みが前提）
+        savingsPointsAdded: true,
+      },
+    }) as PrevBonusResultItem[];
+  } catch (e) {
+    // savingsPtAFromRegistration カラムがDBに存在しない場合（マイグレーション未適用）
+    // 翌月消滅チェックをスキップし、安全に空配列で継続する
+    console.warn("⚠️ 前月BonusResult取得失敗（savingsPtAFromRegistrationカラム未適用の可能性）。翌月A消滅チェックをスキップします:", e);
+    prevBonusResults = [];
+  }
   // 前月A仮付与があった会員ID → 前月にsavingsPointsAdded(×10整数)のマップ
   const prevHadRegistrationA = new Map<string, number>(
     prevBonusResults
-      .filter((r: PrevBonusResultItem) => r.savingsPtAFromRegistration)
+      .filter((r: PrevBonusResultItem) => r.savingsPtAFromRegistration === true)
       .map((r: PrevBonusResultItem) => [r.mlmMemberId.toString(), r.savingsPointsAdded] as [string, number])
   );
 
@@ -542,8 +565,8 @@ export async function executeBonusCalculation(
 
     // 事務手数料
     const serviceFee =
-      finalAmount > bonusSettings.minPayoutAmount
-        ? bonusSettings.serviceFeeAmount
+      finalAmount > resolvedSettings.minPayoutAmount
+        ? resolvedSettings.serviceFeeAmount
         : 0;
 
     // 支払額
@@ -588,8 +611,7 @@ export async function executeBonusCalculation(
     data: {
       bonusMonth,
       closingDate: new Date(),
-      status: "confirmed",
-      confirmedAt: new Date(),
+      status: "draft",
       paymentAdjustmentRate: paymentAdjustmentRate != null ? paymentAdjustmentRate * 100 : 0,
       totalMembers: members.length,
       totalActiveMembers,
