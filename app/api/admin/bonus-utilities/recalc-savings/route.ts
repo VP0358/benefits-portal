@@ -12,21 +12,21 @@
  *     - ステータス不問（登録時点で付与）
  *     - 翌月に autoship でなければ消滅
  *
- *   B（毎月・アクティブ月のみ）:
+ *   B（2回目以降・毎月）:
  *     - 01ポジション
- *     - isActive=true（ステータス不問）
+ *     - status === "autoship" かつ isActive=true
  *     - AS伝票（入金済）1件以上
  *     - 計算: AS伝票合計pt × autoshipRate(5%)
  *
- *   C（毎月・アクティブ月のみ）:
+ *   C（毎月・ボーナス発生者のみ）:
  *     - 01ポジション
- *     - isActive=true（ステータス不問）
+ *     - status === "autoship" かつ isActive=true
  *     - 当月ボーナス実際発生（directBonus+unilevel+structure > 0）
  *     - 計算: GP × bonusRate(3%)
  *
- * 【累計ルール】
- *   - アクティブ月: B/C分を加算
- *   - 非アクティブ月: 累計をそのまま保持（全消滅なし）
+ * 【全消滅ルール】
+ *   - autoship 以外のステータス（active等）かつ isActive=false → 累計全消滅
+ *   - autoship でも当月 isActive=false（返送等）→ 累計全消滅
  *   - 登録翌月に autoship でない → 前月A仮付与分を差し引き消滅
  *
  * Body:
@@ -292,20 +292,23 @@ export async function POST(req: NextRequest) {
       if (isRegistrationMonth && r.savingsPtAFromRegistration) {
         // 登録月: A仮付与分を加算
         cumulative = Math.round((cumulative + added) * 10) / 10;
-      } else if (r.isActive) {
-        // アクティブ月: B/C分を加算（前月A仮付与消滅チェック）
+        // 翌月が autoship でなければ消滅（次ループで差し引く）
+      } else if (memberStatus === "autoship" && r.isActive) {
+        // 通常月: autoship かつ isActive → B/C分加算
+        // 前月A仮付与消滅チェック
         if (i > 0 && allResults[i - 1].savingsPtAFromRegistration && memberStatus !== "autoship") {
           const prevAdded = (allResults[i - 1].savingsPointsAdded ?? 0) / 10;
           cumulative = Math.max(0, Math.round((cumulative - prevAdded) * 10) / 10);
         }
         cumulative = Math.round((cumulative + added) * 10) / 10;
       } else if (!isRegistrationMonth) {
-        // 非アクティブ月: 前月A仮付与があれば消滅、それ以外は累計保持（全消滅なし）
+        // 全消滅: autoship以外 または isActive=false
+        // ただし前月A仮付与があり今月autoshipでない → A分消滅
         if (i > 0 && allResults[i - 1].savingsPtAFromRegistration && memberStatus !== "autoship") {
-          const prevAdded = (allResults[i - 1].savingsPointsAdded ?? 0) / 10;
-          cumulative = Math.max(0, Math.round((cumulative - prevAdded) * 10) / 10);
+          cumulative = 0;
+        } else {
+          cumulative = 0;
         }
-        // cumulative はそのまま保持
       }
 
       const cumulativeInt = Math.round(cumulative * 10);
