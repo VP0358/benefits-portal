@@ -652,6 +652,15 @@ export async function executeBonusCalculation(
   // ────────────────────────────────────────────────────
   onProgress("DBへの保存中... [BonusRun作成]");
 
+  // 同月の既存 BonusRun があれば削除してから再作成（再計算対応）
+  // BonusResult は cascade delete されるため別途削除不要
+  const existingRun = await prisma.bonusRun.findFirst({ where: { bonusMonth } });
+  if (existingRun) {
+    await prisma.bonusRun.delete({ where: { id: existingRun.id } });
+    console.log(`🗑️ 既存BonusRun削除: ${bonusMonth} (id=${existingRun.id})`);
+    onProgress(`既存の計算結果を削除して再計算します`);
+  }
+
   const bonusRun = await prisma.bonusRun.create({
     data: {
       bonusMonth,
