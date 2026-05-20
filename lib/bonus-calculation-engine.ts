@@ -698,12 +698,14 @@ export async function executeBonusCalculation(
 
     // 成功・失敗を集計
     const failed: typeof results = [];
+    let firstErrMsg = "";
     for (let j = 0; j < batchInsertResults.length; j++) {
       const res = batchInsertResults[j];
       if (res.status === "fulfilled") {
         savedCount++;
       } else {
         const errMsg = res.reason instanceof Error ? res.reason.message : String(res.reason);
+        if (!firstErrMsg) firstErrMsg = errMsg;
         console.warn(`⚠️ バッチ${batchNum} [${j}] INSERT失敗: ${errMsg}`);
         failed.push(batch[j]);
       }
@@ -711,7 +713,8 @@ export async function executeBonusCalculation(
 
     // 失敗分は貯金カラム除外で個別リトライ
     if (failed.length > 0) {
-      onProgress(`⚠️ バッチ${batchNum}: ${failed.length}件失敗 → 貯金カラム除外で再試行`);
+      // エラー内容をSSEに送信（根本原因の特定に使用）
+      onProgress(`⚠️ バッチ${batchNum}: ${failed.length}件失敗 [ERR: ${firstErrMsg.substring(0, 180)}] → 貯金カラム除外で再試行`);
       const retryResults = await Promise.allSettled(
         failed.map((r) =>
           prisma.bonusResult.create({
@@ -746,14 +749,21 @@ export async function executeBonusCalculation(
         )
       );
 
+      let retryFailCount = 0;
+      let retryFirstErr = "";
       for (let j = 0; j < retryResults.length; j++) {
         const res = retryResults[j];
         if (res.status === "fulfilled") {
           savedCount++;
         } else {
           const errMsg = res.reason instanceof Error ? res.reason.message : String(res.reason);
+          if (!retryFirstErr) retryFirstErr = errMsg;
+          retryFailCount++;
           console.error(`❌ バッチ${batchNum} 再試行[${j}]も失敗 (mlmMemberId=${failed[j].mlmMemberId}): ${errMsg}`);
         }
+      }
+      if (retryFailCount > 0) {
+        onProgress(`❌ バッチ${batchNum} 再試行${retryFailCount}件も失敗 [ERR: ${retryFirstErr.substring(0, 180)}]`);
       }
     }
 
