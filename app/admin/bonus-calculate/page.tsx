@@ -1641,13 +1641,22 @@ export default function BonusCalculatePage() {
                         してください
                       </p>
                       {debugInfo && (
-                        <div className="mt-4 text-left mx-auto max-w-lg bg-red-50 border border-red-200 rounded-lg p-4 text-xs">
-                          <p className="font-bold text-red-700 mb-2">🔍 診断情報</p>
-                          <p>HTTPステータス: <strong>{debugInfo.status}</strong></p>
-                          <p>results配列あり: <strong>{String(debugInfo.hasResults)}</strong></p>
-                          <p>件数: <strong>{debugInfo.resultsCount}</strong></p>
-                          {debugInfo.error && <p className="text-red-600 mt-1">エラー: <strong>{debugInfo.error}</strong></p>}
-                          {debugInfo.detail && <p className="text-red-600 mt-1">詳細: <strong>{debugInfo.detail}</strong></p>}
+                        <div className="mt-4 text-left mx-auto max-w-lg bg-amber-50 border border-amber-200 rounded-lg p-4 text-xs">
+                          <p className="font-bold text-amber-700 mb-2">⚠️ 結果データ取得エラー</p>
+                          <p className="text-amber-800 mb-2">
+                            ボーナス計算は完了しましたが、結果データの表示に失敗しました。
+                          </p>
+                          {debugInfo.detail?.includes("savingsPtAFromRegistration") ? (
+                            <p className="text-amber-700 font-semibold">
+                              DBスキーマの更新が必要です。Vercelの次回デプロイ後に自動的に修正されます。
+                            </p>
+                          ) : (
+                            <>
+                              <p className="text-red-600">エラー: <strong>{debugInfo.error}</strong></p>
+                              {debugInfo.detail && <p className="text-red-600 mt-1">詳細: <strong>{debugInfo.detail}</strong></p>}
+                            </>
+                          )}
+                          <button onClick={fetchBonusRun} className="mt-2 text-blue-500 underline text-xs">再読み込み</button>
                         </div>
                       )}
                     </div>

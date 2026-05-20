@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 /**
  * POST /api/admin/migrate
  * 必要なDBマイグレーションを実行する（管理者専用）
- * bonus_results テーブルへの isPublished / publishedAt カラム追加など
+ * bonus_results テーブルへの不足カラム追加
  */
 export async function POST() {
   const session = await auth();
@@ -18,36 +18,79 @@ export async function POST() {
 
   const results: { step: string; status: string; detail?: string }[] = [];
 
+  // ADD COLUMN IF NOT EXISTS を安全に実行するヘルパー
+  const addCol = async (step: string, sql: string) => {
+    try {
+      await prisma.$executeRawUnsafe(sql);
+      results.push({ step, status: "OK" });
+    } catch (e) {
+      results.push({ step, status: "SKIP", detail: String(e) });
+    }
+  };
+
   try {
-    // Step 1: bonus_results に isPublished カラムを追加
-    try {
-      await prisma.$executeRawUnsafe(
-        `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "isPublished" BOOLEAN NOT NULL DEFAULT false`
-      );
-      results.push({ step: "bonus_results.isPublished", status: "OK" });
-    } catch (e) {
-      results.push({ step: "bonus_results.isPublished", status: "SKIP", detail: String(e) });
-    }
+    // ── bonus_results: 公開フラグ ──
+    await addCol("bonus_results.isPublished",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "isPublished" BOOLEAN NOT NULL DEFAULT false`);
+    await addCol("bonus_results.publishedAt",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "publishedAt" TIMESTAMP(3)`);
 
-    // Step 2: bonus_results に publishedAt カラムを追加
-    try {
-      await prisma.$executeRawUnsafe(
-        `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "publishedAt" TIMESTAMP(3)`
-      );
-      results.push({ step: "bonus_results.publishedAt", status: "OK" });
-    } catch (e) {
-      results.push({ step: "bonus_results.publishedAt", status: "SKIP", detail: String(e) });
-    }
+    // ── bonus_results: 貯金カラム ──
+    await addCol("bonus_results.savingsPoints",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "savingsPoints" INTEGER NOT NULL DEFAULT 0`);
+    await addCol("bonus_results.savingsPointsAdded",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "savingsPointsAdded" INTEGER NOT NULL DEFAULT 0`);
+    await addCol("bonus_results.savingsPtAFromRegistration",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "savingsPtAFromRegistration" BOOLEAN NOT NULL DEFAULT false`);
 
-    // Step 3: インデックス追加
-    try {
-      await prisma.$executeRawUnsafe(
-        `CREATE INDEX IF NOT EXISTS "bonus_results_isPublished_idx" ON "bonus_results"("isPublished")`
-      );
-      results.push({ step: "index_isPublished", status: "OK" });
-    } catch (e) {
-      results.push({ step: "index_isPublished", status: "SKIP", detail: String(e) });
-    }
+    // ── bonus_results: 称号レベル ──
+    await addCol("bonus_results.previousTitleLevel",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "previousTitleLevel" INTEGER NOT NULL DEFAULT 0`);
+    await addCol("bonus_results.forcedLevel",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "forcedLevel" INTEGER NOT NULL DEFAULT 0`);
+
+    // ── bonus_results: 組織データ ──
+    await addCol("bonus_results.groupActiveCount",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "groupActiveCount" INTEGER NOT NULL DEFAULT 0`);
+    await addCol("bonus_results.minLinePoints",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "minLinePoints" INTEGER NOT NULL DEFAULT 0`);
+    await addCol("bonus_results.lineCount",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "lineCount" INTEGER NOT NULL DEFAULT 0`);
+    await addCol("bonus_results.level1Lines",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "level1Lines" INTEGER NOT NULL DEFAULT 0`);
+    await addCol("bonus_results.level2Lines",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "level2Lines" INTEGER NOT NULL DEFAULT 0`);
+    await addCol("bonus_results.level3Lines",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "level3Lines" INTEGER NOT NULL DEFAULT 0`);
+    await addCol("bonus_results.conditions",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "conditions" VARCHAR(500)`);
+
+    // ── bonus_results: 支払い計算 ──
+    await addCol("bonus_results.paymentAdjustmentRate",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "paymentAdjustmentRate" DOUBLE PRECISION NOT NULL DEFAULT 0`);
+    await addCol("bonus_results.paymentAdjustmentAmount",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "paymentAdjustmentAmount" INTEGER NOT NULL DEFAULT 0`);
+    await addCol("bonus_results.amountBeforeAdjustment",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "amountBeforeAdjustment" INTEGER NOT NULL DEFAULT 0`);
+    await addCol("bonus_results.finalAmount",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "finalAmount" INTEGER NOT NULL DEFAULT 0`);
+    await addCol("bonus_results.withholdingTax",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "withholdingTax" INTEGER NOT NULL DEFAULT 0`);
+    await addCol("bonus_results.serviceFee",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "serviceFee" INTEGER NOT NULL DEFAULT 0`);
+    await addCol("bonus_results.paymentAmount",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "paymentAmount" INTEGER NOT NULL DEFAULT 0`);
+    await addCol("bonus_results.adjustmentAmount",
+      `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "adjustmentAmount" INTEGER NOT NULL DEFAULT 0`);
+
+    // ── bonus_results: updatedAt に DEFAULT を付与 ──
+    // 初期マイグレーションで NOT NULL DEFAULT なしで作られているため
+    await addCol("bonus_results.updatedAt DEFAULT",
+      `ALTER TABLE "bonus_results" ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP`);
+
+    // ── インデックス ──
+    await addCol("index_isPublished",
+      `CREATE INDEX IF NOT EXISTS "bonus_results_isPublished_idx" ON "bonus_results"("isPublished")`);
 
     return NextResponse.json({
       success: true,
@@ -74,24 +117,34 @@ export async function GET() {
   }
 
   try {
-    // bonus_results の isPublished カラムが存在するか確認
     const colCheck = await prisma.$queryRaw<{ column_name: string }[]>`
       SELECT column_name
       FROM information_schema.columns
       WHERE table_name = 'bonus_results'
-      AND column_name IN ('isPublished', 'publishedAt')
       ORDER BY column_name
     `;
 
-    const hasIsPublished = colCheck.some(r => r.column_name === "isPublished");
-    const hasPublishedAt = colCheck.some(r => r.column_name === "publishedAt");
+    const cols = colCheck.map((r: { column_name: string }) => r.column_name);
+
+    const required = [
+      "isPublished", "publishedAt",
+      "savingsPoints", "savingsPointsAdded", "savingsPtAFromRegistration",
+      "previousTitleLevel", "forcedLevel",
+      "groupActiveCount", "minLinePoints", "lineCount",
+      "level1Lines", "level2Lines", "level3Lines",
+      "paymentAdjustmentRate", "paymentAdjustmentAmount",
+      "amountBeforeAdjustment", "finalAmount",
+      "withholdingTax", "serviceFee", "paymentAmount", "adjustmentAmount",
+      "updatedAt",
+    ];
+
+    const missing = required.filter(c => !cols.includes(c));
 
     return NextResponse.json({
-      bonus_results: {
-        isPublished: hasIsPublished,
-        publishedAt: hasPublishedAt,
-      },
-      needsMigration: !hasIsPublished || !hasPublishedAt,
+      columns: cols,
+      required,
+      missing,
+      needsMigration: missing.length > 0,
     });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
