@@ -167,23 +167,43 @@ export async function executeBonusCalculation(
   const prevBonusMonth = `${prevYear}-${String(prevMonth).padStart(2, "0")}`;
 
   // 前月BonusResultを取得（savingsPointsAdded, savingsPtAFromRegistration フラグ確認用）
-  // ※ savingsPtAFromRegistration カラムが本番DBに未適用の場合も try/catch で安全に処理
+  // ※ savingsPtAFromRegistration / savingsPointsAdded カラムが本番DBに未適用の場合も
+  //   try/catch で段階的フォールバックして安全に処理
   type PrevBonusResultItem = { mlmMemberId: bigint; savingsPtAFromRegistration: boolean | null; savingsPointsAdded: number };
   let prevBonusResults: PrevBonusResultItem[] = [];
   try {
+    // フル版：savingsPtAFromRegistration + savingsPointsAdded 両方取得
     prevBonusResults = await prisma.bonusResult.findMany({
       where: { bonusMonth: prevBonusMonth },
       select: {
         mlmMemberId: true,
-        savingsPtAFromRegistration: true, // A仮付与フラグ（カラム追加済みが前提）
+        savingsPtAFromRegistration: true,
         savingsPointsAdded: true,
       },
     }) as PrevBonusResultItem[];
-  } catch (e) {
-    // savingsPtAFromRegistration カラムがDBに存在しない場合（マイグレーション未適用）
-    // 翌月消滅チェックをスキップし、安全に空配列で継続する
-    console.warn("⚠️ 前月BonusResult取得失敗（savingsPtAFromRegistrationカラム未適用の可能性）。翌月A消滅チェックをスキップします:", e);
-    prevBonusResults = [];
+    console.log(`📋 前月BonusResult取得成功 (フル版): ${prevBonusResults.length}件`);
+  } catch (e1) {
+    console.warn("⚠️ 前月BonusResult取得失敗（フル版）。savingsPtAFromRegistration除外で再試行:", e1 instanceof Error ? e1.message : String(e1));
+    try {
+      // フォールバック：savingsPtAFromRegistration を除外（カラム未存在の場合）
+      const fallback = await prisma.bonusResult.findMany({
+        where: { bonusMonth: prevBonusMonth },
+        select: {
+          mlmMemberId: true,
+          savingsPointsAdded: true,
+        },
+      });
+      prevBonusResults = fallback.map((r: { mlmMemberId: bigint; savingsPointsAdded: number }) => ({
+        mlmMemberId: r.mlmMemberId,
+        savingsPtAFromRegistration: null, // カラム未存在のためnull扱い
+        savingsPointsAdded: r.savingsPointsAdded,
+      }));
+      console.log(`📋 前月BonusResult取得成功 (フォールバック版): ${prevBonusResults.length}件`);
+    } catch (e2) {
+      // 両方失敗した場合は翌月A消滅チェックをスキップして計算継続
+      console.warn("⚠️ 前月BonusResult取得完全失敗。翌月A消滅チェックをスキップします:", e2 instanceof Error ? e2.message : String(e2));
+      prevBonusResults = [];
+    }
   }
   // 前月A仮付与があった会員ID → 前月にsavingsPointsAdded(×10整数)のマップ
   const prevHadRegistrationA = new Map<string, number>(
@@ -635,40 +655,105 @@ export async function executeBonusCalculation(
 
   // BonusResultを一括作成
   // ※ createMany は @updatedAt を自動セットしないため、明示的に updatedAt を指定する
+  // ※ savingsPtAFromRegistration / savingsPointsAdded / savingsPoints などの新カラムが
+  //   本番DBに未適用の場合に備えて、段階的フォールバック方式で保存する
   const now = new Date();
-  await prisma.bonusResult.createMany({
-    data: results.map((r) => ({
-      bonusRunId: bonusRun.id,
-      mlmMemberId: r.mlmMemberId,
-      bonusMonth: r.bonusMonth,
-      isActive: r.isActive,
-      selfPurchasePoints: r.selfPurchasePoints,
-      groupPoints: r.groupPoints,
-      directActiveCount: r.directActiveCount,
-      achievedLevel: r.achievedLevel,
-      forcedLevel: r.forcedLevel,
-      previousTitleLevel: r.previousTitleLevel,
-      newTitleLevel: r.newTitleLevel,
-      directBonus: r.directBonus,
-      unilevelBonus: r.unilevelBonus,
-      structureBonus: r.structureBonus,
-      adjustmentAmount: r.adjustmentAmount,
-      amountBeforeAdjustment: r.amountBeforeAdjustment,
-      paymentAdjustmentRate: r.paymentAdjustmentRate,
-      paymentAdjustmentAmount: r.paymentAdjustmentAmount,
-      finalAmount: r.finalAmount,
-      withholdingTax: r.withholdingTax,
-      serviceFee: r.serviceFee,
-      paymentAmount: r.paymentAmount,
-      unilevelDetail: r.unilevelDetail,
-      savingsPointsAdded: r.savingsPointsAdded,
-      savingsPoints: r.savingsPoints,
-      savingsPtAFromRegistration: r.savingsPtAFromRegistration,
-      minLinePoints: r.minLinePoints,
-      lineCount: r.lineCount,
-      updatedAt: now, // createMany は @updatedAt を自動セットしないため明示指定
-    })),
-  });
+
+  // 基本データ（旧カラムのみ・全DBで確実に存在する）
+  const baseDataList = results.map((r) => ({
+    bonusRunId: bonusRun.id,
+    mlmMemberId: r.mlmMemberId,
+    bonusMonth: r.bonusMonth,
+    isActive: r.isActive,
+    selfPurchasePoints: r.selfPurchasePoints,
+    groupPoints: r.groupPoints,
+    directActiveCount: r.directActiveCount,
+    achievedLevel: r.achievedLevel,
+    forcedLevel: r.forcedLevel,
+    previousTitleLevel: r.previousTitleLevel,
+    newTitleLevel: r.newTitleLevel,
+    directBonus: r.directBonus,
+    unilevelBonus: r.unilevelBonus,
+    structureBonus: r.structureBonus,
+    adjustmentAmount: r.adjustmentAmount,
+    amountBeforeAdjustment: r.amountBeforeAdjustment,
+    paymentAdjustmentRate: r.paymentAdjustmentRate,
+    paymentAdjustmentAmount: r.paymentAdjustmentAmount,
+    finalAmount: r.finalAmount,
+    withholdingTax: r.withholdingTax,
+    serviceFee: r.serviceFee,
+    paymentAmount: r.paymentAmount,
+    unilevelDetail: r.unilevelDetail,
+    minLinePoints: r.minLinePoints,
+    lineCount: r.lineCount,
+    updatedAt: now,
+  }));
+
+  // フル版（新カラムを含む）でまず試みる
+  let createManySuccess = false;
+  try {
+    await prisma.bonusResult.createMany({
+      data: baseDataList.map((base, i) => ({
+        ...base,
+        savingsPointsAdded: results[i].savingsPointsAdded,
+        savingsPoints: results[i].savingsPoints,
+        savingsPtAFromRegistration: results[i].savingsPtAFromRegistration,
+      })),
+    });
+    createManySuccess = true;
+    console.log(`✅ BonusResult createMany (フル版) 成功: ${results.length}件`);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(`⚠️ BonusResult createMany (フル版) 失敗。新カラム未適用の可能性。基本版で再試行します。エラー: ${msg}`);
+  }
+
+  // フル版が失敗した場合、savingsPoints/savingsPointsAdded のみ追加して再試行
+  if (!createManySuccess) {
+    try {
+      await prisma.bonusResult.createMany({
+        data: baseDataList.map((base, i) => ({
+          ...base,
+          savingsPointsAdded: results[i].savingsPointsAdded,
+          savingsPoints: results[i].savingsPoints,
+          // savingsPtAFromRegistration は除外（カラム未存在の場合）
+        })),
+      });
+      createManySuccess = true;
+      console.log(`✅ BonusResult createMany (savingsPtAFromRegistration除外版) 成功: ${results.length}件`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`⚠️ BonusResult createMany (savingsPtAFromRegistration除外版) 失敗。さらに基本版で再試行します。エラー: ${msg}`);
+    }
+  }
+
+  // それでも失敗した場合、savingsPointsAdded/savingsPoints も除外した最小版で試みる
+  if (!createManySuccess) {
+    try {
+      await prisma.bonusResult.createMany({
+        data: baseDataList,
+      });
+      createManySuccess = true;
+      console.log(`✅ BonusResult createMany (最小版: 貯金カラム全除外) 成功: ${results.length}件`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`❌ BonusResult createMany 最小版も失敗。個別INSERTに切り替えます。エラー: ${msg}`);
+    }
+  }
+
+  // 最後の手段: 個別INSERT（エラーが出たレコードをスキップして継続）
+  if (!createManySuccess) {
+    let insertedCount = 0;
+    for (let i = 0; i < results.length; i++) {
+      try {
+        await prisma.bonusResult.create({ data: baseDataList[i] });
+        insertedCount++;
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.warn(`⚠️ BonusResult 個別INSERT失敗 (mlmMemberId=${results[i].mlmMemberId}): ${msg}`);
+      }
+    }
+    console.log(`✅ BonusResult 個別INSERT完了: ${insertedCount}/${results.length}件`);
+  }
 
   // 調整金にbonusRunIdを紐付け
   if (adjustments.length > 0) {
