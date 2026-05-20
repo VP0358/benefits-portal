@@ -90,13 +90,7 @@ function isFirstPosition(memberCode: string): boolean {
 }
 
 /**
- * ボーナス計算メインエンジン
- * @param bonusMonth "YYYY-MM"
- * @param paymentAdjustmentRate 支払調整率（0.0〜1.0）、nullの場合は調整なし
- */
-/**
- * 進捗コールバック付きボーナス計算（SSEストリーミング用）
- * executeBonusCalculation の内部で onProgress を呼び出す
+ * 進捗コールバック付きボーナス計算（SSEストリーミング用ラッパー）
  */
 export async function executeBonusCalculationWithProgress(
   bonusMonth: string,
@@ -111,6 +105,12 @@ export async function executeBonusCalculationWithProgress(
   return executeBonusCalculation(bonusMonth, paymentAdjustmentRate, onProgress);
 }
 
+/**
+ * ボーナス計算メインエンジン
+ * @param bonusMonth "YYYY-MM"
+ * @param paymentAdjustmentRate 支払調整率（0.0〜1.0）、nullの場合は調整なし
+ * @param onProgress 進捗コールバック（SSE送信用）
+ */
 export async function executeBonusCalculation(
   bonusMonth: string,
   paymentAdjustmentRate: number | null = null,
@@ -124,30 +124,25 @@ export async function executeBonusCalculation(
   console.log(`🚀 ボーナス計算開始: ${bonusMonth}`);
   onProgress("ボーナス計算を開始しました");
 
-  onProgress("設定データ読み込み中...");
+  // ────────────────────────────────────────────────────
   // 1. ボーナス設定・貯金ボーナス設定を取得
-  // ※ テーブルが存在しない場合やレコードが0件の場合もデフォルト値で動作するように防御
-  let bonusSettings: {
-    serviceFeeAmount: number;
-    minPayoutAmount: number;
-  } | null = null;
+  // ────────────────────────────────────────────────────
+  onProgress("設定データ読み込み中...");
+
+  let bonusSettings: { serviceFeeAmount: number; minPayoutAmount: number } | null = null;
   try {
     bonusSettings = await prisma.bonusSettings.findFirst();
   } catch (e) {
     console.warn("⚠️ bonus_settingsテーブルが見つかりません。デフォルト値を使用します:", e);
   }
-  // デフォルト値フォールバック（テーブル未作成・レコード0件の場合）
   const resolvedSettings = {
     serviceFeeAmount: bonusSettings?.serviceFeeAmount ?? 440,
     minPayoutAmount:  bonusSettings?.minPayoutAmount  ?? 2560,
   };
 
-  // 貯金ボーナス設定（最新レコードを使用）
   let savingsConfig: { registrationRate: number; autoshipRate: number; bonusRate: number } | null = null;
   try {
-    savingsConfig = await prisma.savingsBonusConfig.findFirst({
-      orderBy: { id: "desc" },
-    });
+    savingsConfig = await prisma.savingsBonusConfig.findFirst({ orderBy: { id: "desc" } });
   } catch (e) {
     console.warn("⚠️ savings_bonus_configテーブルが見つかりません。デフォルト値を使用します:", e);
   }
@@ -156,93 +151,82 @@ export async function executeBonusCalculation(
   const savingsBonusRate        = savingsConfig?.bonusRate        ?? 3.0;
 
   onProgress("設定データ読み込み完了");
-  onProgress("会員データ読み込み中...");
+
+  // ────────────────────────────────────────────────────
   // 2. 全MLM会員を取得（退会者以外）
+  // ────────────────────────────────────────────────────
+  onProgress("会員データ読み込み中...");
+
   const members = await prisma.mlmMember.findMany({
-    where: {
-      status: { in: ["active", "autoship", "suspended"] },
-    },
-    include: {
-      user: { select: { name: true, email: true } },
-    },
+    where: { status: { in: ["active", "autoship", "suspended"] } },
+    include: { user: { select: { name: true, email: true } } },
   });
 
-  // 貯金ボーナスA（初回）判定用：
-  // 「商品1000を今月より前に一度も購入したことがない会員ID」セットを作成
+  // 貯金ボーナスA（初回）判定用：今月より前に商品1000を購入済みの会員IDセット
   const [bonusMonthYear, bonusMonthMonth] = bonusMonth.split("-").map(Number);
 
-  // 今月より前に商品1000を購入済みの会員IDセット
   const pastProduct1000Purchases = await prisma.mlmPurchase.findMany({
-    where: {
-      productCode: "1000",
-      purchaseMonth: { lt: bonusMonth }, // bonusMonth より前の月
-    },
+    where: { productCode: "1000", purchaseMonth: { lt: bonusMonth } },
     select: { mlmMemberId: true },
     distinct: ["mlmMemberId"],
   });
-  const hasPastProduct1000 = new Set(pastProduct1000Purchases.map((p: { mlmMemberId: bigint }) => p.mlmMemberId.toString()));
+  const hasPastProduct1000 = new Set(
+    pastProduct1000Purchases.map((p: { mlmMemberId: bigint }) => p.mlmMemberId.toString())
+  );
 
   // 前月BonusResultを取得（翌月チェック：A仮付与の消滅判定用）
   const prevMonthTotal = bonusMonthYear * 12 + (bonusMonthMonth - 1) - 1;
-  const prevYear = Math.floor(prevMonthTotal / 12);
+  const prevYear  = Math.floor(prevMonthTotal / 12);
   const prevMonth = (prevMonthTotal % 12) + 1;
   const prevBonusMonth = `${prevYear}-${String(prevMonth).padStart(2, "0")}`;
 
-  // 前月BonusResultを取得（savingsPointsAdded, savingsPtAFromRegistration フラグ確認用）
-  // ※ savingsPtAFromRegistration / savingsPointsAdded カラムが本番DBに未適用の場合も
-  //   try/catch で段階的フォールバックして安全に処理
-  type PrevBonusResultItem = { mlmMemberId: bigint; savingsPtAFromRegistration: boolean | null; savingsPointsAdded: number };
+  type PrevBonusResultItem = {
+    mlmMemberId: bigint;
+    savingsPtAFromRegistration: boolean | null;
+    savingsPointsAdded: number;
+  };
   let prevBonusResults: PrevBonusResultItem[] = [];
   try {
-    // フル版：savingsPtAFromRegistration + savingsPointsAdded 両方取得
     prevBonusResults = await prisma.bonusResult.findMany({
       where: { bonusMonth: prevBonusMonth },
-      select: {
-        mlmMemberId: true,
-        savingsPtAFromRegistration: true,
-        savingsPointsAdded: true,
-      },
+      select: { mlmMemberId: true, savingsPtAFromRegistration: true, savingsPointsAdded: true },
     }) as PrevBonusResultItem[];
-    console.log(`📋 前月BonusResult取得成功 (フル版): ${prevBonusResults.length}件`);
+    console.log(`📋 前月BonusResult取得成功: ${prevBonusResults.length}件`);
   } catch (e1) {
-    console.warn("⚠️ 前月BonusResult取得失敗（フル版）。savingsPtAFromRegistration除外で再試行:", e1 instanceof Error ? e1.message : String(e1));
+    console.warn("⚠️ 前月BonusResult取得失敗（フル版）:", e1 instanceof Error ? e1.message : String(e1));
     try {
-      // フォールバック：savingsPtAFromRegistration を除外（カラム未存在の場合）
       const fallback = await prisma.bonusResult.findMany({
         where: { bonusMonth: prevBonusMonth },
-        select: {
-          mlmMemberId: true,
-          savingsPointsAdded: true,
-        },
+        select: { mlmMemberId: true, savingsPointsAdded: true },
       });
       prevBonusResults = fallback.map((r: { mlmMemberId: bigint; savingsPointsAdded: number }) => ({
         mlmMemberId: r.mlmMemberId,
-        savingsPtAFromRegistration: null, // カラム未存在のためnull扱い
+        savingsPtAFromRegistration: null,
         savingsPointsAdded: r.savingsPointsAdded,
       }));
-      console.log(`📋 前月BonusResult取得成功 (フォールバック版): ${prevBonusResults.length}件`);
     } catch (e2) {
-      // 両方失敗した場合は翌月A消滅チェックをスキップして計算継続
-      console.warn("⚠️ 前月BonusResult取得完全失敗。翌月A消滅チェックをスキップします:", e2 instanceof Error ? e2.message : String(e2));
+      console.warn("⚠️ 前月BonusResult取得完全失敗。A消滅チェックをスキップ:", e2 instanceof Error ? e2.message : String(e2));
       prevBonusResults = [];
     }
   }
-  // 前月A仮付与があった会員ID → 前月にsavingsPointsAdded(×10整数)のマップ
+
   const prevHadRegistrationA = new Map<string, number>(
     prevBonusResults
-      .filter((r: PrevBonusResultItem) => r.savingsPtAFromRegistration === true)
-      .map((r: PrevBonusResultItem) => [r.mlmMemberId.toString(), r.savingsPointsAdded] as [string, number])
+      .filter((r) => r.savingsPtAFromRegistration === true)
+      .map((r) => [r.mlmMemberId.toString(), r.savingsPointsAdded] as [string, number])
   );
 
-  // 源泉徴収税の閾値
-  const WITHHOLDING_THRESHOLD = 120000; // 12万円
-  const WITHHOLDING_RATE = 0.1021;      // 10.21%
+  const WITHHOLDING_THRESHOLD = 120000;
+  const WITHHOLDING_RATE      = 0.1021;
 
   console.log(`📊 対象会員数: ${members.length}名`);
   onProgress(`会員データロード完了（対象: ${members.length}名）`);
+
+  // ────────────────────────────────────────────────────
+  // 3. 対象月の購入データを取得
+  // ────────────────────────────────────────────────────
   onProgress("購入データ読み込み中...");
 
-  // 3. 対象月の購入データを取得（Orderリレーション含む：オートシップ伝票判定用）
   const purchases = await prisma.mlmPurchase.findMany({
     where: { purchaseMonth: bonusMonth },
     include: {
@@ -253,11 +237,13 @@ export async function executeBonusCalculation(
 
   console.log(`💳 対象月購入件数: ${purchases.length}件`);
   onProgress(`売上データロード完了（${purchases.length}件）`);
+
+  // ────────────────────────────────────────────────────
+  // 4. 会員ごとの購入データを集計
+  // ────────────────────────────────────────────────────
   onProgress("自己購入データ集計中...");
 
-  // 4. 会員ごとの購入データを集計
   const memberPurchaseMap = new Map<bigint, MemberPurchaseData>();
-
   for (const purchase of purchases) {
     const memberId = purchase.mlmMemberId;
     if (!memberPurchaseMap.has(memberId)) {
@@ -271,18 +257,13 @@ export async function executeBonusCalculation(
     }
     const data = memberPurchaseMap.get(memberId)!;
 
-    // アクティブ判定対象商品（1000・2000）のpt集計
     if (ACTIVE_REQUIRED_PRODUCTS.includes(purchase.productCode)) {
       data.selfPurchasePoints += purchase.totalPoints || 0;
       data.purchasedRequiredProduct = true;
     }
-
-    // 商品1000の購入個数（自分が購入した分 → ダイレクトボーナスは「直接紹介の購入」なので別途計算）
     if (purchase.productCode === DIRECT_BONUS_PRODUCT) {
       data.directBonusProductCount += purchase.quantity;
     }
-
-    // オートシップ伝票の判定（伝票種別=autoship かつ 入金あり）
     if (
       purchase.order &&
       purchase.order.slipType === "autoship" &&
@@ -296,12 +277,15 @@ export async function executeBonusCalculation(
   }
 
   onProgress("自己購入データ保存完了");
-  onProgress("組織データ構築中...");
+
+  // ────────────────────────────────────────────────────
   // 5. 組織構造マップを構築
+  // ────────────────────────────────────────────────────
+  onProgress("組織データ構築中...");
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const memberMap = new Map<bigint, any>(members.map((m: any) => [m.id, m]));
 
-  // 直下の子会員一覧（referrerId基準 = ユニレベル組織）
   const childrenMap = new Map<bigint, bigint[]>();
   for (const member of members) {
     if (member.referrerId) {
@@ -312,51 +296,49 @@ export async function executeBonusCalculation(
     }
   }
 
+  // ────────────────────────────────────────────────────
   // 6. 調整金を取得
-  // ※ bonus_adjustments テーブルが本番DBに存在しない / カラム名不一致の場合も try/catch で安全に処理
-  let adjustments: { mlmMemberId: bigint; amount: number; comment: string | null; adjustmentType: string }[] = [];
+  // ────────────────────────────────────────────────────
+  let adjustments: {
+    mlmMemberId: bigint;
+    amount: number;
+    comment: string | null;
+    adjustmentType: string;
+  }[] = [];
   try {
     adjustments = await prisma.bonusAdjustment.findMany({
       where: { bonusMonth },
-      select: {
-        mlmMemberId: true,
-        amount: true,
-        comment: true,
-        adjustmentType: true,
-      },
+      select: { mlmMemberId: true, amount: true, comment: true, adjustmentType: true },
     });
   } catch (e) {
-    console.warn("⚠️ bonus_adjustmentsテーブル取得失敗（テーブル未作成またはカラム不一致の可能性）。調整金なしで続行します:", e);
+    console.warn("⚠️ bonus_adjustments取得失敗。調整金なしで続行:", e);
     adjustments = [];
   }
 
   const adjustmentMap = new Map<bigint, {
     total: number;
-    items: { amount: number; comment: string | null; adjustmentType: string }[]
+    items: { amount: number; comment: string | null; adjustmentType: string }[];
   }>();
   for (const adj of adjustments) {
     const key = adj.mlmMemberId;
-    if (!adjustmentMap.has(key)) {
-      adjustmentMap.set(key, { total: 0, items: [] });
-    }
+    if (!adjustmentMap.has(key)) adjustmentMap.set(key, { total: 0, items: [] });
     const entry = adjustmentMap.get(key)!;
     entry.total += adj.amount;
-    entry.items.push({
-      amount: adj.amount,
-      comment: adj.comment ?? null,
-      adjustmentType: adj.adjustmentType,
-    });
+    entry.items.push({ amount: adj.amount, comment: adj.comment ?? null, adjustmentType: adj.adjustmentType });
   }
 
   console.log(`💰 調整金対象会員: ${adjustmentMap.size}名（合計件数: ${adjustments.length}件）`);
   onProgress(`組織データ構築完了 / 調整金 ${adjustments.length}件読み込み完了`);
+
+  // ────────────────────────────────────────────────────
+  // 7. 各会員のボーナス計算
+  // ────────────────────────────────────────────────────
   onProgress("アクティブ判定・グループ集計中...");
 
-  // 7. 各会員のボーナス計算
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const results: any[] = [];
   let totalActiveMembers = 0;
-  let totalBonusAmount = 0;
+  let totalBonusAmount   = 0;
 
   for (const member of members) {
     const purchaseData = memberPurchaseMap.get(member.id) ?? {
@@ -373,57 +355,36 @@ export async function executeBonusCalculation(
       purchasedRequiredProduct: purchaseData.purchasedRequiredProduct,
       forceActive: member.forceActive || false,
     });
-
     if (isActive) totalActiveMembers++;
 
-    // ━━━ グループポイント・直接紹介アクティブ数・系列情報を計算 ━━━
+    // ━━━ グループポイント・直接紹介アクティブ数・系列情報 ━━━
     const { groupPoints, directActiveCount, seriesCount, seriesAchieverMap } =
-      calcGroupDataFull(
-        member.id,
-        childrenMap,
-        memberPurchaseMap,
-        memberMap,
-        purchaseData.selfPurchasePoints // 自己購入ptをGPに含める
-      );
+      calcGroupDataFull(member.id, childrenMap, memberPurchaseMap, memberMap, purchaseData.selfPurchasePoints);
 
     // ━━━ 当月実績レベル判定 ━━━
     const naturalLevel = isActive
-      ? calcAchievedLevel({
-          groupPoints,
-          selfPurchasePoints: purchaseData.selfPurchasePoints,
-          seriesCount,
-          seriesAchieverMap,
-        })
+      ? calcAchievedLevel({ groupPoints, selfPurchasePoints: purchaseData.selfPurchasePoints, seriesCount, seriesAchieverMap })
       : 0;
 
     // ━━━ 強制レベル適用 ━━━
     const forceLevel = (member as any).forceLevel;
     let achievedLevel: number;
-
     if (!isActive) {
       achievedLevel = 0;
     } else if (forceLevel !== null && forceLevel !== undefined) {
       achievedLevel = Math.max(forceLevel, naturalLevel);
-      console.log(
-        `  🏅 強制レベル適用: ${(member as any).memberCode} forceLevel=${forceLevel} naturalLevel=${naturalLevel} → achievedLevel=${achievedLevel}`
-      );
+      console.log(`  🏅 強制レベル: ${(member as any).memberCode} force=${forceLevel} natural=${naturalLevel} → ${achievedLevel}`);
     } else {
       achievedLevel = naturalLevel;
     }
 
-    // ━━━ 称号レベル計算（降格なし・非アクティブは消滅） ━━━
+    // ━━━ 称号レベル（降格なし・非アクティブは消滅） ━━━
     const previousTitleLevel = member.currentLevel || 0;
-    const newTitleLevel = isActive
-      ? Math.max(previousTitleLevel, achievedLevel)
-      : 0;
+    const newTitleLevel = isActive ? Math.max(previousTitleLevel, achievedLevel) : 0;
 
-    // ━━━ ボーナス受取資格判定 ━━━
+    // ━━━ ボーナス受取資格 ━━━
     const conditionAchieved = member.conditionAchieved || false;
-    const eligible = isEligibleForBonus({
-      isActive,
-      directActiveCount,
-      conditionAchieved,
-    });
+    const eligible = isEligibleForBonus({ isActive, directActiveCount, conditionAchieved });
 
     if (isActive) {
       console.log(
@@ -431,140 +392,83 @@ export async function executeBonusCalculation(
       );
     }
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // ①ダイレクトボーナス計算
-    // 条件: ① 当月アクティブのみ（②③不要）
-    // 計算: 「直接紹介している会員」が商品1000を購入した個数 × ¥2,000
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ━━━ ①ダイレクトボーナス ━━━
     let directBonus = 0;
     if (isActive) {
-      // 自分の直接紹介会員（referrals）が商品1000を購入した個数を合計
       const directReferrals = childrenMap.get(member.id) || [];
       let directBonusProductTotal = 0;
       for (const referralId of directReferrals) {
         const referralPurchase = memberPurchaseMap.get(referralId);
-        if (referralPurchase) {
-          directBonusProductTotal += referralPurchase.directBonusProductCount;
-        }
+        if (referralPurchase) directBonusProductTotal += referralPurchase.directBonusProductCount;
       }
       directBonus = directBonusProductTotal * DIRECT_BONUS_AMOUNT;
       if (directBonus > 0) {
-        console.log(
-          `  💸 ダイレクトB: ${(member as any).memberCode} 直接紹介商品1000購入${directBonusProductTotal}個 → ¥${directBonus.toLocaleString()}`
-        );
+        console.log(`  💸 ダイレクトB: ${(member as any).memberCode} 商品1000×${directBonusProductTotal}個 → ¥${directBonus.toLocaleString()}`);
       }
     }
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // ②ユニレベルボーナス計算
-    // 条件: ①②③すべて + achievedLevel >= 0（レベルなしでも1〜3段取得可）
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ━━━ ②ユニレベルボーナス ━━━
     let unilevelResult = { total: 0, detail: {} as Record<number, number> };
     if (eligible) {
-      const depthPoints = calcDepthPoints(
-        member.id,
-        childrenMap,
-        memberPurchaseMap,
-        memberMap,
-        achievedLevel
-      );
+      const depthPoints = calcDepthPoints(member.id, childrenMap, memberPurchaseMap, memberMap, achievedLevel);
       unilevelResult = calcUnilevelBonus(depthPoints, achievedLevel, directActiveCount);
       if (unilevelResult.total > 0) {
-        console.log(
-          `  📊 ユニレベルB: ${(member as any).memberCode} LV.${achievedLevel} → ¥${unilevelResult.total.toLocaleString()}`
-        );
+        console.log(`  📊 ユニレベルB: ${(member as any).memberCode} LV.${achievedLevel} → ¥${unilevelResult.total.toLocaleString()}`);
       }
     }
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // ③組織構築ボーナス計算
-    // 条件: ①②③ + LV.3以上 + 01ポジション
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    let structureBonus = 0;
+    // ━━━ ③組織構築ボーナス ━━━
+    let structureBonus  = 0;
     let minSeriesPoints = 0;
     const memberCodeStr = (member as any).memberCode as string;
-    const isFirstPos = isFirstPosition(memberCodeStr);
+    const isFirstPos    = isFirstPosition(memberCodeStr);
 
     if (eligible && achievedLevel >= 3 && isFirstPos) {
-      minSeriesPoints = calcMinSeriesPoints(
-        member.id,
-        childrenMap,
-        memberPurchaseMap,
-        memberMap
-      );
-      // 最小系列はGP≥1の系列のみで比較（仕様書準拠）
+      minSeriesPoints = calcMinSeriesPoints(member.id, childrenMap, memberPurchaseMap, memberMap);
       const rate = STRUCTURE_BONUS_RATES[achievedLevel] ?? 0;
       structureBonus = Math.floor(minSeriesPoints * (rate / 100) * POINT_RATE);
       if (structureBonus > 0) {
-        console.log(
-          `  🏗️ 組織構築B: ${memberCodeStr} LV.${achievedLevel} 最小系列${minSeriesPoints}pt × ${rate}% → ¥${structureBonus.toLocaleString()}`
-        );
+        console.log(`  🏗️ 組織構築B: ${memberCodeStr} LV.${achievedLevel} 最小系列${minSeriesPoints}pt × ${rate}% → ¥${structureBonus.toLocaleString()}`);
       }
     }
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // ④貯金ボーナス（SAVpt）計算
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 【全消滅条件】
-    //   ステータスが autoship 以外、または 当月 isActive=false
-    //   → 累計ポイント全消滅（0リセット）
-    //
-    // 【A: 初回登録月のみ・仮付与】
-    //   条件: 01ポジション かつ 登録月=bonusMonth かつ 過去に商品1000購入なし
-    //   計算: 自己購入pt × registrationRate(20%)
-    //   ※ ステータス判定なし（登録時点で仮付与）
-    //   ※ 翌月に autoship でなければ消滅
-    //
-    // 【B: 2回目以降・毎月】
-    //   条件: autoship かつ isActive=true かつ AS伝票（入金済）≥1件
-    //   計算: AS伝票合計pt × autoshipRate(5%)
-    //
-    // 【C: 毎月・ボーナス発生者のみ】
-    //   条件: autoship かつ isActive=true かつ 当月ボーナス実際発生（>0）
-    //   計算: GP × bonusRate(3%)
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    let savingsPointsAdded = 0;
-    let savingsPtAFromRegistration = false; // A仮付与フラグ（翌月消滅チェック用）
-    const memberStatus = member.status;
-    const memberIdStr = member.id.toString();
+    // ━━━ ④貯金ボーナス（SAVpt） ━━━
+    let savingsPointsAdded        = 0;
+    let savingsPtAFromRegistration = false;
+    const memberStatus  = member.status;
+    const memberIdStr   = member.id.toString();
 
-    // 登録月判定: MlmMember.createdAt の年月 === bonusMonth
-    const memberCreatedAt: Date = (member as any).createdAt;
-    // JSTで年月を比較（createdAt はUTC保存なので+9h）
-    const createdAtJST = new Date(memberCreatedAt.getTime() + 9 * 60 * 60 * 1000);
-    const createdMonthStr = `${createdAtJST.getUTCFullYear()}-${String(createdAtJST.getUTCMonth() + 1).padStart(2, "0")}`;
-    const isRegistrationMonth = createdMonthStr === bonusMonth;
+    // 登録月判定（JST）
+    const memberCreatedAt: Date  = (member as any).createdAt;
+    const createdAtJST           = new Date(memberCreatedAt.getTime() + 9 * 60 * 60 * 1000);
+    const createdMonthStr        = `${createdAtJST.getUTCFullYear()}-${String(createdAtJST.getUTCMonth() + 1).padStart(2, "0")}`;
+    const isRegistrationMonth    = createdMonthStr === bonusMonth;
 
-    // 【翌月チェック】前月にA仮付与があった場合、今月 autoship でなければ消滅
-    // → 前月の savingsPointsAdded から A分を差し引く（累計から引く）
-    let prevAConsumptionPt = 0; // 前月A分消滅額（× 10 整数）
+    // 前月A仮付与消滅チェック
+    let prevAConsumptionPt = 0;
     if (prevHadRegistrationA.has(memberIdStr) && memberStatus !== "autoship") {
-      // 前月にA仮付与があり、今月 autoship でない → A分消滅
-      const prevAddedInt = prevHadRegistrationA.get(memberIdStr) ?? 0;
-      prevAConsumptionPt = prevAddedInt; // 前月A付与分（×10整数）を消滅
+      const prevAddedInt  = prevHadRegistrationA.get(memberIdStr) ?? 0;
+      prevAConsumptionPt  = prevAddedInt;
       console.log(`  🔥 貯金A消滅: ${memberCodeStr} 前月A仮付与分 ${prevAddedInt / 10}pt 消滅`);
     }
 
-    // 【A: 初回登録月・仮付与】ステータス不問
+    // A: 初回登録月・仮付与（ステータス不問）
     if (isFirstPos && isRegistrationMonth && !hasPastProduct1000.has(memberIdStr)) {
       if (purchaseData.directBonusProductCount >= 1) {
         const ptA = Math.floor(purchaseData.selfPurchasePoints * (savingsRegistrationRate / 100) * 10) / 10;
-        savingsPointsAdded += ptA;
-        savingsPtAFromRegistration = true; // 翌月消滅チェック用フラグ
-        console.log(`  💰 貯金A（初回仮付与）: ${memberCodeStr} 自己購入${purchaseData.selfPurchasePoints}pt × ${savingsRegistrationRate}% = ${ptA}pt`);
+        savingsPointsAdded       += ptA;
+        savingsPtAFromRegistration = true;
+        console.log(`  💰 貯金A（初回仮付与）: ${memberCodeStr} 自己${purchaseData.selfPurchasePoints}pt × ${savingsRegistrationRate}% = ${ptA}pt`);
       }
     }
 
-    // 【B・C: autoship かつ 当月アクティブのみ】
+    // B・C: autoship かつ 当月アクティブのみ
     if (isFirstPos && memberStatus === "autoship" && isActive) {
-      // B. AS伝票（入金済）が1件以上
       if (purchaseData.hasAutoshipInvoice && purchaseData.autoshipInvoicePoints > 0) {
         const ptB = Math.floor(purchaseData.autoshipInvoicePoints * (savingsAutoshipRate / 100) * 10) / 10;
         savingsPointsAdded += ptB;
         console.log(`  💰 貯金B: ${memberCodeStr} AS伝票${purchaseData.autoshipInvoicePoints}pt × ${savingsAutoshipRate}% = ${ptB}pt`);
       }
-
-      // C. 当月ボーナスが実際に発生（①〜③合計 > 0）かつ GP > 0
       const hasBonusThisMonth = (directBonus + unilevelResult.total + structureBonus) > 0;
       if (hasBonusThisMonth && groupPoints > 0) {
         const ptC = Math.floor(groupPoints * (savingsBonusRate / 100) * 10) / 10;
@@ -573,243 +477,251 @@ export async function executeBonusCalculation(
       }
     }
 
-    // 小数点第1位まで（第2位切り捨て）
     savingsPointsAdded = Math.floor(savingsPointsAdded * 10) / 10;
-    if (savingsPointsAdded > 0) {
-      console.log(`  💎 貯金合計: ${memberCodeStr} 今月+${savingsPointsAdded}pt`);
-    }
+    if (savingsPointsAdded > 0) console.log(`  💎 貯金合計: ${memberCodeStr} 今月+${savingsPointsAdded}pt`);
 
-    // 貯金ポイント累計計算
-    // 【全消滅】autoship以外 または 当月非アクティブ（ただしA初回月はステータス不問で加算）
+    // 貯金ポイント累計
     const previousSavingsPoints = member.savingsPoints || 0;
     let newSavingsPoints: number;
-
     if (isRegistrationMonth && savingsPtAFromRegistration) {
-      // 登録月：A仮付与のみ（累計に加算、ステータス不問）
       newSavingsPoints = Math.floor((previousSavingsPoints + savingsPointsAdded) * 10) / 10;
     } else if (memberStatus === "autoship" && isActive) {
-      // 通常月：autoship かつ アクティブ → B・C分加算
-      // 前月A消滅分を差し引き（prevAConsumptionPt は × 10 整数）
       const prevAConsumptionReal = prevAConsumptionPt / 10;
       newSavingsPoints = Math.max(0, Math.floor((previousSavingsPoints - prevAConsumptionReal + savingsPointsAdded) * 10) / 10);
     } else {
-      // 全消滅（autoship以外、または当月非アクティブ）
       newSavingsPoints = 0;
     }
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // ⑤合計ボーナス・支払い計算
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    const totalBonus = directBonus + unilevelResult.total + structureBonus;
-
-    // 調整金
-    const adjEntry = adjustmentMap.get(member.id);
-    const adjustmentAmount = adjEntry ? adjEntry.total : 0;
-
-    // 支払調整前取得額 = ボーナス合計 + 調整金
+    // ━━━ ⑤合計ボーナス・支払い計算 ━━━
+    const totalBonus        = directBonus + unilevelResult.total + structureBonus;
+    const adjEntry          = adjustmentMap.get(member.id);
+    const adjustmentAmount  = adjEntry ? adjEntry.total : 0;
     const amountBeforeAdjustment = totalBonus + adjustmentAmount;
 
-    // 支払調整
     const paymentAdjustmentAmount =
-      paymentAdjustmentRate !== null
-        ? Math.floor(amountBeforeAdjustment * paymentAdjustmentRate)
-        : 0;
-
+      paymentAdjustmentRate !== null ? Math.floor(amountBeforeAdjustment * paymentAdjustmentRate) : 0;
     const finalAmount = amountBeforeAdjustment - paymentAdjustmentAmount;
 
-    // 源泉徴収税
-    // 仕様: 支払調整後の月間報酬支払額（finalAmount）が12万円を超えた場合、
-    //       超えた金額に対して10.21%を差引く。法人会員（companyNameあり）は対象外。
     const isCompany = !!(member as any).companyName;
     let withholdingTax = 0;
     if (!isCompany && finalAmount > WITHHOLDING_THRESHOLD) {
       withholdingTax = Math.floor((finalAmount - WITHHOLDING_THRESHOLD) * WITHHOLDING_RATE);
     }
 
-    // 事務手数料
-    const serviceFee =
-      finalAmount > resolvedSettings.minPayoutAmount
-        ? resolvedSettings.serviceFeeAmount
-        : 0;
-
-    // 支払額
+    const serviceFee    = finalAmount > resolvedSettings.minPayoutAmount ? resolvedSettings.serviceFeeAmount : 0;
     const paymentAmount = Math.max(0, finalAmount - withholdingTax - serviceFee);
 
     totalBonusAmount += paymentAmount;
 
     results.push({
-      mlmMemberId: member.id,
+      mlmMemberId:               member.id,
       bonusMonth,
       isActive,
-      selfPurchasePoints: purchaseData.selfPurchasePoints,
+      selfPurchasePoints:        purchaseData.selfPurchasePoints,
       groupPoints,
       directActiveCount,
       achievedLevel,
-      forcedLevel: forceLevel ?? 0,
+      forcedLevel:               forceLevel ?? 0,
       previousTitleLevel,
       newTitleLevel,
       directBonus,
-      unilevelBonus: unilevelResult.total,
+      unilevelBonus:             unilevelResult.total,
       structureBonus,
       adjustmentAmount,
       amountBeforeAdjustment,
-      paymentAdjustmentRate: paymentAdjustmentRate != null ? paymentAdjustmentRate * 100 : 0,
+      paymentAdjustmentRate:     paymentAdjustmentRate != null ? paymentAdjustmentRate * 100 : 0,
       paymentAdjustmentAmount,
       finalAmount,
       withholdingTax,
       serviceFee,
       paymentAmount,
-      unilevelDetail: unilevelResult.detail,
-      savingsPointsAdded: Math.round(savingsPointsAdded * 10),       // × 10して整数保存
-      savingsPoints: Math.round(newSavingsPoints * 10),               // 累計も × 10
-      savingsPtAFromRegistration,                                      // A仮付与フラグ
-      // 組織データ（BonusResult保存用）
-      minLinePoints: minSeriesPoints,
-      lineCount: seriesCount,
+      unilevelDetail:            unilevelResult.detail,
+      savingsPointsAdded:        Math.round(savingsPointsAdded * 10),  // ×10して整数保存
+      savingsPoints:             Math.round(newSavingsPoints * 10),    // 累計も×10
+      savingsPtAFromRegistration,
+      minLinePoints:             minSeriesPoints,
+      lineCount:                 seriesCount,
     });
   }
 
   onProgress(`ボーナス計算完了（対象: ${members.length}名 / アクティブ: ${totalActiveMembers}名）`);
-  onProgress("DBへの保存中... (BonusRun作成)");
 
+  // ────────────────────────────────────────────────────
   // 8. データベースに保存
+  // ────────────────────────────────────────────────────
+  onProgress("DBへの保存中... [BonusRun作成]");
+
   const bonusRun = await prisma.bonusRun.create({
     data: {
       bonusMonth,
-      closingDate: new Date(),
-      status: "draft",
-      paymentAdjustmentRate: paymentAdjustmentRate != null ? paymentAdjustmentRate * 100 : 0,
-      totalMembers: members.length,
+      closingDate:            new Date(),
+      status:                 "draft",
+      paymentAdjustmentRate:  paymentAdjustmentRate != null ? paymentAdjustmentRate * 100 : 0,
+      totalMembers:           members.length,
       totalActiveMembers,
-      totalBonusAmount: Math.floor(totalBonusAmount),
-      capAdjustmentAmount: 0,
+      totalBonusAmount:       Math.floor(totalBonusAmount),
+      capAdjustmentAmount:    0,
     },
   });
-  onProgress(`BonusRun作成完了 (ID: ${bonusRun.id})`);
 
-  // BonusResultを一括作成
-  // ※ createMany は @updatedAt を自動セットしないため、明示的に updatedAt を指定する
-  // ※ savingsPtAFromRegistration / savingsPointsAdded / savingsPoints などの新カラムが
-  //   本番DBに未適用の場合に備えて、段階的フォールバック方式で保存する
-  const now = new Date();
+  onProgress(`BonusRun作成完了 (ID: ${bonusRun.id}) / BonusResult書き込み開始 [${results.length}件]`);
 
-  // 基本データ（旧カラムのみ・全DBで確実に存在する）
-  const baseDataList = results.map((r) => ({
-    bonusRunId: bonusRun.id,
-    mlmMemberId: r.mlmMemberId,
-    bonusMonth: r.bonusMonth,
-    isActive: r.isActive,
-    selfPurchasePoints: r.selfPurchasePoints,
-    groupPoints: r.groupPoints,
-    directActiveCount: r.directActiveCount,
-    achievedLevel: r.achievedLevel,
-    forcedLevel: r.forcedLevel,
-    previousTitleLevel: r.previousTitleLevel,
-    newTitleLevel: r.newTitleLevel,
-    directBonus: r.directBonus,
-    unilevelBonus: r.unilevelBonus,
-    structureBonus: r.structureBonus,
-    adjustmentAmount: r.adjustmentAmount,
-    amountBeforeAdjustment: r.amountBeforeAdjustment,
-    paymentAdjustmentRate: r.paymentAdjustmentRate,
-    paymentAdjustmentAmount: r.paymentAdjustmentAmount,
-    finalAmount: r.finalAmount,
-    withholdingTax: r.withholdingTax,
-    serviceFee: r.serviceFee,
-    paymentAmount: r.paymentAmount,
-    unilevelDetail: r.unilevelDetail,
-    minLinePoints: r.minLinePoints,
-    lineCount: r.lineCount,
-    updatedAt: now,
-  }));
+  // ────────────────────────────────────────────────────
+  // BonusResult を 50件ずつ $transaction でバッチINSERT
+  //
+  // ※ createMany は @updatedAt を自動セットせず、かつ本番DBのカラム有無が
+  //   不明なため使用しない。$transaction(個別create[]) は各レコードを
+  //   独立したINSERTとして扱うためカラム欠落の影響を受けにくく、
+  //   Prismaのデフォルト値も正しく適用される。
+  // ────────────────────────────────────────────────────
+  const BATCH_SIZE = 50;
+  let savedCount   = 0;
 
-  // ── Tier 1: フル版（savingsPtAFromRegistration + savingsPoints + savingsPointsAdded）
-  let createManySuccess = false;
-  onProgress(`BonusResult書き込み中... [Tier1: フル版] ${results.length}件`);
-  try {
-    await prisma.bonusResult.createMany({
-      data: baseDataList.map((base, i) => ({
-        ...base,
-        savingsPointsAdded: results[i].savingsPointsAdded,
-        savingsPoints: results[i].savingsPoints,
-        savingsPtAFromRegistration: results[i].savingsPtAFromRegistration,
-      })),
-    });
-    createManySuccess = true;
-    console.log(`✅ BonusResult createMany (フル版) 成功: ${results.length}件`);
-    onProgress(`BonusResult書き込み完了 [Tier1成功] ${results.length}件`);
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.warn(`⚠️ BonusResult createMany (フル版) 失敗: ${msg}`);
-    onProgress(`⚠️ Tier1失敗 → Tier2試行中... (${msg.slice(0, 80)})`);
-  }
+  for (let i = 0; i < results.length; i += BATCH_SIZE) {
+    const batch = results.slice(i, i + BATCH_SIZE);
 
-  // ── Tier 2: savingsPtAFromRegistration を除外
-  if (!createManySuccess) {
+    // $transaction でバッチ内を一括コミット（失敗時はそのバッチだけロールバック）
     try {
-      await prisma.bonusResult.createMany({
-        data: baseDataList.map((base, i) => ({
-          ...base,
-          savingsPointsAdded: results[i].savingsPointsAdded,
-          savingsPoints: results[i].savingsPoints,
-        })),
-      });
-      createManySuccess = true;
-      console.log(`✅ BonusResult createMany (Tier2: savingsPtAFromRegistration除外) 成功: ${results.length}件`);
-      onProgress(`BonusResult書き込み完了 [Tier2成功] ${results.length}件`);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.warn(`⚠️ BonusResult createMany (Tier2) 失敗: ${msg}`);
-      onProgress(`⚠️ Tier2失敗 → Tier3試行中... (${msg.slice(0, 80)})`);
-    }
-  }
-
-  // ── Tier 3: 貯金カラム全除外（最小版）
-  if (!createManySuccess) {
-    try {
-      await prisma.bonusResult.createMany({ data: baseDataList });
-      createManySuccess = true;
-      console.log(`✅ BonusResult createMany (Tier3: 最小版) 成功: ${results.length}件`);
-      onProgress(`BonusResult書き込み完了 [Tier3成功] ${results.length}件`);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error(`❌ BonusResult createMany (Tier3) 失敗: ${msg}`);
-      onProgress(`⚠️ Tier3失敗 → Tier4個別INSERT開始... (${msg.slice(0, 80)})`);
-    }
-  }
-
-  // ── Tier 4: 個別INSERT（50件ずつバッチ処理・進捗通知あり）
-  if (!createManySuccess) {
-    let insertedCount = 0;
-    const BATCH = 50;
-    const total = results.length;
-    for (let i = 0; i < total; i += BATCH) {
-      const batchItems = baseDataList.slice(i, i + BATCH);
-      // バッチを並列実行（同一バッチ内はPromise.allSettledで独立処理）
-      const batchResults = await Promise.allSettled(
-        batchItems.map((item) => prisma.bonusResult.create({ data: item }))
+      await prisma.$transaction(
+        batch.map((r) =>
+          prisma.bonusResult.create({
+            data: {
+              bonusRunId:                bonusRun.id,
+              mlmMemberId:               r.mlmMemberId,
+              bonusMonth:                r.bonusMonth,
+              isActive:                  r.isActive,
+              selfPurchasePoints:        r.selfPurchasePoints,
+              groupPoints:               r.groupPoints,
+              directActiveCount:         r.directActiveCount,
+              achievedLevel:             r.achievedLevel,
+              forcedLevel:               r.forcedLevel,
+              previousTitleLevel:        r.previousTitleLevel,
+              newTitleLevel:             r.newTitleLevel,
+              directBonus:               r.directBonus,
+              unilevelBonus:             r.unilevelBonus,
+              structureBonus:            r.structureBonus,
+              adjustmentAmount:          r.adjustmentAmount,
+              amountBeforeAdjustment:    r.amountBeforeAdjustment,
+              paymentAdjustmentRate:     r.paymentAdjustmentRate,
+              paymentAdjustmentAmount:   r.paymentAdjustmentAmount,
+              finalAmount:               r.finalAmount,
+              withholdingTax:            r.withholdingTax,
+              serviceFee:                r.serviceFee,
+              paymentAmount:             r.paymentAmount,
+              unilevelDetail:            r.unilevelDetail,
+              minLinePoints:             r.minLinePoints,
+              lineCount:                 r.lineCount,
+              savingsPointsAdded:        r.savingsPointsAdded,
+              savingsPoints:             r.savingsPoints,
+              savingsPtAFromRegistration: r.savingsPtAFromRegistration,
+            },
+          })
+        )
       );
-      batchResults.forEach((res, j) => {
-        if (res.status === "fulfilled") {
-          insertedCount++;
-        } else {
-          const msg = res.reason instanceof Error ? res.reason.message : String(res.reason);
-          console.warn(`⚠️ 個別INSERT失敗 (mlmMemberId=${baseDataList[i + j].mlmMemberId}): ${msg}`);
+      savedCount += batch.length;
+    } catch (err) {
+      // バッチが失敗した場合、貯金系カラムを除外して再試行
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.warn(`⚠️ BonusResult バッチINSERT失敗 (${i}〜${i + batch.length - 1}件目): ${errMsg}`);
+      onProgress(`⚠️ バッチ ${Math.floor(i / BATCH_SIZE) + 1} 失敗 → 貯金カラム除外で再試行...`);
+
+      // 貯金系カラムを除外して再試行（カラム未存在の場合のフォールバック）
+      try {
+        await prisma.$transaction(
+          batch.map((r) =>
+            prisma.bonusResult.create({
+              data: {
+                bonusRunId:              bonusRun.id,
+                mlmMemberId:             r.mlmMemberId,
+                bonusMonth:              r.bonusMonth,
+                isActive:                r.isActive,
+                selfPurchasePoints:      r.selfPurchasePoints,
+                groupPoints:             r.groupPoints,
+                directActiveCount:       r.directActiveCount,
+                achievedLevel:           r.achievedLevel,
+                forcedLevel:             r.forcedLevel,
+                previousTitleLevel:      r.previousTitleLevel,
+                newTitleLevel:           r.newTitleLevel,
+                directBonus:             r.directBonus,
+                unilevelBonus:           r.unilevelBonus,
+                structureBonus:          r.structureBonus,
+                adjustmentAmount:        r.adjustmentAmount,
+                amountBeforeAdjustment:  r.amountBeforeAdjustment,
+                paymentAdjustmentRate:   r.paymentAdjustmentRate,
+                paymentAdjustmentAmount: r.paymentAdjustmentAmount,
+                finalAmount:             r.finalAmount,
+                withholdingTax:          r.withholdingTax,
+                serviceFee:              r.serviceFee,
+                paymentAmount:           r.paymentAmount,
+                unilevelDetail:          r.unilevelDetail,
+                minLinePoints:           r.minLinePoints,
+                lineCount:               r.lineCount,
+              },
+            })
+          )
+        );
+        savedCount += batch.length;
+        console.log(`✅ バッチ再試行成功（貯金カラム除外）: ${batch.length}件`);
+      } catch (err2) {
+        // バッチ再試行も失敗した場合、1件ずつ個別INSERT（エラーをスキップして継続）
+        const err2Msg = err2 instanceof Error ? err2.message : String(err2);
+        console.error(`❌ バッチ再試行失敗。個別INSERTに切替: ${err2Msg}`);
+        onProgress(`⚠️ バッチ再試行失敗 → 個別INSERT (${batch.length}件)`);
+
+        for (const r of batch) {
+          try {
+            await prisma.bonusResult.create({
+              data: {
+                bonusRunId:              bonusRun.id,
+                mlmMemberId:             r.mlmMemberId,
+                bonusMonth:              r.bonusMonth,
+                isActive:                r.isActive,
+                selfPurchasePoints:      r.selfPurchasePoints,
+                groupPoints:             r.groupPoints,
+                directActiveCount:       r.directActiveCount,
+                achievedLevel:           r.achievedLevel,
+                forcedLevel:             r.forcedLevel,
+                previousTitleLevel:      r.previousTitleLevel,
+                newTitleLevel:           r.newTitleLevel,
+                directBonus:             r.directBonus,
+                unilevelBonus:           r.unilevelBonus,
+                structureBonus:          r.structureBonus,
+                adjustmentAmount:        r.adjustmentAmount,
+                amountBeforeAdjustment:  r.amountBeforeAdjustment,
+                paymentAdjustmentRate:   r.paymentAdjustmentRate,
+                paymentAdjustmentAmount: r.paymentAdjustmentAmount,
+                finalAmount:             r.finalAmount,
+                withholdingTax:          r.withholdingTax,
+                serviceFee:              r.serviceFee,
+                paymentAmount:           r.paymentAmount,
+                unilevelDetail:          r.unilevelDetail,
+                minLinePoints:           r.minLinePoints,
+                lineCount:               r.lineCount,
+              },
+            });
+            savedCount++;
+          } catch (e3) {
+            console.warn(`⚠️ 個別INSERT失敗 (mlmMemberId=${r.mlmMemberId}): ${e3 instanceof Error ? e3.message : String(e3)}`);
+          }
         }
-      });
-      const done = Math.min(i + BATCH, total);
-      onProgress(`Tier4個別INSERT: ${done}/${total}件完了`);
+      }
     }
-    console.log(`✅ BonusResult 個別INSERT完了: ${insertedCount}/${total}件`);
-    onProgress(`BonusResult書き込み完了 [Tier4] ${insertedCount}/${total}件`);
+
+    const done = Math.min(i + BATCH_SIZE, results.length);
+    onProgress(`BonusResult保存中: ${done}/${results.length}件完了`);
   }
 
+  console.log(`✅ BonusResult保存完了: ${savedCount}/${results.length}件`);
+  onProgress(`DB書き込み処理完了 (${savedCount}/${results.length}件保存)`);
+
+  // ────────────────────────────────────────────────────
   // 調整金にbonusRunIdを紐付け
+  // ────────────────────────────────────────────────────
   if (adjustments.length > 0) {
     try {
       await prisma.bonusAdjustment.updateMany({
         where: { bonusMonth, bonusRunId: null },
-        data: { bonusRunId: bonusRun.id },
+        data:  { bonusRunId: bonusRun.id },
       });
       console.log(`🔗 調整金 ${adjustments.length}件をBonusRunに紐付けました`);
     } catch (e) {
@@ -817,24 +729,23 @@ export async function executeBonusCalculation(
     }
   }
 
-  onProgress("DB書き込み処理完了");
+  // ────────────────────────────────────────────────────
+  // 9. 会員レベル・貯金ポイントを自動更新
+  //    更新が必要な会員だけ抽出して 50件ずつ $transaction バッチ処理
+  // ────────────────────────────────────────────────────
   onProgress("終月処理中... (会員レベル・貯金ポイント更新)");
 
-  // 9. 会員レベル・貯金ポイントを自動更新
-  //    updateMany が使えないため個別UPDATEだが、$transaction でバッチ化してDB往復を削減
-  let upgradedCount = 0;
+  let upgradedCount   = 0;
   let downgradedCount = 0;
 
-  // 更新が必要な会員だけ抽出
-  const memberUpdateOps: Array<ReturnType<typeof prisma.mlmMember.update>> = [];
+  // 更新が必要な会員のみ抽出
+  const memberUpdates: Array<{ id: bigint; data: Record<string, unknown> }> = [];
   for (const result of results) {
     const member = memberMap.get(result.mlmMemberId);
     if (!member) continue;
 
-    const oldLevel = member.currentLevel || 0;
-    const newLevel = result.newTitleLevel;
-    const newSavingsPt = result.savingsPoints;
-
+    const oldLevel  = member.currentLevel || 0;
+    const newLevel  = result.newTitleLevel;
     const updateData: Record<string, unknown> = {};
 
     if (newLevel !== oldLevel) {
@@ -845,24 +756,22 @@ export async function executeBonusCalculation(
 
     const isFirstPos = isFirstPosition((member as any).memberCode);
     if (isFirstPos) {
-      updateData.savingsPoints = newSavingsPt;
+      updateData.savingsPoints = result.savingsPoints;
     }
 
     if (Object.keys(updateData).length > 0) {
-      memberUpdateOps.push(
-        prisma.mlmMember.update({ where: { id: result.mlmMemberId }, data: updateData })
-      );
+      memberUpdates.push({ id: result.mlmMemberId, data: updateData });
     }
   }
 
-  // 50件ずつバッチで$transaction実行（DB接続過多を避けつつ高速化）
-  if (memberUpdateOps.length > 0) {
-    const MBATCH = 50;
-    for (let i = 0; i < memberUpdateOps.length; i += MBATCH) {
-      await prisma.$transaction(memberUpdateOps.slice(i, i + MBATCH));
-      const done = Math.min(i + MBATCH, memberUpdateOps.length);
-      onProgress(`会員情報更新: ${done}/${memberUpdateOps.length}件`);
-    }
+  // 50件ずつ $transaction でバッチ更新
+  for (let i = 0; i < memberUpdates.length; i += BATCH_SIZE) {
+    const batch = memberUpdates.slice(i, i + BATCH_SIZE);
+    await prisma.$transaction(
+      batch.map((u) => prisma.mlmMember.update({ where: { id: u.id }, data: u.data }))
+    );
+    const done = Math.min(i + BATCH_SIZE, memberUpdates.length);
+    onProgress(`会員情報更新: ${done}/${memberUpdates.length}件`);
   }
 
   console.log(`✅ ボーナス計算完了: ${bonusMonth}`);
@@ -870,14 +779,15 @@ export async function executeBonusCalculation(
   console.log(`   アクティブ: ${totalActiveMembers}名`);
   console.log(`   総支払額: ¥${totalBonusAmount.toLocaleString()}`);
   console.log(`   レベルアップ: ${upgradedCount}名 / レベルダウン: ${downgradedCount}名`);
+
   onProgress(`最終処理完了（レベルアップ: ${upgradedCount}名）`);
   onProgress(`✅ 全処理完了: 対象 ${members.length}名 / アクティブ ${totalActiveMembers}名 / 総支払額 ¥${Math.floor(totalBonusAmount).toLocaleString()}`);
 
   return {
-    bonusRunId: bonusRun.id,
-    totalMembers: members.length,
+    bonusRunId:          bonusRun.id,
+    totalMembers:        members.length,
     totalActiveMembers,
-    totalBonusAmount: Math.floor(totalBonusAmount),
+    totalBonusAmount:    Math.floor(totalBonusAmount),
   };
 }
 
@@ -898,7 +808,7 @@ function calcGroupDataFull(
   childrenMap: Map<bigint, bigint[]>,
   purchaseMap: Map<bigint, MemberPurchaseData>,
   memberMap: Map<bigint, any>,
-  selfPurchasePoints: number  // 自己購入ptをGPに含める
+  selfPurchasePoints: number
 ): {
   groupPoints: number;
   directActiveCount: number;
@@ -907,8 +817,7 @@ function calcGroupDataFull(
 } {
   const directChildren = childrenMap.get(memberId) || [];
 
-  // GPに自己購入ptを加算（仕様: GP = 自己購入pt + 傘下7段目までの購入pt）
-  let groupPoints = selfPurchasePoints;
+  let groupPoints     = selfPurchasePoints;
   let directActiveCount = 0;
   const seriesAchieverMap: Record<number, number> = {};
 
@@ -916,10 +825,8 @@ function calcGroupDataFull(
     const childMember = memberMap.get(childId);
     if (!childMember) return;
 
-    // 系列の初期化
     seriesAchieverMap[seriesIndex] = seriesAchieverMap[seriesIndex] ?? 0;
 
-    // 直下のアクティブ判定
     const childPurchase = purchaseMap.get(childId);
     const childIsActive = isActiveMember({
       selfPoints: childPurchase?.selfPurchasePoints ?? 0,
@@ -932,13 +839,11 @@ function calcGroupDataFull(
       groupPoints += childPurchase?.selfPurchasePoints ?? 0;
     }
 
-    // 系列内の最高達成レベルを記録（currentLevelを参照）
     const childLevel = childMember.currentLevel || 0;
     if (childLevel > (seriesAchieverMap[seriesIndex] ?? 0)) {
       seriesAchieverMap[seriesIndex] = childLevel;
     }
 
-    // 再帰的に下位（最大7段）を探索してGP加算・系列内達成者レベル更新
     const subResult = calcSubGroupPoints(childId, childrenMap, purchaseMap, memberMap, 1, 7);
     groupPoints += subResult.groupPoints;
 
@@ -947,9 +852,7 @@ function calcGroupDataFull(
     }
   });
 
-  const seriesCount = directChildren.length;
-
-  return { groupPoints, directActiveCount, seriesCount, seriesAchieverMap };
+  return { groupPoints, directActiveCount, seriesCount: directChildren.length, seriesAchieverMap };
 }
 
 /**
@@ -968,27 +871,24 @@ function calcSubGroupPoints(
 
   const children = childrenMap.get(memberId) || [];
   let groupPoints = 0;
-  let maxLevel = 0;
+  let maxLevel    = 0;
 
   for (const childId of children) {
-    const childMember = memberMap.get(childId);
+    const childMember   = memberMap.get(childId);
+    const childPurchase = purchaseMap.get(childId);
     if (!childMember) continue;
 
-    const childPurchase = purchaseMap.get(childId);
     const childIsActive = isActiveMember({
       selfPoints: childPurchase?.selfPurchasePoints ?? 0,
       purchasedRequiredProduct: childPurchase?.purchasedRequiredProduct ?? false,
       forceActive: childMember.forceActive || false,
     });
 
-    if (childIsActive) {
-      groupPoints += childPurchase?.selfPurchasePoints ?? 0;
-    }
+    if (childIsActive) groupPoints += childPurchase?.selfPurchasePoints ?? 0;
 
     const childLevel = childMember.currentLevel || 0;
     if (childLevel > maxLevel) maxLevel = childLevel;
 
-    // 再帰
     const sub = calcSubGroupPoints(childId, childrenMap, purchaseMap, memberMap, currentDepth + 1, maxDepth);
     groupPoints += sub.groupPoints;
     if (sub.maxLevel > maxLevel) maxLevel = sub.maxLevel;
@@ -1009,7 +909,7 @@ function calcDepthPoints(
   memberMap: Map<bigint, any>,
   achievedLevel: number
 ): Record<number, number> {
-  const maxDepth = getUnilevelMaxDepth(achievedLevel);
+  const maxDepth    = getUnilevelMaxDepth(achievedLevel);
   const depthPoints: Record<number, number> = {};
 
   function traverse(currentId: bigint, depth: number) {
@@ -1017,9 +917,8 @@ function calcDepthPoints(
 
     const children = childrenMap.get(currentId) || [];
     for (const childId of children) {
-      const childMember = memberMap.get(childId);
+      const childMember   = memberMap.get(childId);
       const childPurchase = purchaseMap.get(childId);
-
       if (!childMember) continue;
 
       const childIsActive = isActiveMember({
@@ -1029,13 +928,10 @@ function calcDepthPoints(
       });
 
       if (childIsActive) {
-        // アクティブなら当段数に購入ptを加算
         depthPoints[depth] = (depthPoints[depth] || 0) + (childPurchase?.selfPurchasePoints ?? 0);
-        // アクティブの下位を次の段数で探索
         traverse(childId, depth + 1);
       } else {
-        // 非アクティブは圧縮：同じ段数のまま下位を探索
-        traverse(childId, depth);
+        traverse(childId, depth); // 圧縮：同じ段数で下位を探索
       }
     }
   }
@@ -1065,7 +961,7 @@ function calcMinSeriesPoints(
 
     function traverseSeries(currentId: bigint) {
       const purchase = purchaseMap.get(currentId);
-      const mem = memberMap.get(currentId);
+      const mem      = memberMap.get(currentId);
       if (!mem) return;
 
       const isActive = isActiveMember({
@@ -1074,22 +970,15 @@ function calcMinSeriesPoints(
         forceActive: mem.forceActive || false,
       });
 
-      if (isActive) {
-        seriesTotal += purchase?.selfPurchasePoints ?? 0;
-      }
+      if (isActive) seriesTotal += purchase?.selfPurchasePoints ?? 0;
 
-      const descendants = childrenMap.get(currentId) || [];
-      for (const descId of descendants) {
+      for (const descId of (childrenMap.get(currentId) || [])) {
         traverseSeries(descId);
       }
     }
 
     traverseSeries(childId);
-
-    // GP≥1の系列のみ比較対象に含める（仕様書準拠）
-    if (seriesTotal >= 1) {
-      seriesPoints.push(seriesTotal);
-    }
+    if (seriesTotal >= 1) seriesPoints.push(seriesTotal);
   }
 
   if (seriesPoints.length === 0) return 0;
