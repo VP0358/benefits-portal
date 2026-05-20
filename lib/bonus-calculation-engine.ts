@@ -581,7 +581,8 @@ export async function executeBonusCalculation(
     if (savingsPointsAdded > 0) console.log(`  💎 貯金合計: ${memberCodeStr} 今月+${savingsPointsAdded}pt`);
 
     // 貯金ポイント累計
-    const previousSavingsPoints = member.savingsPoints || 0;
+    // ※ member.savingsPoints はDBに×10整数で保存されているので /10 でpt単位に戻す
+    const previousSavingsPoints = (member.savingsPoints || 0) / 10;
     let newSavingsPoints: number;
     if (isRegistrationMonth && savingsPtAFromRegistration) {
       newSavingsPoints = Math.floor((previousSavingsPoints + savingsPointsAdded) * 10) / 10;
