@@ -937,7 +937,8 @@ export default function BonusCalculatePage() {
         await fetchBonusRun();
         setActiveTab("calculation");
       } else {
-        alert(`❌ エラー: ${data.error}`);
+        const detail = data.detail ? `\n\n詳細: ${data.detail}` : "";
+        alert(`❌ エラー: ${data.error}${detail}`);
       }
     } catch (err: unknown) { alert(`❌ エラー: ${(err as Error).message}`); }
     finally { setExecuting(false); }

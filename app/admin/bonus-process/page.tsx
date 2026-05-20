@@ -369,12 +369,13 @@ export default function BonusProcessPage() {
         body: JSON.stringify({ bonusMonth: selectedMonth }),
       });
 
+      const data = await res.json();
       if (res.ok) {
         alert("ボーナス計算を実行しました");
         fetchData();
       } else {
-        const error = await res.json();
-        alert(`実行失敗: ${error.error || "不明なエラー"}`);
+        const detail = data.detail ? `\n詳細: ${data.detail}` : "";
+        alert(`実行失敗: ${data.error || "不明なエラー"}${detail}`);
       }
     } catch (error) {
       console.error("Error executing bonus:", error);
