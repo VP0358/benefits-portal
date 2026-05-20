@@ -746,6 +746,15 @@ export default function BonusCalculatePage() {
   type DebugInfo = { status: number; hasResults: boolean; resultsCount: number; error?: string; detail?: string } | null;
   const [debugInfo, setDebugInfo] = useState<DebugInfo>(null);
 
+  // ─── 進捗ログ（SSEストリーミング） ───
+  const [progressLogs, setProgressLogs] = useState<{ text: string; ts: number }[]>([]);
+  const [progressDone, setProgressDone] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [progressError, setProgressError] = useState<string | null>(null);
+  const [elapsedSec, setElapsedSec] = useState(0);
+  const progressStartRef = useRef<number | null>(null);
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressLogRef = useRef<HTMLDivElement>(null);
+
   // CSV ファイル ref
   const adjCsvRef  = useRef<HTMLInputElement>(null);
   const shorCsvRef = useRef<HTMLInputElement>(null);
@@ -920,28 +929,108 @@ export default function BonusCalculatePage() {
     finally { setUpdatingRate(false); }
   };
 
-  // ─── ボーナス計算実行 ───
+  // ─── 経過時間タイマー ───
+  const startProgressTimer = () => {
+    progressStartRef.current = Date.now();
+    setElapsedSec(0);
+    progressTimerRef.current = setInterval(() => {
+      if (progressStartRef.current) {
+        setElapsedSec(Math.floor((Date.now() - progressStartRef.current) / 1000));
+      }
+    }, 1000);
+  };
+  const stopProgressTimer = () => {
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current);
+      progressTimerRef.current = null;
+    }
+  };
+
+  // ─── ボーナス計算実行（SSEストリーミング版） ───
   const handleExecute = async () => {
     if (!selectedMonth) return;
-    if (!confirm(`${selectedMonth}のボーナス計算を実行しますか？\n\n計算完了後、即座に「確定」状態で保存されます。`)) return;
+    if (!confirm(`${selectedMonth}のボーナス計算を実行しますか？\n\n計算完了まで数十秒かかる場合があります。`)) return;
+
+    // 進捗ログを初期化
+    setProgressLogs([]);
+    setProgressDone("running");
+    setProgressError(null);
     setExecuting(true);
+    startProgressTimer();
+
+    const addLog = (text: string) => {
+      setProgressLogs(prev => [...prev, { text, ts: Date.now() }]);
+      // 自動スクロール
+      setTimeout(() => {
+        if (progressLogRef.current) {
+          progressLogRef.current.scrollTop = progressLogRef.current.scrollHeight;
+        }
+      }, 50);
+    };
+
+    addLog(`▶ ${selectedMonth} ボーナス計算を開始します...`);
+
     try {
-      const res = await fetch("/api/admin/bonus-run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bonusMonth: selectedMonth, paymentAdjustmentRate }),
+      const url = `/api/admin/bonus-run/stream?bonusMonth=${encodeURIComponent(selectedMonth)}&paymentAdjustmentRate=${paymentAdjustmentRate}`;
+      const eventSource = new EventSource(url);
+
+      await new Promise<void>((resolve, reject) => {
+        eventSource.onmessage = (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            if (data.type === "progress") {
+              addLog(`  ✓ ${data.step}`);
+            } else if (data.type === "complete") {
+              addLog(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+              addLog(`✅ ボーナス計算が完了しました`);
+              addLog(`   対象会員: ${data.result.totalMembers}名`);
+              addLog(`   アクティブ: ${data.result.totalActiveMembers}名`);
+              addLog(`   合計ボーナス: ¥${Number(data.result.totalBonusAmount).toLocaleString()}`);
+              eventSource.close();
+              setProgressDone("done");
+              resolve();
+            } else if (data.type === "error") {
+              addLog(`❌ エラー: ${data.message}`);
+              if (data.detail) addLog(`   詳細: ${data.detail}`);
+              setProgressError(data.message);
+              setProgressDone("error");
+              eventSource.close();
+              reject(new Error(data.message));
+            }
+          } catch {
+            // JSON parse失敗は無視
+          }
+        };
+        eventSource.onerror = (e) => {
+          console.error("SSE error:", e);
+          // readyState=2(CLOSED)なら正常終了扱い（complete後に自動クローズされた場合）
+          if (eventSource.readyState === EventSource.CLOSED) {
+            resolve();
+          } else {
+            const errMsg = "接続エラー: サーバーとの通信が切断されました";
+            addLog(`❌ ${errMsg}`);
+            setProgressError(errMsg);
+            setProgressDone("error");
+            eventSource.close();
+            reject(new Error(errMsg));
+          }
+        };
       });
-      const data = await res.json();
-      if (res.ok) {
-        alert(`✅ ボーナス計算・確定が完了しました\n対象: ${data.totalMembers}名 / アクティブ: ${data.totalActiveMembers}名\n合計ボーナス: ¥${Number(data.totalBonusAmount).toLocaleString()}\n\n次のステップ: 計算結果を確認して「全員に一括公開」を実行してください`);
-        await fetchBonusRun();
-        setActiveTab("calculation");
-      } else {
-        const detail = data.detail ? `\n\n詳細: ${data.detail}` : "";
-        alert(`❌ エラー: ${data.error}${detail}`);
+
+      // 計算成功 → bonusRunを再取得
+      await fetchBonusRun();
+      setActiveTab("calculation");
+
+    } catch (err: unknown) {
+      const msg = (err as Error).message;
+      if (!progressError) {
+        setProgressError(msg);
+        setProgressDone("error");
       }
-    } catch (err: unknown) { alert(`❌ エラー: ${(err as Error).message}`); }
-    finally { setExecuting(false); }
+    } finally {
+      stopProgressTimer();
+      setExecuting(false);
+    }
   };
 
   // ─── draft → confirmed 強制切り替え（古いdraftレコードの救済用） ───
@@ -1342,6 +1431,104 @@ export default function BonusCalculatePage() {
           </div>
         </div>
       </div>
+
+      {/* ─── 進捗ログパネル（計算中 or 完了時に表示） ─── */}
+      {progressDone !== "idle" && (
+        <div className="bg-gray-950 rounded-2xl border border-gray-700 overflow-hidden shadow-xl">
+          {/* ヘッダー */}
+          <div className="flex items-center justify-between px-5 py-3 bg-gray-900 border-b border-gray-700">
+            <div className="flex items-center gap-3">
+              {progressDone === "running" && (
+                <span className="flex items-center gap-2">
+                  <span className="w-3 h-3 bg-blue-400 rounded-full animate-pulse"></span>
+                  <span className="text-blue-300 font-bold text-sm">計算実行中...</span>
+                </span>
+              )}
+              {progressDone === "done" && (
+                <span className="flex items-center gap-2">
+                  <span className="text-2xl">✅</span>
+                  <span className="text-emerald-300 font-bold text-sm">ボーナス計算は正常に終了いたしました。</span>
+                </span>
+              )}
+              {progressDone === "error" && (
+                <span className="flex items-center gap-2">
+                  <span className="text-2xl">❌</span>
+                  <span className="text-red-300 font-bold text-sm">計算エラーが発生しました</span>
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-gray-400 text-xs font-mono">
+                経過時間 {String(Math.floor(elapsedSec / 60)).padStart(2, "0")}:{String(elapsedSec % 60).padStart(2, "0")}
+              </span>
+              {progressDone !== "running" && (
+                <button
+                  onClick={() => { setProgressDone("idle"); setProgressLogs([]); setProgressError(null); }}
+                  className="text-gray-500 hover:text-gray-300 text-xs px-2 py-1 border border-gray-700 rounded transition"
+                >
+                  閉じる
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* プログレスバー（計算中のみ） */}
+          {progressDone === "running" && (
+            <div className="w-full bg-gray-800 h-1">
+              <div className="h-1 bg-blue-500 animate-pulse" style={{ width: "100%" }}></div>
+            </div>
+          )}
+          {progressDone === "done" && (
+            <div className="w-full bg-gray-800 h-1">
+              <div className="h-1 bg-emerald-500" style={{ width: "100%" }}></div>
+            </div>
+          )}
+          {progressDone === "error" && (
+            <div className="w-full bg-gray-800 h-1">
+              <div className="h-1 bg-red-500" style={{ width: "100%" }}></div>
+            </div>
+          )}
+
+          {/* ログ本体 */}
+          <div
+            ref={progressLogRef}
+            className="px-5 py-4 overflow-y-auto font-mono text-xs leading-6"
+            style={{ maxHeight: "400px", minHeight: "120px", background: "#0d1117" }}
+          >
+            {/* 計算種別ヘッダー */}
+            <div className="text-gray-400 mb-2">
+              <span className="text-gray-500">計算種別</span>
+              <br />
+              <span className="text-white font-semibold">ボーナス計算</span>
+              <br />
+              <span className="text-gray-500">対象月:</span>
+              <span className="text-cyan-300 ml-2">{selectedMonth}</span>
+            </div>
+            <div className="border-t border-gray-800 mb-3"></div>
+
+            {progressLogs.map((log, i) => (
+              <div
+                key={i}
+                className={`leading-6 whitespace-pre-wrap ${
+                  log.text.startsWith("✅") ? "text-emerald-400 font-bold mt-1"
+                  : log.text.startsWith("❌") ? "text-red-400 font-bold"
+                  : log.text.startsWith("▶") ? "text-cyan-300 font-bold"
+                  : log.text.startsWith("━") ? "text-gray-600"
+                  : log.text.startsWith("   ") ? "text-gray-300"
+                  : "text-green-300"
+                }`}
+              >
+                {log.text}
+              </div>
+            ))}
+
+            {/* カーソル点滅（計算中） */}
+            {progressDone === "running" && (
+              <span className="inline-block w-2 h-4 bg-gray-400 ml-1 animate-pulse align-middle"></span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ステータス + 公開エリア */}
       {bonusRun && (
