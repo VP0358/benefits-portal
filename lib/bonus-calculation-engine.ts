@@ -670,7 +670,7 @@ export async function executeBonusCalculation(
   }
 
   onProgress(`ボーナス計算完了（対象: ${members.length}名 / アクティブ: ${totalActiveMembers}名）`);
-  onProgress("DBへの保存中...");
+  onProgress("DBへの保存中... (BonusRun作成)");
 
   // 8. データベースに保存
   const bonusRun = await prisma.bonusRun.create({
@@ -685,6 +685,7 @@ export async function executeBonusCalculation(
       capAdjustmentAmount: 0,
     },
   });
+  onProgress(`BonusRun作成完了 (ID: ${bonusRun.id})`);
 
   // BonusResultを一括作成
   // ※ createMany は @updatedAt を自動セットしないため、明示的に updatedAt を指定する
@@ -722,8 +723,9 @@ export async function executeBonusCalculation(
     updatedAt: now,
   }));
 
-  // フル版（新カラムを含む）でまず試みる
+  // ── Tier 1: フル版（savingsPtAFromRegistration + savingsPoints + savingsPointsAdded）
   let createManySuccess = false;
+  onProgress(`BonusResult書き込み中... [Tier1: フル版] ${results.length}件`);
   try {
     await prisma.bonusResult.createMany({
       data: baseDataList.map((base, i) => ({
@@ -735,12 +737,14 @@ export async function executeBonusCalculation(
     });
     createManySuccess = true;
     console.log(`✅ BonusResult createMany (フル版) 成功: ${results.length}件`);
+    onProgress(`BonusResult書き込み完了 [Tier1成功] ${results.length}件`);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.warn(`⚠️ BonusResult createMany (フル版) 失敗。新カラム未適用の可能性。基本版で再試行します。エラー: ${msg}`);
+    console.warn(`⚠️ BonusResult createMany (フル版) 失敗: ${msg}`);
+    onProgress(`⚠️ Tier1失敗 → Tier2試行中... (${msg.slice(0, 80)})`);
   }
 
-  // フル版が失敗した場合、savingsPoints/savingsPointsAdded のみ追加して再試行
+  // ── Tier 2: savingsPtAFromRegistration を除外
   if (!createManySuccess) {
     try {
       await prisma.bonusResult.createMany({
@@ -748,49 +752,59 @@ export async function executeBonusCalculation(
           ...base,
           savingsPointsAdded: results[i].savingsPointsAdded,
           savingsPoints: results[i].savingsPoints,
-          // savingsPtAFromRegistration は除外（カラム未存在の場合）
         })),
       });
       createManySuccess = true;
-      console.log(`✅ BonusResult createMany (savingsPtAFromRegistration除外版) 成功: ${results.length}件`);
+      console.log(`✅ BonusResult createMany (Tier2: savingsPtAFromRegistration除外) 成功: ${results.length}件`);
+      onProgress(`BonusResult書き込み完了 [Tier2成功] ${results.length}件`);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.warn(`⚠️ BonusResult createMany (savingsPtAFromRegistration除外版) 失敗。さらに基本版で再試行します。エラー: ${msg}`);
+      console.warn(`⚠️ BonusResult createMany (Tier2) 失敗: ${msg}`);
+      onProgress(`⚠️ Tier2失敗 → Tier3試行中... (${msg.slice(0, 80)})`);
     }
   }
 
-  // それでも失敗した場合、savingsPointsAdded/savingsPoints も除外した最小版で試みる
+  // ── Tier 3: 貯金カラム全除外（最小版）
   if (!createManySuccess) {
     try {
-      await prisma.bonusResult.createMany({
-        data: baseDataList,
-      });
+      await prisma.bonusResult.createMany({ data: baseDataList });
       createManySuccess = true;
-      console.log(`✅ BonusResult createMany (最小版: 貯金カラム全除外) 成功: ${results.length}件`);
+      console.log(`✅ BonusResult createMany (Tier3: 最小版) 成功: ${results.length}件`);
+      onProgress(`BonusResult書き込み完了 [Tier3成功] ${results.length}件`);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error(`❌ BonusResult createMany 最小版も失敗。個別INSERTに切り替えます。エラー: ${msg}`);
+      console.error(`❌ BonusResult createMany (Tier3) 失敗: ${msg}`);
+      onProgress(`⚠️ Tier3失敗 → Tier4個別INSERT開始... (${msg.slice(0, 80)})`);
     }
   }
 
-  // 最後の手段: 個別INSERT（エラーが出たレコードをスキップして継続）
+  // ── Tier 4: 個別INSERT（50件ずつバッチ処理・進捗通知あり）
   if (!createManySuccess) {
     let insertedCount = 0;
-    for (let i = 0; i < results.length; i++) {
-      try {
-        await prisma.bonusResult.create({ data: baseDataList[i] });
-        insertedCount++;
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.warn(`⚠️ BonusResult 個別INSERT失敗 (mlmMemberId=${results[i].mlmMemberId}): ${msg}`);
-      }
+    const BATCH = 50;
+    const total = results.length;
+    for (let i = 0; i < total; i += BATCH) {
+      const batchItems = baseDataList.slice(i, i + BATCH);
+      // バッチを並列実行（同一バッチ内はPromise.allSettledで独立処理）
+      const batchResults = await Promise.allSettled(
+        batchItems.map((item) => prisma.bonusResult.create({ data: item }))
+      );
+      batchResults.forEach((res, j) => {
+        if (res.status === "fulfilled") {
+          insertedCount++;
+        } else {
+          const msg = res.reason instanceof Error ? res.reason.message : String(res.reason);
+          console.warn(`⚠️ 個別INSERT失敗 (mlmMemberId=${baseDataList[i + j].mlmMemberId}): ${msg}`);
+        }
+      });
+      const done = Math.min(i + BATCH, total);
+      onProgress(`Tier4個別INSERT: ${done}/${total}件完了`);
     }
-    console.log(`✅ BonusResult 個別INSERT完了: ${insertedCount}/${results.length}件`);
+    console.log(`✅ BonusResult 個別INSERT完了: ${insertedCount}/${total}件`);
+    onProgress(`BonusResult書き込み完了 [Tier4] ${insertedCount}/${total}件`);
   }
 
   // 調整金にbonusRunIdを紐付け
-  onProgress("DB書き込み処理完了");
-
   if (adjustments.length > 0) {
     try {
       await prisma.bonusAdjustment.updateMany({
@@ -803,12 +817,16 @@ export async function executeBonusCalculation(
     }
   }
 
-  onProgress("終月処理中...");
+  onProgress("DB書き込み処理完了");
+  onProgress("終月処理中... (会員レベル・貯金ポイント更新)");
 
   // 9. 会員レベル・貯金ポイントを自動更新
+  //    updateMany が使えないため個別UPDATEだが、$transaction でバッチ化してDB往復を削減
   let upgradedCount = 0;
   let downgradedCount = 0;
 
+  // 更新が必要な会員だけ抽出
+  const memberUpdateOps: Array<ReturnType<typeof prisma.mlmMember.update>> = [];
   for (const result of results) {
     const member = memberMap.get(result.mlmMemberId);
     if (!member) continue;
@@ -819,24 +837,31 @@ export async function executeBonusCalculation(
 
     const updateData: Record<string, unknown> = {};
 
-    // レベル更新
     if (newLevel !== oldLevel) {
       updateData.currentLevel = newLevel;
       if (newLevel > oldLevel) upgradedCount++;
       else downgradedCount++;
     }
 
-    // 貯金ポイント更新（01ポジションのみ）
     const isFirstPos = isFirstPosition((member as any).memberCode);
     if (isFirstPos) {
       updateData.savingsPoints = newSavingsPt;
     }
 
     if (Object.keys(updateData).length > 0) {
-      await prisma.mlmMember.update({
-        where: { id: result.mlmMemberId },
-        data: updateData,
-      });
+      memberUpdateOps.push(
+        prisma.mlmMember.update({ where: { id: result.mlmMemberId }, data: updateData })
+      );
+    }
+  }
+
+  // 50件ずつバッチで$transaction実行（DB接続過多を避けつつ高速化）
+  if (memberUpdateOps.length > 0) {
+    const MBATCH = 50;
+    for (let i = 0; i < memberUpdateOps.length; i += MBATCH) {
+      await prisma.$transaction(memberUpdateOps.slice(i, i + MBATCH));
+      const done = Math.min(i + MBATCH, memberUpdateOps.length);
+      onProgress(`会員情報更新: ${done}/${memberUpdateOps.length}件`);
     }
   }
 
