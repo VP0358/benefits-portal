@@ -153,47 +153,111 @@ export async function GET(req: NextRequest) {
 
     // =====================================================
     // 貯金ポイント一覧 (tab=savings)
+    // 【リデザイン】
+    //   - 当月獲得者: 当月にautoship伝票（入金済）が発行された全会員
+    //                BonusRunの有無・紹介者の有無に関係なく全員表示
+    //   - 累計獲得者: MlmMember.savingsPoints > 0 の全会員
     // =====================================================
     if (tab === "savings") {
+      // ── 当月autoship伝票発行者を MlmPurchase + Order から直接取得 ──
+      const autoshipPurchases = await prisma.mlmPurchase.findMany({
+        where: {
+          purchaseMonth: bonusMonth,
+          order: {
+            slipType: "autoship",
+            OR: [
+              { paidAt: { not: null } },
+              { paymentStatus: "paid" },
+            ],
+          },
+        },
+        select: {
+          mlmMemberId: true,
+          totalPoints: true,
+          mlmMember: {
+            select: {
+              memberCode: true,
+              companyName: true,
+              savingsPoints: true,
+              user: { select: { name: true } },
+            },
+          },
+        },
+        distinct: ["mlmMemberId"],
+        orderBy: { mlmMember: { memberCode: "asc" } },
+      });
+
+      // 当月autoship伝票発行者のmlmMemberIdセット
+      const currentMonthMemberIds = new Set(autoshipPurchases.map((p) => p.mlmMemberId.toString()));
+
+      // BonusRunがある場合は当月BonusResultの貯金ptも取得
       const bonusRun = await prisma.bonusRun.findUnique({
         where: { bonusMonth },
         select: { id: true },
       });
 
-      if (!bonusRun) {
-        return NextResponse.json({ records: [] });
+      // BonusResult から当月追加pt・累計ptをマップ
+      type BrMap = { savingsPointsAdded: number; savingsPoints: number };
+      const brMap = new Map<string, BrMap>();
+      if (bonusRun) {
+        const bonusResults = await prisma.bonusResult.findMany({
+          where: { bonusRunId: bonusRun.id },
+          select: {
+            mlmMemberId: true,
+            savingsPointsAdded: true,
+            savingsPoints: true,
+          },
+        });
+        for (const br of bonusResults) {
+          brMap.set(br.mlmMemberId.toString(), {
+            savingsPointsAdded: br.savingsPointsAdded,
+            savingsPoints: br.savingsPoints,
+          });
+        }
       }
 
-      const results = await prisma.bonusResult.findMany({
-        where: {
-          bonusRunId: bonusRun.id,
-          savingsPointsAdded: { gt: 0 },
-        },
-        select: {
-          savingsPoints: true,
-          savingsPointsAdded: true,
-          mlmMember: {
-            select: {
-              memberCode: true,
-              companyName: true,
-              user: {
-                select: { name: true },
-              },
-            },
-          },
-        },
-        orderBy: { mlmMember: { memberCode: "asc" } },
+      // 当月獲得者レコード
+      const currentMonthRecords = autoshipPurchases.map((p) => {
+        const memberIdStr = p.mlmMemberId.toString();
+        const br = brMap.get(memberIdStr);
+        return {
+          memberCode: p.mlmMember.memberCode,
+          memberName: p.mlmMember.user.name,
+          companyName: p.mlmMember.companyName ?? null,
+          // BonusResultがあればそこから、なければMlmMemberの累計を表示
+          savingsPoints: br ? br.savingsPoints : p.mlmMember.savingsPoints,
+          // 今月追加pt (×10整数→実数に戻す、BonusResultなしは0)
+          savingsPointsAdded: br ? br.savingsPointsAdded : 0,
+          hasBonus: br ? br.savingsPointsAdded > 0 : false,
+        };
       });
 
-      const records = results.map((r) => ({
-        memberCode: r.mlmMember.memberCode,
-        memberName: r.mlmMember.user.name,
-        companyName: r.mlmMember.companyName ?? null,
-        savingsPoints: r.savingsPoints,
-        savingsPointsAdded: r.savingsPointsAdded,
+      // 累計獲得者: MlmMember.savingsPoints > 0 の全会員
+      const allSavingsMembers = await prisma.mlmMember.findMany({
+        where: { savingsPoints: { gt: 0 } },
+        select: {
+          memberCode: true,
+          companyName: true,
+          savingsPoints: true,
+          user: { select: { name: true } },
+        },
+        orderBy: { savingsPoints: "desc" },
+      });
+
+      const cumulativeRecords = allSavingsMembers.map((m) => ({
+        memberCode: m.memberCode,
+        memberName: m.user.name,
+        companyName: m.companyName ?? null,
+        savingsPoints: m.savingsPoints,
       }));
 
-      return NextResponse.json({ records });
+      return NextResponse.json({
+        records: currentMonthRecords,         // 当月autoship伝票発行者（後方互換）
+        currentMonthRecords,                  // 当月獲得者
+        cumulativeRecords,                    // 累計獲得者
+        hasBonusRun: !!bonusRun,
+        currentMonthMemberCount: currentMonthMemberIds.size,
+      });
     }
 
     // =====================================================

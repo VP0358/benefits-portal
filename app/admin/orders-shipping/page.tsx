@@ -1112,21 +1112,17 @@ export default function OrdersShippingPage() {
                           </span>
                         </td>
                         <td className="px-3 py-2">
-                          <div className="flex flex-col gap-0.5">
-                            <span className={`px-1.5 py-0.5 rounded w-fit ${
-                              order.paymentStatus === "paid" ? "bg-green-100 text-green-700"
-                              : order.paymentStatus === "ignored" ? "bg-gray-100 text-gray-500"
-                              : "bg-red-50 text-red-600"
-                            }`}>
-                              {order.paymentStatus === "paid" ? "入金済" : order.paymentStatus === "ignored" ? "無視" : "未入金"}
-                            </span>
-                            <span className={`px-1.5 py-0.5 rounded w-fit ${
-                              order.shippingStatus === "shipped" ? "bg-green-100 text-green-700"
-                              : order.shippingStatus === "ignored" ? "bg-gray-100 text-gray-500"
-                              : "bg-orange-50 text-orange-600"
-                            }`}>
-                              {order.shippingStatus === "shipped" ? "発送済" : order.shippingStatus === "ignored" ? "無視" : "未発送"}
-                            </span>
+                          <div className="flex flex-col gap-0.5 text-xs">
+                            {order.paidAt
+                              ? <span className="text-green-700 font-medium">{order.paidAt.slice(0,10)}</span>
+                              : order.paymentStatus === "ignored"
+                              ? <span className="text-gray-400">無視</span>
+                              : <span className="text-gray-300">—</span>}
+                            {order.shippingLabel?.shippedAt
+                              ? <span className="text-blue-700 font-medium">{order.shippingLabel.shippedAt.slice(0,10)}</span>
+                              : order.shippingStatus === "ignored"
+                              ? <span className="text-gray-400">無視</span>
+                              : <span className="text-gray-300">—</span>}
                           </div>
                         </td>
                         <td className="px-3 py-2 text-right font-medium text-gray-800">¥{order.totalAmount.toLocaleString()}</td>
@@ -1616,21 +1612,17 @@ export default function OrdersShippingPage() {
                           </span>
                         </td>
                         <td className="px-3 py-2">
-                          <div className="flex flex-col gap-0.5">
-                            <span className={`px-1.5 py-0.5 rounded w-fit ${
-                              order.paymentStatus === "paid" ? "bg-green-100 text-green-700"
-                              : order.paymentStatus === "ignored" ? "bg-gray-100 text-gray-500"
-                              : "bg-red-50 text-red-600"
-                            }`}>
-                              {order.paymentStatus === "paid" ? "入金済" : order.paymentStatus === "ignored" ? "無視" : "未入金"}
-                            </span>
-                            <span className={`px-1.5 py-0.5 rounded w-fit ${
-                              order.shippingStatus === "shipped" ? "bg-green-100 text-green-700"
-                              : order.shippingStatus === "ignored" ? "bg-gray-100 text-gray-500"
-                              : "bg-orange-50 text-orange-600"
-                            }`}>
-                              {order.shippingStatus === "shipped" ? "発送済" : order.shippingStatus === "ignored" ? "無視" : "未発送"}
-                            </span>
+                          <div className="flex flex-col gap-0.5 text-xs">
+                            {order.paidAt
+                              ? <span className="text-green-700 font-medium">{order.paidAt.slice(0,10)}</span>
+                              : order.paymentStatus === "ignored"
+                              ? <span className="text-gray-400">無視</span>
+                              : <span className="text-gray-300">—</span>}
+                            {order.shippingLabel?.shippedAt
+                              ? <span className="text-blue-700 font-medium">{order.shippingLabel.shippedAt.slice(0,10)}</span>
+                              : order.shippingStatus === "ignored"
+                              ? <span className="text-gray-400">無視</span>
+                              : <span className="text-gray-300">—</span>}
                           </div>
                         </td>
                         <td className="px-3 py-2 text-right font-medium text-gray-800">¥{order.totalAmount.toLocaleString()}</td>
@@ -1803,25 +1795,17 @@ export default function OrdersShippingPage() {
                         </td>
                         {/* ステイタス */}
                         <td className="px-2 py-2">
-                          <div className="flex flex-col gap-0.5">
-                            <span className={`px-1.5 py-0.5 rounded text-xs w-fit ${
-                              order.paymentStatus === "paid"
-                                ? "bg-green-100 text-green-700"
-                                : order.paymentStatus === "ignored"
-                                ? "bg-gray-100 text-gray-500"
-                                : "bg-red-50 text-red-600"
-                            }`}>
-                              {order.paymentStatus === "paid" ? "入金済" : order.paymentStatus === "ignored" ? "無視" : "未入金"}
-                            </span>
-                            <span className={`px-1.5 py-0.5 rounded text-xs w-fit ${
-                              order.shippingStatus === "shipped"
-                                ? "bg-green-100 text-green-700"
-                                : order.shippingStatus === "ignored"
-                                ? "bg-gray-100 text-gray-500"
-                                : "bg-orange-50 text-orange-600"
-                            }`}>
-                              {order.shippingStatus === "shipped" ? "発送済" : order.shippingStatus === "ignored" ? "無視" : "未発送"}
-                            </span>
+                          <div className="flex flex-col gap-0.5 text-xs">
+                            {order.paidAt
+                              ? <span className="text-green-700 font-medium">{order.paidAt.slice(0,10)}</span>
+                              : order.paymentStatus === "ignored"
+                              ? <span className="text-gray-400">無視</span>
+                              : <span className="text-gray-300">—</span>}
+                            {order.shippingLabel?.shippedAt
+                              ? <span className="text-blue-700 font-medium">{order.shippingLabel.shippedAt.slice(0,10)}</span>
+                              : order.shippingStatus === "ignored"
+                              ? <span className="text-gray-400">無視</span>
+                              : <span className="text-gray-300">—</span>}
                           </div>
                         </td>
                         {/* 金額 */}

@@ -6,6 +6,12 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 function todayJST() {
   return new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\//g, "-");
 }
+/** ブラウザ側 JST 当月1日の日付 "YYYY-MM-01" */
+function firstDayOfMonthJST() {
+  const s = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" });
+  const [y, m] = s.split("/");
+  return `${y}-${m}-01`;
+}
 /** ブラウザ側 JST 今月の "YYYY-MM" */
 function currentMonthJST() {
   const s = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" });
@@ -659,29 +665,51 @@ export default function AutoShipPanel() {
   /* ─── 一括伝票作成実行 ─── */
   async function handleBulkSlipCreate(e: React.FormEvent) {
     e.preventDefault();
-    const validItems = bulkSlipItems.filter(i => i.productId);
-    if (validItems.length === 0) { alert("商品を1つ以上選択してください"); return; }
+    const defaultValidItems = bulkSlipItems.filter(i => i.productId);
+    if (defaultValidItems.length === 0) { alert("商品を1つ以上選択してください"); return; }
     const targets = memberListData.filter(m => selectedMemberIds.has(m.id));
     if (targets.length === 0) return;
     setBulkSubmitting(true);
     setBulkResult(null);
-    const today = todayJST();
+    // 一括作成の注文日は当月1日で固定
+    const firstDay = firstDayOfMonthJST();
     let success = 0, failed = 0;
     const errors: string[] = [];
     for (const m of targets) {
       try {
-        const form = makeSlipForm(m.memberCode, m.memberName, m.memberPhone || "", m.memberPostal || "", m.memberAddress || "", today);
+        // 会員別継続購入商品設定を取得（設定があればそちらを優先）
+        let itemsToUse: SlipItem[] = defaultValidItems;
+        try {
+          const itemRes = await fetch(`/api/admin/mlm-members/autoship-items?memberCode=${m.memberCode}`);
+          if (itemRes.ok) {
+            const itemData = await itemRes.json();
+            if (itemData.items && itemData.items.length > 0) {
+              // 会員別設定をSlipItem形式に変換（productIdなし）
+              itemsToUse = itemData.items.map((it: { productCode: string; productName: string; unitPrice: number; quantity: number; points: number; taxRate: number }) => ({
+                productId: "",
+                productCode: it.productCode,
+                productName: it.productName,
+                unitPrice: it.unitPrice,
+                quantity: it.quantity,
+                points: it.points,
+                taxRate: it.taxRate,
+              }));
+            }
+          }
+        } catch { /* 取得失敗時はデフォルト商品を使用 */ }
+
+        const form = makeSlipForm(m.memberCode, m.memberName, m.memberPhone || "", m.memberPostal || "", m.memberAddress || "", firstDay);
         form.slipType = bulkSlipType;
         form.paymentMethod = bulkPaymentMethod;
         const res = await fetch("/api/admin/mlm-members/orders", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...form, memberCode: m.memberCode, items: validItems }),
+          body: JSON.stringify({ ...form, memberCode: m.memberCode, items: itemsToUse }),
         });
         const data = await res.json();
         if (!res.ok) { failed++; errors.push(`${m.memberName}(${m.memberCode}): ${data.error ?? "失敗"}`); }
         else success++;
-      } catch (err) {
+      } catch {
         failed++;
         errors.push(`${m.memberName}(${m.memberCode}): エラー`);
       }

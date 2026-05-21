@@ -46,6 +46,7 @@ export const SHOP_TYPES = [
   { value: "nationwide", label: "全国",       badge: "🗾 全国対応",   color: "#059669", sortOrder: 2 },
   { value: "authorized", label: "正規代理店", badge: "✅ 正規代理店", color: "#d97706", sortOrder: 3 },
   { value: "agent",      label: "代理店",     badge: "📍 代理店",     color: "#6b7280", sortOrder: 4 },
+  { value: "reseller",   label: "取次店",     badge: "🤝 取次店",     color: "#0891b2", sortOrder: 5 },
 ];
 
 export type SkinShop = {
@@ -536,8 +537,8 @@ function SkinShopEditor({ shops, onUpdate, onAdd, onRemove, onMove, onAddPhoto, 
               </div>
             </div>
 
-            {/* ── ③ 都道府県ピッカー（正規代理店・代理店のみ） ── */}
-            {(shop.shopType === "authorized" || shop.shopType === "agent") && (
+            {/* ── ③ 都道府県ピッカー（正規代理店・代理店・取次店） ── */}
+            {(shop.shopType === "authorized" || shop.shopType === "agent" || shop.shopType === "reseller") && (
               <div>
                 <label className="mb-1.5 block text-xs font-bold text-slate-700">都道府県</label>
                 <div className="flex flex-wrap gap-1 max-h-44 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
