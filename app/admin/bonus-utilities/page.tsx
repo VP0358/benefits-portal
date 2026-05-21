@@ -49,6 +49,21 @@ type SavingsRecord = {
   companyName: string | null;
   savingsPoints: number;
   savingsPointsAdded: number;
+  hasBonus?: boolean;
+};
+
+type CumulativeSavingsRecord = {
+  memberCode: string;
+  memberName: string;
+  companyName: string | null;
+  savingsPoints: number;
+};
+
+type SavingsData = {
+  currentMonthRecords: SavingsRecord[];
+  cumulativeRecords: CumulativeSavingsRecord[];
+  hasBonusRun: boolean;
+  currentMonthMemberCount: number;
 };
 
 type HistoryItem = {
@@ -93,6 +108,8 @@ export default function BonusUtilitiesPage() {
   const [purchaseRecords, setPurchaseRecords] = useState<PurchaseRecord[]>([]);
   const [purchaseMonths, setPurchaseMonths]   = useState<string[]>([]);
   const [savingsRecords, setSavingsRecords]   = useState<SavingsRecord[]>([]);
+  const [savingsData, setSavingsData]         = useState<SavingsData | null>(null);
+  const [savingsSubTab, setSavingsSubTab]     = useState<"current" | "cumulative">("current");
   const [historyItems, setHistoryItems]       = useState<HistoryItem[]>([]);
   const [bonusRunInfo, setBonusRunInfo]       = useState<BonusRunInfo | null>(null);
   const [bonusNote, setBonusNote]             = useState("");
@@ -133,6 +150,12 @@ export default function BonusUtilitiesPage() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         setSavingsRecords(data.records ?? []);
+        setSavingsData({
+          currentMonthRecords: data.currentMonthRecords ?? data.records ?? [],
+          cumulativeRecords: data.cumulativeRecords ?? [],
+          hasBonusRun: data.hasBonusRun ?? false,
+          currentMonthMemberCount: data.currentMonthMemberCount ?? 0,
+        });
       } else if (tab === "updateHistory") {
         const res = await fetch(`/api/admin/bonus-utilities?bonusMonth=${month}&tab=history`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -265,7 +288,8 @@ export default function BonusUtilitiesPage() {
       const data = await res.json();
       setRecalcResult(data);
       if (res.ok) {
-        // 再計算後にテーブルを自動リフレッシュ
+        // 再計算後にテーブルを自動リフレッシュ（当月獲得者タブを表示）
+        setSavingsSubTab("current");
         await fetchTabData("savingsInput", selectedMonth);
       }
     } catch {
@@ -601,12 +625,18 @@ export default function BonusUtilitiesPage() {
 
           {/* ============== 貯金ポイント一覧タブ ============== */}
           {!loading && activeTab === "savingsInput" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <h3 className="text-base font-bold text-gray-800">
-                  <i className="fas fa-piggy-bank mr-2 text-pink-600"></i>
-                  貯金ポイント（SAVpt）一覧 — {selectedMonth.replace("-", "年")}月度
-                </h3>
+            <div className="space-y-5">
+              {/* ── ヘッダー ── */}
+              <div className="flex items-start justify-between flex-wrap gap-3">
+                <div>
+                  <h3 className="text-base font-bold text-gray-800">
+                    <i className="fas fa-piggy-bank mr-2 text-pink-600"></i>
+                    貯金ボーナス獲得者一覧 — {selectedMonth.replace("-", "年")}月度
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    当月オートシップ伝票発行者（入金済）が対象。紹介者の有無・ボーナス計算の有無に関わらず全員表示。
+                  </p>
+                </div>
               </div>
 
               {/* ── 再計算パネル ── */}
@@ -623,7 +653,6 @@ export default function BonusUtilitiesPage() {
                   当月アクティブでなかった月（商品未受取・返送等）は累計ゼロにリセットされます。MlmMemberの貯金ポイント累計も更新されます。
                 </p>
                 <div className="flex flex-wrap items-center gap-3">
-                  {/* 対象選択 */}
                   <div className="flex gap-2">
                     <label className="flex items-center gap-1.5 cursor-pointer">
                       <input
@@ -659,9 +688,10 @@ export default function BonusUtilitiesPage() {
                   </button>
                 </div>
 
-                {/* 結果表示 */}
                 {recalcResult && (
-                  <div className={`mt-3 rounded-lg px-4 py-3 text-sm ${recalcResult.success ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
+                  <div className={`mt-3 rounded-lg px-4 py-3 text-sm ${
+                    recalcResult.success ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"
+                  }`}>
                     {recalcResult.success ? (
                       <>
                         <p className="font-bold text-green-800 mb-1">
@@ -694,46 +724,191 @@ export default function BonusUtilitiesPage() {
                 )}
               </div>
 
-              {savingsRecords.length === 0 ? (
-                <div className="text-center text-gray-400 py-10">
-                  <i className="fas fa-inbox text-3xl mb-3 block"></i>
-                  貯金ポイント追加データがありません
+              {/* ── サブタブ切り替え ── */}
+              <div className="flex gap-1 p-1 bg-stone-100 rounded-xl w-fit">
+                <button
+                  onClick={() => setSavingsSubTab("current")}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
+                    savingsSubTab === "current"
+                      ? "bg-white text-pink-700 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  <i className="fas fa-calendar-check mr-1.5"></i>
+                  当月獲得者
+                  {savingsData && (
+                    <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-bold ${
+                      savingsSubTab === "current" ? "bg-pink-100 text-pink-700" : "bg-gray-200 text-gray-600"
+                    }`}>
+                      {savingsData.currentMonthRecords.length}名
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setSavingsSubTab("cumulative")}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
+                    savingsSubTab === "cumulative"
+                      ? "bg-white text-violet-700 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  <i className="fas fa-layer-group mr-1.5"></i>
+                  累計獲得者
+                  {savingsData && (
+                    <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-bold ${
+                      savingsSubTab === "cumulative" ? "bg-violet-100 text-violet-700" : "bg-gray-200 text-gray-600"
+                    }`}>
+                      {savingsData.cumulativeRecords.length}名
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* ── 当月獲得者テーブル ── */}
+              {savingsSubTab === "current" && (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-3">
+                    <div className="flex items-center gap-2 bg-pink-50 border border-pink-200 rounded-xl px-4 py-2">
+                      <i className="fas fa-users text-pink-500"></i>
+                      <span className="text-sm font-bold text-pink-700">
+                        {savingsData?.currentMonthRecords.length ?? 0}名
+                      </span>
+                      <span className="text-xs text-pink-600">当月AS伝票発行者（入金済）</span>
+                    </div>
+                    {savingsData && !savingsData.hasBonusRun && (
+                      <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2">
+                        <i className="fas fa-info-circle text-amber-500"></i>
+                        <span className="text-xs text-amber-700">ボーナス計算未実行 — 追加pt欄は0（AS伝票発行者は全員リスト済）</span>
+                      </div>
+                    )}
+                    {savingsData?.hasBonusRun && (
+                      <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2">
+                        <i className="fas fa-check-circle text-emerald-500"></i>
+                        <span className="text-xs text-emerald-700">ボーナス計算済 — 追加ptはBonusResultから表示</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {!savingsData || savingsData.currentMonthRecords.length === 0 ? (
+                    <div className="text-center text-gray-400 py-10">
+                      <i className="fas fa-inbox text-3xl mb-3 block"></i>
+                      {selectedMonth.replace("-", "年")}月度のオートシップ伝票（入金済）がありません
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-xl border border-slate-100">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gradient-to-r from-pink-50 to-rose-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-500 w-10">#</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">会員コード</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">法人名</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">会員名</th>
+                            <th className="px-4 py-3 text-right font-semibold text-gray-700">貯金pt累計</th>
+                            <th className="px-4 py-3 text-right font-semibold text-gray-700">今月追加pt</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700">ボーナス反映</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {savingsData.currentMonthRecords.map((s, idx) => (
+                            <tr key={idx} className="hover:bg-pink-50/40">
+                              <td className="px-4 py-3 text-xs text-gray-400">{idx + 1}</td>
+                              <td className="px-4 py-3 font-mono text-xs text-gray-600">{s.memberCode}</td>
+                              <td className="px-4 py-3 text-xs text-gray-500">{s.companyName ?? "—"}</td>
+                              <td className="px-4 py-3 font-medium text-gray-800">{s.memberName}</td>
+                              <td className="px-4 py-3 text-right font-semibold text-pink-700">
+                                {(s.savingsPoints / 10).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}pt
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                {s.savingsPointsAdded > 0 ? (
+                                  <span className="text-emerald-700 font-semibold">
+                                    +{(s.savingsPointsAdded / 10).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}pt
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400 text-xs">未計算</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                {s.hasBonus ? (
+                                  <span className="inline-flex items-center gap-1 text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">
+                                    <i className="fas fa-check"></i> 反映済
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+                                    <i className="fas fa-clock"></i> 未反映
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="bg-pink-50 font-bold">
+                            <td colSpan={4} className="px-4 py-3 text-right text-gray-700">合計</td>
+                            <td className="px-4 py-3 text-right text-pink-700">
+                              {(savingsData.currentMonthRecords.reduce((s, r) => s + r.savingsPoints, 0) / 10).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}pt
+                            </td>
+                            <td className="px-4 py-3 text-right text-emerald-700">
+                              +{(savingsData.currentMonthRecords.reduce((s, r) => s + r.savingsPointsAdded, 0) / 10).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}pt
+                            </td>
+                            <td></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="overflow-x-auto rounded-xl border border-slate-100">
-                  <table className="w-full text-sm">
-                    <thead className="bg-stone-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left font-semibold text-gray-700">会員コード</th>
-                        <th className="px-4 py-3 text-left font-semibold text-gray-700">法人名</th>
-                        <th className="px-4 py-3 text-left font-semibold text-gray-700">会員名</th>
-                        <th className="px-4 py-3 text-right font-semibold text-gray-700">貯金pt累計</th>
-                        <th className="px-4 py-3 text-right font-semibold text-gray-700">今月追加pt</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {savingsRecords.map((s, idx) => (
-                        <tr key={idx} className="hover:bg-stone-50">
-                          <td className="px-4 py-3 font-mono text-xs">{s.memberCode}</td>
-                          <td className="px-4 py-3 text-xs text-gray-500">{s.companyName ?? "-"}</td>
-                          <td className="px-4 py-3 font-medium">{s.memberName}</td>
-                          <td className="px-4 py-3 text-right font-semibold text-pink-700">{s.savingsPoints.toLocaleString()}pt</td>
-                          <td className="px-4 py-3 text-right text-emerald-700">+{s.savingsPointsAdded.toLocaleString()}pt</td>
+              )}
 
-                        </tr>
-                      ))}
-                      <tr className="bg-stone-100 font-bold">
-                        <td colSpan={3} className="px-4 py-3 text-right text-gray-700">合計</td>
-                        <td className="px-4 py-3 text-right text-pink-700">
-                          {savingsRecords.reduce((s, r) => s + r.savingsPoints, 0).toLocaleString()}pt
-                        </td>
-                        <td className="px-4 py-3 text-right text-emerald-700">
-                          +{savingsRecords.reduce((s, r) => s + r.savingsPointsAdded, 0).toLocaleString()}pt
-                        </td>
+              {/* ── 累計獲得者テーブル ── */}
+              {savingsSubTab === "cumulative" && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 bg-violet-50 border border-violet-200 rounded-xl px-4 py-2 w-fit">
+                    <i className="fas fa-layer-group text-violet-500"></i>
+                    <span className="text-sm font-bold text-violet-700">
+                      {savingsData?.cumulativeRecords.length ?? 0}名
+                    </span>
+                    <span className="text-xs text-violet-600">貯金ポイント保有中（全期間累計 &gt; 0）</span>
+                  </div>
 
-                      </tr>
-                    </tbody>
-                  </table>
+                  {!savingsData || savingsData.cumulativeRecords.length === 0 ? (
+                    <div className="text-center text-gray-400 py-10">
+                      <i className="fas fa-inbox text-3xl mb-3 block"></i>
+                      貯金ポイントを保有している会員がいません
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-xl border border-slate-100">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gradient-to-r from-violet-50 to-purple-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-500 w-10">#</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">会員コード</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">法人名</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">会員名</th>
+                            <th className="px-4 py-3 text-right font-semibold text-gray-700">貯金pt累計</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {savingsData.cumulativeRecords.map((s, idx) => (
+                            <tr key={idx} className="hover:bg-violet-50/40">
+                              <td className="px-4 py-3 text-xs text-gray-400">{idx + 1}</td>
+                              <td className="px-4 py-3 font-mono text-xs text-gray-600">{s.memberCode}</td>
+                              <td className="px-4 py-3 text-xs text-gray-500">{s.companyName ?? "—"}</td>
+                              <td className="px-4 py-3 font-medium text-gray-800">{s.memberName}</td>
+                              <td className="px-4 py-3 text-right">
+                                <span className="font-bold text-violet-700 text-base">
+                                  {(s.savingsPoints / 10).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}pt
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="bg-violet-50 font-bold">
+                            <td colSpan={4} className="px-4 py-3 text-right text-gray-700">総計</td>
+                            <td className="px-4 py-3 text-right text-violet-700 text-base">
+                              {(savingsData.cumulativeRecords.reduce((s, r) => s + r.savingsPoints, 0) / 10).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}pt
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

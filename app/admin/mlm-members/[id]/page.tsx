@@ -465,6 +465,79 @@ export default function MlmMemberDetailPage() {
   const [relSearching, setRelSearching] = useState<{ referrer: boolean; upline: boolean }>({ referrer: false, upline: false });
   const [relSaving, setRelSaving] = useState(false);
 
+  // ─── 継続購入商品設定 ───
+  type AutoshipItem = { id?: string; productCode: string; productName: string; unitPrice: number; quantity: number; points: number; taxRate: number; feeAmount: number };
+  const [autoshipItems, setAutoshipItems] = useState<AutoshipItem[]>([]);
+  const [autoshipItemsLoading, setAutoshipItemsLoading] = useState(false);
+  const [autoshipItemsSaving, setAutoshipItemsSaving] = useState(false);
+  const [autoshipItemsMsg, setAutoshipItemsMsg] = useState<string | null>(null);
+
+  const fetchAutoshipItems = useCallback(async (memberCode: string) => {
+    setAutoshipItemsLoading(true);
+    try {
+      const res = await fetch(`/api/admin/mlm-members/autoship-items?memberCode=${memberCode}`);
+      if (res.ok) { const d = await res.json(); setAutoshipItems(d.items || []); }
+    } finally { setAutoshipItemsLoading(false); }
+  }, []);
+
+  const saveAutoshipItems = async (memberCode: string) => {
+    setAutoshipItemsSaving(true);
+    setAutoshipItemsMsg(null);
+    try {
+      const res = await fetch("/api/admin/mlm-members/autoship-items", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberCode, items: autoshipItems }),
+      });
+      if (res.ok) { setAutoshipItemsMsg("保存しました"); }
+      else { const d = await res.json(); setAutoshipItemsMsg(d.error || "保存に失敗しました"); }
+    } finally { setAutoshipItemsSaving(false); }
+  };
+
+  // ─── 対応履歴メモ ───
+  type ContactMemo = { id: string; content: string; category: string | null; authorName: string | null; createdAt: string };
+  const [contactMemos, setContactMemos] = useState<ContactMemo[]>([]);
+  const [contactMemosLoading, setContactMemosLoading] = useState(false);
+  const [newMemoContent, setNewMemoContent] = useState("");
+  const [newMemoCategory, setNewMemoCategory] = useState("");
+  const [newMemoAuthor, setNewMemoAuthor] = useState("");
+  const [memoSaving, setMemoSaving] = useState(false);
+  const [deletingMemoId, setDeletingMemoId] = useState<string | null>(null);
+
+  const fetchContactMemos = useCallback(async (memberCode: string) => {
+    setContactMemosLoading(true);
+    try {
+      const res = await fetch(`/api/admin/mlm-members/contact-memos?memberCode=${memberCode}`);
+      if (res.ok) { const d = await res.json(); setContactMemos(d.memos || []); }
+    } finally { setContactMemosLoading(false); }
+  }, []);
+
+  const handleAddMemo = async (memberCode: string) => {
+    if (!newMemoContent.trim()) return;
+    setMemoSaving(true);
+    try {
+      const res = await fetch("/api/admin/mlm-members/contact-memos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberCode, content: newMemoContent, category: newMemoCategory || null, authorName: newMemoAuthor || null }),
+      });
+      if (res.ok) {
+        setNewMemoContent(""); setNewMemoCategory(""); setNewMemoAuthor("");
+        await fetchContactMemos(memberCode);
+      } else { const d = await res.json(); alert(d.error || "メモの追加に失敗しました"); }
+    } finally { setMemoSaving(false); }
+  };
+
+  const handleDeleteMemo = async (id: string, memberCode: string) => {
+    if (!confirm("このメモを削除しますか？")) return;
+    setDeletingMemoId(id);
+    try {
+      const res = await fetch(`/api/admin/mlm-members/contact-memos?id=${id}`, { method: "DELETE" });
+      if (res.ok) await fetchContactMemos(memberCode);
+      else { const d = await res.json(); alert(d.error || "削除に失敗しました"); }
+    } finally { setDeletingMemoId(null); }
+  };
+
   const searchRelMember = async (type: "referrer" | "upline") => {
     const code = relSearchCode[type].trim();
     if (!code) return;
@@ -651,10 +724,12 @@ export default function MlmMemberDetailPage() {
     fetchMember();
   }, [fetchMember, memberId]);
 
-  // member取得後にボーナス明細を自動読み込み
+  // member取得後にボーナス明細・継続購入設定・対応履歴を自動読み込み
   useEffect(() => {
     if (member) {
       fetchBonusStatements();
+      fetchAutoshipItems(member.memberCode);
+      fetchContactMemos(member.memberCode);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [member?.memberCode]);
@@ -1193,6 +1268,201 @@ export default function MlmMemberDetailPage() {
             <InfoRow label="支払い方法" value={PAYMENT_LABEL[m.paymentMethod] ?? m.paymentMethod} />
           </div>
         </div>
+
+        {/* ─── 継続購入商品設定 ─── */}
+        {m.autoshipEnabled && (
+          <div className="mt-4 border-t pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-slate-700">
+                <i className="fas fa-shopping-cart mr-1 text-blue-500" />継続購入商品・手数料設定
+              </h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setAutoshipItems(prev => [...prev, { productCode: "", productName: "", unitPrice: 0, quantity: 1, points: 0, taxRate: 10, feeAmount: 0 }])}
+                  className="px-2 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded text-xs hover:bg-blue-100"
+                >
+                  <i className="fas fa-plus mr-1" />商品追加
+                </button>
+                <button
+                  onClick={() => saveAutoshipItems(m.memberCode)}
+                  disabled={autoshipItemsSaving}
+                  className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {autoshipItemsSaving ? "保存中..." : "保存"}
+                </button>
+              </div>
+            </div>
+            {autoshipItemsMsg && (
+              <p className={`text-xs mb-2 ${autoshipItemsMsg === "保存しました" ? "text-green-600" : "text-red-600"}`}>{autoshipItemsMsg}</p>
+            )}
+            {autoshipItemsLoading ? (
+              <p className="text-slate-400 text-sm">読み込み中...</p>
+            ) : autoshipItems.length === 0 ? (
+              <p className="text-slate-400 text-xs">商品設定なし（一括伝票作成時はデフォルト設定が使われます）</p>
+            ) : (
+              <div className="space-y-2">
+                {autoshipItems.map((item, idx) => (
+                  <div key={idx} className="flex flex-wrap gap-2 items-center bg-slate-50 rounded-lg p-2 border border-slate-200">
+                    <input
+                      type="text"
+                      placeholder="商品コード"
+                      value={item.productCode}
+                      onChange={e => setAutoshipItems(prev => prev.map((it, i) => i === idx ? { ...it, productCode: e.target.value } : it))}
+                      className="border border-gray-300 rounded px-2 py-1 text-xs w-24"
+                    />
+                    <input
+                      type="text"
+                      placeholder="商品名"
+                      value={item.productName}
+                      onChange={e => setAutoshipItems(prev => prev.map((it, i) => i === idx ? { ...it, productName: e.target.value } : it))}
+                      className="border border-gray-300 rounded px-2 py-1 text-xs flex-1 min-w-[120px]"
+                    />
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-500">単価</span>
+                      <input
+                        type="number"
+                        placeholder="単価"
+                        value={item.unitPrice}
+                        onChange={e => setAutoshipItems(prev => prev.map((it, i) => i === idx ? { ...it, unitPrice: Number(e.target.value) } : it))}
+                        className="border border-gray-300 rounded px-2 py-1 text-xs w-24"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-500">数量</span>
+                      <input
+                        type="number"
+                        placeholder="数量"
+                        value={item.quantity}
+                        min={1}
+                        onChange={e => setAutoshipItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: Number(e.target.value) } : it))}
+                        className="border border-gray-300 rounded px-2 py-1 text-xs w-14"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-500">PV</span>
+                      <input
+                        type="number"
+                        placeholder="PV"
+                        value={item.points}
+                        onChange={e => setAutoshipItems(prev => prev.map((it, i) => i === idx ? { ...it, points: Number(e.target.value) } : it))}
+                        className="border border-gray-300 rounded px-2 py-1 text-xs w-16"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-500">手数料</span>
+                      <input
+                        type="number"
+                        placeholder="手数料"
+                        value={item.feeAmount}
+                        onChange={e => setAutoshipItems(prev => prev.map((it, i) => i === idx ? { ...it, feeAmount: Number(e.target.value) } : it))}
+                        className="border border-gray-300 rounded px-2 py-1 text-xs w-20"
+                      />
+                    </div>
+                    <button
+                      onClick={() => setAutoshipItems(prev => prev.filter((_, i) => i !== idx))}
+                      className="px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded text-xs hover:bg-red-100"
+                    >
+                      <i className="fas fa-trash" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* ─── 対応履歴メモ ─── */}
+      <section className="bg-white rounded-2xl shadow-sm p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-bold text-slate-800">
+            <i className="fas fa-sticky-note mr-2 text-amber-500" />対応履歴メモ
+          </h2>
+          <button
+            onClick={() => fetchContactMemos(m.memberCode)}
+            disabled={contactMemosLoading}
+            className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded hover:bg-slate-200 transition disabled:opacity-50"
+          >
+            <i className={`fas fa-sync text-[10px] ${contactMemosLoading ? "animate-spin" : ""}`} />更新
+          </button>
+        </div>
+
+        {/* メモ入力フォーム */}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
+          <div className="flex flex-wrap gap-2 mb-2">
+            <select
+              value={newMemoCategory}
+              onChange={e => setNewMemoCategory(e.target.value)}
+              className="border border-gray-300 rounded px-2 py-1 text-xs bg-white"
+            >
+              <option value="">カテゴリ（任意）</option>
+              <option value="電話">電話</option>
+              <option value="メール">メール</option>
+              <option value="訪問">訪問</option>
+              <option value="問い合わせ">問い合わせ</option>
+              <option value="クレーム">クレーム</option>
+              <option value="その他">その他</option>
+            </select>
+            <input
+              type="text"
+              placeholder="対応者名（任意）"
+              value={newMemoAuthor}
+              onChange={e => setNewMemoAuthor(e.target.value)}
+              className="border border-gray-300 rounded px-2 py-1 text-xs w-32"
+            />
+          </div>
+          <textarea
+            placeholder="対応内容をメモしてください..."
+            value={newMemoContent}
+            onChange={e => setNewMemoContent(e.target.value)}
+            rows={3}
+            className="w-full border border-gray-300 rounded px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-300 mb-2"
+          />
+          <button
+            onClick={() => handleAddMemo(m.memberCode)}
+            disabled={memoSaving || !newMemoContent.trim()}
+            className="px-4 py-1.5 bg-amber-500 text-white rounded text-sm hover:bg-amber-600 disabled:opacity-50 font-medium"
+          >
+            {memoSaving ? "保存中..." : "メモを追加"}
+          </button>
+        </div>
+
+        {/* メモ一覧 */}
+        {contactMemosLoading ? (
+          <p className="text-slate-400 text-sm">読み込み中...</p>
+        ) : contactMemos.length === 0 ? (
+          <p className="text-slate-400 text-sm">対応履歴メモなし</p>
+        ) : (
+          <div className="space-y-2">
+            {contactMemos.map(memo => (
+              <div key={memo.id} className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="text-xs text-slate-400">
+                        {new Date(memo.createdAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      {memo.category && (
+                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-medium">{memo.category}</span>
+                      )}
+                      {memo.authorName && (
+                        <span className="text-xs text-slate-500">対応者: {memo.authorName}</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{memo.content}</p>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteMemo(memo.id, m.memberCode)}
+                    disabled={deletingMemoId === memo.id}
+                    className="px-2 py-0.5 bg-red-50 text-red-500 border border-red-200 rounded text-xs hover:bg-red-100 disabled:opacity-50 shrink-0"
+                  >
+                    {deletingMemoId === memo.id ? "..." : <i className="fas fa-trash" />}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* ─── ポイント情報 ─── */}

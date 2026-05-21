@@ -752,11 +752,50 @@ model MlmMember {
   autoShipOrders    AutoShipOrder[] @relation("AutoShipOrders")
   bonusAdjustments  BonusAdjustment[]
   bonusShortagePayments BonusShortagePayment[]
+  autoshipItems     MlmMemberAutoshipItem[]
+  contactMemos      MlmMemberContactMemo[]
 
   @@index([uplineId])
   @@index([referrerId])
   @@index([status])
   @@map("mlm_members")
+}
+
+/// 会員別継続購入商品設定
+model MlmMemberAutoshipItem {
+  id            BigInt    @id @default(autoincrement())
+  mlmMemberId   BigInt
+  productCode   String    @db.VarChar(20)
+  productName   String    @db.VarChar(255)
+  unitPrice     Int                               // 税込金額（円）
+  quantity      Int       @default(1)
+  points        Int       @default(0)
+  taxRate       Int       @default(10)            // 税率（8 or 10）
+  feeAmount     Int       @default(0)             // 出荷事務手数料（円）
+  sortOrder     Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  mlmMember     MlmMember @relation(fields: [mlmMemberId], references: [id], onDelete: Cascade)
+
+  @@index([mlmMemberId])
+  @@map("mlm_member_autoship_items")
+}
+
+/// 会員対応履歴メモ
+model MlmMemberContactMemo {
+  id            BigInt    @id @default(autoincrement())
+  mlmMemberId   BigInt
+  content       String    @db.Text
+  category      String?   @db.VarChar(50)         // "電話", "メール", "訪問", etc.
+  authorName    String?   @db.VarChar(100)         // 対応者名
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  mlmMember     MlmMember @relation(fields: [mlmMemberId], references: [id], onDelete: Cascade)
+
+  @@index([mlmMemberId])
+  @@map("mlm_member_contact_memos")
 }
 
 /// MLM商品マスター

@@ -35,19 +35,27 @@ export async function GET(request: NextRequest) {
     include: {
       mlmMember: {
         include: { user: { select: { name: true } } }
+      },
+      // 伝票の入金日を確認するために Order を include
+      order: {
+        select: { id: true, paidAt: true, orderNumber: true }
       }
     },
     orderBy: [{ purchaseMonth: "desc" }, { purchasedAt: "asc" }],
     take: 200,
   })
 
-  // purchasedAt のミリ秒部分が同じ = 同一伝票（msMarker = orderId % 1000）
-  // 同一会員・同一月でmsが同じグループごとに orderNumber の代わりとして
-  // 「購入日時（ミリ秒を除く）＋連番」で伝票を識別して表示する
-  // ※ msMarker が 0 のものはバッチ登録データの可能性あり（orderNumberなし扱い）
+  // 購入履歴フィルタ:
+  // - orderId が null（オートシップ等バッチ登録）→ 表示する（支払い確認後に登録されるため）
+  // - orderId が設定されている場合 → 伝票に入金日(paidAt)が設定されているものだけ表示
+  const filtered = purchases.filter(p => {
+    if (!p.orderId) return true // バッチ登録は常に表示
+    if (!p.order) return false  // Order が見つからない場合は非表示
+    return p.order.paidAt !== null // 入金日が設定されているものだけ表示
+  })
 
   return NextResponse.json({
-    purchases: purchases.map(p => ({
+    purchases: filtered.map(p => ({
       id: p.id.toString(),
       orderId: p.orderId ? p.orderId.toString() : null,
       memberCode: p.mlmMember.memberCode,

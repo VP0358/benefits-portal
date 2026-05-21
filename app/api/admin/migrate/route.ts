@@ -92,6 +92,67 @@ export async function POST() {
     await addCol("index_isPublished",
       `CREATE INDEX IF NOT EXISTS "bonus_results_isPublished_idx" ON "bonus_results"("isPublished")`);
 
+    // ══════════════════════════════════════════════════════════════
+    // 会員別継続購入商品設定テーブル (mlm_member_autoship_items)
+    // ══════════════════════════════════════════════════════════════
+    await addCol("create_mlm_member_autoship_items",
+      `CREATE TABLE IF NOT EXISTS "mlm_member_autoship_items" (
+        "id"           BIGSERIAL NOT NULL,
+        "mlmMemberId"  BIGINT NOT NULL,
+        "productCode"  VARCHAR(20) NOT NULL,
+        "productName"  VARCHAR(255) NOT NULL,
+        "unitPrice"    INTEGER NOT NULL,
+        "quantity"     INTEGER NOT NULL DEFAULT 1,
+        "points"       INTEGER NOT NULL DEFAULT 0,
+        "taxRate"      INTEGER NOT NULL DEFAULT 10,
+        "feeAmount"    INTEGER NOT NULL DEFAULT 0,
+        "sortOrder"    INTEGER NOT NULL DEFAULT 0,
+        "createdAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "mlm_member_autoship_items_pkey" PRIMARY KEY ("id")
+      )`);
+    await addCol("index_autoship_items_memberId",
+      `CREATE INDEX IF NOT EXISTS "mlm_member_autoship_items_mlmMemberId_idx" ON "mlm_member_autoship_items"("mlmMemberId")`);
+    await addCol("fk_autoship_items_member",
+      `DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'mlm_member_autoship_items_mlmMemberId_fkey'
+        ) THEN
+          ALTER TABLE "mlm_member_autoship_items"
+            ADD CONSTRAINT "mlm_member_autoship_items_mlmMemberId_fkey"
+            FOREIGN KEY ("mlmMemberId") REFERENCES "mlm_members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+        END IF;
+      END $$`);
+
+    // ══════════════════════════════════════════════════════════════
+    // 会員対応履歴メモテーブル (mlm_member_contact_memos)
+    // ══════════════════════════════════════════════════════════════
+    await addCol("create_mlm_member_contact_memos",
+      `CREATE TABLE IF NOT EXISTS "mlm_member_contact_memos" (
+        "id"           BIGSERIAL NOT NULL,
+        "mlmMemberId"  BIGINT NOT NULL,
+        "content"      TEXT NOT NULL,
+        "category"     VARCHAR(50),
+        "authorName"   VARCHAR(100),
+        "createdAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "mlm_member_contact_memos_pkey" PRIMARY KEY ("id")
+      )`);
+    await addCol("index_contact_memos_memberId",
+      `CREATE INDEX IF NOT EXISTS "mlm_member_contact_memos_mlmMemberId_idx" ON "mlm_member_contact_memos"("mlmMemberId")`);
+    await addCol("fk_contact_memos_member",
+      `DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'mlm_member_contact_memos_mlmMemberId_fkey'
+        ) THEN
+          ALTER TABLE "mlm_member_contact_memos"
+            ADD CONSTRAINT "mlm_member_contact_memos_mlmMemberId_fkey"
+            FOREIGN KEY ("mlmMemberId") REFERENCES "mlm_members"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+        END IF;
+      END $$`);
+
     return NextResponse.json({
       success: true,
       message: "マイグレーション完了",

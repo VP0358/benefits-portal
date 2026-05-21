@@ -33,6 +33,7 @@ const SHOP_TYPE_CONFIG: Record<string, { label:string; badge:string; color:strin
   nationwide: { label:"全国",       badge:"🗾 全国対応",   color:"#059669", bgColor:"rgba(5,150,105,0.12)",   borderColor:"rgba(5,150,105,0.30)",   sortOrder:2 },
   authorized: { label:"正規代理店", badge:"✅ 正規代理店", color:"#d97706", bgColor:"rgba(217,119,6,0.12)",   borderColor:"rgba(217,119,6,0.30)",   sortOrder:3 },
   agent:      { label:"代理店",     badge:"📍 代理店",     color:"#6b7280", bgColor:"rgba(107,114,128,0.12)", borderColor:"rgba(107,114,128,0.30)", sortOrder:4 },
+  reseller:   { label:"取次店",     badge:"🤝 取次店",     color:"#0891b2", bgColor:"rgba(8,145,178,0.12)",   borderColor:"rgba(8,145,178,0.30)",   sortOrder:5 },
 };
 
 // ── エリア定義（都道府県 → エリア名のマッピング）──
@@ -569,7 +570,7 @@ function MlmStatusButton({status}:{status:string|null}){
   );
 }
 
-// ── 肌診断 店舗カード ──────────────────────────────────────────────────
+// ── 肌診断 店舗カード（代理店 / 取次店でレイアウト切替）─────────────────
 function SkinShopCard({
   shop, gold, goldLight, navyCard2, onPhotoClick
 }:{
@@ -580,23 +581,127 @@ function SkinShopCard({
   onPhotoClick: (photos: string[], idx: number) => void;
 }) {
   const typeCfg = SHOP_TYPE_CONFIG[shop.shopType ?? "agent"] ?? SHOP_TYPE_CONFIG.agent;
+  const isReseller = shop.shopType === "reseller";
+  const mainPhoto = shop.photos?.[0];
+  const subPhotos = shop.photos?.slice(1) ?? [];
+
+  // ──────────────────────────────────────────
+  // 取次店カード（コンパクト・横ライン区切り）
+  // ──────────────────────────────────────────
+  if (isReseller) {
+    return (
+      <div className="rounded-xl overflow-hidden"
+        style={{background:"rgba(8,145,178,0.07)",border:"1px solid rgba(8,145,178,0.22)"}}>
+        <div className="h-0.5" style={{background:"linear-gradient(90deg,transparent,rgba(8,145,178,0.60),transparent)"}}/>
+        <div className="p-3">
+          {/* 店名・バッジ行 */}
+          <div className="flex items-center gap-2 mb-2">
+            <span className="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full"
+              style={{background:typeCfg.bgColor,color:typeCfg.color,border:`1px solid ${typeCfg.borderColor}`}}>
+              {typeCfg.badge}
+            </span>
+            <p className="font-jp font-bold text-white text-sm leading-snug flex-1 min-w-0 truncate">{shop.name}</p>
+          </div>
+          {/* 都道府県・住所・電話 */}
+          <div className="space-y-1">
+            {(shop.prefecture || shop.area) && (
+              <p className="text-xs font-medium" style={{color:"rgba(8,145,178,0.90)"}}>📍 {shop.prefecture || shop.area}</p>
+            )}
+            {shop.address && (
+              <a href={`https://maps.google.com/?q=${encodeURIComponent(shop.address)}`}
+                target="_blank" rel="noopener noreferrer"
+                className="flex items-start gap-1.5 group">
+                <span className="flex-shrink-0 mt-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded"
+                  style={{background:"rgba(66,133,244,0.20)",color:"#7ab4ff",border:"1px solid rgba(66,133,244,0.35)",whiteSpace:"nowrap"}}>
+                  マップ
+                </span>
+                <span className="text-xs font-jp group-hover:underline leading-snug" style={{color:"rgba(255,255,255,0.70)"}}>{shop.address}</span>
+              </a>
+            )}
+            {shop.phone && (
+              <a href={`tel:${shop.phone}`} className="flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{color:"#6ee7b7"}}>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                </svg>
+                <span className="text-xs font-bold font-jp" style={{color:"#6ee7b7"}}>{shop.phone}</span>
+              </a>
+            )}
+          </div>
+          {/* アクションボタン */}
+          {(shop.url || shop.websiteUrl) && (
+            <div className="flex gap-1.5 mt-2">
+              {shop.url && (
+                <a href={shop.url} target="_blank" rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1 rounded-lg py-1.5 text-[10px] font-jp font-semibold transition hover:opacity-80"
+                  style={{background:"rgba(8,145,178,0.20)",color:"#67e8f9",border:"1px solid rgba(8,145,178,0.40)"}}>
+                  予約する
+                </a>
+              )}
+              {shop.websiteUrl && (
+                <a href={shop.websiteUrl} target="_blank" rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1 rounded-lg py-1.5 text-[10px] font-jp font-semibold transition hover:opacity-80"
+                  style={{background:"rgba(255,255,255,0.05)",color:"rgba(255,255,255,0.50)",border:"1px solid rgba(255,255,255,0.12)"}}>
+                  サイト
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ──────────────────────────────────────────
+  // 代理店カード（メイン画像大きく＋詳細情報）
+  // ──────────────────────────────────────────
   return (
     <div className="rounded-2xl overflow-hidden"
       style={{background:navyCard2,border:`1px solid ${gold}30`}}>
-      <div className="h-1" style={{background:`linear-gradient(90deg,transparent,${gold}80,transparent)`}}/>
+
+      {/* ── メイン画像（大） ── */}
+      {mainPhoto ? (
+        <button type="button" className="w-full block relative" onClick={() => onPhotoClick(shop.photos!, 0)}>
+          <div className="w-full aspect-[16/9] overflow-hidden">
+            <img src={mainPhoto} alt={`${shop.name} メイン`} className="w-full h-full object-cover transition hover:scale-105"/>
+          </div>
+          {/* 種別バッジ（画像上オーバーレイ） */}
+          <div className="absolute top-2.5 left-2.5">
+            <span className="text-xs font-bold px-2.5 py-1 rounded-full backdrop-blur-sm"
+              style={{background:typeCfg.bgColor,color:typeCfg.color,border:`1px solid ${typeCfg.borderColor}`}}>
+              {typeCfg.badge}
+            </span>
+          </div>
+          {shop.photos!.length > 1 && (
+            <div className="absolute bottom-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-full"
+              style={{background:"rgba(0,0,0,0.60)",color:"rgba(255,255,255,0.80)"}}>
+              📷 {shop.photos!.length}枚
+            </div>
+          )}
+        </button>
+      ) : (
+        /* 画像なしの場合はグラデーションプレースホルダー */
+        <div className="h-1" style={{background:`linear-gradient(90deg,transparent,${gold}80,transparent)`}}/>
+      )}
+
       <div className="p-4">
-        {/* 店名・種別バッジ */}
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <p className="font-jp font-bold text-white text-base leading-snug">{shop.name}</p>
-          <span className="flex-shrink-0 text-xs font-bold px-2.5 py-1 rounded-full"
-            style={{background:typeCfg.bgColor,color:typeCfg.color,border:`1px solid ${typeCfg.borderColor}`}}>
-            {typeCfg.badge}
-          </span>
-        </div>
+        {/* 画像なし時のバッジ */}
+        {!mainPhoto && (
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className="text-xs font-bold px-2.5 py-1 rounded-full"
+              style={{background:typeCfg.bgColor,color:typeCfg.color,border:`1px solid ${typeCfg.borderColor}`}}>
+              {typeCfg.badge}
+            </span>
+          </div>
+        )}
+
+        {/* 店舗名 */}
+        <p className="font-jp font-bold text-white text-base leading-snug mb-2">{shop.name}</p>
+
         {/* 都道府県 */}
         {(shop.prefecture || shop.area) && (
           <p className="text-sm font-bold mb-2" style={{color:gold}}>📍 {shop.prefecture || shop.area}</p>
         )}
+
         {/* 住所 */}
         {shop.address && (
           <a href={`https://maps.google.com/?q=${encodeURIComponent(shop.address)}`}
@@ -609,6 +714,7 @@ function SkinShopCard({
             <span className="text-sm font-jp group-hover:underline leading-snug" style={{color:"rgba(255,255,255,0.80)"}}>{shop.address}</span>
           </a>
         )}
+
         {/* 電話番号 */}
         {shop.phone && (
           <a href={`tel:${shop.phone}`} className="flex items-center gap-2 mb-2">
@@ -618,30 +724,33 @@ function SkinShopCard({
             <span className="text-sm font-bold font-jp" style={{color:"#6ee7b7"}}>{shop.phone}</span>
           </a>
         )}
-        {/* 写真ギャラリー */}
-        {shop.photos && shop.photos.length > 0 && (
+
+        {/* サブ写真（2枚目以降） */}
+        {subPhotos.length > 0 && (
           <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1">
-            {shop.photos.map((photo, pi) => (
+            {subPhotos.map((photo, pi) => (
               <button key={pi} type="button"
-                onClick={() => onPhotoClick(shop.photos!, pi)}
-                className="flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden border transition hover:scale-105"
+                onClick={() => onPhotoClick(shop.photos!, pi + 1)}
+                className="flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden border transition hover:scale-105"
                 style={{borderColor:`${gold}30`}}>
-                <img src={photo} alt={`${shop.name} 写真${pi+1}`} className="w-full h-full object-cover"/>
+                <img src={photo} alt={`${shop.name} 写真${pi+2}`} className="w-full h-full object-cover"/>
               </button>
             ))}
           </div>
         )}
+
         {/* 予約URLボタン */}
         {shop.url && (
           <a href={shop.url} target="_blank" rel="noopener noreferrer"
-            className="mt-3 flex items-center justify-center gap-1.5 w-full rounded-xl py-2 text-xs font-jp font-semibold transition hover:opacity-80"
-            style={{background:`${gold}18`,color:goldLight,border:`1px solid ${gold}35`}}>
+            className="mt-3 flex items-center justify-center gap-1.5 w-full rounded-xl py-2.5 text-xs font-jp font-semibold transition hover:opacity-80"
+            style={{background:`linear-gradient(135deg,${gold}22,${gold}12)`,color:goldLight,border:`1px solid ${gold}45`}}>
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
             </svg>
             ご予約はこちら
           </a>
         )}
+
         {/* ウェブサイトURLボタン */}
         {shop.websiteUrl && (
           <a href={shop.websiteUrl} target="_blank" rel="noopener noreferrer"
@@ -1226,7 +1335,7 @@ export default function MemberDashboard({
                   </div>
                   <div>
                     <p className="text-[8px] font-label tracking-[0.26em] font-bold" style={{color:`${GOLD}60`}}>SKIN DIAGNOSIS</p>
-                    <h2 className="font-jp font-bold text-white text-sm leading-tight">{skinModal.title} — 全国代理店</h2>
+                    <h2 className="font-jp font-bold text-white text-sm leading-tight">{skinModal.title} — 全国代理店・取次店</h2>
                   </div>
                 </div>
                 <button onClick={()=>{setSkinModal(null);}}
@@ -1236,12 +1345,16 @@ export default function MemberDashboard({
 
               {/* ── 全コンテンツを1本のスクロールdivに収める ── */}
               {(()=>{
-                const localShops = skinModal.shops.filter(s=>{
+                // 代理店（authorized / agent）
+                const agentShops = skinModal.shops.filter(s=>{
                   const t = s.shopType??"agent";
                   return t==="authorized" || t==="agent";
                 });
+                // 取次店
+                const resellerShops = skinModal.shops.filter(s=>s.shopType==="reseller");
+
                 const areaBlocks = AREA_GROUPS.map(area=>{
-                  const areaShops = localShops
+                  const areaShops = agentShops
                     .filter(s=>area.prefs.includes(s.prefecture??s.area??""))
                     .sort((a,b)=>{
                       const ap = area.prefs.indexOf(a.prefecture??a.area??"");
@@ -1262,8 +1375,29 @@ export default function MemberDashboard({
                   return {area, prefGroups, count:areaShops.length};
                 }).filter(Boolean) as {area:{label:string;prefs:string[]};prefGroups:{pref:string;shops:SkinShop[]}[];count:number}[];
 
+                // 取次店エリアブロック
+                const resellerAreaBlocks = AREA_GROUPS.map(area=>{
+                  const areaShops = resellerShops
+                    .filter(s=>area.prefs.includes(s.prefecture??s.area??""))
+                    .sort((a,b)=>{
+                      const ap = area.prefs.indexOf(a.prefecture??a.area??"");
+                      const bp = area.prefs.indexOf(b.prefecture??b.area??"");
+                      return ap-bp;
+                    });
+                  if(areaShops.length===0) return null;
+                  const prefGroups: {pref:string; shops:SkinShop[]}[] = [];
+                  areaShops.forEach(shop=>{
+                    const pref = shop.prefecture??shop.area??"";
+                    const g = prefGroups.find(g=>g.pref===pref);
+                    if(g) g.shops.push(shop);
+                    else prefGroups.push({pref,shops:[shop]});
+                  });
+                  return {area, prefGroups, count:areaShops.length};
+                }).filter(Boolean) as {area:{label:string;prefs:string[]};prefGroups:{pref:string;shops:SkinShop[]}[];count:number}[];
+
                 const activeAreaLabels = areaBlocks.map(b=>b.area.label);
-                const noPrefShops = localShops.filter(s=>!(s.prefecture??s.area??""));
+                const noPrefShops = agentShops.filter(s=>!(s.prefecture??s.area??""));
+                const noPrefResellerShops = resellerShops.filter(s=>!(s.prefecture??s.area??""));
 
                 return (
                   // ★ 唯一のスクロールコンテナ。flex-1でヘッダー以外の全高を占有
@@ -1294,94 +1428,198 @@ export default function MemberDashboard({
                       );
                     })}
 
-                    {/* ── エリアジャンプボタン ── */}
-                    {activeAreaLabels.length > 0 && (
-                      <div className="pt-4 pb-4"
-                        style={{borderTop:`1px solid rgba(255,255,255,0.10)`,borderBottom:`1px solid rgba(255,255,255,0.10)`}}>
-                        <p className="text-sm font-bold mb-3" style={{color:GOLD_LIGHT}}>▼ エリアから探す</p>
-                        <div className="flex flex-wrap gap-2">
-                          {["全国",...activeAreaLabels].map(label=>{
-                            const isZenkoku = label==="全国";
-                            return (
-                              <button key={label} type="button"
-                                onClick={()=>{
-                                  if(isZenkoku){
-                                    if(skinScrollRef.current) skinScrollRef.current.scrollTop=0;
-                                  } else {
-                                    jumpToArea(label);
-                                  }
-                                }}
-                                className="rounded-xl px-3 py-1.5 text-xs font-bold transition-all active:scale-95"
-                                style={isZenkoku
-                                  ?{background:`linear-gradient(135deg,${GOLD},${GOLD_LIGHT})`,color:NAVY,boxShadow:`0 2px 8px ${GOLD}50`}
-                                  :{background:"rgba(255,255,255,0.10)",color:"rgba(255,255,255,0.85)",border:"1px solid rgba(255,255,255,0.20)"}
-                                }>
-                                {label.replace("エリア","")}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* ── エリア別代理店リスト ── */}
-                    {areaBlocks.map(({area, prefGroups, count})=>(
-                      <div key={area.label}
-                        ref={el=>{ skinAreaRefs.current[area.label]=el; }}>
-                        {/* エリアバー */}
-                        <div className="flex items-center gap-2.5 px-3 py-2.5 mt-4 mb-2 rounded-xl"
-                          style={{background:`linear-gradient(90deg,rgba(201,168,76,0.22),rgba(201,168,76,0.08))`,border:`1px solid ${GOLD}50`}}>
-                          <div className="h-4 w-1 rounded-full flex-shrink-0" style={{background:`linear-gradient(180deg,${GOLD_LIGHT},${GOLD})`}}/>
-                          <span className="text-sm font-bold font-jp tracking-wide" style={{color:"#ffffff"}}>{area.label}</span>
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{background:`${GOLD}30`,color:GOLD_LIGHT}}>{count}件</span>
+                    {/* ════════════════════════════════════════
+                        代理店セクション
+                    ════════════════════════════════════════ */}
+                    {(agentShops.length > 0 || noPrefShops.length > 0) && (
+                      <>
+                        {/* 代理店セクションヘッダー */}
+                        <div className="flex items-center gap-2.5 mt-5 mb-1">
+                          <div className="w-5 h-5 rounded-lg flex items-center justify-center flex-shrink-0"
+                            style={{background:"rgba(217,119,6,0.20)",border:"1px solid rgba(217,119,6,0.40)"}}>
+                            <span className="text-[10px]">📍</span>
+                          </div>
+                          <span className="text-sm font-bold font-jp" style={{color:GOLD_LIGHT}}>代理店</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                            style={{background:"rgba(217,119,6,0.15)",color:"#fbbf24",border:"1px solid rgba(217,119,6,0.30)"}}>
+                            {agentShops.length}件
+                          </span>
                           <div className="flex-1 h-px" style={{background:`linear-gradient(90deg,${GOLD}50,transparent)`}}/>
                         </div>
-                        {/* 都道府県グループ */}
-                        <div className="space-y-3 pt-1 pb-2">
-                          {prefGroups.map(({pref, shops})=>(
-                            <div key={pref}>
-                              {pref && (
-                                <div className="flex items-center gap-2 mb-2 mt-1">
-                                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full"
-                                    style={{background:`${GOLD}20`,color:"#ffffff",border:`1px solid ${GOLD}50`}}>
-                                    {pref}
-                                  </span>
-                                  <span className="text-xs font-bold" style={{color:"rgba(255,255,255,0.50)"}}>{shops.length}件</span>
-                                  <div className="flex-1 h-px" style={{background:`linear-gradient(90deg,${GOLD}40,transparent)`}}/>
-                                </div>
-                              )}
-                              <div className="space-y-2">
-                                {shops.map((shop,si)=>(
-                                  <SkinShopCard key={si} shop={shop} gold={GOLD} goldLight={GOLD_LIGHT} navyCard2={NAVY_CARD2}
-                                    onPhotoClick={(photos,idx)=>setSkinPhotoViewer({photos,index:idx})}/>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
 
-                    {/* 都道府県未設定 */}
-                    {noPrefShops.length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-2 py-2 mt-2 mb-1"
-                          style={{borderBottom:`1px solid rgba(255,255,255,0.08)`}}>
-                          <span className="text-[10px] font-bold" style={{color:"rgba(255,255,255,0.40)"}}>エリア未設定</span>
-                          <span className="text-[9px]" style={{color:"rgba(255,255,255,0.25)"}}>{noPrefShops.length}件</span>
-                        </div>
-                        <div className="space-y-2 pt-1">
-                          {noPrefShops.map((shop,si)=>(
-                            <SkinShopCard key={si} shop={shop} gold={GOLD} goldLight={GOLD_LIGHT} navyCard2={NAVY_CARD2}
-                              onPhotoClick={(photos,idx)=>setSkinPhotoViewer({photos,index:idx})}/>
-                          ))}
-                        </div>
-                      </div>
+                        {/* エリアジャンプボタン */}
+                        {activeAreaLabels.length > 0 && (
+                          <div className="pt-3 pb-3"
+                            style={{borderTop:`1px solid rgba(255,255,255,0.08)`,borderBottom:`1px solid rgba(255,255,255,0.08)`}}>
+                            <p className="text-[11px] font-bold mb-2" style={{color:"rgba(255,255,255,0.50)"}}>▼ エリアから探す</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {["全国",...activeAreaLabels].map(label=>{
+                                const isZenkoku = label==="全国";
+                                return (
+                                  <button key={label} type="button"
+                                    onClick={()=>{
+                                      if(isZenkoku){
+                                        if(skinScrollRef.current) skinScrollRef.current.scrollTop=0;
+                                      } else {
+                                        jumpToArea(label);
+                                      }
+                                    }}
+                                    className="rounded-xl px-3 py-1.5 text-xs font-bold transition-all active:scale-95"
+                                    style={isZenkoku
+                                      ?{background:`linear-gradient(135deg,${GOLD},${GOLD_LIGHT})`,color:NAVY,boxShadow:`0 2px 8px ${GOLD}50`}
+                                      :{background:"rgba(255,255,255,0.10)",color:"rgba(255,255,255,0.85)",border:"1px solid rgba(255,255,255,0.20)"}
+                                    }>
+                                    {label.replace("エリア","")}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* エリア別代理店リスト */}
+                        {areaBlocks.map(({area, prefGroups, count})=>(
+                          <div key={area.label}
+                            ref={el=>{ skinAreaRefs.current[area.label]=el; }}>
+                            <div className="flex items-center gap-2.5 px-3 py-2.5 mt-4 mb-2 rounded-xl"
+                              style={{background:`linear-gradient(90deg,rgba(201,168,76,0.22),rgba(201,168,76,0.08))`,border:`1px solid ${GOLD}50`}}>
+                              <div className="h-4 w-1 rounded-full flex-shrink-0" style={{background:`linear-gradient(180deg,${GOLD_LIGHT},${GOLD})`}}/>
+                              <span className="text-sm font-bold font-jp tracking-wide" style={{color:"#ffffff"}}>{area.label}</span>
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{background:`${GOLD}30`,color:GOLD_LIGHT}}>{count}件</span>
+                              <div className="flex-1 h-px" style={{background:`linear-gradient(90deg,${GOLD}50,transparent)`}}/>
+                            </div>
+                            <div className="space-y-3 pt-1 pb-2">
+                              {prefGroups.map(({pref, shops})=>(
+                                <div key={pref}>
+                                  {pref && (
+                                    <div className="flex items-center gap-2 mb-2 mt-1">
+                                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-full"
+                                        style={{background:`${GOLD}20`,color:"#ffffff",border:`1px solid ${GOLD}50`}}>
+                                        {pref}
+                                      </span>
+                                      <span className="text-xs font-bold" style={{color:"rgba(255,255,255,0.50)"}}>{shops.length}件</span>
+                                      <div className="flex-1 h-px" style={{background:`linear-gradient(90deg,${GOLD}40,transparent)`}}/>
+                                    </div>
+                                  )}
+                                  <div className="space-y-2">
+                                    {shops.map((shop,si)=>(
+                                      <SkinShopCard key={si} shop={shop} gold={GOLD} goldLight={GOLD_LIGHT} navyCard2={NAVY_CARD2}
+                                        onPhotoClick={(photos,idx)=>setSkinPhotoViewer({photos,index:idx})}/>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* 都道府県未設定代理店 */}
+                        {noPrefShops.length > 0 && (
+                          <div>
+                            <div className="flex items-center gap-2 py-2 mt-2 mb-1"
+                              style={{borderBottom:`1px solid rgba(255,255,255,0.08)`}}>
+                              <span className="text-[10px] font-bold" style={{color:"rgba(255,255,255,0.40)"}}>エリア未設定</span>
+                              <span className="text-[9px]" style={{color:"rgba(255,255,255,0.25)"}}>{noPrefShops.length}件</span>
+                            </div>
+                            <div className="space-y-2 pt-1">
+                              {noPrefShops.map((shop,si)=>(
+                                <SkinShopCard key={si} shop={shop} gold={GOLD} goldLight={GOLD_LIGHT} navyCard2={NAVY_CARD2}
+                                  onPhotoClick={(photos,idx)=>setSkinPhotoViewer({photos,index:idx})}/>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
 
-                    {localShops.length===0 && (
+                    {/* ════════════════════════════════════════
+                        取次店セクション
+                    ════════════════════════════════════════ */}
+                    {resellerShops.length > 0 && (
+                      <>
+                        {/* 取次店セクションヘッダー */}
+                        <div className="flex items-center gap-2.5 mt-6 mb-1">
+                          <div className="w-5 h-5 rounded-lg flex items-center justify-center flex-shrink-0"
+                            style={{background:"rgba(8,145,178,0.20)",border:"1px solid rgba(8,145,178,0.40)"}}>
+                            <span className="text-[10px]">🤝</span>
+                          </div>
+                          <span className="text-sm font-bold font-jp" style={{color:"#67e8f9"}}>取次店</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                            style={{background:"rgba(8,145,178,0.15)",color:"#67e8f9",border:"1px solid rgba(8,145,178,0.30)"}}>
+                            {resellerShops.length}件
+                          </span>
+                          <div className="flex-1 h-px" style={{background:"linear-gradient(90deg,rgba(8,145,178,0.50),transparent)"}}/>
+                        </div>
+
+                        {/* 取次店説明バナー */}
+                        <div className="mb-3 rounded-xl p-3"
+                          style={{background:"rgba(8,145,178,0.10)",border:"1px solid rgba(8,145,178,0.25)"}}>
+                          <div className="flex items-start gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{color:"#67e8f9"}}>
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <div>
+                              <p className="text-xs font-bold mb-1" style={{color:"#67e8f9"}}>取次店とは？</p>
+                              <p className="text-[11px] leading-relaxed font-jp" style={{color:"rgba(255,255,255,0.70)"}}>
+                                取次店は<span className="font-bold" style={{color:"#67e8f9"}}>代理店のパートナー店</span>です。代理店と連携した加盟店で、<span className="font-bold text-white">肌診断も受けることができます</span>。お近くの取次店をご利用ください。
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 取次店エリア別リスト */}
+                        {resellerAreaBlocks.map(({area, prefGroups, count})=>(
+                          <div key={area.label}>
+                            <div className="flex items-center gap-2.5 px-3 py-2 mt-3 mb-2 rounded-xl"
+                              style={{background:"linear-gradient(90deg,rgba(8,145,178,0.18),rgba(8,145,178,0.06))",border:"1px solid rgba(8,145,178,0.35)"}}>
+                              <div className="h-3.5 w-1 rounded-full flex-shrink-0"
+                                style={{background:"linear-gradient(180deg,#67e8f9,#0891b2)"}}/>
+                              <span className="text-sm font-bold font-jp tracking-wide text-white">{area.label}</span>
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                                style={{background:"rgba(8,145,178,0.25)",color:"#67e8f9"}}>{count}件</span>
+                              <div className="flex-1 h-px" style={{background:"linear-gradient(90deg,rgba(8,145,178,0.40),transparent)"}}/>
+                            </div>
+                            <div className="space-y-2 pt-1 pb-2">
+                              {prefGroups.map(({pref, shops})=>(
+                                <div key={pref}>
+                                  {pref && (
+                                    <div className="flex items-center gap-2 mb-1.5 mt-1">
+                                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-full text-white"
+                                        style={{background:"rgba(8,145,178,0.20)",border:"1px solid rgba(8,145,178,0.40)"}}>
+                                        {pref}
+                                      </span>
+                                      <span className="text-xs font-bold" style={{color:"rgba(255,255,255,0.40)"}}>{shops.length}件</span>
+                                      <div className="flex-1 h-px" style={{background:"linear-gradient(90deg,rgba(8,145,178,0.35),transparent)"}}/>
+                                    </div>
+                                  )}
+                                  <div className="space-y-1.5">
+                                    {shops.map((shop,si)=>(
+                                      <SkinShopCard key={si} shop={shop} gold={GOLD} goldLight={GOLD_LIGHT} navyCard2={NAVY_CARD2}
+                                        onPhotoClick={(photos,idx)=>setSkinPhotoViewer({photos,index:idx})}/>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* 都道府県未設定取次店 */}
+                        {noPrefResellerShops.length > 0 && (
+                          <div className="space-y-1.5 pt-1">
+                            {noPrefResellerShops.map((shop,si)=>(
+                              <SkinShopCard key={si} shop={shop} gold={GOLD} goldLight={GOLD_LIGHT} navyCard2={NAVY_CARD2}
+                                onPhotoClick={(photos,idx)=>setSkinPhotoViewer({photos,index:idx})}/>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* 何もない場合 */}
+                    {agentShops.length===0 && resellerShops.length===0 && (
                       <div className="flex items-center justify-center py-16">
-                        <p className="text-sm font-jp" style={{color:"rgba(255,255,255,0.35)"}}>代理店情報がありません</p>
+                        <p className="text-sm font-jp" style={{color:"rgba(255,255,255,0.35)"}}>代理店・取次店情報がありません</p>
                       </div>
                     )}
                   </div>
