@@ -607,13 +607,12 @@ export async function executeBonusCalculation(
     if (eligible && achievedLevel >= 3 && isFirstPos) {
       minSeriesPoints = calcMinSeriesPoints(member.id, childrenMap, memberPurchaseMap, memberMap, bonusEligibleMemberIds);
       const rate = STRUCTURE_BONUS_RATES[achievedLevel] ?? 0;
-      // ★ Bug #2 Fix: 組織構築ボーナスの基準はグループポイント（GP）
-      //   旧: minSeriesPoints × rate × POINT_RATE（最小系列pt基準 → 誤り）
-      //   正: groupPoints × rate × POINT_RATE（GP基準）
-      //   例: 30,600pt × 4% × ¥100 = ¥122,400
-      structureBonus = Math.floor(groupPoints * (rate / 100) * POINT_RATE);
+      // 組織構築ボーナス = 最小系列ポイント × レベル別率 × POINT_RATE
+      // 例: 30,600pt × 4% × ¥100 = ¥122,400
+      // ※ groupPoints（7段制限内）ではなく最小系列pt（制限なし）が正しい基準
+      structureBonus = Math.floor(minSeriesPoints * (rate / 100) * POINT_RATE);
       if (structureBonus > 0) {
-        console.log(`  🏗️ 組織構築B: ${memberCodeStr} LV.${achievedLevel} GP=${groupPoints}pt × ${rate}% → ¥${structureBonus.toLocaleString()}（最小系列${minSeriesPoints}pt）`);
+        console.log(`  🏗️ 組織構築B: ${memberCodeStr} LV.${achievedLevel} 最小系列${minSeriesPoints}pt × ${rate}% → ¥${structureBonus.toLocaleString()}`);
       }
     }
 
@@ -974,7 +973,11 @@ export async function executeBonusCalculation(
 /**
  * グループポイント・直接紹介アクティブ数・系列情報を一括計算
  *
- * ・groupPoints  = 自己購入pt + 傘下7段目アクティブ購入ptの合計（非アクティブは圧縮）
+ * ・groupPoints  = 自己購入pt + 傘下7段目以内のアクティブ購入ptの合計（圧縮なし）
+ *   ★ 重要: 非アクティブポジションでも深さをカウントする（圧縮しない）
+ *   ★ 退会者（withdrawn）のみ深さを消費しない（組織から消えているため）
+ *   → viola-pure.biz 正解: VP社長 GP=7,950pt = 53名（7段以内）× 150pt
+ *
  * ・directActiveCount = 直下でアクティブな会員数
  * ・seriesCount = 直下でポジションが存在する系列数（アクティブ/非アクティブ問わず）
  * ・seriesAchieverMap = 各直下系列(インデックス)内の最高達成レベル（7段以内）
@@ -1037,6 +1040,8 @@ function calcGroupDataFull(
         seriesAchieverMap[seriesIndex] = childLevel;
       }
 
+      // ★ 圧縮なし: depth=1（この直下が1段目）で走査
+      //   非アクティブでも深さを消費する（depth+1で次の段へ）
       const subResult = calcSubGroupPoints(childId, childrenMap, purchaseMap, memberMap, 1, 7, pass1ResultMap, bonusEligibleMemberIds);
       groupPoints += subResult.groupPoints;
 
@@ -1044,10 +1049,10 @@ function calcGroupDataFull(
         seriesAchieverMap[seriesIndex] = subResult.maxLevel;
       }
     } else {
-      // 退会者の場合: その傘下を圧縮して走査（退会者自身はGP非加算、系列非カウント）
+      // 退会者の場合: 深さ消費なし（退会者は組織から消えているため）でその傘下を走査
+      // GP加算なし、系列非カウント
       const subResult = calcSubGroupPoints(childId, childrenMap, purchaseMap, memberMap, 0, 7, pass1ResultMap, bonusEligibleMemberIds);
       groupPoints += subResult.groupPoints;
-      // 退会者経由の傘下は系列としてカウントしない（仕様：退会者は組織ツリーから消えている）
     }
   });
 
@@ -1057,9 +1062,15 @@ function calcGroupDataFull(
 }
 
 /**
- * 下位のグループポイントと最高レベルを再帰計算（圧縮あり）
- * 非アクティブポジションはスキップし下位に潜る（圧縮）
- * 退会者（withdrawn）はGP加算しないが、その下位は引き続き探索する
+ * 下位のグループポイントと最高レベルを再帰計算
+ *
+ * ★ 圧縮なし仕様（viola-pure.biz準拠）:
+ *   - 非アクティブポジションも深さ(depth)を消費する → currentDepth + 1で子孫探索
+ *   - 退会者（withdrawn）のみ深さを消費しない（組織から消えているため）
+ *   - 7段制限は「実際のポジション段数」で判定
+ *
+ *   旧仕様（誤り）: 非アクティブを圧縮 → 深い層が繰り上がってGPが過大になる
+ *   正仕様: 非アクティブは自身をGP加算しないが深さはカウント
  *
  * @param currentDepth 現在の深さ（退会者を経由する場合は深さを消費しない）
  */
@@ -1088,6 +1099,7 @@ function calcSubGroupPoints(
 
     if (childIsWithdrawn) {
       // 退会者: GP加算なし・レベル0・深さ消費なし → 子孫を同じ深さで探索
+      // （退会者は組織から消えているので段数カウントしない）
       const sub = calcSubGroupPoints(childId, childrenMap, purchaseMap, memberMap, currentDepth, maxDepth, pass1ResultMap, bonusEligibleMemberIds);
       groupPoints += sub.groupPoints;
       if (sub.maxLevel > maxLevel) maxLevel = sub.maxLevel;
@@ -1100,6 +1112,7 @@ function calcSubGroupPoints(
       forceActive: childMember.forceActive || false,
     });
 
+    // アクティブのみGPに加算
     if (childIsActive) groupPoints += childPurchase?.selfPurchasePoints ?? 0;
 
     // 達成レベル取得：Pass1結果があれば当月レベル、なければ currentLevel（DB値）
@@ -1109,6 +1122,7 @@ function calcSubGroupPoints(
 
     if (childLevel > maxLevel) maxLevel = childLevel;
 
+    // ★ 圧縮なし: 非アクティブでも depth+1で子孫探索（深さを消費する）
     const sub = calcSubGroupPoints(childId, childrenMap, purchaseMap, memberMap, currentDepth + 1, maxDepth, pass1ResultMap, bonusEligibleMemberIds);
     groupPoints += sub.groupPoints;
     if (sub.maxLevel > maxLevel) maxLevel = sub.maxLevel;
