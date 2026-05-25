@@ -607,9 +607,13 @@ export async function executeBonusCalculation(
     if (eligible && achievedLevel >= 3 && isFirstPos) {
       minSeriesPoints = calcMinSeriesPoints(member.id, childrenMap, memberPurchaseMap, memberMap, bonusEligibleMemberIds);
       const rate = STRUCTURE_BONUS_RATES[achievedLevel] ?? 0;
-      structureBonus = Math.floor(minSeriesPoints * (rate / 100) * POINT_RATE);
+      // ★ Bug #2 Fix: 組織構築ボーナスの基準はグループポイント（GP）
+      //   旧: minSeriesPoints × rate × POINT_RATE（最小系列pt基準 → 誤り）
+      //   正: groupPoints × rate × POINT_RATE（GP基準）
+      //   例: 30,600pt × 4% × ¥100 = ¥122,400
+      structureBonus = Math.floor(groupPoints * (rate / 100) * POINT_RATE);
       if (structureBonus > 0) {
-        console.log(`  🏗️ 組織構築B: ${memberCodeStr} LV.${achievedLevel} 最小系列${minSeriesPoints}pt × ${rate}% → ¥${structureBonus.toLocaleString()}`);
+        console.log(`  🏗️ 組織構築B: ${memberCodeStr} LV.${achievedLevel} GP=${groupPoints}pt × ${rate}% → ¥${structureBonus.toLocaleString()}（最小系列${minSeriesPoints}pt）`);
       }
     }
 
@@ -1116,8 +1120,16 @@ function calcSubGroupPoints(
 /**
  * 段数別ポイントを計算（ユニレベルボーナス用）
  * アクティブな下位会員の購入ptを段数ごとに集計
- * 非アクティブは圧縮してスキップ（同じ段数のまま下位を探索）
- * 退会者（withdrawn）も圧縮扱い：深さ消費なしで子孫を探索
+ *
+ * ★ Bug #3 Fix: 圧縮ロジックの修正
+ *   旧: 非アクティブ会員の子孫を同じ段数で探索（圧縮）→ ¥131,850（過大）
+ *   正: 非アクティブ会員は自身をスキップするが深さは消費する（depth+1で子孫探索）
+ *       退会者（withdrawn）のみ圧縮扱い（深さ消費なし）
+ *
+ *   根拠（viola-pure.biz仕様）:
+ *     ユニレベルは「ポジションの実際の段数」基準。非アクティブポジションは
+ *     ボーナス対象外だが、その子孫の段数カウントは通常通り進む。
+ *     VP社長の直下に非アクティブ会員がいても、その子孫は4段目以降に正しく配置される。
  */
 function calcDepthPoints(
   memberId: bigint,
@@ -1139,7 +1151,7 @@ function calcDepthPoints(
       const childPurchase = purchaseMap.get(childId);
       if (!childMember) continue;
 
-      // 退会者は圧縮（深さ消費なし）
+      // 退会者は圧縮（深さ消費なし）：退会者は組織から消えているため
       const childIsWithdrawn = !bonusEligibleMemberIds.has(childId);
       if (childIsWithdrawn) {
         traverse(childId, depth); // 退会者を透過して同じ深さで探索
@@ -1153,10 +1165,13 @@ function calcDepthPoints(
       });
 
       if (childIsActive) {
+        // アクティブ: 当段数に加算し、次段数へ進む
         depthPoints[depth] = (depthPoints[depth] || 0) + (childPurchase?.selfPurchasePoints ?? 0);
         traverse(childId, depth + 1);
       } else {
-        traverse(childId, depth); // 非アクティブは圧縮：同じ段数で下位を探索
+        // 非アクティブ: ポイント加算なし、深さを消費して子孫を探索
+        // （旧: depth据え置きで圧縮 → 誤り。正: depth+1で子孫の実際の段数を維持）
+        traverse(childId, depth + 1);
       }
     }
   }
