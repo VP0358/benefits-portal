@@ -158,6 +158,14 @@ export async function executeBonusCalculation(
     `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "paymentAmount" INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "adjustmentAmount" INTEGER NOT NULL DEFAULT 0`,
     `ALTER TABLE "bonus_results" ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP`,
+    // 新規フィールド（2026年4月度修正分）
+    `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "rankUpBonus" INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "shareBonus" INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "carryoverAmount" INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "otherPositionAmount" INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "consumptionTax" INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "shortageAmount" INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE "bonus_results" ADD COLUMN IF NOT EXISTS "otherPositionShortage" INTEGER NOT NULL DEFAULT 0`,
   ];
   for (const sql of ensureColumns) {
     try { await prisma.$executeRawUnsafe(sql); } catch { /* 既存カラムはスキップ */ }
@@ -336,7 +344,7 @@ export async function executeBonusCalculation(
   }
 
   // ────────────────────────────────────────────────────
-  // 6. 調整金を取得
+  // 6. 調整金を取得（繰越金と通常調整金を分離）
   // ────────────────────────────────────────────────────
   let adjustments: {
     mlmMemberId: bigint;
@@ -354,19 +362,53 @@ export async function executeBonusCalculation(
     adjustments = [];
   }
 
+  // 繰越金（adjustmentType="carryover"）と通常調整金を分離
+  const carryoverMap = new Map<bigint, number>(); // 繰越金
   const adjustmentMap = new Map<bigint, {
     total: number;
     items: { amount: number; comment: string | null; adjustmentType: string }[];
   }>();
   for (const adj of adjustments) {
     const key = adj.mlmMemberId;
-    if (!adjustmentMap.has(key)) adjustmentMap.set(key, { total: 0, items: [] });
-    const entry = adjustmentMap.get(key)!;
-    entry.total += adj.amount;
-    entry.items.push({ amount: adj.amount, comment: adj.comment ?? null, adjustmentType: adj.adjustmentType });
+    if (adj.adjustmentType === "carryover") {
+      // 繰越金: carryoverMapに集計
+      carryoverMap.set(key, (carryoverMap.get(key) ?? 0) + adj.amount);
+    } else {
+      // 通常調整金: adjustmentMapに集計
+      if (!adjustmentMap.has(key)) adjustmentMap.set(key, { total: 0, items: [] });
+      const entry = adjustmentMap.get(key)!;
+      entry.total += adj.amount;
+      entry.items.push({ amount: adj.amount, comment: adj.comment ?? null, adjustmentType: adj.adjustmentType });
+    }
   }
 
-  console.log(`💰 調整金対象会員: ${adjustmentMap.size}名（合計件数: ${adjustments.length}件）`);
+  console.log(`💰 調整金対象会員: ${adjustmentMap.size}名 / 繰越金対象: ${carryoverMap.size}名（合計件数: ${adjustments.length}件）`);
+
+  // ────────────────────────────────────────────────────
+  // 6b. 過不足金を取得（前月BonusRunのBonusShortagePaymentから）
+  // ────────────────────────────────────────────────────
+  const shortageMap = new Map<bigint, number>();
+  try {
+    const prevRun = await prisma.bonusRun.findFirst({
+      where: { bonusMonth: prevBonusMonth },
+      select: { id: true },
+    });
+    if (prevRun) {
+      const shortagePayments = await prisma.bonusShortagePayment.findMany({
+        where: { bonusRunId: prevRun.id },
+        select: { mlmMemberId: true, amount: true },
+      });
+      for (const sp of shortagePayments) {
+        shortageMap.set(sp.mlmMemberId, (shortageMap.get(sp.mlmMemberId) ?? 0) + sp.amount);
+      }
+      console.log(`💸 過不足金取得: 前月BonusRun(id=${prevRun.id}) から ${shortagePayments.length}件`);
+    } else {
+      console.log(`💸 過不足金: 前月(${prevBonusMonth})のBonusRunが見つかりません`);
+    }
+  } catch (e) {
+    console.warn("⚠️ BonusShortagePayment取得失敗（スキップ）:", e);
+  }
+
   onProgress(`組織データ構築完了 / 調整金 ${adjustments.length}件読み込み完了`);
 
   // ────────────────────────────────────────────────────
@@ -594,14 +636,34 @@ export async function executeBonusCalculation(
     }
 
     // ━━━ ⑤合計ボーナス・支払い計算 ━━━
-    const totalBonus        = directBonus + unilevelResult.total + structureBonus;
+    //
+    // 貯金ボーナス円換算：savingsPointsAdded（float pt）× POINT_RATE
+    // ※ savingsPointsAdded はまだ×10スケール前のpt単位の値
+    const savingsBonusYen   = Math.round(savingsPointsAdded * POINT_RATE);
+
+    // ランクアップB・シェアB: 2026年4月度は未実装 → 0
+    const rankUpBonus       = 0;
+    const shareBonus        = 0;
+
+    // 繰越金（adjustmentType="carryover"）
+    const carryoverAmount   = carryoverMap.get(member.id) ?? 0;
+
+    // 通常調整金
     const adjEntry          = adjustmentMap.get(member.id);
     const adjustmentAmount  = adjEntry ? adjEntry.total : 0;
-    const amountBeforeAdjustment = totalBonus + adjustmentAmount;
+
+    // 支払調整前取得額 = 全ボーナス合計
+    // directB + unilevelB + rankUpB + shareB + structureB + savingsBonusYen + carryoverAmount + adjustmentAmount
+    const amountBeforeAdjustment =
+      directBonus + unilevelResult.total + rankUpBonus + shareBonus
+      + structureBonus + savingsBonusYen + carryoverAmount + adjustmentAmount;
 
     const paymentAdjustmentAmount =
       paymentAdjustmentRate !== null ? Math.floor(amountBeforeAdjustment * paymentAdjustmentRate) : 0;
     const finalAmount = amountBeforeAdjustment - paymentAdjustmentAmount;
+
+    // 10%消費税（内税）
+    const consumptionTax = Math.floor(finalAmount / 11);
 
     const isCompany = !!(member as any).companyName;
     let withholdingTax = 0;
@@ -609,8 +671,12 @@ export async function executeBonusCalculation(
       withholdingTax = Math.floor((finalAmount - WITHHOLDING_THRESHOLD) * WITHHOLDING_RATE);
     }
 
-    const serviceFee    = finalAmount > resolvedSettings.minPayoutAmount ? resolvedSettings.serviceFeeAmount : 0;
-    const paymentAmount = Math.max(0, finalAmount - withholdingTax - serviceFee);
+    // 過不足金
+    const shortageAmount    = shortageMap.get(member.id) ?? 0;
+
+    const serviceFee        = finalAmount > resolvedSettings.minPayoutAmount ? resolvedSettings.serviceFeeAmount : 0;
+    // 支払額: Math.max なし（負値を許容）。他ポジション過不足金はPost-Processで加算
+    const paymentAmount     = finalAmount - withholdingTax - serviceFee + shortageAmount;
 
     totalBonusAmount += paymentAmount;
 
@@ -627,14 +693,22 @@ export async function executeBonusCalculation(
       newTitleLevel,
       directBonus,
       unilevelBonus:             unilevelResult.total,
+      rankUpBonus,
+      shareBonus,
       structureBonus,
+      savingsBonusYen,
+      carryoverAmount,
       adjustmentAmount,
       amountBeforeAdjustment,
       paymentAdjustmentRate:     paymentAdjustmentRate != null ? paymentAdjustmentRate * 100 : 0,
       paymentAdjustmentAmount,
       finalAmount,
+      consumptionTax,
       withholdingTax,
       serviceFee,
+      shortageAmount,
+      otherPositionAmount:       0,   // Post-Processで集計
+      otherPositionShortage:     0,   // Post-Processで集計
       paymentAmount,
       unilevelDetail:            unilevelResult.detail,
       savingsPointsAdded:        Math.min(2147483647, Math.max(0, Math.round(savingsPointsAdded * 10))),
@@ -646,6 +720,42 @@ export async function executeBonusCalculation(
   }
 
   onProgress(`ボーナス計算完了（対象: ${members.length}名 / アクティブ: ${totalActiveMembers}名）`);
+
+  // ────────────────────────────────────────────────────
+  // 8b. Post-Process: 他ポジション集計
+  //     非01ポジションの finalAmount を 01ポジションの otherPositionAmount に集計
+  //     非01ポジションの shortageAmount を 01ポジションの otherPositionShortage に集計
+  // ────────────────────────────────────────────────────
+  onProgress("他ポジション集計中...");
+
+  // baseCode でグループ化（memberCode の枝番を除いた部分）
+  const baseCodeMap = new Map<string, typeof results[0][]>();
+  for (const r of results) {
+    const mc = (memberMap.get(r.mlmMemberId) as any).memberCode as string;
+    const baseCode = mc.includes("-") ? mc.replace(/-\d+$/, "") : mc;
+    if (!baseCodeMap.has(baseCode)) baseCodeMap.set(baseCode, []);
+    baseCodeMap.get(baseCode)!.push(r);
+  }
+
+  for (const [, positions] of baseCodeMap) {
+    if (positions.length <= 1) continue;
+    // 01ポジションを探す（枝番なし or -01 で終わる）
+    const pos01 = positions.find((r) => {
+      const mc = (memberMap.get(r.mlmMemberId) as any).memberCode as string;
+      return mc.endsWith("-01") || !mc.includes("-");
+    });
+    if (!pos01) continue;
+    // 非01ポジションの finalAmount / shortageAmount を集計
+    for (const pos of positions) {
+      if (pos === pos01) continue;
+      pos01.otherPositionAmount   += pos.finalAmount;
+      pos01.otherPositionShortage += pos.shortageAmount;
+    }
+    // 01ポジションの paymentAmount を再計算（otherPositionShortageを加算）
+    pos01.paymentAmount =
+      pos01.finalAmount - pos01.withholdingTax - pos01.serviceFee
+      + pos01.shortageAmount + pos01.otherPositionShortage;
+  }
 
   // ────────────────────────────────────────────────────
   // 9. データベースに保存
@@ -708,14 +818,21 @@ export async function executeBonusCalculation(
       newTitleLevel:             r.newTitleLevel,
       directBonus:               r.directBonus,
       unilevelBonus:             r.unilevelBonus,
+      rankUpBonus:               r.rankUpBonus,
+      shareBonus:                r.shareBonus,
       structureBonus:            r.structureBonus,
+      carryoverAmount:           r.carryoverAmount,
       adjustmentAmount:          r.adjustmentAmount,
       amountBeforeAdjustment:    r.amountBeforeAdjustment,
       paymentAdjustmentRate:     r.paymentAdjustmentRate,
       paymentAdjustmentAmount:   r.paymentAdjustmentAmount,
       finalAmount:               r.finalAmount,
+      consumptionTax:            r.consumptionTax,
       withholdingTax:            r.withholdingTax,
       serviceFee:                r.serviceFee,
+      shortageAmount:            r.shortageAmount,
+      otherPositionAmount:       r.otherPositionAmount,
+      otherPositionShortage:     r.otherPositionShortage,
       paymentAmount:             r.paymentAmount,
       unilevelDetail:            r.unilevelDetail,
       minLinePoints:             r.minLinePoints,
