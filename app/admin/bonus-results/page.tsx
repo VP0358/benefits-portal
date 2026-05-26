@@ -105,24 +105,40 @@ type BonusRunInfo = {
 };
 
 // ━━━ 行ごとの再計算（フロントエンド側） ━━━
+// ★ viola-pure.biz 確定仕様（2026-05-27）
+//   1. amountBefore = ボーナス合計（savingsYen含まない）
+//   2. 支払調整額 = floor(税抜き本体 × 調整率)  ← 税抜きに対してかける
+//   3. 取得額(finalAmount) = amountBefore - 支払調整額
+//   4. 消費税(内税) = floor(finalAmount / 11)  ※参考表示のみ
+//   5. 源泉税 = floor((finalAmount - 120,000) × 10.21%)
+//   6. 支払額 = finalAmount - 源泉税 - 事務手数料  ← 消費税は引かない
 function recalcRow(row: BonusResultDetail): BonusResultDetail {
   const amountBeforeAdj = row.amountBeforeAdjustment;
   const adjRate = row.paymentAdjustmentRate ?? 0;
-  const adjAmount = Math.floor(amountBeforeAdj * (adjRate / 100));
-  const finalAmt = amountBeforeAdj - adjAmount;
 
-  // 源泉税: 法人は0、支払調整後取得額（finalAmt）の12万円超過分に10.21%
+  // 支払調整は「税抜き本体」に対してかける
+  const consumptionTaxForAdj = Math.floor(amountBeforeAdj / 11);
+  const taxExcludedForAdj    = amountBeforeAdj - consumptionTaxForAdj;
+  const adjAmount = Math.floor(taxExcludedForAdj * (adjRate / 100));
+  const finalAmt  = amountBeforeAdj - adjAmount;
+
+  // 消費税(内税) = floor(取得額 / 11)  参考表示のみ
+  const consumptionTax = Math.floor(finalAmt / 11);
+
+  // 源泉税: 法人は0、取得額の12万円超過分に10.21%
   const withholding = row.isCompany
     ? 0
     : finalAmt > WITHHOLDING_THRESHOLD
       ? Math.floor((finalAmt - WITHHOLDING_THRESHOLD) * WITHHOLDING_RATE)
       : 0;
 
-  const payAmt = Math.max(0, finalAmt - withholding - row.serviceFee - row.shortageAmount);
+  // 支払額 = 取得額 - 源泉税 - 事務手数料  ※消費税(内税)は引かない
+  const payAmt = finalAmt - withholding - row.serviceFee + row.shortageAmount;
   return {
     ...row,
     paymentAdjustmentAmount: adjAmount,
     finalAmount: finalAmt,
+    consumptionTax,
     withholdingTax: withholding,
     paymentAmount: payAmt,
   };
@@ -404,8 +420,9 @@ export default function BonusResultsPage() {
       const dr = getDisplayRow(r);
       const titleChange = dr.newTitleLevel > dr.previousTitleLevel ? "昇格"
         : dr.newTitleLevel < dr.previousTitleLevel ? "降格" : "変動なし";
-      const bonusTotal = dr.directBonus + dr.unilevelBonus + dr.structureBonus
-        + dr.carryoverAmount + dr.adjustmentAmount;
+      // ボーナス合計は API から返却された bonusTotal（= amountBeforeAdjustment）を使用
+      // ※ 自前計算すると savingsBonusYen が抜けて取得額より小さくなるバグが発生する
+      const bonusTotal = dr.bonusTotal;
       return [
         r.baseCode || r.memberCode,
         r.companyName || r.memberName,
@@ -623,9 +640,9 @@ export default function BonusResultsPage() {
                       : dr.newTitleLevel < dr.previousTitleLevel
                         ? "text-red-500 font-bold"
                         : "text-gray-400";
-                    // ボーナス合計 = ダイレクトB + ユニレベルB + 組織構築B + 繰越金 + 調整金
-                    const bonusTotal = dr.directBonus + dr.unilevelBonus + dr.structureBonus
-                      + dr.carryoverAmount + dr.adjustmentAmount;
+                    // ボーナス合計は API から返却された bonusTotal（= amountBeforeAdjustment）を使用
+                    // ※ 自前計算すると savingsBonusYen が抜けて取得額より小さくなるバグが発生する
+                    const bonusTotal = dr.bonusTotal;
 
                     return (
                       <tr key={r.id}
@@ -809,7 +826,7 @@ export default function BonusResultsPage() {
               <span>貯金PT: <b className="text-emerald-600">{filteredResults.reduce((s, r) => s + getDisplayRow(r).savingsPointsAdded, 0) > 0 ? `+${(filteredResults.reduce((s, r) => s + getDisplayRow(r).savingsPointsAdded, 0) / 10).toFixed(1)}pt` : "0pt"}</b></span>
               <span>繰越金: <b className="text-gray-600">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).carryoverAmount, 0))}</b></span>
               <span>調整金: <b className="text-gray-600">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).adjustmentAmount, 0))}</b></span>
-              <span>ボーナス合計: <b className="text-slate-700">{yen(filteredResults.reduce((s, r) => { const dr = getDisplayRow(r); return s + dr.directBonus + dr.unilevelBonus + dr.structureBonus + dr.carryoverAmount + dr.adjustmentAmount; }, 0))}</b></span>
+              <span>ボーナス合計: <b className="text-slate-700">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).bonusTotal, 0))}</b></span>
               <span>取得額計: <b className="text-orange-700">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).finalAmount, 0))}</b></span>
               <span>源泉税計: <b className="text-red-600">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).withholdingTax, 0))}</b></span>
               <span>事務手数料計: <b className="text-gray-600">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).serviceFee, 0))}</b></span>

@@ -71,16 +71,26 @@ export async function POST(req: NextRequest) {
       // 支払調整前取得額 = 純ボーナス + 調整金
       const amountBeforeAdjustment = pureBonus + adjustmentAmount;
 
-      // 支払調整額
+      // 支払調整額 = floor(税抜き本体 × 調整率)
+      // ★ 支払調整は「消費税抜き本体」に対してかける（viola-pure.biz 仕様確定）
+      const consumptionTaxForAdj   = Math.floor(amountBeforeAdjustment / 11);
+      const taxExcludedForAdj      = amountBeforeAdjustment - consumptionTaxForAdj;
       const paymentAdjustmentAmount =
         paymentAdjRate > 0
-          ? Math.floor(amountBeforeAdjustment * paymentAdjRate)
+          ? Math.floor(taxExcludedForAdj * paymentAdjRate)
           : 0;
 
+      // 取得額 = 支払調整前取得額 - 支払調整額
       const finalAmount = amountBeforeAdjustment - paymentAdjustmentAmount;
 
-      // 源泉徴収税（10.21%）
-      const withholdingTax = Math.floor(finalAmount * 0.1021);
+      // 消費税(内税) = floor(取得額 / 11)  ※参考表示のみ・支払額計算には使わない
+      const consumptionTax = Math.floor(finalAmount / 11);
+
+      // 源泉徴収税 = floor((取得額 - 120,000) × 10.21%)
+      const WITHHOLDING_THRESHOLD = 120000;
+      const withholdingTax = finalAmount > WITHHOLDING_THRESHOLD
+        ? Math.floor((finalAmount - WITHHOLDING_THRESHOLD) * 0.1021)
+        : 0;
 
       // 事務手数料
       const serviceFee =
@@ -88,8 +98,8 @@ export async function POST(req: NextRequest) {
           ? bonusSettings.serviceFeeAmount
           : 0;
 
-      // 支払額
-      const paymentAmount = Math.max(0, finalAmount - withholdingTax - serviceFee);
+      // 支払額 = 取得額 - 源泉税 - 事務手数料  ※消費税(内税)は引かない
+      const paymentAmount = finalAmount - withholdingTax - serviceFee;
 
       totalBonusAmount += paymentAmount;
 
@@ -100,11 +110,12 @@ export async function POST(req: NextRequest) {
           data: {
             adjustmentAmount,        // 調整金（なければ0）
             amountBeforeAdjustment,  // 純ボーナス + 調整金
-            paymentAdjustmentAmount, // 支払調整額
-            finalAmount,             // 調整後取得額
+            paymentAdjustmentAmount, // 支払調整額（税抜き本体×調整率）
+            finalAmount,             // 取得額（調整後）
+            consumptionTax,          // 消費税(内税)参考表示
             withholdingTax,          // 源泉徴収税
             serviceFee,              // 事務手数料
-            paymentAmount,           // 最終支払額
+            paymentAmount,           // 支払額（振込額）
           },
         })
       );
