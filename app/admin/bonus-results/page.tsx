@@ -105,24 +105,40 @@ type BonusRunInfo = {
 };
 
 // ━━━ 行ごとの再計算（フロントエンド側） ━━━
+// ★ viola-pure.biz 確定仕様（2026-05-27）
+//   1. amountBefore = ボーナス合計（savingsYen含まない）
+//   2. 支払調整額 = floor(税抜き本体 × 調整率)  ← 税抜きに対してかける
+//   3. 取得額(finalAmount) = amountBefore - 支払調整額
+//   4. 消費税(内税) = floor(finalAmount / 11)  ※参考表示のみ
+//   5. 源泉税 = floor((finalAmount - 120,000) × 10.21%)
+//   6. 支払額 = finalAmount - 源泉税 - 事務手数料  ← 消費税は引かない
 function recalcRow(row: BonusResultDetail): BonusResultDetail {
   const amountBeforeAdj = row.amountBeforeAdjustment;
   const adjRate = row.paymentAdjustmentRate ?? 0;
-  const adjAmount = Math.floor(amountBeforeAdj * (adjRate / 100));
-  const finalAmt = amountBeforeAdj - adjAmount;
 
-  // 源泉税: 法人は0、支払調整後取得額（finalAmt）の12万円超過分に10.21%
+  // 支払調整は「税抜き本体」に対してかける
+  const consumptionTaxForAdj = Math.floor(amountBeforeAdj / 11);
+  const taxExcludedForAdj    = amountBeforeAdj - consumptionTaxForAdj;
+  const adjAmount = Math.floor(taxExcludedForAdj * (adjRate / 100));
+  const finalAmt  = amountBeforeAdj - adjAmount;
+
+  // 消費税(内税) = floor(取得額 / 11)  参考表示のみ
+  const consumptionTax = Math.floor(finalAmt / 11);
+
+  // 源泉税: 法人は0、取得額の12万円超過分に10.21%
   const withholding = row.isCompany
     ? 0
     : finalAmt > WITHHOLDING_THRESHOLD
       ? Math.floor((finalAmt - WITHHOLDING_THRESHOLD) * WITHHOLDING_RATE)
       : 0;
 
-  const payAmt = Math.max(0, finalAmt - withholding - row.serviceFee - row.shortageAmount);
+  // 支払額 = 取得額 - 源泉税 - 事務手数料  ※消費税(内税)は引かない
+  const payAmt = finalAmt - withholding - row.serviceFee + row.shortageAmount;
   return {
     ...row,
     paymentAdjustmentAmount: adjAmount,
     finalAmount: finalAmt,
+    consumptionTax,
     withholdingTax: withholding,
     paymentAmount: payAmt,
   };

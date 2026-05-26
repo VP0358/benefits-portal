@@ -707,25 +707,42 @@ export async function executeBonusCalculation(
     const adjEntry          = adjustmentMap.get(member.id);
     const adjustmentAmount  = adjEntry ? adjEntry.total : 0;
 
-    // 支払調整前取得額（ボーナス合計）= 全ボーナス合計
-    // directB + unilevelB + rankUpB + shareB + structureB + 貯金B(円換算) + 繰越金 + 調整金
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 支払調整前取得額（ボーナス合計）
+    // = directB + unilevelB + rankUpB + shareB + structureB + 繰越金 + 調整金
     //
-    // ★ 重要: savingsBonusYen（貯金ポイントの当月円換算額）は
-    //   amountBeforeAdjustment に必ず含める必要がある。
-    //   フロントエンド側で自前計算するときに savingsBonusYen を抜かすと
-    //   「取得額 > ボーナス合計（表示）」という矛盾が発生するバグになる。
-    //   bonus_results テーブルの bonusTotal（= amountBeforeAdjustment）をそのまま使うこと。
+    // ★ savingsBonusYen（貯金ボーナス円換算）は含めない
+    //   貯金ボーナスは「貯金ポイント」として管理するものであり、
+    //   当月の支払い報酬額には加算しない（viola-pure.biz 仕様確定）
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const amountBeforeAdjustment =
       directBonus + unilevelResult.total + rankUpBonus + shareBonus
-      + structureBonus + savingsBonusYen + carryoverAmount + adjustmentAmount;
+      + structureBonus + carryoverAmount + adjustmentAmount;
 
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 支払調整額 = floor(税抜き本体 × 調整率)
+    //
+    // ★ 支払調整は「消費税抜き本体」に対してかける（viola-pure.biz 仕様確定）
+    //   消費税(内税) = floor(amountBefore / 11)
+    //   税抜き本体   = amountBefore - 消費税(内税)
+    //   支払調整額   = floor(税抜き本体 × 調整率)
+    //
+    //   例: amountBefore=142,350 → 内税=12,940 → 本体=129,410
+    //       調整額 = floor(129,410 × 2%) = 2,588 ✅
+    //   ※ amountBefore に直接かけると floor(142,350×2%)=2,847 になりズレる
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const consumptionTaxForAdj   = Math.floor(amountBeforeAdjustment / 11);
+    const taxExcludedForAdj      = amountBeforeAdjustment - consumptionTaxForAdj;
     const paymentAdjustmentAmount =
-      paymentAdjustmentRate !== null ? Math.floor(amountBeforeAdjustment * paymentAdjustmentRate) : 0;
+      paymentAdjustmentRate !== null ? Math.floor(taxExcludedForAdj * paymentAdjustmentRate) : 0;
+
+    // 取得額 = 支払調整前取得額 - 支払調整額
     const finalAmount = amountBeforeAdjustment - paymentAdjustmentAmount;
 
-    // 10%消費税（内税）
+    // 10%消費税（内税）= floor(取得額 / 11)  ※参考表示のみ・支払額計算には使わない
     const consumptionTax = Math.floor(finalAmount / 11);
 
+    // 源泉税 = floor((取得額 - 120,000) × 10.21%)
     const isCompany = !!(member as any).companyName;
     let withholdingTax = 0;
     if (!isCompany && finalAmount > WITHHOLDING_THRESHOLD) {
@@ -736,7 +753,14 @@ export async function executeBonusCalculation(
     const shortageAmount    = shortageMap.get(member.id) ?? 0;
 
     const serviceFee        = finalAmount > resolvedSettings.minPayoutAmount ? resolvedSettings.serviceFeeAmount : 0;
-    // 支払額: Math.max なし（負値を許容）。他ポジション過不足金はPost-Processで加算
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 支払額（振込額）= 取得額 - 源泉税 - 事務手数料 + 過不足金
+    //
+    // ★ 消費税(内税)は支払額から引かない（内税なので取得額に含まれている）
+    //   viola-pure.biz の正しい計算式：
+    //   支払額 = 取得額(139,762) - 源泉税(2,017) - 手数料(440) = 137,305 ✅
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const paymentAmount     = finalAmount - withholdingTax - serviceFee + shortageAmount;
 
     totalBonusAmount += paymentAmount;
