@@ -404,8 +404,9 @@ export default function BonusResultsPage() {
       const dr = getDisplayRow(r);
       const titleChange = dr.newTitleLevel > dr.previousTitleLevel ? "昇格"
         : dr.newTitleLevel < dr.previousTitleLevel ? "降格" : "変動なし";
-      const bonusTotal = dr.directBonus + dr.unilevelBonus + dr.structureBonus
-        + dr.carryoverAmount + dr.adjustmentAmount;
+      // ボーナス合計は API から返却された bonusTotal（= amountBeforeAdjustment）を使用
+      // ※ 自前計算すると savingsBonusYen が抜けて取得額より小さくなるバグが発生する
+      const bonusTotal = dr.bonusTotal;
       return [
         r.baseCode || r.memberCode,
         r.companyName || r.memberName,
@@ -623,9 +624,9 @@ export default function BonusResultsPage() {
                       : dr.newTitleLevel < dr.previousTitleLevel
                         ? "text-red-500 font-bold"
                         : "text-gray-400";
-                    // ボーナス合計 = ダイレクトB + ユニレベルB + 組織構築B + 繰越金 + 調整金
-                    const bonusTotal = dr.directBonus + dr.unilevelBonus + dr.structureBonus
-                      + dr.carryoverAmount + dr.adjustmentAmount;
+                    // ボーナス合計は API から返却された bonusTotal（= amountBeforeAdjustment）を使用
+                    // ※ 自前計算すると savingsBonusYen が抜けて取得額より小さくなるバグが発生する
+                    const bonusTotal = dr.bonusTotal;
 
                     return (
                       <tr key={r.id}
@@ -809,7 +810,7 @@ export default function BonusResultsPage() {
               <span>貯金PT: <b className="text-emerald-600">{filteredResults.reduce((s, r) => s + getDisplayRow(r).savingsPointsAdded, 0) > 0 ? `+${(filteredResults.reduce((s, r) => s + getDisplayRow(r).savingsPointsAdded, 0) / 10).toFixed(1)}pt` : "0pt"}</b></span>
               <span>繰越金: <b className="text-gray-600">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).carryoverAmount, 0))}</b></span>
               <span>調整金: <b className="text-gray-600">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).adjustmentAmount, 0))}</b></span>
-              <span>ボーナス合計: <b className="text-slate-700">{yen(filteredResults.reduce((s, r) => { const dr = getDisplayRow(r); return s + dr.directBonus + dr.unilevelBonus + dr.structureBonus + dr.carryoverAmount + dr.adjustmentAmount; }, 0))}</b></span>
+              <span>ボーナス合計: <b className="text-slate-700">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).bonusTotal, 0))}</b></span>
               <span>取得額計: <b className="text-orange-700">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).finalAmount, 0))}</b></span>
               <span>源泉税計: <b className="text-red-600">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).withholdingTax, 0))}</b></span>
               <span>事務手数料計: <b className="text-gray-600">{yen(filteredResults.reduce((s, r) => s + getDisplayRow(r).serviceFee, 0))}</b></span>

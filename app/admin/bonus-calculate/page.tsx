@@ -510,9 +510,11 @@ function ResultTable({ results }: { results: BonusResultRow[] }) {
                 : r.newTitleLevel < r.previousTitleLevel
                   ? "text-red-500 font-bold"
                   : "text-gray-400";
-              // ボーナス合計 = ダイレクトB + ユニレベルB + 組織構築B + 繰越金 + 調整金
-              const bonusTotal = r.directBonus + r.unilevelBonus + r.structureBonus
-                + r.carryoverAmount + r.adjustmentAmount;
+              // ボーナス合計 = amountBeforeAdjustment（エンジン計算済み）を使用
+              // ※ directB + unilevelB + 組織構築B + 貯金B(円換算) + 繰越金 + 調整金 の合計
+              // ※ ページ側で自前計算すると savingsBonusYen が抜けて取得額より小さくなるバグが発生するため
+              //    API から返却された r.bonusTotal（= amountBeforeAdjustment）を直接使う
+              const bonusTotal = r.bonusTotal;
               return (
               <tr key={r.id} className={`hover:bg-violet-50/30 transition ${r.paymentAmount > 0 ? "" : "opacity-60"}`}>
 

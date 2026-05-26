@@ -707,8 +707,14 @@ export async function executeBonusCalculation(
     const adjEntry          = adjustmentMap.get(member.id);
     const adjustmentAmount  = adjEntry ? adjEntry.total : 0;
 
-    // 支払調整前取得額 = 全ボーナス合計
-    // directB + unilevelB + rankUpB + shareB + structureB + savingsBonusYen + carryoverAmount + adjustmentAmount
+    // 支払調整前取得額（ボーナス合計）= 全ボーナス合計
+    // directB + unilevelB + rankUpB + shareB + structureB + 貯金B(円換算) + 繰越金 + 調整金
+    //
+    // ★ 重要: savingsBonusYen（貯金ポイントの当月円換算額）は
+    //   amountBeforeAdjustment に必ず含める必要がある。
+    //   フロントエンド側で自前計算するときに savingsBonusYen を抜かすと
+    //   「取得額 > ボーナス合計（表示）」という矛盾が発生するバグになる。
+    //   bonus_results テーブルの bonusTotal（= amountBeforeAdjustment）をそのまま使うこと。
     const amountBeforeAdjustment =
       directBonus + unilevelResult.total + rankUpBonus + shareBonus
       + structureBonus + savingsBonusYen + carryoverAmount + adjustmentAmount;
