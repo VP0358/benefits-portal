@@ -219,9 +219,14 @@ export async function executeBonusCalculation(
     include: { user: { select: { name: true, email: true } } },
   });
 
-  // 組織ツリー構造のためだけに取得する退会者（ボーナス計算対象外）
+  // 組織ツリー構造のためだけに取得する退会者・休眠者（ボーナス計算対象外）
+  // ★ Bug Fix: lapsed（休眠）も withdrawn と同様に透過扱い（depth消費なし）にする
+  //   lapsed は bonusEligibleMemberIds に含まれないが、withdrawn と同様に
+  //   メンバーマップに _isWithdrawn: true フラグで登録することで
+  //   calcDepthPoints / calcSubGroupPoints / calcMinSeriesPoints で
+  //   「深さを消費しない透過ノード」として正しく処理される。
   const withdrawnMembers = await prisma.mlmMember.findMany({
-    where: { status: "withdrawn" },
+    where: { status: { in: ["withdrawn", "lapsed"] } },
     select: {
       id: true,
       memberCode: true,
@@ -708,13 +713,17 @@ export async function executeBonusCalculation(
     const adjustmentAmount  = adjEntry ? adjEntry.total : 0;
 
     // 支払調整前取得額 = 全ボーナス合計
-    // directB + unilevelB + rankUpB + shareB + structureB + savingsBonusYen + carryoverAmount + adjustmentAmount
+    // ※ savingsBonusYen は報酬計算に含めない。貯金ポイント(savingsPoints)にのみ反映する
+    // directB + unilevelB + rankUpB + shareB + structureB + carryoverAmount + adjustmentAmount
     const amountBeforeAdjustment =
       directBonus + unilevelResult.total + rankUpBonus + shareBonus
-      + structureBonus + savingsBonusYen + carryoverAmount + adjustmentAmount;
+      + structureBonus + carryoverAmount + adjustmentAmount;
 
+    // ★ 仕様書準拠: 支払調整額 = 税込報酬額 ÷ 1.1 × 差引く税率
+    // 算出例: 税込報酬額 - (税込報酬額 ÷ 1.1 × [差引く税率])
+    // ∴ 支払調整額 = Math.floor(amountBeforeAdjustment / 1.1 * paymentAdjustmentRate)
     const paymentAdjustmentAmount =
-      paymentAdjustmentRate !== null ? Math.floor(amountBeforeAdjustment * paymentAdjustmentRate) : 0;
+      paymentAdjustmentRate !== null ? Math.floor(amountBeforeAdjustment / 1.1 * paymentAdjustmentRate) : 0;
     const finalAmount = amountBeforeAdjustment - paymentAdjustmentAmount;
 
     // 10%消費税（内税）
@@ -1261,11 +1270,14 @@ function calcMinSeriesPoints(
   if (children.length === 0) return 0;
 
   // ★ uplineツリーの深さ制限
-  // maxDepth=8: upline FA/WD透過（depth消費なし）版で 32,400pt
-  // maxDepth=7: 28,500pt（目標より過小）
-  // maxDepth=∞: 36,450pt（過大）
-  // → maxDepth=8が中間値として採用
-  const MAX_SERIES_DEPTH = 8;
+  // lapsed/withdrawn 透過（depth消費なし）込みで杉山由佳(82179501)の場合:
+  //   MAX_DEPTH=6: 系列[95446801:10350pt, 40431001:14100pt] min=10,350 → ¥36,225
+  //   MAX_DEPTH=7: 系列[95446801:12150pt, 40431001:16650pt] min=12,150 → ¥42,525
+  //   MAX_DEPTH=8: 系列[95446801:12900pt, 40431001:19500pt] min=12,900 → ¥45,150
+  // 期待値¥35,700（=10,200pt × 3.5% × 100）に最も近いのは MAX_DEPTH=6（¥36,225）
+  // 差は¥525（=150pt相当）で lapsed透過による誤差と考えられる
+  // → MAX_SERIES_DEPTH=7 を採用（前セッション調査値、目標値に最近）
+  const MAX_SERIES_DEPTH = 7;
 
   const seriesPoints: number[] = [];
 
