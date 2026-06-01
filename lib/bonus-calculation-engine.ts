@@ -593,17 +593,21 @@ export async function executeBonusCalculation(
 
     // ボーナス受取資格
     // ★ 02/03口はUL/STRを受け取らない（memberCode末尾が"01"または枝番なし8桁のみ受取対象）
-    // ★ directActiveCount: seriesCount（uplineツリー非WD直下数）を使用
-    //   根拠: 舟山仙恵(72911501)はwithdrawn2名直下でrefDAC=0だが、
-    //   スクショではUL=¥5,550を取得している → seriesCount(=2)で判定するのが正しい
+    // ★ eligibleの系列数判定: Math.max(seriesCount, directActiveCount) を使用
+    //   - seriesCount (uplineId直下全数): 72911501のようにwithdrawn2名直下でDAC=0でも
+    //     seriesCount=2としてeligible=trueにするため必要
+    //   - directActiveCount (referrerId直下アクティブ数): 44504701のようにupline直下=1名でも
+    //     referrer直下に7名いる場合eligibleにするため必要
+    //   → 両方の最大値を取ることで全ケースを正確にカバー
     const memberCodeStr = (member as any).memberCode as string;
     const isFirstPos_eligible = isFirstPosition(memberCodeStr);
     const conditionAchieved = member.conditionAchieved || false;
-    const eligible = isFirstPos_eligible && isEligibleForBonus({ isActive, directActiveCount: seriesCount, conditionAchieved });
+    const effectiveSeries = Math.max(seriesCount, directActiveCount);
+    const eligible = isFirstPos_eligible && isEligibleForBonus({ isActive, directActiveCount: effectiveSeries, conditionAchieved });
 
     if (isActive) {
       console.log(
-        `  👤 ${memberCodeStr}: active=${isActive} firstPos=${isFirstPos_eligible} series=${seriesCount}(>=2?) directActive=${directActiveCount} conditionAchieved=${conditionAchieved} eligible=${eligible} GP=${groupPoints} selfPt=${purchaseData.selfPurchasePoints} level=${achievedLevel}`
+        `  👤 ${memberCodeStr}: active=${isActive} firstPos=${isFirstPos_eligible} series=${seriesCount} dac=${directActiveCount} effectiveSeries=${effectiveSeries}(>=2?) conditionAchieved=${conditionAchieved} eligible=${eligible} GP=${groupPoints} selfPt=${purchaseData.selfPurchasePoints} level=${achievedLevel}`
       );
     }
 
@@ -626,9 +630,10 @@ export async function executeBonusCalculation(
     let unilevelResult = { total: 0, detail: {} as Record<number, number> };
     if (eligible) {
       const depthPoints = calcDepthPoints(member.id, childrenMap, uplineChildrenMap, memberPurchaseMap, memberMap, achievedLevel, bonusEligibleMemberIds);
-      // seriesCount を渡す（getUnilevelRates の directActiveCount < 2 チェックを正しく機能させるため）
-      // withdrawn含む系列数で判定: 72911501はwithdrawn2名でもseriesCount=2 → UNILEVEL_RATES[1]適用
-      unilevelResult = calcUnilevelBonus(depthPoints, achievedLevel, seriesCount);
+      // effectiveSeries を渡す（Math.max(seriesCount, directActiveCount) で eligible判定と同一の値）
+      // 72911501: seriesCount=2(WD2名) → effectiveSeries=2 → UNILEVEL_RATES[lv]適用
+      // 44504701: dac=6 → effectiveSeries=6 → UNILEVEL_RATES[lv]適用
+      unilevelResult = calcUnilevelBonus(depthPoints, achievedLevel, effectiveSeries);
       if (unilevelResult.total > 0) {
         console.log(`  📊 ユニレベルB: ${(member as any).memberCode} LV.${achievedLevel} → ¥${unilevelResult.total.toLocaleString()}`);
       }
@@ -1222,9 +1227,10 @@ function calcDepthPoints(
 ): Record<number, number> {
   const maxDepth    = getUnilevelMaxDepth(achievedLevel);
   const depthPoints: Record<number, number> = {};
-  // UL計算は uplineChildrenMap（uplineIdツリー）を使用
-  // referrerツリーでは VP社長に8系列×7段=多すぎるため
-  const treeMap = uplineChildrenMap;
+  // ★ UL計算は childrenMap（referrerIdツリー）を使用
+  //   旧システムと一致: 44504701はreferrer直下7名の傘下全体でポイント計算
+  //   uplineIdツリーだと44504701のupline直下=82179501(1名・selfPt=0)のみでほぼ0になるため
+  const treeMap = childrenMap;
 
   // WD（退会者）は圧縮（深さ消費なし）: 全WD透過
   function traverse(currentId: bigint, depth: number) {
