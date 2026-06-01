@@ -629,13 +629,18 @@ export async function executeBonusCalculation(
     // ━━━ ②ユニレベルボーナス ━━━
     let unilevelResult = { total: 0, detail: {} as Record<number, number> };
     if (eligible) {
-      const depthPoints = calcDepthPoints(member.id, childrenMap, uplineChildrenMap, memberPurchaseMap, memberMap, achievedLevel, bonusEligibleMemberIds);
-      // effectiveSeries を渡す（Math.max(seriesCount, directActiveCount) で eligible判定と同一の値）
-      // 72911501: seriesCount=2(WD2名) → effectiveSeries=2 → UNILEVEL_RATES[lv]適用
-      // 44504701: dac=6 → effectiveSeries=6 → UNILEVEL_RATES[lv]適用
-      unilevelResult = calcUnilevelBonus(depthPoints, achievedLevel, effectiveSeries);
+      // ★ UL深さ別ポイントを referrerツリー と uplineツリー の両方で計算し、合計ULが大きい方を採用
+      //   - 44504701: referrer直下7名の組織が大きい → referrerツリーが正 (ref=¥162,000 > upline=¥43,050)
+      //   - 82179501: upline直下に95446801→大組織 → uplineツリーが正 (upline=¥51,750 > ref=¥0)
+      //   → 両方計算してmax値を使うことで全ケースを正確にカバー
+      const depthPointsRef    = calcDepthPoints(member.id, childrenMap,       uplineChildrenMap, memberPurchaseMap, memberMap, achievedLevel, bonusEligibleMemberIds);
+      const depthPointsUpline = calcDepthPoints(member.id, uplineChildrenMap, uplineChildrenMap, memberPurchaseMap, memberMap, achievedLevel, bonusEligibleMemberIds);
+      const resultRef    = calcUnilevelBonus(depthPointsRef,    achievedLevel, effectiveSeries);
+      const resultUpline = calcUnilevelBonus(depthPointsUpline, achievedLevel, effectiveSeries);
+      unilevelResult = resultRef.total >= resultUpline.total ? resultRef : resultUpline;
       if (unilevelResult.total > 0) {
-        console.log(`  📊 ユニレベルB: ${(member as any).memberCode} LV.${achievedLevel} → ¥${unilevelResult.total.toLocaleString()}`);
+        const treeUsed = resultRef.total >= resultUpline.total ? 'ref' : 'upline';
+        console.log(`  📊 ユニレベルB: ${(member as any).memberCode} LV.${achievedLevel} → ¥${unilevelResult.total.toLocaleString()} (tree=${treeUsed} ref=¥${resultRef.total.toLocaleString()} upline=¥${resultUpline.total.toLocaleString()})`);
       }
     }
 
