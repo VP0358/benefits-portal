@@ -94,13 +94,20 @@ type MemberPurchaseData = {
 
 /**
  * 01ポジション判定
- * memberCode の枝番部分が "01" かどうかで判定
- * 例: "123456-01" → true, "123456-02" → false
+ * DBのmemberCodeは8桁数字（ハイフンなし）例: "86820601" → 末尾2桁が"01"
+ * ハイフンあり形式 "123456-01" にも対応
+ * 例: "86820601" → true, "86820602" → false
+ *     "123456-01" → true, "123456-02" → false
+ * ★ 重要: 02/03口はUL/STRを受け取らない（段数点源としては機能する）
  */
 function isFirstPosition(memberCode: string): boolean {
-  const parts = memberCode.split("-");
-  if (parts.length < 2) return true; // 枝番なしは01とみなす
-  return parts[parts.length - 1] === "01";
+  // ハイフンあり形式: "123456-01"
+  if (memberCode.includes("-")) {
+    const parts = memberCode.split("-");
+    return parts[parts.length - 1] === "01";
+  }
+  // 8桁数字形式: "86820601" → 末尾2桁が"01"
+  return memberCode.slice(-2) === "01";
 }
 
 /**
@@ -592,12 +599,18 @@ export async function executeBonusCalculation(
     const newTitleLevel = isActive ? Math.max(previousTitleLevel, achievedLevel) : 0;
 
     // ボーナス受取資格
+    // ★ 02/03口はUL/STRを受け取らない（memberCode末尾2桁が"01"のみボーナス受取対象）
+    // ★ seriesCount >= 2 を使用（withdrawn含む直下系列数）
+    //   根拠: 舟山仙恵(72911501)はwithdrawn2名直下でdirectActive=0だが、
+    //   スクショではUL=¥5,550を取得している → seriesCount(=2)で判定するのが正しい
+    const memberCodeStr = (member as any).memberCode as string;
+    const isFirstPos_eligible = isFirstPosition(memberCodeStr);
     const conditionAchieved = member.conditionAchieved || false;
-    const eligible = isEligibleForBonus({ isActive, directActiveCount, conditionAchieved });
+    const eligible = isFirstPos_eligible && isEligibleForBonus({ isActive, directActiveCount: seriesCount, conditionAchieved });
 
     if (isActive) {
       console.log(
-        `  👤 ${(member as any).memberCode}: active=${isActive} directActive=${directActiveCount} conditionAchieved=${conditionAchieved} eligible=${eligible} GP=${groupPoints} selfPt=${purchaseData.selfPurchasePoints} series=${seriesCount} level=${achievedLevel}`
+        `  👤 ${memberCodeStr}: active=${isActive} firstPos=${isFirstPos_eligible} series=${seriesCount}(>=2?) directActive=${directActiveCount} conditionAchieved=${conditionAchieved} eligible=${eligible} GP=${groupPoints} selfPt=${purchaseData.selfPurchasePoints} level=${achievedLevel}`
       );
     }
 
@@ -620,7 +633,8 @@ export async function executeBonusCalculation(
     let unilevelResult = { total: 0, detail: {} as Record<number, number> };
     if (eligible) {
       const depthPoints = calcDepthPoints(member.id, childrenMap, memberPurchaseMap, memberMap, achievedLevel);
-      unilevelResult = calcUnilevelBonus(depthPoints, achievedLevel, directActiveCount);
+      // seriesCount を渡す（getUnilevelRates の directActiveCount < 2 チェックを正しく機能させるため）
+      unilevelResult = calcUnilevelBonus(depthPoints, achievedLevel, seriesCount);
       if (unilevelResult.total > 0) {
         console.log(`  📊 ユニレベルB: ${(member as any).memberCode} LV.${achievedLevel} → ¥${unilevelResult.total.toLocaleString()}`);
       }
@@ -629,8 +643,8 @@ export async function executeBonusCalculation(
     // ━━━ ③組織構築ボーナス ━━━
     let structureBonus  = 0;
     let minSeriesPoints = 0;
-    const memberCodeStr = (member as any).memberCode as string;
-    const isFirstPos    = isFirstPosition(memberCodeStr);
+    // memberCodeStr は eligible 判定ブロックで宣言済み
+    const isFirstPos    = isFirstPos_eligible; // isFirstPosition(memberCodeStr) と同値
 
     if (eligible && achievedLevel >= 3 && isFirstPos) {
       minSeriesPoints = calcMinSeriesPoints(member.id, childrenMap, memberPurchaseMap, memberMap);
