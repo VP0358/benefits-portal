@@ -37,3 +37,29 @@ next-env.d.ts
 
 # Core dump
 core
+
+# Investigation probes (temporary debug scripts)
+probe_*.mjs
+check_*.mjs
+analyze_*.mjs
+aggregate_*.mjs
+calc_*.mjs
+compare_*.mjs
+debug_*.mjs
+deep_*.mjs
+diagnose*.mjs
+final_*.mjs
+find_*.mjs
+full_*.mjs
+identify_*.mjs
+key_*.mjs
+master_*.mjs
+match_*.mjs
+reverse_*.mjs
+test_*.mjs
+trace_*.mjs
+tree_*.mjs
+ultra_*.mjs
+verify_*.mjs
+vp_*.mjs
+comprehensive_*.mjs
