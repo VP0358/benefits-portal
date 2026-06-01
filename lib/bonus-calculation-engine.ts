@@ -505,7 +505,7 @@ export async function executeBonusCalculation(
     // Pass 1 では currentLevel（DB値）で seriesAchieverMap を構築
     // childrenMap は退会者含む全会員で構築済み → 退会者経由の傘下もGPに含まれる
     const { groupPoints, directActiveCount, seriesCount, seriesAchieverMap } =
-      calcGroupDataFull(member.id, childrenMap, uplineChildrenMap, memberPurchaseMap, memberMap, purchaseData.selfPurchasePoints, null, bonusEligibleMemberIds);
+      calcGroupDataFull(member.id, childrenMap, memberPurchaseMap, memberMap, purchaseData.selfPurchasePoints, null);
 
     const naturalLevel = isActive
       ? calcAchievedLevel({ groupPoints, selfPurchasePoints: purchaseData.selfPurchasePoints, seriesCount, seriesAchieverMap })
@@ -558,7 +558,7 @@ export async function executeBonusCalculation(
     // ★ Pass 2: pass1ResultMap（当月達成レベル）を seriesAchieverMap に使用
     // childrenMap は退会者含む全会員で構築済み → 退会者経由の傘下もGPに含まれる
     const { groupPoints, directActiveCount, seriesCount, seriesAchieverMap } =
-      calcGroupDataFull(member.id, childrenMap, uplineChildrenMap, memberPurchaseMap, memberMap, purchaseData.selfPurchasePoints, pass1ResultMap, bonusEligibleMemberIds);
+      calcGroupDataFull(member.id, childrenMap, memberPurchaseMap, memberMap, purchaseData.selfPurchasePoints, pass1ResultMap);
 
     // 当月実績レベル判定（Pass2: 当月達成レベルで判定）
     const naturalLevel = isActive
@@ -609,7 +609,7 @@ export async function executeBonusCalculation(
     // ━━━ ②ユニレベルボーナス ━━━
     let unilevelResult = { total: 0, detail: {} as Record<number, number> };
     if (eligible) {
-      const depthPoints = calcDepthPoints(member.id, childrenMap, uplineChildrenMap, memberPurchaseMap, memberMap, achievedLevel, bonusEligibleMemberIds);
+      const depthPoints = calcDepthPoints(member.id, childrenMap, memberPurchaseMap, memberMap, achievedLevel);
       unilevelResult = calcUnilevelBonus(depthPoints, achievedLevel, directActiveCount);
       if (unilevelResult.total > 0) {
         console.log(`  📊 ユニレベルB: ${(member as any).memberCode} LV.${achievedLevel} → ¥${unilevelResult.total.toLocaleString()}`);
@@ -623,7 +623,7 @@ export async function executeBonusCalculation(
     const isFirstPos    = isFirstPosition(memberCodeStr);
 
     if (eligible && achievedLevel >= 3 && isFirstPos) {
-      minSeriesPoints = calcMinSeriesPoints(member.id, uplineChildrenMap, memberPurchaseMap, memberMap, bonusEligibleMemberIds);
+      minSeriesPoints = calcMinSeriesPoints(member.id, childrenMap, memberPurchaseMap, memberMap);
       const rate = STRUCTURE_BONUS_RATES[achievedLevel] ?? 0;
       // 組織構築ボーナス = 最小系列ポイント × レベル別率 × POINT_RATE
       // 例: 30,600pt × 4% × ¥100 = ¥122,400
@@ -995,129 +995,74 @@ export async function executeBonusCalculation(
 /**
  * グループポイント・直接紹介アクティブ数・系列情報を一括計算
  *
- * ★ viola-pure.biz 仕様準拠（2026-04調査）:
- *   - groupPoints: uplineId ツリーの7段以内アクティブ購入ptの合計（圧縮なし）
- *   - directActiveCount: referrerId ツリーの直下アクティブ数（UNILEVELレート選択用）
- *   - seriesCount: uplineId ツリーの直下系列数（lineCount用）
- *   - seriesAchieverMap: referrerId ツリーの各直下系列内の最高達成レベル（LV判定用）
+ * ・groupPoints  = 自己購入pt + 傘下7段目アクティブ購入ptの合計（非アクティブは圧縮）
+ * ・directActiveCount = 直下でアクティブな会員数
+ * ・seriesCount = 直下でポジションが存在する系列数（アクティブ/非アクティブ問わず）
+ * ・seriesAchieverMap = 各直下系列(インデックス)内の最高達成レベル（7段以内）
  *
- * ★ GP計算はuplineIdツリーを使用する理由:
- *   referrerツリーでは VP社長直下8名×7段=28,800ptになり過大。
- *   uplineツリーでは直下1名（id=1134）経由の7段以内=7,650pt（退会者WD透過込み）が正解。
- *   ※ 過去コメントで「7,800pt」と記載していたが誤り。正確なエンジン再現で7,650ptと確定（2026-05-26調査）。
- *
- * ★ DACはreferrerツリーを使用する理由:
- *   uplineツリー直下=1名（FA）→ DAC=1 → UNILEVEL_RATES[0]適用 → UL過小。
- *   referrerツリー直下3名アクティブ → DAC=3 → UNILEVEL_RATES[level]適用 → 正解に近い。
- *
- * @param childrenMap referrerIdベースの子リスト（DAC・seriesAchieverMap計算用）
- * @param uplineChildrenMap uplineIdベースの子リスト（GP・seriesCount計算用）
  * @param pass1ResultMap Pass1の当月達成レベルマップ。null の場合は currentLevel（DB値）を使用。
- * @param bonusEligibleMemberIds ボーナス計算対象会員ID（withdrawn除外済み）のセット。
+ *   LV.2以上の正確な判定には Pass1 結果を渡すこと。
  */
 function calcGroupDataFull(
   memberId: bigint,
   childrenMap: Map<bigint, bigint[]>,
-  uplineChildrenMap: Map<bigint, bigint[]>,
   purchaseMap: Map<bigint, MemberPurchaseData>,
   memberMap: Map<bigint, any>,
   selfPurchasePoints: number,
-  pass1ResultMap: Map<bigint, { achievedLevel: number }> | null,
-  bonusEligibleMemberIds: Set<bigint>
+  pass1ResultMap: Map<bigint, { achievedLevel: number }> | null
 ): {
   groupPoints: number;
   directActiveCount: number;
   seriesCount: number;
   seriesAchieverMap: Record<number, number>;
 } {
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // GP計算: uplineChildrenMap（uplineIdツリー）を使用
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const uplineDirectChildren = uplineChildrenMap.get(memberId) || [];
+  const directChildren = childrenMap.get(memberId) || [];
 
-  let groupPoints = selfPurchasePoints;
+  let groupPoints     = selfPurchasePoints;
+  let directActiveCount = 0;
   const seriesAchieverMap: Record<number, number> = {};
 
-  uplineDirectChildren.forEach((childId, seriesIndex) => {
+  directChildren.forEach((childId, seriesIndex) => {
     const childMember = memberMap.get(childId);
     if (!childMember) return;
 
-    const childIsWithdrawn = !bonusEligibleMemberIds.has(childId);
+    seriesAchieverMap[seriesIndex] = seriesAchieverMap[seriesIndex] ?? 0;
 
-    if (!childIsWithdrawn) {
-      seriesAchieverMap[seriesIndex] = seriesAchieverMap[seriesIndex] ?? 0;
-
-      const childPurchase = purchaseMap.get(childId);
-      const childIsActive = isActiveMember({
-        selfPoints: childPurchase?.selfPurchasePoints ?? 0,
-        purchasedRequiredProduct: childPurchase?.purchasedRequiredProduct ?? false,
-        forceActive: childMember.forceActive || false,
-      });
-
-      if (childIsActive) {
-        groupPoints += childPurchase?.selfPurchasePoints ?? 0;
-      }
-
-      const childLevel = pass1ResultMap
-        ? (pass1ResultMap.get(childId)?.achievedLevel ?? 0)
-        : (childMember.currentLevel || 0);
-
-      if (childLevel > (seriesAchieverMap[seriesIndex] ?? 0)) {
-        seriesAchieverMap[seriesIndex] = childLevel;
-      }
-
-      // uplineChildrenMap を使って傘下のGPを再帰計算
-      const subResult = calcSubGroupPoints(childId, uplineChildrenMap, purchaseMap, memberMap, 1, 7, pass1ResultMap, bonusEligibleMemberIds);
-      groupPoints += subResult.groupPoints;
-
-      if (subResult.maxLevel > (seriesAchieverMap[seriesIndex] ?? 0)) {
-        seriesAchieverMap[seriesIndex] = subResult.maxLevel;
-      }
-    } else {
-      // 退会者: 深さ消費なしで傘下を走査（GP加算なし）
-      const subResult = calcSubGroupPoints(childId, uplineChildrenMap, purchaseMap, memberMap, 0, 7, pass1ResultMap, bonusEligibleMemberIds);
-      groupPoints += subResult.groupPoints;
-    }
-  });
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // DAC計算: childrenMap（referrerIdツリー）を使用
-  // UNILEVEL_RATESの選択（level別 or DAC<2でrates[0]）に影響するため
-  // referrerツリーの直下アクティブ数を使う
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const referrerDirectChildren = childrenMap.get(memberId) || [];
-  let directActiveCount = 0;
-  for (const childId of referrerDirectChildren) {
-    const childMember = memberMap.get(childId);
-    if (!childMember) continue;
-    const childIsWithdrawn = !bonusEligibleMemberIds.has(childId);
-    if (childIsWithdrawn) continue;
     const childPurchase = purchaseMap.get(childId);
     const childIsActive = isActiveMember({
       selfPoints: childPurchase?.selfPurchasePoints ?? 0,
       purchasedRequiredProduct: childPurchase?.purchasedRequiredProduct ?? false,
       forceActive: childMember.forceActive || false,
     });
-    if (childIsActive) directActiveCount++;
-  }
 
-  // seriesCount: uplineIdツリーの退会者を除く直下系列数（viola-pure.biz準拠: lineCount用）
-  const nonWithdrawnUplineDirectCount = uplineDirectChildren.filter(id => bonusEligibleMemberIds.has(id)).length;
-  return { groupPoints, directActiveCount, seriesCount: nonWithdrawnUplineDirectCount, seriesAchieverMap };
+    if (childIsActive) {
+      directActiveCount++;
+      groupPoints += childPurchase?.selfPurchasePoints ?? 0;
+    }
+
+    // 達成レベル取得：Pass1結果があれば当月レベル、なければ currentLevel（DB値）
+    const childLevel = pass1ResultMap
+      ? (pass1ResultMap.get(childId)?.achievedLevel ?? 0)
+      : (childMember.currentLevel || 0);
+
+    if (childLevel > (seriesAchieverMap[seriesIndex] ?? 0)) {
+      seriesAchieverMap[seriesIndex] = childLevel;
+    }
+
+    const subResult = calcSubGroupPoints(childId, childrenMap, purchaseMap, memberMap, 1, 7, pass1ResultMap);
+    groupPoints += subResult.groupPoints;
+
+    if (subResult.maxLevel > (seriesAchieverMap[seriesIndex] ?? 0)) {
+      seriesAchieverMap[seriesIndex] = subResult.maxLevel;
+    }
+  });
+
+  return { groupPoints, directActiveCount, seriesCount: directChildren.length, seriesAchieverMap };
 }
 
 /**
- * 下位のグループポイントと最高レベルを再帰計算
- *
- * ★ 圧縮なし仕様（viola-pure.biz準拠）:
- *   - 非アクティブポジションも深さ(depth)を消費する → currentDepth + 1で子孫探索
- *   - 退会者（withdrawn）のみ深さを消費しない（組織から消えているため）
- *   - 7段制限は「実際のポジション段数」で判定
- *
- *   旧仕様（誤り）: 非アクティブを圧縮 → 深い層が繰り上がってGPが過大になる
- *   正仕様: 非アクティブは自身をGP加算しないが深さはカウント
- *
- * @param currentDepth 現在の深さ（退会者を経由する場合は深さを消費しない）
+ * 下位のグループポイントと最高レベルを再帰計算（圧縮あり）
+ * 非アクティブポジションはスキップし下位に潜る（圧縮）
  */
 function calcSubGroupPoints(
   memberId: bigint,
@@ -1126,8 +1071,7 @@ function calcSubGroupPoints(
   memberMap: Map<bigint, any>,
   currentDepth: number,
   maxDepth: number,
-  pass1ResultMap: Map<bigint, { achievedLevel: number }> | null,
-  bonusEligibleMemberIds: Set<bigint>
+  pass1ResultMap: Map<bigint, { achievedLevel: number }> | null
 ): { groupPoints: number; maxLevel: number } {
   if (currentDepth >= maxDepth) return { groupPoints: 0, maxLevel: 0 };
 
@@ -1140,24 +1084,12 @@ function calcSubGroupPoints(
     const childPurchase = purchaseMap.get(childId);
     if (!childMember) continue;
 
-    const childIsWithdrawn = !bonusEligibleMemberIds.has(childId);
-
-    if (childIsWithdrawn) {
-      // 退会者: GP加算なし・レベル0・深さ消費なし → 子孫を同じ深さで探索
-      // （退会者は組織から消えているので段数カウントしない）
-      const sub = calcSubGroupPoints(childId, childrenMap, purchaseMap, memberMap, currentDepth, maxDepth, pass1ResultMap, bonusEligibleMemberIds);
-      groupPoints += sub.groupPoints;
-      if (sub.maxLevel > maxLevel) maxLevel = sub.maxLevel;
-      continue;
-    }
-
     const childIsActive = isActiveMember({
       selfPoints: childPurchase?.selfPurchasePoints ?? 0,
       purchasedRequiredProduct: childPurchase?.purchasedRequiredProduct ?? false,
       forceActive: childMember.forceActive || false,
     });
 
-    // アクティブのみGPに加算
     if (childIsActive) groupPoints += childPurchase?.selfPurchasePoints ?? 0;
 
     // 達成レベル取得：Pass1結果があれば当月レベル、なければ currentLevel（DB値）
@@ -1167,8 +1099,7 @@ function calcSubGroupPoints(
 
     if (childLevel > maxLevel) maxLevel = childLevel;
 
-    // ★ 圧縮なし: 非アクティブでも depth+1で子孫探索（深さを消費する）
-    const sub = calcSubGroupPoints(childId, childrenMap, purchaseMap, memberMap, currentDepth + 1, maxDepth, pass1ResultMap, bonusEligibleMemberIds);
+    const sub = calcSubGroupPoints(childId, childrenMap, purchaseMap, memberMap, currentDepth + 1, maxDepth, pass1ResultMap);
     groupPoints += sub.groupPoints;
     if (sub.maxLevel > maxLevel) maxLevel = sub.maxLevel;
   }
@@ -1179,47 +1110,26 @@ function calcSubGroupPoints(
 /**
  * 段数別ポイントを計算（ユニレベルボーナス用）
  * アクティブな下位会員の購入ptを段数ごとに集計
- *
- * ★ Bug #3 Fix: 圧縮ロジックの修正
- *   旧: 非アクティブ会員の子孫を同じ段数で探索（圧縮）→ ¥131,850（過大）
- *   正: 非アクティブ会員は自身をスキップするが深さは消費する（depth+1で子孫探索）
- *       退会者（withdrawn）のみ圧縮扱い（深さ消費なし）
- *
- *   根拠（viola-pure.biz仕様）:
- *     ユニレベルは「ポジションの実際の段数」基準。非アクティブポジションは
- *     ボーナス対象外だが、その子孫の段数カウントは通常通り進む。
- *     VP社長の直下に非アクティブ会員がいても、その子孫は4段目以降に正しく配置される。
+ * 非アクティブは圧縮してスキップ（同じ段数のまま下位を探索）
  */
 function calcDepthPoints(
   memberId: bigint,
   childrenMap: Map<bigint, bigint[]>,
-  uplineChildrenMap: Map<bigint, bigint[]>,
   purchaseMap: Map<bigint, MemberPurchaseData>,
   memberMap: Map<bigint, any>,
-  achievedLevel: number,
-  bonusEligibleMemberIds: Set<bigint>
+  achievedLevel: number
 ): Record<number, number> {
   const maxDepth    = getUnilevelMaxDepth(achievedLevel);
   const depthPoints: Record<number, number> = {};
-  // UL計算は uplineChildrenMap（uplineIdツリー）を使用
-  // referrerツリーでは VP社長に8系列×7段=多すぎるため
-  const treeMap = uplineChildrenMap;
 
-  // WD（退会者）は圧縮（深さ消費なし）: 全WD透過
   function traverse(currentId: bigint, depth: number) {
     if (depth > maxDepth) return;
 
-    const children = treeMap.get(currentId) || [];
+    const children = childrenMap.get(currentId) || [];
     for (const childId of children) {
       const childMember   = memberMap.get(childId);
       const childPurchase = purchaseMap.get(childId);
       if (!childMember) continue;
-
-      const childIsWithdrawn = !bonusEligibleMemberIds.has(childId);
-      if (childIsWithdrawn) {
-        traverse(childId, depth);  // WD: depth消費なし（全透過）
-        continue;
-      }
 
       const childIsActive = isActiveMember({
         selfPoints: childPurchase?.selfPurchasePoints ?? 0,
@@ -1228,12 +1138,10 @@ function calcDepthPoints(
       });
 
       if (childIsActive) {
-        // アクティブ: 当段数に加算し、次段数へ進む
         depthPoints[depth] = (depthPoints[depth] || 0) + (childPurchase?.selfPurchasePoints ?? 0);
         traverse(childId, depth + 1);
       } else {
-        // 非アクティブ: ポイント加算なし、深さを消費して子孫を探索
-        traverse(childId, depth + 1);
+        traverse(childId, depth); // 圧縮：同じ段数で下位を探索
       }
     }
   }
@@ -1244,87 +1152,42 @@ function calcDepthPoints(
 
 /**
  * 最小系列ポイントを計算（組織構築ボーナス用）
- * uplineId ツリーの直下系列ごとにポイントを合計し、GP≥1の系列の中で最小値を返す
- *
- * ★ viola-pure.biz 仕様準拠:
- *   - lineCount（系列数）と minSeriesPoints は uplineId ツリーで計算する
- *   - VP社長(id=1484)のupline直下は id=1134 の1名 → lineCount=1
- *   - 退会者（withdrawn）は透過扱い：その子孫は同じ系列として集計
- *   - forceActive 会員は透過扱い：深さ消費なし・GP加算なし（自己購入0pt）
- *   - maxDepth=8: uplineツリー8段以内のみ集計
- *     ※ 旧コード（referrerツリー・深さ制限なし）での VP社長minSP:
- *       BonusRun=22(2026-03)=300pt、BonusRun=51(2026-04)=600pt（旧エンジン実値）
- *     ※ 現コード（uplineツリー・FA/WD透過・maxDepth=8）での VP社長minSP=30,300pt
- *       BonusRun=53(2026-04 draft)にて確認済み（2026-05-26調査）
- *
- * @param uplineChildrenMap uplineId ベースで構築された子リスト
+ * 直下系列ごとにポイントを合計し、GP≥1の系列の中で最小値を返す
+ * 仕様: 「グループボーナスが1pt以上の系列で比較し判定」
  */
 function calcMinSeriesPoints(
   memberId: bigint,
-  uplineChildrenMap: Map<bigint, bigint[]>,
+  childrenMap: Map<bigint, bigint[]>,
   purchaseMap: Map<bigint, MemberPurchaseData>,
-  memberMap: Map<bigint, any>,
-  bonusEligibleMemberIds: Set<bigint>
+  memberMap: Map<bigint, any>
 ): number {
-  const children = uplineChildrenMap.get(memberId) || [];
+  const children = childrenMap.get(memberId) || [];
   if (children.length === 0) return 0;
-
-  // ★ uplineツリーの深さ制限
-  // lapsed/withdrawn 透過（depth消費なし）込みで杉山由佳(82179501)の場合:
-  //   MAX_DEPTH=6: 系列[95446801:10350pt, 40431001:14100pt] min=10,350 → ¥36,225
-  //   MAX_DEPTH=7: 系列[95446801:12150pt, 40431001:16650pt] min=12,150 → ¥42,525
-  //   MAX_DEPTH=8: 系列[95446801:12900pt, 40431001:19500pt] min=12,900 → ¥45,150
-  // 期待値¥35,700（=10,200pt × 3.5% × 100）に最も近いのは MAX_DEPTH=6（¥36,225）
-  // 差は¥525（=150pt相当）で lapsed透過による誤差と考えられる
-  // → MAX_SERIES_DEPTH=7 を採用（前セッション調査値、目標値に最近）
-  const MAX_SERIES_DEPTH = 7;
 
   const seriesPoints: number[] = [];
 
   for (const childId of children) {
-    if (!bonusEligibleMemberIds.has(childId)) continue; // 退会者直下はスキップ
-
     let seriesTotal = 0;
 
-    function traverseSeries(currentId: bigint, depth: number) {
-      if (depth > MAX_SERIES_DEPTH) return; // ★ 深さ制限
+    function traverseSeries(currentId: bigint) {
       const purchase = purchaseMap.get(currentId);
       const mem      = memberMap.get(currentId);
       if (!mem) return;
 
-      const isWithdrawn  = !bonusEligibleMemberIds.has(currentId);
-      const isForceActive = mem.forceActive || false;
-
-      if (isWithdrawn) {
-        // 退会者: 深さ消費なしで透過
-        for (const descId of (uplineChildrenMap.get(currentId) || [])) {
-          traverseSeries(descId, depth);
-        }
-        return;
-      }
-
-      if (isForceActive) {
-        // forceActive: 深さ消費なしで透過（購入pt加算なし）
-        for (const descId of (uplineChildrenMap.get(currentId) || [])) {
-          traverseSeries(descId, depth);
-        }
-        return;
-      }
-
-      // 通常会員（非退会・非forceActive）: アクティブなら購入ptを加算
       const isActive = isActiveMember({
         selfPoints: purchase?.selfPurchasePoints ?? 0,
         purchasedRequiredProduct: purchase?.purchasedRequiredProduct ?? false,
-        forceActive: false,
+        forceActive: mem.forceActive || false,
       });
+
       if (isActive) seriesTotal += purchase?.selfPurchasePoints ?? 0;
 
-      for (const descId of (uplineChildrenMap.get(currentId) || [])) {
-        traverseSeries(descId, depth + 1);
+      for (const descId of (childrenMap.get(currentId) || [])) {
+        traverseSeries(descId);
       }
     }
 
-    traverseSeries(childId, 1);
+    traverseSeries(childId);
     if (seriesTotal >= 1) seriesPoints.push(seriesTotal);
   }
 
