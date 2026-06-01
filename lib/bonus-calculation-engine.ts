@@ -201,32 +201,33 @@ export async function executeBonusCalculation(
 
   // ────────────────────────────────────────────────────
   // 2. 全MLM会員を取得
-  //    ボーナス計算対象: active/autoship/suspended（退会者除く）
+  //    ボーナス計算対象: active/autoship/suspended/lapsed（退会者除く）
   //    組織ツリー用:     上記 + withdrawn（退会者）も含む
   //
-  // ★ 重要バグ修正:
+  // ★ lapsed（休眠）はボーナス計算対象に含める:
+  //   forceActive=true の lapsed 会員はアクティブ扱いでボーナスを取得できる。
+  //   スクショ確認: 杉山由佳(82179501,lapsed+forceActive)・有限会社オリエンタ(44504701,lapsed+forceActive)
+  //   が支払対象者一覧に掲載されている。
+  //
+  // ★ withdrawn（退会者）のみツリー構造用に別取得:
   //   withdrawn 会員を memberMap・childrenMap から除外すると、
   //   「退会者の紹介で入会した非退会者」がツリー上で孤立し、
   //   GP集計に含まれなくなる（過少計上バグ）。
-  //   修正: withdrawn 会員もツリー構造のために取得するが、
+  //   修正: withdrawn 会員のみツリー構造のために取得するが、
   //   ボーナス計算（isActive 判定・報酬付与）の対象からは外す。
   // ────────────────────────────────────────────────────
   onProgress("会員データ読み込み中...");
 
-  // ボーナス計算対象会員（退会者除く）
+  // ボーナス計算対象会員（退会者除く・休眠者lapsedは含む）
   const members = await prisma.mlmMember.findMany({
-    where: { status: { in: ["active", "autoship", "suspended"] } },
+    where: { status: { in: ["active", "autoship", "suspended", "lapsed"] } },
     include: { user: { select: { name: true, email: true } } },
   });
 
-  // 組織ツリー構造のためだけに取得する退会者・休眠者（ボーナス計算対象外）
-  // ★ Bug Fix: lapsed（休眠）も withdrawn と同様に透過扱い（depth消費なし）にする
-  //   lapsed は bonusEligibleMemberIds に含まれないが、withdrawn と同様に
-  //   メンバーマップに _isWithdrawn: true フラグで登録することで
-  //   calcDepthPoints / calcSubGroupPoints / calcMinSeriesPoints で
-  //   「深さを消費しない透過ノード」として正しく処理される。
+  // 組織ツリー構造のためだけに取得する退会者（ボーナス計算対象外）
+  // withdrawn のみ: lapsed はボーナス計算対象なので members に含まれている
   const withdrawnMembers = await prisma.mlmMember.findMany({
-    where: { status: { in: ["withdrawn", "lapsed"] } },
+    where: { status: { in: ["withdrawn"] } },
     select: {
       id: true,
       memberCode: true,
@@ -697,11 +698,19 @@ export async function executeBonusCalculation(
 
     // ━━━ ⑤合計ボーナス・支払い計算 ━━━
     //
-    // 貯金ボーナス円換算：savingsPointsAdded（float pt）× POINT_RATE
-    // ※ savingsPointsAdded はまだ×10スケール前のpt単位の値
+    // ■ 計算式（仕様書準拠）
+    //   ボーナス合計 = ダイレクトB + ユニレベルB + 組織構築B + 繰越金 + 調整金
+    //   支払調整額   = ボーナス合計 ÷ 1.1 × 支払調整率
+    //   取得額       = ボーナス合計 - 支払調整額
+    //   消費税       = 取得額（税抜）× 10%  ← 取得額 ÷ 11 で内税計算
+    //   源泉税       = 取得額 > ¥120,000 の場合、(取得額 - ¥120,000) × 10.21%（法人除く）
+    //   事務手数料   = 一律¥440（最低支払金額未満は0）
+    //   支払額       = 取得額 - 源泉税 - 事務手数料（過不足金はPost-Processで加算）
+    //
+    // 貯金ボーナス円換算（表示用のみ・支払額には含めない）
     const savingsBonusYen   = Math.round(savingsPointsAdded * POINT_RATE);
 
-    // ランクアップB・シェアB: 2026年4月度は未実装 → 0
+    // ランクアップB・シェアB: 未実装 → 0
     const rankUpBonus       = 0;
     const shareBonus        = 0;
 
@@ -712,35 +721,37 @@ export async function executeBonusCalculation(
     const adjEntry          = adjustmentMap.get(member.id);
     const adjustmentAmount  = adjEntry ? adjEntry.total : 0;
 
-    // 支払調整前取得額 = 全ボーナス合計
-    // ※ savingsBonusYen は報酬計算に含めない。貯金ポイント(savingsPoints)にのみ反映する
-    // directB + unilevelB + rankUpB + shareB + structureB + carryoverAmount + adjustmentAmount
+    // ボーナス合計 = ダイレクトB + ユニレベルB + 組織構築B + 繰越金 + 調整金
+    // ※ savingsBonusYen は支払額に含めない（貯金ポイントへのみ反映）
     const amountBeforeAdjustment =
       directBonus + unilevelResult.total + rankUpBonus + shareBonus
       + structureBonus + carryoverAmount + adjustmentAmount;
 
-    // ★ 仕様書準拠: 支払調整額 = 税込報酬額 ÷ 1.1 × 差引く税率
-    // 算出例: 税込報酬額 - (税込報酬額 ÷ 1.1 × [差引く税率])
-    // ∴ 支払調整額 = Math.floor(amountBeforeAdjustment / 1.1 * paymentAdjustmentRate)
+    // 支払調整額 = ボーナス合計 ÷ 1.1 × 支払調整率
     const paymentAdjustmentAmount =
       paymentAdjustmentRate !== null ? Math.floor(amountBeforeAdjustment / 1.1 * paymentAdjustmentRate) : 0;
+
+    // 取得額 = ボーナス合計 - 支払調整額
     const finalAmount = amountBeforeAdjustment - paymentAdjustmentAmount;
 
-    // 10%消費税（内税）
+    // 消費税（内税）= 取得額 ÷ 11（10%の内税）
     const consumptionTax = Math.floor(finalAmount / 11);
 
+    // 源泉税 = (取得額 - ¥120,000) × 10.21%（法人除く・取得額が¥120,000超の場合）
     const isCompany = !!(member as any).companyName;
     let withholdingTax = 0;
     if (!isCompany && finalAmount > WITHHOLDING_THRESHOLD) {
       withholdingTax = Math.floor((finalAmount - WITHHOLDING_THRESHOLD) * WITHHOLDING_RATE);
     }
 
-    // 過不足金
+    // 過不足金（CSVデータ取り込み時に追加されたもの）
     const shortageAmount    = shortageMap.get(member.id) ?? 0;
 
+    // 事務手数料 = 一律¥440（最低支払金額を超える場合のみ）
     const serviceFee        = finalAmount > resolvedSettings.minPayoutAmount ? resolvedSettings.serviceFeeAmount : 0;
-    // 支払額: Math.max なし（負値を許容）。他ポジション過不足金はPost-Processで加算
-    const paymentAmount     = finalAmount - withholdingTax - serviceFee + shortageAmount;
+
+    // 支払額 = 取得額 - 源泉税 - 事務手数料（+ 過不足金はPost-Processで加算）
+    const paymentAmount     = finalAmount - withholdingTax - serviceFee;
 
     totalBonusAmount += paymentAmount;
 
@@ -815,7 +826,7 @@ export async function executeBonusCalculation(
       pos01.otherPositionAmount   += pos.finalAmount;
       pos01.otherPositionShortage += pos.shortageAmount;
     }
-    // 01ポジションの paymentAmount を再計算（otherPositionShortageを加算）
+    // 01ポジションの paymentAmount を再計算（shortageAmount + otherPositionShortageを加算）
     pos01.paymentAmount =
       pos01.finalAmount - pos01.withholdingTax - pos01.serviceFee
       + pos01.shortageAmount + pos01.otherPositionShortage;
