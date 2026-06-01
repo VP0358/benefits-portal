@@ -593,21 +593,15 @@ export async function executeBonusCalculation(
 
     // ボーナス受取資格
     // ★ 02/03口はUL/STRを受け取らない（memberCode末尾が"01"または枝番なし8桁のみ受取対象）
-    // ★ eligibleの系列数判定: Math.max(seriesCount, directActiveCount) を使用
-    //   - seriesCount (uplineId直下全数): 72911501のようにwithdrawn2名直下でDAC=0でも
-    //     seriesCount=2としてeligible=trueにするため必要
-    //   - directActiveCount (referrerId直下アクティブ数): 44504701のようにupline直下=1名でも
-    //     referrer直下に7名いる場合eligibleにするため必要
-    //   → 両方の最大値を取ることで全ケースを正確にカバー
+    // ★ eligibleの系列数判定: directActiveCount（referrerId直下アクティブ数）を使用
     const memberCodeStr = (member as any).memberCode as string;
     const isFirstPos_eligible = isFirstPosition(memberCodeStr);
     const conditionAchieved = member.conditionAchieved || false;
-    const effectiveSeries = Math.max(seriesCount, directActiveCount);
-    const eligible = isFirstPos_eligible && isEligibleForBonus({ isActive, directActiveCount: effectiveSeries, conditionAchieved });
+    const eligible = isFirstPos_eligible && isEligibleForBonus({ isActive, directActiveCount, conditionAchieved });
 
     if (isActive) {
       console.log(
-        `  👤 ${memberCodeStr}: active=${isActive} firstPos=${isFirstPos_eligible} series=${seriesCount} dac=${directActiveCount} effectiveSeries=${effectiveSeries}(>=2?) conditionAchieved=${conditionAchieved} eligible=${eligible} GP=${groupPoints} selfPt=${purchaseData.selfPurchasePoints} level=${achievedLevel}`
+        `  👤 ${memberCodeStr}: active=${isActive} firstPos=${isFirstPos_eligible} series=${seriesCount} dac=${directActiveCount} conditionAchieved=${conditionAchieved} eligible=${eligible} GP=${groupPoints} selfPt=${purchaseData.selfPurchasePoints} level=${achievedLevel}`
       );
     }
 
@@ -627,20 +621,15 @@ export async function executeBonusCalculation(
     }
 
     // ━━━ ②ユニレベルボーナス ━━━
+    // ★ ULツリー: uplineChildrenMap 固定
+    // ★ 複数ポジション保有者（01〜06番）の場合、各ポジションが自身のuplineツリーで
+    //   ULを計算し、Post-Process で 01 番のunilevelBonusに合算する
     let unilevelResult = { total: 0, detail: {} as Record<number, number> };
     if (eligible) {
-      // ★ UL深さ別ポイントを referrerツリー と uplineツリー の両方で計算し、合計ULが大きい方を採用
-      //   - 44504701: referrer直下7名の組織が大きい → referrerツリーが正 (ref=¥162,000 > upline=¥43,050)
-      //   - 82179501: upline直下に95446801→大組織 → uplineツリーが正 (upline=¥51,750 > ref=¥0)
-      //   → 両方計算してmax値を使うことで全ケースを正確にカバー
-      const depthPointsRef    = calcDepthPoints(member.id, childrenMap,       uplineChildrenMap, memberPurchaseMap, memberMap, achievedLevel, bonusEligibleMemberIds);
-      const depthPointsUpline = calcDepthPoints(member.id, uplineChildrenMap, uplineChildrenMap, memberPurchaseMap, memberMap, achievedLevel, bonusEligibleMemberIds);
-      const resultRef    = calcUnilevelBonus(depthPointsRef,    achievedLevel, effectiveSeries);
-      const resultUpline = calcUnilevelBonus(depthPointsUpline, achievedLevel, effectiveSeries);
-      unilevelResult = resultRef.total >= resultUpline.total ? resultRef : resultUpline;
+      const depthPoints = calcDepthPoints(member.id, uplineChildrenMap, memberPurchaseMap, memberMap, achievedLevel, bonusEligibleMemberIds);
+      unilevelResult = calcUnilevelBonus(depthPoints, achievedLevel, directActiveCount);
       if (unilevelResult.total > 0) {
-        const treeUsed = resultRef.total >= resultUpline.total ? 'ref' : 'upline';
-        console.log(`  📊 ユニレベルB: ${(member as any).memberCode} LV.${achievedLevel} → ¥${unilevelResult.total.toLocaleString()} (tree=${treeUsed} ref=¥${resultRef.total.toLocaleString()} upline=¥${resultUpline.total.toLocaleString()})`);
+        console.log(`  📊 ユニレベルB: ${(member as any).memberCode} LV.${achievedLevel} → ¥${unilevelResult.total.toLocaleString()}`);
       }
     }
 
@@ -837,13 +826,27 @@ export async function executeBonusCalculation(
       return mc.endsWith("-01") || !mc.includes("-");
     });
     if (!pos01) continue;
-    // 非01ポジションの finalAmount / shortageAmount を集計
+    // 非01ポジションの ULボーナス / finalAmount / shortageAmount を 01 に集計
+    // ★ 複数ポジション保有者仕様: 各ポジション（01〜06番）のULを合算して01番に表示
     for (const pos of positions) {
       if (pos === pos01) continue;
-      pos01.otherPositionAmount   += pos.finalAmount;
-      pos01.otherPositionShortage += pos.shortageAmount;
+      pos01.unilevelBonus          += pos.unilevelBonus;
+      pos01.otherPositionAmount    += pos.finalAmount;
+      pos01.otherPositionShortage  += pos.shortageAmount;
     }
-    // 01ポジションの paymentAmount を再計算（otherPositionShortageを加算）
+    // 01ポジションの amountBeforeAdjustment / finalAmount / paymentAmount を再計算
+    pos01.amountBeforeAdjustment =
+      pos01.directBonus + pos01.unilevelBonus + pos01.rankUpBonus + pos01.shareBonus
+      + pos01.structureBonus + pos01.carryoverAmount + pos01.adjustmentAmount;
+    const adjAmt = paymentAdjustmentRate !== null
+      ? Math.floor(pos01.amountBeforeAdjustment / 1.1 * paymentAdjustmentRate) : 0;
+    pos01.paymentAdjustmentAmount = adjAmt;
+    pos01.finalAmount = pos01.amountBeforeAdjustment - adjAmt;
+    pos01.consumptionTax = Math.floor(pos01.finalAmount / 11);
+    const isCompany01 = !!(memberMap.get(pos01.mlmMemberId) as any).companyName;
+    pos01.withholdingTax = (!isCompany01 && pos01.finalAmount > WITHHOLDING_THRESHOLD)
+      ? Math.floor((pos01.finalAmount - WITHHOLDING_THRESHOLD) * WITHHOLDING_RATE) : 0;
+    pos01.serviceFee = pos01.finalAmount > resolvedSettings.minPayoutAmount ? resolvedSettings.serviceFeeAmount : 0;
     pos01.paymentAmount =
       pos01.finalAmount - pos01.withholdingTax - pos01.serviceFee
       + pos01.shortageAmount + pos01.otherPositionShortage;
@@ -1129,10 +1132,10 @@ function calcGroupDataFull(
     if (childIsActive) directActiveCount++;
   }
 
-  // seriesCount: uplineIdツリーの全直下数（withdrawn含む）
-  // ★ 72911501（舟山仙恵）のように uplChildren が全員 withdrawn でも
-  //   seriesCount=2 として eligible=true にするため withdrawn を含める。
-  //   根拠: eligible判定は「ポジション数≥2」（実際のメンバー存在ベース）で判定する仕様。
+  // seriesCount: uplineIdツリーの直下数
+  // ★ LV達成判定用: withdrawn含む全直下数（72911501のようにwithdrawn2名直下でも series=2 としてLV判定させる）
+  // ★ eligible判定はdirectActiveCount（referrer直下アクティブ数）で別途判定するため、
+  //   ここではLV判定用にwithdrawn含む全数を返す
   const seriesCountAll = uplineDirectChildren.length;
   return { groupPoints, directActiveCount, seriesCount: seriesCountAll, seriesAchieverMap };
 }
@@ -1211,20 +1214,15 @@ function calcSubGroupPoints(
  * 段数別ポイントを計算（ユニレベルボーナス用）
  * アクティブな下位会員の購入ptを段数ごとに集計
  *
- * ★ Bug #3 Fix: 圧縮ロジックの修正
- *   旧: 非アクティブ会員の子孫を同じ段数で探索（圧縮）→ ¥131,850（過大）
- *   正: 非アクティブ会員は自身をスキップするが深さは消費する（depth+1で子孫探索）
- *       退会者（withdrawn）のみ圧縮扱い（深さ消費なし）
- *
- *   根拠（viola-pure.biz仕様）:
- *     ユニレベルは「ポジションの実際の段数」基準。非アクティブポジションは
- *     ボーナス対象外だが、その子孫の段数カウントは通常通り進む。
- *     VP社長の直下に非アクティブ会員がいても、その子孫は4段目以降に正しく配置される。
+ * ★ Fix10 仕様:
+ *   - ツリー: uplineChildrenMap（uplineIdベース）固定
+ *   - 非アクティブ: ポイント加算なし・depth消費なし（透過）
+ *   - withdrawn / lapsed(forceActive=false): depth消費なし（透過）
+ *   - アクティブのみ: 当段数に加算し depth+1 で子孫探索
  */
 function calcDepthPoints(
   memberId: bigint,
-  childrenMap: Map<bigint, bigint[]>,
-  uplineChildrenMap: Map<bigint, bigint[]>,
+  treeMap: Map<bigint, bigint[]>,
   purchaseMap: Map<bigint, MemberPurchaseData>,
   memberMap: Map<bigint, any>,
   achievedLevel: number,
@@ -1232,12 +1230,8 @@ function calcDepthPoints(
 ): Record<number, number> {
   const maxDepth    = getUnilevelMaxDepth(achievedLevel);
   const depthPoints: Record<number, number> = {};
-  // ★ UL計算は childrenMap（referrerIdツリー）を使用
-  //   旧システムと一致: 44504701はreferrer直下7名の傘下全体でポイント計算
-  //   uplineIdツリーだと44504701のupline直下=82179501(1名・selfPt=0)のみでほぼ0になるため
-  const treeMap = childrenMap;
 
-  // WD（退会者）は圧縮（深さ消費なし）: 全WD透過
+  // 非アクティブ・withdrawn はどちらも透過（depth消費なし）
   function traverse(currentId: bigint, depth: number) {
     if (depth > maxDepth) return;
 
@@ -1249,7 +1243,7 @@ function calcDepthPoints(
 
       const childIsWithdrawn = !bonusEligibleMemberIds.has(childId);
       if (childIsWithdrawn) {
-        traverse(childId, depth);  // WD: depth消費なし（全透過）
+        traverse(childId, depth);  // withdrawn: depth消費なし（透過）
         continue;
       }
 
@@ -1264,8 +1258,8 @@ function calcDepthPoints(
         depthPoints[depth] = (depthPoints[depth] || 0) + (childPurchase?.selfPurchasePoints ?? 0);
         traverse(childId, depth + 1);
       } else {
-        // 非アクティブ: ポイント加算なし、深さを消費して子孫を探索
-        traverse(childId, depth + 1);
+        // 非アクティブ: ポイント加算なし・depth消費なし（透過）
+        traverse(childId, depth);
       }
     }
   }
