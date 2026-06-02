@@ -315,8 +315,12 @@ export async function executeBonusCalculation(
   // ────────────────────────────────────────────────────
   onProgress("購入データ読み込み中...");
 
+  // ★ クーリングオフ・キャンセル済みは自己購入ptから除外（仕様: 有効な購入のみ集計）
   const purchases = await prisma.mlmPurchase.findMany({
-    where: { purchaseMonth: bonusMonth },
+    where: {
+      purchaseMonth: bonusMonth,
+      purchaseStatus: { notIn: ["cooling_off", "canceled"] },
+    },
     include: {
       mlmMember: { select: { id: true, memberCode: true } },
       order: { select: { id: true, slipType: true, paidAt: true, paymentStatus: true } },
@@ -631,6 +635,12 @@ export async function executeBonusCalculation(
       if (unilevelResult.total > 0) {
         console.log(`  📊 ユニレベルB: ${(member as any).memberCode} LV.${achievedLevel} → ¥${unilevelResult.total.toLocaleString()}`);
       }
+      // ★ 検証基準会員のデバッグ出力
+      const DEBUG_CODES = ["82179501","44504701","86820601","93713601"];
+      if (DEBUG_CODES.includes((member as any).memberCode)) {
+        console.log(`  🔍 [DEBUG] ${(member as any).memberCode} depthPoints: ${JSON.stringify(depthPoints)}`);
+        console.log(`  🔍 [DEBUG] ${(member as any).memberCode} unilevelDetail: ${JSON.stringify(unilevelResult.detail)}`);
+      }
     }
 
     // ━━━ ③組織構築ボーナス ━━━
@@ -652,6 +662,11 @@ export async function executeBonusCalculation(
       structureBonus = Math.floor(minSeriesPoints * (rate / 100) * POINT_RATE);
       if (structureBonus > 0) {
         console.log(`  🏗️ 組織構築B: ${memberCodeStr} LV.${achievedLevel} 最小系列${minSeriesPoints}pt × ${rate}% → ¥${structureBonus.toLocaleString()}`);
+      }
+      // ★ 検証基準会員のデバッグ出力
+      const DEBUG_CODES2 = ["82179501","44504701","86820601","93713601"];
+      if (DEBUG_CODES2.includes(memberCodeStr)) {
+        console.log(`  🔍 [DEBUG-SB] ${memberCodeStr} minSeriesPt=${minSeriesPoints} rate=${rate}% structureBonus=¥${structureBonus}`);
       }
     }
 
