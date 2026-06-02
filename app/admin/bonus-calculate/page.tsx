@@ -772,7 +772,8 @@ export default function BonusCalculatePage() {
     if (!selectedMonth) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/bonus-run?bonusMonth=${selectedMonth}`);
+      const ts = Date.now();
+      const res = await fetch(`/api/admin/bonus-run?bonusMonth=${selectedMonth}&_t=${ts}`, { cache: "no-store" });
       const data = await res.json();
       if (res.ok) {
         setBonusRun(data.bonusRun);
@@ -780,7 +781,7 @@ export default function BonusCalculatePage() {
         if (data.bonusRun) {
           // 計算結果の詳細を取得（エラーでも bonusRun は表示する）
           try {
-            const resDetail = await fetch(`/api/admin/bonus-results/detail?bonusMonth=${selectedMonth}`);
+            const resDetail = await fetch(`/api/admin/bonus-results/detail?bonusMonth=${selectedMonth}&_t=${ts}`, { cache: "no-store" });
             const detailData = await resDetail.json();
             if (resDetail.ok && Array.isArray(detailData.results)) {
               setResults(detailData.results);

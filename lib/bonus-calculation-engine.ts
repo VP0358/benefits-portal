@@ -634,18 +634,17 @@ export async function executeBonusCalculation(
     }
 
     // ━━━ ③組織構築ボーナス ━━━
-    // ★ 仕様変更: 直接紹介2名条件（eligible）は組織構築Bには適用しない
-    //   条件: isActive + conditionAchieved + LV.3以上 + 01ポジション
-    //   → 44504701・89248801など1系列でも対象になる
+    // ★ 仕様: 直接紹介2名条件（eligible）は組織構築Bにも必要
+    //   条件: eligible（isActive + directActiveCount>=2 + conditionAchieved）+ LV.3以上 + 01ポジション
+    //   ※ isOrgException（44504701・89248801）は1系列でも対象になる（seriesCountとは別概念）
     let structureBonus  = 0;
     let minSeriesPoints = 0;
     // memberCodeStr / isFirstPos_eligible は eligible 判定ブロックで宣言済み
     const isFirstPos    = isFirstPos_eligible; // isFirstPosition(memberCodeStr) と同値
 
-    // 組織構築Bの資格: アクティブ + conditionAchieved + LV.3以上 + 01ポジション
-    // ※ 直接紹介2名（eligible）の条件は組織構築Bには適用しない
-    const structureEligible = isActive && conditionAchieved && achievedLevel >= 3 && isFirstPos;
-    if (structureEligible) {
+    // 組織構築Bの資格: eligible（直ACT2名以上を含む）+ LV.3以上 + 01ポジション
+    // ★ 直接紹介2名（eligible）の条件は組織構築Bにも適用する（貯金Bとは異なる）
+    if (eligible && achievedLevel >= 3 && isFirstPos) {
       minSeriesPoints = calcMinSeriesPoints(member.id, uplineChildrenMap, memberPurchaseMap, memberMap, bonusEligibleMemberIds);
       const rate = STRUCTURE_BONUS_RATES[achievedLevel] ?? 0;
       // 組織構築ボーナス = 最小系列ポイント × レベル別率 × POINT_RATE

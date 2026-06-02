@@ -36,13 +36,13 @@ export async function GET(req: NextRequest) {
     return new Response("bonusMonth required", { status: 400 });
   }
 
-  // 既存チェック
+  // 既存チェック → 存在する場合は削除してから再計算（force recalculate）
   const existing = await prisma.bonusRun.findUnique({ where: { bonusMonth } });
   if (existing) {
-    return new Response(
-      JSON.stringify({ error: "Bonus calculation already exists for this month" }),
-      { status: 409, headers: { "Content-Type": "application/json" } }
-    );
+    console.log(`🗑️ 既存ボーナス実行を削除してから再計算: ${bonusMonth} (id=${existing.id})`);
+    // カスケード削除（BonusResultも自動削除）
+    await prisma.bonusRun.delete({ where: { bonusMonth } });
+    console.log(`✅ 削除完了: ${bonusMonth}`);
   }
 
   const rateDecimal =

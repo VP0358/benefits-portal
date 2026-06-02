@@ -48,6 +48,11 @@ export async function GET(req: NextRequest) {
         confirmedAt: bonusRun.confirmedAt?.toISOString(),
         createdAt: bonusRun.createdAt.toISOString(),
       },
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        "Pragma": "no-cache",
+      },
     });
   } catch (error) {
     console.error("Error fetching bonus run:", error);
@@ -79,16 +84,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 既存のボーナス実行をチェック
+    // 既存のボーナス実行をチェック → 存在する場合は削除してから再計算
     const existing = await prisma.bonusRun.findUnique({
       where: { bonusMonth },
     });
 
     if (existing) {
-      return NextResponse.json(
-        { error: "Bonus calculation already exists for this month" },
-        { status: 409 }
-      );
+      console.log(`🗑️ 既存ボーナス実行を削除してから再計算: ${bonusMonth} (id=${existing.id})`);
+      await prisma.bonusRun.delete({ where: { bonusMonth } });
+      console.log(`✅ 削除完了: ${bonusMonth}`);
     }
 
     // ボーナス計算実行（エンジン呼び出し）
