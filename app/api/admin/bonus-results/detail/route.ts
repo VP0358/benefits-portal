@@ -248,6 +248,11 @@ export async function GET(req: NextRequest) {
         createdAt: bonusRun.createdAt.toISOString(),
       },
       results,
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        "Pragma": "no-cache",
+      },
     });
   } catch (error) {
     console.error("Error fetching bonus results detail:", error);

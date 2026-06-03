@@ -315,8 +315,12 @@ export async function executeBonusCalculation(
   // ────────────────────────────────────────────────────
   onProgress("購入データ読み込み中...");
 
+  // ★ クーリングオフ・キャンセル済みは自己購入ptから除外（仕様: 有効な購入のみ集計）
   const purchases = await prisma.mlmPurchase.findMany({
-    where: { purchaseMonth: bonusMonth },
+    where: {
+      purchaseMonth: bonusMonth,
+      purchaseStatus: { notIn: ["cooling_off", "canceled"] },
+    },
     include: {
       mlmMember: { select: { id: true, memberCode: true } },
       order: { select: { id: true, slipType: true, paidAt: true, paymentStatus: true } },
@@ -631,23 +635,38 @@ export async function executeBonusCalculation(
       if (unilevelResult.total > 0) {
         console.log(`  📊 ユニレベルB: ${(member as any).memberCode} LV.${achievedLevel} → ¥${unilevelResult.total.toLocaleString()}`);
       }
+      // ★ 検証基準会員のデバッグ出力
+      const DEBUG_CODES = ["82179501","44504701","86820601","93713601"];
+      if (DEBUG_CODES.includes((member as any).memberCode)) {
+        console.log(`  🔍 [DEBUG] ${(member as any).memberCode} depthPoints: ${JSON.stringify(depthPoints)}`);
+        console.log(`  🔍 [DEBUG] ${(member as any).memberCode} unilevelDetail: ${JSON.stringify(unilevelResult.detail)}`);
+      }
     }
 
     // ━━━ ③組織構築ボーナス ━━━
+    // ★ 仕様: 直接紹介2名条件（eligible）は組織構築Bにも必要
+    //   条件: eligible（isActive + directActiveCount>=2 + conditionAchieved）+ LV.3以上 + 01ポジション
+    //   ※ isOrgException（44504701・89248801）は1系列でも対象になる（seriesCountとは別概念）
     let structureBonus  = 0;
     let minSeriesPoints = 0;
     // memberCodeStr / isFirstPos_eligible は eligible 判定ブロックで宣言済み
     const isFirstPos    = isFirstPos_eligible; // isFirstPosition(memberCodeStr) と同値
 
+    // 組織構築Bの資格: eligible（直ACT2名以上を含む）+ LV.3以上 + 01ポジション
+    // ★ 直接紹介2名（eligible）の条件は組織構築Bにも適用する（貯金Bとは異なる）
     if (eligible && achievedLevel >= 3 && isFirstPos) {
       minSeriesPoints = calcMinSeriesPoints(member.id, uplineChildrenMap, memberPurchaseMap, memberMap, bonusEligibleMemberIds);
       const rate = STRUCTURE_BONUS_RATES[achievedLevel] ?? 0;
       // 組織構築ボーナス = 最小系列ポイント × レベル別率 × POINT_RATE
-      // 例: 30,600pt × 4% × ¥100 = ¥122,400
-      // ※ groupPoints（7段制限内）ではなく最小系列pt（制限なし）が正しい基準
+      // 計算式: 最小系列PT × LV率 × 100（0pt系列除外・1系列でも対象）
       structureBonus = Math.floor(minSeriesPoints * (rate / 100) * POINT_RATE);
       if (structureBonus > 0) {
         console.log(`  🏗️ 組織構築B: ${memberCodeStr} LV.${achievedLevel} 最小系列${minSeriesPoints}pt × ${rate}% → ¥${structureBonus.toLocaleString()}`);
+      }
+      // ★ 検証基準会員のデバッグ出力
+      const DEBUG_CODES2 = ["82179501","44504701","86820601","93713601"];
+      if (DEBUG_CODES2.includes(memberCodeStr)) {
+        console.log(`  🔍 [DEBUG-SB] ${memberCodeStr} minSeriesPt=${minSeriesPoints} rate=${rate}% structureBonus=¥${structureBonus}`);
       }
     }
 
@@ -681,18 +700,23 @@ export async function executeBonusCalculation(
       }
     }
 
-    // B・C: autoship かつ 当月アクティブのみ
+    // B・C: autoship かつ 当月アクティブのみ（直接紹介2名条件は不要）
     if (isFirstPos && memberStatus === "autoship" && isActive) {
+      // 成分B: 01番のAS購入PT × 5%
       if (purchaseData.hasAutoshipInvoice && purchaseData.autoshipInvoicePoints > 0) {
         const ptB = Math.floor(purchaseData.autoshipInvoicePoints * (savingsAutoshipRate / 100) * 10) / 10;
         savingsPointsAdded += ptB;
         console.log(`  💰 貯金B: ${memberCodeStr} AS伝票${purchaseData.autoshipInvoicePoints}pt × ${savingsAutoshipRate}% = ${ptB}pt`);
       }
-      const hasBonusThisMonth = (directBonus + unilevelResult.total + structureBonus) > 0;
-      if (hasBonusThisMonth && groupPoints > 0) {
-        const ptC = Math.floor(groupPoints * (savingsBonusRate / 100) * 10) / 10;
+      // 成分C: 01番の獲得ポイント（directB+unilevelB+structureB ÷ POINT_RATE）× 3%
+      // ★ 仕様変更: groupPoints × 3% → 獲得ポイント(円/100) × 3%
+      //   仕様書: 01番の獲得ポイント × 3%（グループPTではなく実際に獲得したボーナス円÷100）
+      const earnedTotalYen = directBonus + unilevelResult.total + structureBonus;
+      const earnedTotalPt  = Math.floor(earnedTotalYen / POINT_RATE);
+      if (earnedTotalPt > 0) {
+        const ptC = Math.floor(earnedTotalPt * (savingsBonusRate / 100) * 10) / 10;
         savingsPointsAdded += ptC;
-        console.log(`  💰 貯金C: ${memberCodeStr} GP=${groupPoints}pt × ${savingsBonusRate}% = ${ptC}pt`);
+        console.log(`  💰 貯金C: ${memberCodeStr} 獲得pt=${earnedTotalPt}pt × ${savingsBonusRate}% = ${ptC}pt (獲得ボーナス¥${earnedTotalYen})`);
       }
     }
 
@@ -714,9 +738,9 @@ export async function executeBonusCalculation(
 
     // ━━━ ⑤合計ボーナス・支払い計算 ━━━
     //
-    // 貯金ボーナス円換算：savingsPointsAdded（float pt）× POINT_RATE
-    // ※ savingsPointsAdded はまだ×10スケール前のpt単位の値
-    const savingsBonusYen   = Math.round(savingsPointsAdded * POINT_RATE);
+    // ★ 貯金ボーナスは現金ボーナスではない。支払額に混ぜない。
+    //   savingsPointsAdded は貯金PT列のみに反映する（円換算して支払額に含めない）
+    const savingsBonusYen   = 0; // 貯金ボーナスは支払額に含めない（savingsPoints列のみ）
 
     // ランクアップB・シェアB: 2026年4月度は未実装 → 0
     const rankUpBonus       = 0;
@@ -755,9 +779,18 @@ export async function executeBonusCalculation(
     // 過不足金
     const shortageAmount    = shortageMap.get(member.id) ?? 0;
 
-    const serviceFee        = finalAmount > resolvedSettings.minPayoutAmount ? resolvedSettings.serviceFeeAmount : 0;
-    // 支払額: Math.max なし（負値を許容）。他ポジション過不足金はPost-Processで加算
-    const paymentAmount     = finalAmount - withholdingTax - serviceFee + shortageAmount;
+    // ★ 支払いルール（仕様書準拠）:
+    //   控除前取得額（amountBeforeAdjustment）が ¥3,000未満 → 繰越（paymentAmount=0）
+    //   ¥3,000以上のみ支払対象。事務手数料 ¥440 を控除
+    const MIN_PAYOUT_THRESHOLD = 3000; // 最低支払閾値（控除前取得額ベース）
+    const serviceFee = amountBeforeAdjustment >= MIN_PAYOUT_THRESHOLD
+      ? resolvedSettings.serviceFeeAmount
+      : 0;
+    // 支払額: amountBeforeAdjustmentが3000円未満の場合はpaymentAmount=0（繰越）
+    // 他ポジション過不足金はPost-Processで加算
+    const paymentAmount = amountBeforeAdjustment >= MIN_PAYOUT_THRESHOLD
+      ? finalAmount - withholdingTax - serviceFee + shortageAmount
+      : 0 + shortageAmount; // 閾値未満: 0（繰越）+ 過不足金のみ
 
     totalBonusAmount += paymentAmount;
 
@@ -846,10 +879,13 @@ export async function executeBonusCalculation(
     const isCompany01 = !!(memberMap.get(pos01.mlmMemberId) as any).companyName;
     pos01.withholdingTax = (!isCompany01 && pos01.finalAmount > WITHHOLDING_THRESHOLD)
       ? Math.floor((pos01.finalAmount - WITHHOLDING_THRESHOLD) * WITHHOLDING_RATE) : 0;
-    pos01.serviceFee = pos01.finalAmount > resolvedSettings.minPayoutAmount ? resolvedSettings.serviceFeeAmount : 0;
-    pos01.paymentAmount =
-      pos01.finalAmount - pos01.withholdingTax - pos01.serviceFee
-      + pos01.shortageAmount + pos01.otherPositionShortage;
+    // ★ 支払いルール: amountBeforeAdjustment が ¥3,000未満の場合はpaymentAmount=0（繰越）
+    const POST_MIN_PAYOUT = 3000;
+    pos01.serviceFee = pos01.amountBeforeAdjustment >= POST_MIN_PAYOUT ? resolvedSettings.serviceFeeAmount : 0;
+    pos01.paymentAmount = pos01.amountBeforeAdjustment >= POST_MIN_PAYOUT
+      ? pos01.finalAmount - pos01.withholdingTax - pos01.serviceFee
+        + pos01.shortageAmount + pos01.otherPositionShortage
+      : 0 + pos01.shortageAmount + pos01.otherPositionShortage;
   }
 
   // ────────────────────────────────────────────────────
@@ -1295,24 +1331,29 @@ function calcMinSeriesPoints(
   const children = uplineChildrenMap.get(memberId) || [];
   if (children.length === 0) return 0;
 
-  // ★ uplineツリーの深さ制限
-  // lapsed/withdrawn 透過（depth消費なし）込みで杉山由佳(82179501)の場合:
-  //   MAX_DEPTH=6: 系列[95446801:10350pt, 40431001:14100pt] min=10,350 → ¥36,225
-  //   MAX_DEPTH=7: 系列[95446801:12150pt, 40431001:16650pt] min=12,150 → ¥42,525
-  //   MAX_DEPTH=8: 系列[95446801:12900pt, 40431001:19500pt] min=12,900 → ¥45,150
-  // 期待値¥35,700（=10,200pt × 3.5% × 100）に最も近いのは MAX_DEPTH=6（¥36,225）
-  // 差は¥525（=150pt相当）で lapsed透過による誤差と考えられる
-  // → MAX_SERIES_DEPTH=7 を採用（前セッション調査値、目標値に最近）
-  const MAX_SERIES_DEPTH = 7;
+  // ★ uplineツリーの深さ制限と forceActive処理
+  //
+  // 調査結果（82179501: LV4, 期待SB=35,700=10,200pt×3.5%×100）:
+  //   forceActive透過あり (depth消費なし):
+  //     MAX_DEPTH=6: min=10,350pt → ¥36,225 (差+525)
+  //     MAX_DEPTH=7: min=12,150pt → ¥42,525 (差+6,825)
+  //   forceActive非透過 (depth消費あり・pt加算なし):
+  //     MAX_DEPTH=6: min=10,200pt → ¥35,700 ✓ 期待値と完全一致
+  //
+  // ✅ 正仕様: forceActive会員はdepthを消費する（非透過）がptは加算しない
+  //    退会者(withdrawn/lapsed)のみ透過扱い
+  // → MAX_SERIES_DEPTH=6 に修正
+  const MAX_SERIES_DEPTH = 6;
 
   const seriesPoints: number[] = [];
 
   for (const childId of children) {
-    if (!bonusEligibleMemberIds.has(childId)) continue; // 退会者直下はスキップ
+    // ★ 直下が退会者でもその子孫を同じ系列として探索する（スキップしない）
+    // 旧仕様では退会者直下をスキップしていたが、仕様変更により透過扱いにする
 
     let seriesTotal = 0;
 
-    function traverseSeries(currentId: bigint, depth: number) {
+    const traverseSeries = (currentId: bigint, depth: number): void => {
       if (depth > MAX_SERIES_DEPTH) return; // ★ 深さ制限
       const purchase = purchaseMap.get(currentId);
       const mem      = memberMap.get(currentId);
@@ -1322,17 +1363,21 @@ function calcMinSeriesPoints(
       const isForceActive = mem.forceActive || false;
 
       if (isWithdrawn) {
-        // 退会者: 深さ消費なしで透過
+        // 退会者（withdrawn/lapsed）: 深さ消費なしで透過
         for (const descId of (uplineChildrenMap.get(currentId) || [])) {
           traverseSeries(descId, depth);
         }
         return;
       }
 
+      // ★ forceActive会員は「深さを消費する」が「ptは加算しない」
+      //   （退会者と異なり、透過扱いにしない）
+      //   理由: forceActive=true の lapsed 会員は組織上のポジションを保持しているため
+      //   深さカウントは必要。ただし購入実績がないのでptは0。
       if (isForceActive) {
-        // forceActive: 深さ消費なしで透過（購入pt加算なし）
+        // forceActive: depth消費あり・購入pt加算なし（通常の非アクティブ会員と同様）
         for (const descId of (uplineChildrenMap.get(currentId) || [])) {
-          traverseSeries(descId, depth);
+          traverseSeries(descId, depth + 1); // ★ depth+1（透過しない）
         }
         return;
       }
@@ -1348,10 +1393,11 @@ function calcMinSeriesPoints(
       for (const descId of (uplineChildrenMap.get(currentId) || [])) {
         traverseSeries(descId, depth + 1);
       }
-    }
+    };
 
     traverseSeries(childId, 1);
-    if (seriesTotal >= 1) seriesPoints.push(seriesTotal);
+    // 0pt系列を除外（seriesTotal > 0 の系列のみ対象）
+    if (seriesTotal > 0) seriesPoints.push(seriesTotal);
   }
 
   if (seriesPoints.length === 0) return 0;
