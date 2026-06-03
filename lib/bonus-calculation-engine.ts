@@ -801,7 +801,10 @@ export async function executeBonusCalculation(
   const baseCodeMap = new Map<string, typeof results[0][]>();
   for (const r of results) {
     const mc = (memberMap.get(r.mlmMemberId) as any).memberCode as string;
-    const baseCode = mc.includes("-") ? mc.replace(/-\d+$/, "") : mc;
+    // baseCode: ハイフン付き(123456-01)→先頭6桁、ハイフンなし8桁(86820601)→先頭6桁
+    const baseCode = mc.includes("-")
+      ? mc.replace(/-\d+$/, "")
+      : mc.length >= 8 ? mc.slice(0, 6) : mc;
     if (!baseCodeMap.has(baseCode)) baseCodeMap.set(baseCode, []);
     baseCodeMap.get(baseCode)!.push(r);
   }
@@ -810,7 +813,9 @@ export async function executeBonusCalculation(
     if (positions.length <= 1) continue;
     const pos01 = positions.find((r) => {
       const mc = (memberMap.get(r.mlmMemberId) as any).memberCode as string;
-      return mc.endsWith("-01") || !mc.includes("-");
+      // 01ポジション判定: ハイフン付きなら-01末尾、ハイフンなし8桁なら末尾2桁が01
+      if (mc.includes("-")) return mc.endsWith("-01");
+      return mc.length >= 8 ? mc.slice(-2) === "01" : true;
     });
     if (!pos01) continue;
 
@@ -841,9 +846,14 @@ export async function executeBonusCalculation(
       : 0 + pos01.shortageAmount + pos01.otherPositionShortage;
   }
 
-  // 支払対象者数を集計
-  const payTargetCount = results.filter(r => r.amountBeforeAdjustment >= MIN_PAYOUT_THRESHOLD).length;
-  console.log(`💰 支払対象者数: ${payTargetCount}名（控除前≥¥${MIN_PAYOUT_THRESHOLD}）`);
+  // 支払対象者数を集計（01ポジションのみカウント）
+  // 非01ポジション(02-06)は01に合算済みなのでカウントしない
+  const payTargetCount = results.filter(r => {
+    const mc = (memberMap.get(r.mlmMemberId) as any).memberCode as string;
+    const isFirstPos = mc.includes("-") ? mc.endsWith("-01") : (mc.length >= 8 ? mc.slice(-2) === "01" : true);
+    return isFirstPos && r.amountBeforeAdjustment >= MIN_PAYOUT_THRESHOLD;
+  }).length;
+  console.log(`💰 支払対象者数: ${payTargetCount}名（控除前≥¥${MIN_PAYOUT_THRESHOLD}、01ポジションのみ）`);
 
   // ────────────────────────────────────────────────────
   // 9. データベースに保存
@@ -1225,16 +1235,13 @@ function calcMinSeriesPointsDetail(
   const children = uplineChildrenMap.get(memberId) || [];
   if (children.length === 0) return { minPt: 0, seriesCount: 0, seriesPtList: [] };
 
-  // ★ MAX_SERIES_DEPTH = 6（Fix11確定値）
-  const MAX_SERIES_DEPTH = 6;
-
+  // 組織構築B: 段数制限なし（仕様書「段数制限なし」準拠）
   const seriesPoints: number[] = [];
 
   for (const childId of children) {
     let seriesTotal = 0;
 
     const traverseSeries = (currentId: bigint, depth: number): void => {
-      if (depth > MAX_SERIES_DEPTH) return;
       const purchase = purchaseMap.get(currentId);
       const mem      = memberMap.get(currentId);
       if (!mem) return;

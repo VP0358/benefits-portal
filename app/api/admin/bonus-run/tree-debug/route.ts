@@ -236,7 +236,7 @@ export async function GET(req: NextRequest) {
   }
 
   // ── SB trace ──
-  const MAX_SERIES_DEPTH = 6;
+  // 組織構築B: 段数制限なし（仕様書準拠）
   const directChildren = uplineChildrenMap.get(target.id) || [];
   const seriesDetailMap: Record<string, { total: number; members: { depth: number; memberCode: string; selfPt: number; active: boolean; withdrawn: boolean; forceActive: boolean }[] }> = {};
 
@@ -247,7 +247,7 @@ export async function GET(req: NextRequest) {
     const seriesMembers: { depth: number; memberCode: string; selfPt: number; active: boolean; withdrawn: boolean; forceActive: boolean }[] = [];
 
     function traverseSeries(currentId: bigint, depth: number) {
-      if (depth > MAX_SERIES_DEPTH) return;
+      // 段数制限なし
       const mem      = memberMap.get(currentId);
       const purchase = purchaseMap.get(currentId);
       if (!mem) return;
