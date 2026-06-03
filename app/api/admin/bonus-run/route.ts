@@ -5,7 +5,7 @@ export const revalidate = 0
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { executeBonusCalculation } from "@/lib/bonus-calculation-engine";
+import { executeBonusCalculationV1 } from "@/lib/bonus-calculation-engine-v1";
 
 /**
  * GET /api/admin/bonus-run?bonusMonth=2026-02
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
       paymentAdjustmentRate != null && Number(paymentAdjustmentRate) > 0
         ? Number(paymentAdjustmentRate) / 100
         : null;
-    const result = await executeBonusCalculation(bonusMonth, rateDecimal);
+    const result = await executeBonusCalculationV1(bonusMonth, rateDecimal);
 
     return NextResponse.json({
       success: true,

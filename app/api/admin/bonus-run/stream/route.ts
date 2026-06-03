@@ -9,7 +9,7 @@ export const maxDuration = 300
 import { NextRequest } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { executeBonusCalculationWithProgress } from "@/lib/bonus-calculation-engine";
+import { executeBonusCalculationV1WithProgress } from "@/lib/bonus-calculation-engine-v1";
 
 /**
  * GET /api/admin/bonus-run/stream?bonusMonth=2026-04&paymentAdjustmentRate=2
@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
       }, 15000);
 
       try {
-        const result = await executeBonusCalculationWithProgress(
+        const result = await executeBonusCalculationV1WithProgress(
           bonusMonth,
           rateDecimal,
           (step: string) => {
