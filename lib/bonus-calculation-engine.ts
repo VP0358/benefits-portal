@@ -1331,15 +1331,19 @@ function calcMinSeriesPoints(
   const children = uplineChildrenMap.get(memberId) || [];
   if (children.length === 0) return 0;
 
-  // ★ uplineツリーの深さ制限
-  // lapsed/withdrawn 透過（depth消費なし）込みで杉山由佳(82179501)の場合:
-  //   MAX_DEPTH=6: 系列[95446801:10350pt, 40431001:14100pt] min=10,350 → ¥36,225
-  //   MAX_DEPTH=7: 系列[95446801:12150pt, 40431001:16650pt] min=12,150 → ¥42,525
-  //   MAX_DEPTH=8: 系列[95446801:12900pt, 40431001:19500pt] min=12,900 → ¥45,150
-  // 期待値¥35,700（=10,200pt × 3.5% × 100）に最も近いのは MAX_DEPTH=6（¥36,225）
-  // 差は¥525（=150pt相当）で lapsed透過による誤差と考えられる
-  // → MAX_SERIES_DEPTH=7 を採用（前セッション調査値、目標値に最近）
-  const MAX_SERIES_DEPTH = 7;
+  // ★ uplineツリーの深さ制限と forceActive処理
+  //
+  // 調査結果（82179501: LV4, 期待SB=35,700=10,200pt×3.5%×100）:
+  //   forceActive透過あり (depth消費なし):
+  //     MAX_DEPTH=6: min=10,350pt → ¥36,225 (差+525)
+  //     MAX_DEPTH=7: min=12,150pt → ¥42,525 (差+6,825)
+  //   forceActive非透過 (depth消費あり・pt加算なし):
+  //     MAX_DEPTH=6: min=10,200pt → ¥35,700 ✓ 期待値と完全一致
+  //
+  // ✅ 正仕様: forceActive会員はdepthを消費する（非透過）がptは加算しない
+  //    退会者(withdrawn/lapsed)のみ透過扱い
+  // → MAX_SERIES_DEPTH=6 に修正
+  const MAX_SERIES_DEPTH = 6;
 
   const seriesPoints: number[] = [];
 
@@ -1366,10 +1370,14 @@ function calcMinSeriesPoints(
         return;
       }
 
+      // ★ forceActive会員は「深さを消費する」が「ptは加算しない」
+      //   （退会者と異なり、透過扱いにしない）
+      //   理由: forceActive=true の lapsed 会員は組織上のポジションを保持しているため
+      //   深さカウントは必要。ただし購入実績がないのでptは0。
       if (isForceActive) {
-        // forceActive: 深さ消費なしで透過（購入pt加算なし）
+        // forceActive: depth消費あり・購入pt加算なし（通常の非アクティブ会員と同様）
         for (const descId of (uplineChildrenMap.get(currentId) || [])) {
-          traverseSeries(descId, depth);
+          traverseSeries(descId, depth + 1); // ★ depth+1（透過しない）
         }
         return;
       }

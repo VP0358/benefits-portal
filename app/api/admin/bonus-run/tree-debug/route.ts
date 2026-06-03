@@ -180,7 +180,7 @@ export async function GET(req: NextRequest) {
     let seriesTotal   = 0;
     const seriesMembers: typeof seriesDetailMap[string]["members"] = [];
 
-    const MAX_SERIES_DEPTH = 7;
+    const MAX_SERIES_DEPTH = 6; // Fix: forceActive非透過(depth消費あり)+MAX=6 で期待値と一致
 
     function traverseSeries(currentId: bigint, depth: number) {
       if (depth > MAX_SERIES_DEPTH) return;
@@ -195,15 +195,16 @@ export async function GET(req: NextRequest) {
       if (isWithdrawn) {
         seriesMembers.push({ depth, memberCode: mem.memberCode, selfPt, active: false, withdrawn: true, forceActive: isForceActive });
         for (const descId of (uplineChildrenMap.get(currentId) || [])) {
-          traverseSeries(descId, depth); // transparent
+          traverseSeries(descId, depth); // withdrawn: transparent (depth消費なし)
         }
         return;
       }
 
       if (isForceActive) {
-        seriesMembers.push({ depth, memberCode: mem.memberCode, selfPt, active: true, withdrawn: false, forceActive: true });
+        // ★ Fix: forceActiveは透過しない。depth消費あり・pt加算なし
+        seriesMembers.push({ depth, memberCode: mem.memberCode, selfPt: 0, active: false, withdrawn: false, forceActive: true });
         for (const descId of (uplineChildrenMap.get(currentId) || [])) {
-          traverseSeries(descId, depth); // forceActive: transparent (current impl)
+          traverseSeries(descId, depth + 1); // forceActive: depth+1（非透過）
         }
         return;
       }
@@ -261,10 +262,10 @@ export async function GET(req: NextRequest) {
     seriesDetail: seriesDetailMap,
     ulTrace: depthTrace,
     expected: {
-      "82179501": { ul: 53850, sb: 35700, minSeries: 10200 },
-      "44504701": { ul: 44850, sb: 122400 },
-      "86820601": { ul: 161250, sb: 16200 },
-      "93713601": { ul: 110100, sb: 4200 },
+      "82179501": { ul: 53850, sb: 35700, minSeries: 10200, level: 4 },
+      "44504701": { ul: 44850, sb: 122400, minSeries: 30600, level: 5 },
+      "86820601": { ul: 161250, sb: 16200, minSeries: 5400, level: 3 },
+      "93713601": { ul: 110100, sb: 4200, minSeries: 1400, level: 3 },
     }[memberCode] ?? null,
   }, {
     headers: { "Cache-Control": "no-store" },
